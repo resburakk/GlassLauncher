@@ -375,13 +375,17 @@ internal fun FolderIcon(
     strength: Float,
     page: Int = 0,
 ) {
-    val pad = icon * 0.10f
-    val gap = icon * 0.04f
-    val mini = (icon - pad * 2f - gap * 2f) / 3f
+    // Mini simgeler kutunun %20'si, aralarında %3 boşluk; 3×3 blok kutunun ortasında toplu durur.
+    val mini = icon * 0.20f
+    val gap = icon * 0.03f
+    val block = mini * 3f + gap * 2f
     val pageCount = (folder.keys.size + 8) / 9
     val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
-    Box(Modifier.size(icon).liquidGlass(RoundedCornerShape(icon * 0.225f), strength * 0.8f, 2.dp)) {
-        Column(Modifier.padding(pad), verticalArrangement = Arrangement.spacedBy(gap)) {
+    Box(
+        Modifier.size(icon).liquidGlass(RoundedCornerShape(icon * 0.225f), strength * 0.8f, 2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(Modifier.size(block), verticalArrangement = Arrangement.spacedBy(gap)) {
             shown.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                     row.forEach { k ->
