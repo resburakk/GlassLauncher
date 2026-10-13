@@ -42,7 +42,6 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
 adb shell input swipe $((W*2/10)) $cy $((W*8/10)) $cy 250; step "önceki sayfa"
 adb shell input swipe $cx $((H*40/100)) $cx $((H*70/100)) 300; step "arama" 2
-adb shell log -t GlassDiag "t=$(adb shell cat /proc/uptime | cut -d. -f1)s shot 05-arama"
 shot 05-arama
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 
@@ -55,7 +54,6 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 200; sleep 1; done
 shot 07a-arsiv-hemen
 step "arşiv" 3
-adb shell log -t GlassDiag "t=$(adb shell cat /proc/uptime | cut -d. -f1)s shot 07-arsiv"
 shot 07-arsiv
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 
@@ -70,7 +68,7 @@ shot 09-ayarlar
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
 adb logcat -d > logcat.txt
-grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | awk '!s[$0]++' | head -30 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
+grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -12 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
   grep -A45 "FATAL EXCEPTION" logcat.txt | head -60 | sed 's/^.*AndroidRuntime: //' | while IFS= read -r line; do
     echo "::error::CRASH ${line//$'%'/%25}"
