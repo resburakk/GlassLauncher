@@ -360,6 +360,13 @@ fun LibraryGroupOverlay(
         val icon = minOf(LocalHomeMetrics.current?.icon ?: (pitch * 0.72f), pitch * 0.92f)
         val rowH = icon + 26.dp
         val maxGridH = maxHeight * 0.6f
+        // Ad, ana ekrandaki klasörle aynı biçimde panelin ÜSTÜNDE; etiket stili dışarıdaki etiketle aynı.
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            group.title,
+            style = CellLabelStyle.copy(fontSize = (settings.labelSize * u.value).sp),
+            modifier = Modifier.width(panelW).padding(bottom = u * 14f),
+        )
         Column(
             Modifier
                 .width(panelW)
@@ -376,12 +383,6 @@ fun LibraryGroupOverlay(
                 .padding(top = u * 29f, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Açık klasörün adı, klasörün dışındaki etiketle aynı stilde.
-            Text(
-                group.title,
-                style = CellLabelStyle.copy(fontSize = (settings.labelSize * u.value).sp),
-                modifier = Modifier.padding(bottom = u * 16f),
-            )
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
                 modifier = Modifier.fillMaxWidth().height(minOf(rowH * ((group.apps.size + 3) / 4), maxGridH)),
@@ -399,6 +400,7 @@ fun LibraryGroupOverlay(
                     }
                 }
             }
+        }
         }
     }
 }
