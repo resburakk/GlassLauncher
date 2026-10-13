@@ -375,15 +375,13 @@ fun HomeScreen(
             }
     ) {
         // İçerik katmanı kaydedilir: üstteki menü/düğmeler bunu bulanıklaştırıp yalnızca kendi arkalarında gösterir.
-        val contentLayer = rememberGraphicsLayer()
+        val glassRegions = remember { GlassRegions() }
         val maxBlurPx = with(density) { 22.dp.toPx() }
         Box(
             Modifier
                 .fillMaxSize()
-                .drawWithContent {
-                    contentLayer.record { this@drawWithContent.drawContent() }
-                    drawLayer(contentLayer)
-                }
+                // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
+                .glassRegionBlur(glassRegions)
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
@@ -422,7 +420,7 @@ fun HomeScreen(
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
 
-        CompositionLocalProvider(LocalContentBackdrop provides contentLayer) {
+        CompositionLocalProvider(LocalGlassRegions provides glassRegions) {
 
         AnimatedVisibility(
             overlay == Overlay.Search,
@@ -629,7 +627,7 @@ fun HomeScreen(
 @Composable
 internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onClick: () -> Unit) {
     Box(Modifier.height(height), contentAlignment = Alignment.Center) {
-    BlurBackdrop(CircleShape, Modifier.matchParentSize())
+    BlurBackdrop(height / 2f, Modifier.matchParentSize())
     Box(
         Modifier
             .height(height)

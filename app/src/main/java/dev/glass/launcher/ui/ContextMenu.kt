@@ -162,7 +162,7 @@ fun ContextMenuOverlay(
             modifier = Modifier.fillMaxSize(),
             content = {
                 Box(Modifier.width(250.dp)) {
-                BlurBackdrop(RoundedCornerShape(22.dp), Modifier.matchParentSize())
+                BlurBackdrop(22.dp, Modifier.matchParentSize())
                 Column(
                     Modifier
                         .width(250.dp)

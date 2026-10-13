@@ -37,6 +37,14 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import dev.glass.launcher.data.Blurred
@@ -92,7 +100,7 @@ fun Modifier.liquidGlass(
     val look = LocalGlass.current
     val s = strength
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
-    val content = if (panel && !look.reduced) LocalContentBackdrop.current else null
+    val content = if (panel && !look.reduced) LocalGlassRegions.current else null
     val bd = if (look.reduced || content != null) null else look.backdrop
     // Gerçek bulanıklık varken dolgu daha ince tutulur; cam arkasındaki renkleri göstersin.
     val fill = if (bd != null || content != null) 0.55f else 1f
@@ -219,24 +227,50 @@ fun SearchGlyph(color: Color, glyphSize: Dp) {
 }
 
 /**
- * Bir menünün/düğmenin YALNIZCA kendi arkasını gerçekten bulanıklaştırır: kayıtlı launcher içeriğini bu
- * kutunun konumuna kaydırarak çizer ve kutunun kendi katmanına bulanıklık efekti uygular. Panelin arkasına
- * (aynı boyutta, [shape] ile) yerleştirilir; panelin kendi içeriği bulanıklaşmaz.
+ * Yalnızca kendi arkası bulanık olması gereken küçük cam yüzeylerin (menü, düğme) ekrandaki yuvarlak
+ * köşeli alanları. Launcher içeriği, kendi çiziminde bulanık bir kopyasını yalnızca bu alanlara çizer.
+ */
+class GlassRegions {
+    val regions = mutableStateMapOf<Any, RoundRect>()
+}
+
+val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
+
+/**
+ * Bir menünün/düğmenin YALNIZCA kendi arkasını gerçekten bulanıklaştırır (ekranın geri kalanı net kalır).
+ * Panelin arkasına aynı boyutta yerleştirilir; kendi alanını [GlassRegions]'a kaydeder.
  */
 @Composable
-fun BlurBackdrop(shape: Shape, modifier: Modifier = Modifier, radius: Dp = 24.dp) {
-    val content = LocalContentBackdrop.current ?: return
+fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
+    val reg = LocalGlassRegions.current ?: return
     if (LocalGlass.current.reduced) return
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    val r = with(LocalDensity.current) { radius.toPx() }
+    val key = remember { Any() }
+    val cr = with(LocalDensity.current) { corner.toPx() }
+    DisposableEffect(reg, key) { onDispose { reg.regions.remove(key) } }
     Box(
-        modifier
-            .onGloballyPositioned { origin = it.positionInRoot() }
-            .graphicsLayer {
-                renderEffect = BlurEffect(r, r, TileMode.Clamp)
-                this.shape = shape
-                clip = true
-            }
-            .drawBehind { translate(-origin.x, -origin.y) { drawLayer(content) } }
+        modifier.onGloballyPositioned { c ->
+            val b = c.boundsInRoot()
+            reg.regions[key] = RoundRect(b, CornerRadius(cr.coerceAtMost(minOf(b.width, b.height) / 2f)))
+        }
     )
+}
+
+/**
+ * İçerik katmanına uygulanır: içeriği net çizer, ardından [GlassRegions]'daki alanlara içeriğin bulanık
+ * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
+ */
+fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 24.dp): Modifier = composed {
+    val blurLayer = rememberGraphicsLayer()
+    val r = with(LocalDensity.current) { radius.toPx() }
+    val reduced = LocalGlass.current.reduced
+    this.drawWithContent {
+        drawContent()
+        val list = reg.regions.values
+        if (reduced || list.isEmpty()) return@drawWithContent
+        blurLayer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
+        blurLayer.record { this@drawWithContent.drawContent() }
+        list.forEach { rr ->
+            clipPath(Path().apply { addRoundRect(rr) }) { drawLayer(blurLayer) }
+        }
+    }
 }
