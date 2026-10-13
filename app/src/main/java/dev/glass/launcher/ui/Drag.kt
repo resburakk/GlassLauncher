@@ -382,7 +382,8 @@ internal fun FolderIcon(
     val pageCount = (folder.keys.size + 8) / 9
     val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
     Box(
-        Modifier.size(icon).liquidGlass(RoundedCornerShape(icon * 0.225f), strength * 0.8f, 2.dp),
+        // Gölgesiz: yarı saydam camın altındaki gölge içeriden kare gibi görünüyordu.
+        Modifier.size(icon).liquidGlass(RoundedCornerShape(icon * 0.225f), strength * 0.8f, 0.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.size(block), verticalArrangement = Arrangement.spacedBy(gap)) {
