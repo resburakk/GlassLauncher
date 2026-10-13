@@ -66,7 +66,7 @@ shot 09-ayarlar
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
 adb logcat -d > logcat.txt
-grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -5 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
+grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -12 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
   grep -A45 "FATAL EXCEPTION" logcat.txt | head -60 | sed 's/^.*AndroidRuntime: //' | while IFS= read -r line; do
     echo "::error::CRASH ${line//$'%'/%25}"

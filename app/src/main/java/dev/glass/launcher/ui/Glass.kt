@@ -263,9 +263,14 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 24.dp): Modifier = 
     val blurLayer = rememberGraphicsLayer()
     val r = with(LocalDensity.current) { radius.toPx() }
     val reduced = LocalGlass.current.reduced
+    val lastLogged = remember { intArrayOf(-1) }
     this.drawWithContent {
         drawContent()
         val list = reg.regions.values
+        if (list.size != lastLogged[0]) {
+            lastLogged[0] = list.size
+            android.util.Log.i("GlassDiag", "regionBlur draw regions=${list.size} reduced=$reduced size=$size first=${list.firstOrNull()}")
+        }
         if (reduced || list.isEmpty()) return@drawWithContent
         blurLayer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
         blurLayer.record { this@drawWithContent.drawContent() }
