@@ -45,7 +45,7 @@ sleep 1.5
 adb shell input motionevent UP $jx $iy; step "klasör oluştur" 2
 adb shell input keyevent KEYCODE_BACK; step "geri" 2
 shot 04a-surukle-sonrasi
-adb shell input tap $jx $iy; step "klasör" 2
+adb shell input tap $ix $iy; step "klasör" 2
 shot 04b-klasor
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
