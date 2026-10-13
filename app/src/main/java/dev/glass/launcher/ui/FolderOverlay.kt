@@ -161,7 +161,7 @@ fun FolderOverlay(
                 // gölge içeriden koyu bir kare gibi görünüyordu).
                 .clip(panelShape)
                 .background(
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.20f), Color.White.copy(alpha = 0.12f)))
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
                 )
                 .border(
                     1.2.dp,
