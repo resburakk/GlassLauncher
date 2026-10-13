@@ -166,7 +166,8 @@ internal fun HomeContent(
                 return@LaunchedEffect
             }
             val cell = targetCell ?: return@LaunchedEffect // klasör hedefi üzerinde: düzen sabit kalır
-            delay((140 / motion.speed).toLong())
+            // Kısa bekleme: simge merkezine (klasör hedefine) yönelen parmak düzeni hemen bozmasın.
+            delay((260 / motion.speed).toLong())
             val cur = vm.layout.value
             val without = cur.items.filter { it.id != dragKey }
             if (cell.page < 0) {
