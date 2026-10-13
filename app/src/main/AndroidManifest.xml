@@ -47,7 +47,6 @@
             android:resumeWhilePausing="true"
             android:taskAffinity=""
             android:excludeFromRecents="true"
-            android:screenOrientation="unspecified"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|fontScale|density"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
