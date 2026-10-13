@@ -84,6 +84,9 @@ data class LauncherSettings(
     val glassRimGlow: Float = 1f,
     /** Cam dolgusunun yoğunluğu; düşük = daha saydam (çarpan). */
     val glassOpacity: Float = 1f,
+    /** Dock üstündeki "Ara" düğmesinin yazı boyutu (pt) ve kalınlığı (300–700). */
+    val pillTextSize: Float = 14f,
+    val pillTextWeight: Float = 600f,
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
@@ -137,6 +140,8 @@ data class LauncherSettings(
         glassBrightness = glassBrightness.coerceIn(-1f, 1f),
         glassRimGlow = glassRimGlow.coerceIn(0f, 2f),
         glassOpacity = glassOpacity.coerceIn(0f, 2f),
+        pillTextSize = pillTextSize.coerceIn(9f, 24f),
+        pillTextWeight = pillTextWeight.coerceIn(300f, 700f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -157,6 +162,7 @@ data class LauncherSettings(
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
         put("glassBlur", glassBlur.toDouble()); put("glassBrightness", glassBrightness.toDouble())
         put("glassRimGlow", glassRimGlow.toDouble()); put("glassOpacity", glassOpacity.toDouble())
+        put("pillTextSize", pillTextSize.toDouble()); put("pillTextWeight", pillTextWeight.toDouble())
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary)
         put("metricsVersion", METRICS_VERSION)
@@ -222,6 +228,8 @@ data class LauncherSettings(
                 glassBrightness = f("glassBrightness", d.glassBrightness),
                 glassRimGlow = f("glassRimGlow", d.glassRimGlow),
                 glassOpacity = f("glassOpacity", d.glassOpacity),
+                pillTextSize = f("pillTextSize", d.pillTextSize),
+                pillTextWeight = f("pillTextWeight", d.pillTextWeight),
                 dockCorner = f("dockCorner", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),

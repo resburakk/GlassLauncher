@@ -495,7 +495,9 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: Float, onClick: (
         SearchGlyph(Color.White, m.pt * 13f * k)
         Spacer(Modifier.width(m.pt * 5f * k))
         Text(
-            "Ara", color = Color.White, fontSize = (14f * pt * k).sp, fontWeight = FontWeight.SemiBold,
+            "Ara", color = Color.White,
+            fontSize = (LocalLauncherSettings.current.pillTextSize * pt * k).sp,
+            fontWeight = fontWeightOf(LocalLauncherSettings.current.pillTextWeight),
             style = LocalTextStyle.current.copy(shadow = IosTextShadow),
         )
     }

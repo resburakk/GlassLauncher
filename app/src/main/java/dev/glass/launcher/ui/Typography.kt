@@ -1,5 +1,6 @@
 package dev.glass.launcher.ui
 
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -31,3 +32,15 @@ val AppFont: FontFamily = FontFamily(
  * (keskin bir kenar oluşturmaz; açık duvar kâğıtlarında okunurluğu korur).
  */
 val IosTextShadow = Shadow(color = Color(0x59000000), offset = Offset(0f, 2f), blurRadius = 12f)
+
+/** Ayardaki kalınlık değerini (300–700) en yakın font kalınlığına yuvarlar. */
+fun fontWeightOf(w: Float): FontWeight = FontWeight(((w / 100f).roundToInt() * 100).coerceIn(100, 900))
+
+/** Ayar ekranında kalınlık adı. */
+fun fontWeightName(w: Float): String = when (((w / 100f).roundToInt() * 100)) {
+    300 -> "İnce"
+    400 -> "Normal"
+    500 -> "Orta"
+    600 -> "Yarı kalın"
+    else -> "Kalın"
+}

@@ -76,6 +76,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Icons("Simgeler", Glyph.Edit, Color(0xFF5E5CE6)),
     Dock("Dock", Glyph.Widget, Color(0xFF32ADE6)),
     Folders("Klasörler", Glyph.Folder, Color(0xFF64D2FF)),
+    Fonts("Yazı Tipi", Glyph.Pencil, Color(0xFFFF9F0A)),
     Glass("Liquid Glass", Glyph.Search, Color(0xFF30B0C7)),
     Wallpaper("Duvar Kâğıdı", Glyph.Wallpaper, Color(0xFF34C759)),
     Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
@@ -146,6 +147,7 @@ fun SettingsScreen(
                         SettingsPage.Icons -> IconsPage(s, onChange)
                         SettingsPage.Dock -> DockPage(s, onChange)
                         SettingsPage.Folders -> FoldersPage(s, onChange)
+                        SettingsPage.Fonts -> FontsPage(s, onChange)
                         SettingsPage.Glass -> GlassPage(s, onChange)
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
@@ -172,7 +174,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
         Footer("Home tuşunun Glass Launcher'ı açması için gereklidir. Uygulama kısayolları da yalnızca varsayılan ana ekranda çalışır.")
     }
     val groups = listOf(
-        listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders),
+        listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders, SettingsPage.Fonts),
         listOf(SettingsPage.Glass, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
         listOf(SettingsPage.Widgets, SettingsPage.Library),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
@@ -200,6 +202,11 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         RowDivider()
         SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f) { v -> onChange { it.copy(vSpacing = v) } }
     }
+    Footer("Uygulama adlarının yazı ayarları \"Yazı Tipi\" sayfasında.")
+}
+
+@Composable
+private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group("Uygulama adları") {
         ToggleRow("Adları göster", s.showLabels) { v -> onChange { it.copy(showLabels = v) } }
         RowDivider()
@@ -209,6 +216,21 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
             onChange { it.copy(labelSize = v) }
         }
     }
+    Group("Arama düğmesi (dock üstü)") {
+        SliderRow("Yazı boyutu", "${s.pillTextSize.roundToInt()} pt", s.pillTextSize, 9f..24f) { v ->
+            onChange { it.copy(pillTextSize = v) }
+        }
+        RowDivider()
+        SliderRow("Yazı kalınlığı", fontWeightName(s.pillTextWeight), s.pillTextWeight, 300f..700f) { v ->
+            onChange { it.copy(pillTextWeight = v) }
+        }
+    }
+    Group("Klasörler") {
+        SliderRow("Açık klasör adı boyutu", "${s.openFolderTitleSize.roundToInt()} pt", s.openFolderTitleSize, 10f..40f) { v ->
+            onChange { it.copy(openFolderTitleSize = v) }
+        }
+    }
+    Footer("Yazı tipi: Inter (SF Pro'ya en yakın açık lisanslı yazı tipi).")
 }
 
 private val TintPalette = listOf(
@@ -313,10 +335,6 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
         RowDivider()
         SliderRow("Arşiv açık klasör köşesi", "${s.libraryGroupCorner.roundToInt()} pt", s.libraryGroupCorner, 8f..80f) { v ->
             onChange { it.copy(libraryGroupCorner = v) }
-        }
-        RowDivider()
-        SliderRow("Açık klasör adı boyutu", "${s.openFolderTitleSize.roundToInt()} pt", s.openFolderTitleSize, 10f..40f) { v ->
-            onChange { it.copy(openFolderTitleSize = v) }
         }
     }
     Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")
