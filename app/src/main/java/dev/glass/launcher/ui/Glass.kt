@@ -292,7 +292,8 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
  */
 fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = composed {
     // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
-    val node = remember { android.graphics.RenderNode("glassRegionBlur") }
+    val node = remember { android.graphics.RenderNode("glassRegionContent") }
+    val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
     val r = with(LocalDensity.current) { radius.toPx() }
     val reduced = LocalGlass.current.reduced
     val effect = remember(r) {
@@ -306,7 +307,6 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
         val w = size.width.toInt(); val h = size.height.toInt()
         if (w <= 0 || h <= 0) return@drawWithContent
         node.setPosition(0, 0, w, h)
-        node.setRenderEffect(effect)
         val rc = node.beginRecording(w, h)
         val prev = drawContext.canvas
         try {
@@ -316,12 +316,17 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
             drawContext.canvas = prev
             node.endRecording()
         }
+        // İki katman: bulanıklık, içerik düğümünü saran ayrı düğümde (Haze kütüphanesindeki gibi).
+        blurNode.setPosition(0, 0, w, h)
+        blurNode.setRenderEffect(effect)
+        blurNode.beginRecording(w, h).also { it.drawRenderNode(node) }
+        blurNode.endRecording()
         drawIntoCanvas { c ->
             val nc = c.nativeCanvas
             list.forEach { rr ->
                 nc.save()
                 nc.clipPath(Path().apply { addRoundRect(rr) }.asAndroidPath())
-                nc.drawRenderNode(node)
+                nc.drawRenderNode(blurNode)
                 nc.drawColor(0x40FF0000)
                 nc.restore()
             }
