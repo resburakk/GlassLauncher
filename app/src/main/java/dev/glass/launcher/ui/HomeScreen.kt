@@ -6,6 +6,14 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.PowerManager
 import androidx.activity.compose.BackHandler
+import android.provider.Settings
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalConfiguration
+import dev.glass.launcher.data.SwipeAction
+import dev.glass.launcher.service.LockService
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -82,7 +90,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.glass.launcher.data.FolderItem
 import kotlin.math.roundToInt
 
-enum class Overlay { None, Search, Control, Settings, Folder, Menu, Group, Widgets }
+enum class Overlay { None, Search, Control, Settings, Folder, Menu, Group, Widgets, LockPrompt }
 
 /**
  * Ana ekran katmanları arasında köprü: bırakma işlemi ve sayfa geçişleri ana ekran içeriğinde
@@ -134,6 +142,7 @@ fun HomeScreen(
     var group by remember { mutableStateOf<LibraryGroup?>(null) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     val overlayNow by rememberUpdatedState(overlay)
+    val settingsNow by rememberUpdatedState(settings)
     val editNow by rememberUpdatedState(editMode)
 
     val blur by animateDpAsState(if (overlay == Overlay.None) 0.dp else 22.dp, motion.tween(260), label = "blur")
@@ -193,6 +202,7 @@ fun HomeScreen(
     }
 
     val density = LocalDensity.current
+    val context = LocalContext.current
     val topInsetPx = WindowInsets.statusBars.getTop(density)
     val topZonePx = topInsetPx + with(density) { 72.dp.toPx() }
     val suggestions = remember(recents, allApps) { (recents + allApps).distinctBy { it.key }.take(4) }
@@ -226,6 +236,7 @@ fun HomeScreen(
     CompositionLocalProvider(
         LocalLauncherSettings provides settings,
         LocalMotion provides motion,
+        LocalPt provides HomeMetrics.pt(LocalConfiguration.current.screenWidthDp.dp),
         LocalGlass provides GlassLook(
             dark = dark,
             reduced = reduced,
@@ -270,6 +281,15 @@ fun HomeScreen(
                 )
             }
             .onSizeChanged { rootSize = it }
+            // Boş alana çift dokunma: ekranı kilitle (ayarlardan kapatılabilir).
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = {
+                    val st = settingsNow
+                    if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && st.doubleTapLock) {
+                        if (!LockService.lock()) overlay = Overlay.LockPrompt
+                    }
+                })
+            }
             .pointerInput(topZonePx) {
                 var startY = 0f
                 var total = 0f
@@ -277,7 +297,13 @@ fun HomeScreen(
                     onDragStart = { startY = it.y; total = 0f },
                     onDragEnd = {
                         if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && total > 80.dp.toPx()) {
-                            overlay = if (startY < topZonePx) Overlay.Control else Overlay.Search
+                            // Hangi hareketin ne açacağı Ayarlar > Hareketler'den seçilir.
+                            val action = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
+                            when (action) {
+                                SwipeAction.ControlCenter -> overlay = Overlay.Control
+                                SwipeAction.Search -> overlay = Overlay.Search
+                                SwipeAction.None -> Unit
+                            }
                         }
                         total = 0f
                     },
@@ -445,6 +471,29 @@ fun HomeScreen(
             }
         }
 
+        AnimatedVisibility(
+            overlay == Overlay.LockPrompt,
+            enter = fadeIn(motion.tween(160)) + scaleIn(motion.bouncy(), initialScale = 0.9f),
+            exit = fadeOut(motion.tween(140)),
+        ) {
+            LockPrompt(
+                strength = settings.glassStrength,
+                onOpenSettings = {
+                    closeOverlay()
+                    runCatching {
+                        context.startActivity(
+                            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                },
+                onDisable = {
+                    closeOverlay()
+                    vm.updateSettings { it.copy(doubleTapLock = false) }
+                },
+                onClose = { closeOverlay() },
+            )
+        }
+
         // Düzenleme modu üst çubuğu
         AnimatedVisibility(
             editMode && overlay == Overlay.None,
@@ -524,4 +573,46 @@ private fun rememberPowerSaveMode(): Boolean {
         onDispose { runCatching { ctx.unregisterReceiver(r) } }
     }
     return on
+}
+
+/** Çift dokunarak kilitleme için Erişilebilirlik izni yoksa gösterilen açıklama penceresi. */
+@Composable
+private fun LockPrompt(strength: Float, onOpenSettings: () -> Unit, onDisable: () -> Unit, onClose: () -> Unit) {
+    Box(
+        Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            Modifier
+                .padding(28.dp)
+                .liquidGlass(RoundedCornerShape(28.dp), strength, 18.dp)
+                .background(Color(0x66000000))
+                .pointerInput(Unit) { detectTapGestures { } }
+                .padding(20.dp),
+        ) {
+            Text("Çift dokunarak kilitle", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Telefonu kilitleyebilmek için Android, Glass Launcher'ın Erişilebilirlik hizmetini açmanızı istiyor.\n\n" +
+                    "Ayarlar > Erişilebilirlik > Yüklü uygulamalar (veya İndirilen uygulamalar) bölümünde " +
+                    "\"Glass Launcher – Çift dokunarak kilitle\"yi açın.\n\n" +
+                    "Bu hizmet ekran içeriğini okumaz ve veri toplamaz; yalnızca kilitleme komutunu verir. " +
+                    "Parmak izi ve yüz tanıma ile açma çalışmaya devam eder.",
+                color = Color(0xFFE5E5EA), fontSize = 14.sp, lineHeight = 19.sp,
+            )
+            Spacer(Modifier.height(16.dp))
+            Box(
+                Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF0A84FF))
+                    .clickable(onClick = onOpenSettings),
+                contentAlignment = Alignment.Center,
+            ) { Text("Erişilebilirlik ayarlarını aç", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Bu özelliği kapat", color = Color(0xFFFF453A), fontSize = 15.sp,
+                    modifier = Modifier.clickable(onClick = onDisable).padding(8.dp))
+                Text("Vazgeç", color = Color.White, fontSize = 15.sp,
+                    modifier = Modifier.clickable(onClick = onClose).padding(8.dp))
+            }
+        }
+    }
 }

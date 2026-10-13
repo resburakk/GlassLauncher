@@ -55,7 +55,9 @@ import androidx.compose.ui.unit.sp
 import dev.glass.launcher.BuildConfig
 import dev.glass.launcher.data.IconStyle
 import dev.glass.launcher.data.LauncherSettings
+import dev.glass.launcher.data.SwipeAction
 import dev.glass.launcher.data.ThemeMode
+import dev.glass.launcher.service.LockService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -76,6 +78,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Glass("Liquid Glass", Glyph.Search, Color(0xFF30B0C7)),
     Wallpaper("Duvar Kâğıdı", Glyph.Wallpaper, Color(0xFF34C759)),
     Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
+    Gestures("Hareketler", Glyph.Grid, Color(0xFF30D158)),
     Widgets("Widget'lar", Glyph.Widget, Color(0xFFFF375F)),
     Library("Uygulama Arşivi", Glyph.Grid, Color(0xFFBF5AF2)),
     Backup("Yedekleme ve Geri Yükleme", Glyph.Folder, Color(0xFF8E8E93)),
@@ -145,6 +148,7 @@ fun SettingsScreen(
                         SettingsPage.Glass -> GlassPage(s, onChange)
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
+                        SettingsPage.Gestures -> GesturesPage(s, onChange)
                         SettingsPage.Widgets -> WidgetsPage(onAddWidget)
                         SettingsPage.Library -> LibraryPageSettings(s, onChange)
                         SettingsPage.Backup -> BackupPage(vm)
@@ -168,7 +172,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
     }
     val groups = listOf(
         listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders),
-        listOf(SettingsPage.Glass, SettingsPage.Wallpaper, SettingsPage.Animations),
+        listOf(SettingsPage.Glass, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
         listOf(SettingsPage.Widgets, SettingsPage.Library),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
     )
@@ -198,9 +202,9 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
     Group("Uygulama adları") {
         ToggleRow("Adları göster", s.showLabels) { v -> onChange { it.copy(showLabels = v) } }
         RowDivider()
-        SliderRow("Simgeye uzaklık", "${s.labelGap.toInt()} dp", s.labelGap, 0f..14f) { v -> onChange { it.copy(labelGap = v) } }
+        SliderRow("Simgeye uzaklık", "${s.labelGap.toInt()} pt", s.labelGap, 0f..14f) { v -> onChange { it.copy(labelGap = v) } }
         RowDivider()
-        SliderRow("Yazı boyutu", "${"%.1f".format(Locale.US, s.labelSize)} sp", s.labelSize, 9f..15f) { v ->
+        SliderRow("Yazı boyutu", "${"%.1f".format(Locale.US, s.labelSize)} pt", s.labelSize, 9f..16f) { v ->
             onChange { it.copy(labelSize = v) }
         }
     }
@@ -265,6 +269,8 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         SliderRow("Genişlik", pct(s.dockWidth), s.dockWidth, 0.85f..1.05f) { v -> onChange { it.copy(dockWidth = v) } }
         RowDivider()
         SliderRow("Cam yoğunluğu", pct(s.dockOpacity), s.dockOpacity, 0f..2f) { v -> onChange { it.copy(dockOpacity = v) } }
+        RowDivider()
+        SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f) { v -> onChange { it.copy(dockBottom = v) } }
     }
     Footer("Dock simgelerini değiştirmek için düzenleme modunda simgeleri dock'a sürükleyin.")
 }
@@ -274,6 +280,10 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
     Group(null) {
         SliderRow("Klasör cam yoğunluğu", pct(s.folderOpacity), s.folderOpacity, 0f..2f) { v ->
             onChange { it.copy(folderOpacity = v) }
+        }
+        RowDivider()
+        SliderRow("Açık klasör boyutu", pct(s.folderSize), s.folderSize, 0.55f..0.95f) { v ->
+            onChange { it.copy(folderSize = v) }
         }
     }
     Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")
@@ -344,6 +354,48 @@ private fun AnimationsPage(s: LauncherSettings, onChange: ((LauncherSettings) ->
         SliderRow("Animasyon hızı", label, s.animSpeed, 0.5f..2f) { v -> onChange { it.copy(animSpeed = v) } }
     }
     Footer("Klasör, menü, arama ve sayfa geçişlerini etkiler. Uygulama açılış animasyonunu sistem çizer; launcher tamamen kontrol edemez.")
+}
+
+@Composable
+private fun GesturesPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    val ctx = LocalContext.current
+    Group("Ekranın üstünden aşağı kaydırma") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SwipeAction.entries.forEach { a ->
+                Chip(a.title, s.topSwipe == a, Modifier.weight(1f)) { onChange { it.copy(topSwipe = a) } }
+            }
+        }
+    }
+    Group("Ortadan (boş alandan) aşağı kaydırma") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            SwipeAction.entries.forEach { a ->
+                Chip(a.title, s.midSwipe == a, Modifier.weight(1f)) { onChange { it.copy(midSwipe = a) } }
+            }
+        }
+    }
+    Footer(
+        "Sistemin bildirim gölgesi her zaman durum çubuğundan (en üst kenardan) aşağı çekilerek açılır; " +
+            "launcher bunu engelleyemez veya değiştiremez."
+    )
+    Group("Çift dokunma") {
+        ToggleRow("Boş alana çift dokununca kilitle", s.doubleTapLock) { v -> onChange { it.copy(doubleTapLock = v) } }
+        RowDivider()
+        val enabled = LockService.isEnabled(ctx)
+        InfoRow("Erişilebilirlik izni", if (enabled) "Açık" else "Kapalı")
+        if (!enabled) {
+            RowDivider()
+            ActionRow("İzni aç") {
+                runCatching {
+                    ctx.startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
+        }
+    }
+    Footer(
+        "Kilitleme için Android, Erişilebilirlik hizmetinin açılmasını ister: Ayarlar > Erişilebilirlik > Yüklü " +
+            "uygulamalar > \"Glass Launcher – Çift dokunarak kilitle\". Hizmet ekran içeriğini okumaz; yalnızca " +
+            "kilitleme komutunu verir. Parmak izi/yüz tanıma ile açma çalışmaya devam eder."
+    )
 }
 
 @Composable
@@ -432,6 +484,8 @@ private fun AboutPage() {
                 "• REQUEST_DELETE_PACKAGES: \"Uygulamayı Sil\" seçildiğinde sistemin kaldırma onay penceresini açmak için. " +
                 "Kaldırma kararını her zaman siz verirsiniz.\n" +
                 "• SET_WALLPAPER: yalnızca \"Sistem duvar kâğıdı olarak da ayarla\" açıkken seçilen görseli uygulamak için.\n" +
+                "• Erişilebilirlik hizmeti (isteğe bağlı): yalnızca boş alana çift dokununca ekranı kilitlemek için; " +
+                "ekran içeriğini okumaz.\n" +
                 "• İnternet izni yoktur; launcher tamamen çevrimdışı çalışır.\n" +
                 "• Fotoğraf, duvar kâğıdı ve özel simge seçimi sistemin görsel seçicisiyle yapılır; depolama izni gerekmez.\n" +
                 "• Widget bağlama izni Android tarafından widget eklerken bir kez sorulur."

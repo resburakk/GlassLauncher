@@ -1,5 +1,6 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
@@ -7,27 +8,43 @@ import androidx.compose.ui.unit.min
 import dev.glass.launcher.data.LauncherSettings
 
 /**
- * Ekran ölçüleri. iPhone (393pt genişlik) oranlarından türetilir (göz kararı; cihazda ince ayar gerekebilir):
- * simge 60pt (0.1527), yatay adım 90pt (0.229), satır adımı ~96pt (×1.07), dock yüksekliği ~96pt (0.244),
- * dock yan boşluğu ~16pt (0.04). Simge boyutu, yatay/dikey aralık, etiket ve dock ayarları birbirinden
- * bağımsız uygulanır.
+ * iOS "nokta" (pt) birimi: ekran genişliği / 402 (iPhone 16 Pro). Tüm ölçüler bu birimle ölçeklenir;
+ * böylece Honor 600'de de iPhone'daki görsel oranlar korunur.
+ */
+val LocalPt = staticCompositionLocalOf { 1.dp }
+
+/**
+ * Ana ekran ölçüleri — kullanıcının paylaştığı iOS 26 ekran görüntüsünden (iPhone 16 Pro, 402×874 pt)
+ * piksel ölçümüyle alınmıştır:
+ *  - simge 65 pt, sütun adımı 92 pt (kenar boşluğu ≈ 30 pt), satır adımı 98 pt
+ *  - ilk simge satırının üstü ekranın tepesinden 90 pt aşağıda
+ *  - etiket 12 pt, simgenin 5 pt altında, hafif gölgeli
+ *  - dock 98 pt yüksek, yanlardan 16.5 pt, ekranın altından 15 pt yukarıda; dock simgeleri 65 pt, adım 90 pt
+ *  - arama hapı 77×29 pt; simge dizisinin altı ile dock'un üstü arasında TAM ORTADA (simetrik)
+ * Tüm konumlar ekranın sol-üst köşesine göredir (durum çubuğu dahil), iOS'taki gibi.
  */
 data class HomeMetrics(
+    val pt: Dp,
     val columns: Int,
     val rows: Int,
     val icon: Dp,
     val pitchX: Dp,
     val pitchY: Dp,
     val marginX: Dp,
-    val topPad: Dp,
+    /** İlk simge satırının üst kenarı (ekran tepesinden). */
+    val firstTop: Dp,
+    /** Simge dizisinin (son satırın etiketiyle birlikte) alt kenarı. */
+    val gridBottom: Dp,
     val dockH: Dp,
     val dockMarginX: Dp,
+    val dockTop: Dp,
     val dockIcon: Dp,
     val dockPitch: Dp,
     val dockInnerStart: Dp,
-    val dockReserve: Dp,
     val pillW: Dp,
     val pillH: Dp,
+    /** Arama hapının merkezinin ekran tepesine uzaklığı. */
+    val pillCenterY: Dp,
 ) {
     val perPage: Int get() = columns * rows
 
@@ -36,36 +53,53 @@ data class HomeMetrics(
     fun widgetHeight(spanY: Int): Dp = pitchY * (spanY - 1) + icon
 
     companion object {
-        val IndicatorHeight = 44.dp
+        /** Referans ekran genişliği (pt). */
+        const val REF_WIDTH_PT = 402f
 
-        fun compute(width: Dp, height: Dp, s: LauncherSettings): HomeMetrics {
+        fun pt(screenWidth: Dp): Dp = screenWidth / REF_WIDTH_PT
+
+        /**
+         * @param width/height tam ekran boyutu (dp)
+         * @param statusTop durum çubuğu yüksekliği; ilk satır en az bunun biraz altında başlar
+         */
+        fun compute(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings): HomeMetrics {
+            val u = pt(width)
             val cols = s.columns
             val f = 4f / cols
-            val basePitch = width * 0.229f * f
-            val icon = (width * 0.1527f * f * s.iconScale).coerceAtMost(basePitch * 0.95f)
+
+            // Izgara
+            val basePitchX = u * 92f * f
+            val icon = (u * 65f * f * s.iconScale).coerceAtMost(basePitchX * 0.96f)
             val maxPitch = (width - icon - 16.dp) / (cols - 1).coerceAtLeast(1).toFloat()
-            val pitchX = max(min(basePitch * s.hSpacing, maxPitch), icon + 2.dp)
+            val pitchX = max(min(basePitchX * s.hSpacing, maxPitch), icon + 2.dp)
             val marginX = (width - icon - pitchX * (cols - 1).toFloat()) / 2f
-            val labelH = (s.labelSize * 1.45f).dp
-            val minPitchY = icon + s.labelGap.dp + (if (s.showLabels) labelH else 0.dp) + 6.dp
-            val pitchY = max(basePitch * 1.07f * s.vSpacing, minPitchY)
-            val topPad = width * 0.04f
+            val labelBlock = if (s.showLabels) u * (s.labelGap + s.labelSize * 1.25f) else 0.dp
+            val pitchY = max(u * 98f * s.vSpacing, icon + labelBlock + u * 4f)
+            val firstTop = max(u * 90f, statusTop + u * 12f)
 
-            // Dock her zaman 4 simgelik, ızgara sütun sayısından bağımsız.
-            val dockH = width * 0.244f * s.dockHeight
-            val dockMarginX = (width * 0.04f + width * (1f - s.dockWidth) * 0.5f).coerceAtLeast(4.dp)
+            // Dock (her zaman 4 simge; ızgara sütunlarından bağımsız)
+            val dockH = u * 98f * s.dockHeight
+            val dockMarginX = (u * 16.5f + width * (1f - s.dockWidth) * 0.5f).coerceAtLeast(4.dp)
+            val dockTop = height - u * s.dockBottom - dockH
             val innerW = width - dockMarginX * 2f
-            val dockIcon = (width * 0.1527f * s.iconScale).coerceAtMost(min(width * 0.229f * 0.92f, dockH * 0.78f))
-            val dockPitch = min(width * 0.229f, (innerW * 0.94f - dockIcon) / 3f)
+            val dockIcon = (u * 65f * s.iconScale).coerceAtMost(min(u * 90f * 0.96f, dockH * 0.8f))
+            val dockPitch = min(u * 90f, (innerW * 0.94f - dockIcon) / 3f)
             val dockInnerStart = (innerW - dockIcon - dockPitch * 3f) / 2f
-            val dockReserve = dockH + width * 0.03f
 
-            val free = height - topPad - dockReserve - IndicatorHeight
-            val rows = (free / pitchY).toInt().coerceIn(1, s.rows)
+            // Arama hapı ve satır sayısı: hap, simge dizisinin altı ile dock arasında simetrik durur.
+            val pillW = u * 77f
+            val pillH = u * 29f
+            val minGap = u * 14f
+            val avail = dockTop - minGap * 2f - pillH - firstTop - icon - labelBlock
+            val fit = (avail / pitchY).toInt() + 1
+            val rows = fit.coerceIn(1, s.rows)
+            val gridBottom = firstTop + pitchY * (rows - 1).toFloat() + icon + labelBlock
+            val pillCenterY = (gridBottom + dockTop) / 2f
+
             return HomeMetrics(
-                cols, rows, icon, pitchX, pitchY, marginX, topPad,
-                dockH, dockMarginX, dockIcon, dockPitch, dockInnerStart, dockReserve,
-                width * 0.27f, width * 0.085f,
+                u, cols, rows, icon, pitchX, pitchY, marginX, firstTop, gridBottom,
+                dockH, dockMarginX, dockTop, dockIcon, dockPitch, dockInnerStart,
+                pillW, pillH, pillCenterY,
             )
         }
     }

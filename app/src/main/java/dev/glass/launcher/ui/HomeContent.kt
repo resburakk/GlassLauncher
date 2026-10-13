@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -109,10 +111,12 @@ internal fun HomeContent(
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    BoxWithConstraints(
-        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
-    ) {
-        val m = HomeMetrics.compute(maxWidth, maxHeight, settings)
+    // Tam ekran: konumlar iOS'taki gibi ekranın sol-üst köşesinden ölçülür (durum çubuğu dahil).
+    val statusTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+    val navBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val m = HomeMetrics.compute(maxWidth, maxHeight, statusTop, settings)
+        val firstTopPx = with(density) { m.firstTop.toPx() }
         val motion = LocalMotion.current
         val view = LocalView.current
         val items = layout.items
@@ -152,7 +156,7 @@ internal fun HomeContent(
                         val marginPx = with(density) { m.marginX.toPx() }
                         val col = floor((drag.pos.x - gridOrigin.x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx)
                             .toInt().coerceIn(0, m.columns - 1)
-                        val row = floor((drag.pos.y - gridOrigin.y) / pitchYPx).toInt().coerceIn(0, m.rows - 1)
+                        val row = floor((drag.pos.y - gridOrigin.y - firstTopPx) / pitchYPx).toInt().coerceIn(0, m.rows - 1)
                         Cell(pagerState.currentPage, row, col)
                     }
                 }
@@ -285,7 +289,7 @@ internal fun HomeContent(
             val pitchYPx = with(density) { m.pitchY.toPx() }
             val marginPx = with(density) { m.marginX.toPx() }
             val x = pos.x - gridOrigin.x
-            val y = pos.y - gridOrigin.y
+            val y = pos.y - gridOrigin.y - firstTopPx
             val col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
             val without = cur.items.filter { it.id != id }
@@ -305,110 +309,109 @@ internal fun HomeContent(
                 .let { if (it < 0) items.size else it }
         }
 
-        val bottomReserve = HomeMetrics.IndicatorHeight + m.dockReserve
-
-        Column(Modifier.fillMaxSize()) {
-            if (!isDefaultHome) {
-                Column(
-                    Modifier
-                        .padding(12.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0x66000000))
-                        .padding(14.dp)
-                ) {
-                    Text(stringResource(R.string.make_default_hint), color = Color.White, fontSize = 13.sp)
-                    Button(onClick = onRequestDefault) { Text(stringResource(R.string.make_default)) }
-                }
-            }
-
-            Spacer(Modifier.height(m.topPad))
-
-            HorizontalPager(
-                state = pagerState,
-                userScrollEnabled = !dragging,
-                beyondViewportPageCount = 1,
-                modifier = Modifier.weight(1f).onGloballyPositioned { gridOrigin = it.positionInRoot() },
-            ) { page ->
-                if (page == libIndex) {
+        HorizontalPager(
+            state = pagerState,
+            userScrollEnabled = !dragging,
+            beyondViewportPageCount = 1,
+            modifier = Modifier.fillMaxSize().onGloballyPositioned { gridOrigin = it.positionInRoot() },
+        ) { page ->
+            if (page == libIndex) {
+                Box(Modifier.fillMaxSize().padding(top = statusTop + 10.dp, bottom = navBottom)) {
                     LibraryPage(
                         vm = vm, groups = groups, allApps = allApps, settings = settings,
                         drag = drag, edit = edit, jiggle = jiggle,
                         onDropFromLibrary = { k, p, h -> handleDrop(k, p, h) },
                         onOpenGroup = onOpenGroup,
                     )
-                    return@HorizontalPager
                 }
-                val pagePl = byPage[page].orEmpty()
-                // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
-                Box(Modifier.fillMaxSize().padding(bottom = bottomReserve)) {
-                    pagePl.forEach { pl ->
-                      key(pl.item.id) {
-                        val x = m.marginX + m.pitchX * pl.col.toFloat()
-                        val y = m.pitchY * pl.row.toFloat()
-                        // Yer değişince simge yeni konumuna yayla kayar.
-                        val ax by animateDpAsState(x, motion.reflow(), label = "x")
-                        val ay by animateDpAsState(y, motion.reflow(), label = "y")
-                        Box(Modifier.offset { IntOffset(ax.roundToPx(), ay.roundToPx()) }) {
-                            when (val item = pl.item) {
-                                is AppItem -> {
-                                    val app = byKey[item.key]
-                                    if (app != null) {
-                                        DraggableCell(
-                                            id = item.id, place = CellPlace.Grid,
-                                            label = app.label, showLabel = settings.showLabels,
-                                            icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                            drag = drag, layer = DragLayer.Home, isApp = true,
-                                            acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                            onClick = { r -> if (!edit) launchFrom(app, r) },
-                                            onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                        ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
-                                    }
-                                }
-                                is FolderItem -> DraggableCell(
-                                    id = item.id, place = CellPlace.Grid,
-                                    label = item.name, showLabel = settings.showLabels,
-                                    icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                    drag = drag, layer = DragLayer.Home, isApp = false,
-                                    acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                    onClick = { r -> onOpenFolder(item, r.center) },
-                                    onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                ) {
-                                    FolderIcon(
-                                        item, byKey, vm, m.icon, settings.glassStrength * settings.folderOpacity,
-                                        folderPages[item.id] ?: 0,
-                                    )
-                                }
-                                is WidgetItem -> {
-                                    val w = m.widgetWidth(pl.spanX)
-                                    val h = m.widgetHeight(pl.spanY)
-                                    WidgetCell(
-                                        id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = jiggle,
-                                        onDrop = { p, hv -> handleDrop(item.id, p, hv) },
-                                    ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
+                return@HorizontalPager
+            }
+            val pagePl = byPage[page].orEmpty()
+            // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
+            Box(Modifier.fillMaxSize()) {
+                pagePl.forEach { pl ->
+                  key(pl.item.id) {
+                    val x = m.marginX + m.pitchX * pl.col.toFloat()
+                    val y = m.firstTop + m.pitchY * pl.row.toFloat()
+                    // Yer değişince simge yeni konumuna yayla kayar.
+                    val ax by animateDpAsState(x, motion.reflow(), label = "x")
+                    val ay by animateDpAsState(y, motion.reflow(), label = "y")
+                    Box(Modifier.offset { IntOffset(ax.roundToPx(), ay.roundToPx()) }) {
+                        when (val item = pl.item) {
+                            is AppItem -> {
+                                val app = byKey[item.key]
+                                if (app != null) {
+                                    DraggableCell(
+                                        id = item.id, place = CellPlace.Grid,
+                                        label = app.label, showLabel = settings.showLabels,
+                                        icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
+                                        drag = drag, layer = DragLayer.Home, isApp = true,
+                                        acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                        onClick = { r -> if (!edit) launchFrom(app, r) },
+                                        onDrop = { p, h -> handleDrop(item.id, p, h) },
+                                    ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
                                 }
                             }
+                            is FolderItem -> DraggableCell(
+                                id = item.id, place = CellPlace.Grid,
+                                label = item.name, showLabel = settings.showLabels,
+                                icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
+                                drag = drag, layer = DragLayer.Home, isApp = false,
+                                acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                onClick = { r -> onOpenFolder(item, r.center) },
+                                onDrop = { p, h -> handleDrop(item.id, p, h) },
+                            ) {
+                                FolderIcon(
+                                    item, byKey, vm, m.icon, settings.glassStrength * settings.folderOpacity,
+                                    folderPages[item.id] ?: 0,
+                                )
+                            }
+                            is WidgetItem -> {
+                                val w = m.widgetWidth(pl.spanX)
+                                val h = m.widgetHeight(pl.spanY)
+                                WidgetCell(
+                                    id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = jiggle,
+                                    onDrop = { p, hv -> handleDrop(item.id, p, hv) },
+                                ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
+                            }
                         }
-                      }
                     }
+                  }
                 }
             }
         }
 
-        // Alt bölüm: sayfa noktaları / arama hapı + dock. Arşive geçerken aşağı kayar.
-        val hideShiftPx = with(density) { (bottomReserve + 24.dp).toPx() }
-        Column(
+        if (!isDefaultHome) {
+            Column(
+                Modifier
+                    .padding(top = statusTop + 4.dp, start = 12.dp, end = 12.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0x99000000))
+                    .padding(14.dp)
+            ) {
+                Text(stringResource(R.string.make_default_hint), color = Color.White, fontSize = 13.sp)
+                Button(onClick = onRequestDefault) { Text(stringResource(R.string.make_default)) }
+            }
+        }
+
+        // Alt bölüm: arama hapı / sayfa noktaları ve dock. Arşive geçerken aşağı kayar.
+        val hideShiftPx = with(density) { (maxHeight - m.pillCenterY + m.pillH).toPx() }
+        Box(
             Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
+                .fillMaxSize()
                 .graphicsLayer {
                     translationY = libFraction * hideShiftPx
                     alpha = 1f - libFraction
                 }
         ) {
+            // Hap: simge dizisinin altı ile dock'un üstü arasında tam ortada.
             Box(
-                Modifier.fillMaxWidth().height(HomeMetrics.IndicatorHeight),
-                contentAlignment = Alignment.Center
+                Modifier
+                    .fillMaxWidth()
+                    .height(m.pillH)
+                    .offset(y = m.pillCenterY - m.pillH / 2f),
+                contentAlignment = Alignment.Center,
             ) {
                 Row(Modifier.graphicsLayer { alpha = dotsAlpha }) {
                     repeat(homeCount) { i ->
@@ -426,41 +429,37 @@ internal fun HomeContent(
                 SearchPill(m, settings.glassStrength, (1f - dotsAlpha) * (1f - libFraction), onOpenSearch)
             }
 
-            Box(Modifier.fillMaxWidth().height(m.dockReserve), contentAlignment = Alignment.TopCenter) {
-                if (libFraction < 0.98f) {
-                    Box(
-                        Modifier
-                            .padding(horizontal = m.dockMarginX)
-                            .fillMaxWidth()
-                            .height(m.dockH)
-                            .onGloballyPositioned { dockRect = it.boundsInRoot() }
-                            .liquidGlass(RoundedCornerShape(m.dockH * 0.38f), settings.glassStrength * settings.dockOpacity, 14.dp)
-                    ) {
-                        Box(Modifier.fillMaxSize()) {
-                            shownDock.forEachIndexed { i, dk ->
-                              key(dk) {
-                                val app = byKey[dk]
-                                if (app != null) {
-                                    val dx by animateDpAsState(m.dockInnerStart + m.dockPitch * i.toFloat(), motion.reflow(), label = "dx")
-                                    Box(
-                                        Modifier
-                                            .align(Alignment.CenterStart)
-                                            .offset { IntOffset(dx.roundToPx(), 0) }
-                                    ) {
-                                        DraggableCell(
-                                            id = dk, place = CellPlace.Dock,
-                                            label = app.label, showLabel = false,
-                                            icon = m.dockIcon, pitchX = m.dockPitch, cellHeight = m.dockIcon,
-                                            drag = drag, layer = DragLayer.Home, isApp = true,
-                                            acceptsMerge = false, edit = edit, jiggle = jiggle,
-                                            onClick = { r -> if (!edit) launchFrom(app, r) },
-                                            onDrop = { p, h -> handleDrop(dk, p, h) },
-                                        ) { AppIconImage(app, vm, m.dockIcon, settings.iconGlass, settings.glassStrength) }
-                                    }
-                                }
-                              }
+            if (libFraction < 0.98f) {
+                Box(
+                    Modifier
+                        .offset(x = m.dockMarginX, y = m.dockTop)
+                        .width(maxWidth - m.dockMarginX * 2f)
+                        .height(m.dockH)
+                        .onGloballyPositioned { dockRect = it.boundsInRoot() }
+                        .liquidGlass(RoundedCornerShape(m.dockH * 0.34f), settings.glassStrength * settings.dockOpacity, 14.dp)
+                ) {
+                    shownDock.forEachIndexed { i, dk ->
+                      key(dk) {
+                        val app = byKey[dk]
+                        if (app != null) {
+                            val dx by animateDpAsState(m.dockInnerStart + m.dockPitch * i.toFloat(), motion.reflow(), label = "dx")
+                            Box(
+                                Modifier
+                                    .align(Alignment.CenterStart)
+                                    .offset { IntOffset(dx.roundToPx(), 0) }
+                            ) {
+                                DraggableCell(
+                                    id = dk, place = CellPlace.Dock,
+                                    label = app.label, showLabel = false,
+                                    icon = m.dockIcon, pitchX = m.dockPitch, cellHeight = m.dockIcon,
+                                    drag = drag, layer = DragLayer.Home, isApp = true,
+                                    acceptsMerge = false, edit = edit, jiggle = jiggle,
+                                    onClick = { r -> if (!edit) launchFrom(app, r) },
+                                    onDrop = { p, h -> handleDrop(dk, p, h) },
+                                ) { AppIconImage(app, vm, m.dockIcon, settings.iconGlass, settings.glassStrength) }
                             }
                         }
+                      }
                     }
                 }
             }
@@ -480,9 +479,10 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: Float, onClick: (
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SearchGlyph(Color.White, 14.dp)
-        Spacer(Modifier.width(6.dp))
-        Text("Ara", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        val pt = m.pt.value
+        SearchGlyph(Color.White, m.pt * 13f)
+        Spacer(Modifier.width(m.pt * 5f))
+        Text("Ara", color = Color.White, fontSize = (14f * pt).sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

@@ -15,7 +15,7 @@ class LauncherSettingsTest {
     }
 
     @Test fun fromJson_missingFields_useDefaults_andClamp() {
-        val s = LauncherSettings.fromJson(JSONObject("""{"columns": 12, "iconScale": 9}"""))
+        val s = LauncherSettings.fromJson(JSONObject("""{"columns": 12, "iconScale": 9, "metricsVersion": 2}"""))
         assertEquals(6, s.columns)
         assertEquals(1.4f, s.iconScale)
         assertEquals(LauncherSettings().iconStyle, s.iconStyle)
@@ -25,5 +25,18 @@ class LauncherSettingsTest {
         val s = LauncherSettings.fromJson(JSONObject("""{"iconStyle": "Mor", "theme": "?"}"""))
         assertEquals(IconStyle.Original, s.iconStyle)
         assertEquals(ThemeMode.Auto, s.theme)
+    }
+
+    @Test fun oldMetrics_areResetToNewDefaults_otherSettingsKept() {
+        val s = LauncherSettings.fromJson(JSONObject("""{"iconScale": 1.3, "labelSize": 10, "theme": "Dark"}"""))
+        assertEquals(1f, s.iconScale)
+        assertEquals(12f, s.labelSize)
+        assertEquals(ThemeMode.Dark, s.theme)
+    }
+
+    @Test fun newFields_roundTrip() {
+        val s = LauncherSettings(topSwipe = SwipeAction.Search, midSwipe = SwipeAction.None, doubleTapLock = false,
+            dockBottom = 30f, folderSize = 0.6f)
+        assertEquals(s, LauncherSettings.fromJson(JSONObject(s.toJson().toString())))
     }
 }

@@ -18,6 +18,9 @@ private val Context.dataStore by preferencesDataStore(name = "launcher_settings"
 /** Simge görünümleri (bkz. [IconRenderer]). */
 enum class IconStyle(val title: String) { Original("Orijinal"), Light("Açık"), Dark("Koyu"), Tinted("Renkli") }
 
+/** Ana ekranda aşağı kaydırma hareketinin yapacağı iş. */
+enum class SwipeAction(val title: String) { ControlCenter("Kontrol Merkezi"), Search("Arama"), None("Hiçbiri") }
+
 /** Cam yüzeylerin tonu. Otomatik: duvar kâğıdının parlaklığına göre. */
 enum class ThemeMode(val title: String) { Auto("Otomatik"), Light("Açık"), Dark("Koyu") }
 
@@ -28,10 +31,12 @@ data class LauncherSettings(
     val showLabels: Boolean = true,
     val hSpacing: Float = 1f,
     val vSpacing: Float = 1f,
+    /** Etiketin simgeye uzaklığı (pt). */
     val labelGap: Float = 5f,
-    val labelSize: Float = 11f,
+    /** Etiket yazı boyutu (pt; iOS'ta 12). */
+    val labelSize: Float = 12f,
     // Simgeler
-    val iconScale: Float = 1.1f,
+    val iconScale: Float = 1f,
     val iconStyle: IconStyle = IconStyle.Original,
     val tintColor: Int = 0xFF64D2FF.toInt(),
     val iconCorner: Float = 0.225f,
@@ -42,8 +47,19 @@ data class LauncherSettings(
     val dockHeight: Float = 1f,
     val dockWidth: Float = 1f,
     val dockOpacity: Float = 1f,
+    /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
+    val dockBottom: Float = 15f,
     // Klasörler
     val folderOpacity: Float = 1f,
+    /** Açık klasör panelinin ekran genişliğine oranı. */
+    val folderSize: Float = 0.74f,
+    // Hareketler
+    /** Ekranın üst kenarından aşağı kaydırma. */
+    val topSwipe: SwipeAction = SwipeAction.ControlCenter,
+    /** Ekranın ortasından (boş alandan) aşağı kaydırma. */
+    val midSwipe: SwipeAction = SwipeAction.Search,
+    /** Boş alana çift dokununca ekranı kilitle (Erişilebilirlik hizmeti gerekir). */
+    val doubleTapLock: Boolean = true,
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
     val theme: ThemeMode = ThemeMode.Auto,
@@ -67,13 +83,15 @@ data class LauncherSettings(
         hSpacing = hSpacing.coerceIn(0.8f, 1.3f),
         vSpacing = vSpacing.coerceIn(0.8f, 1.4f),
         labelGap = labelGap.coerceIn(0f, 14f),
-        labelSize = labelSize.coerceIn(9f, 15f),
+        labelSize = labelSize.coerceIn(9f, 16f),
         iconScale = iconScale.coerceIn(0.7f, 1.4f),
         iconCorner = iconCorner.coerceIn(0.05f, 0.5f),
         dockHeight = dockHeight.coerceIn(0.8f, 1.3f),
         dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
         dockOpacity = dockOpacity.coerceIn(0f, 2f),
+        dockBottom = dockBottom.coerceIn(0f, 60f),
         folderOpacity = folderOpacity.coerceIn(0f, 2f),
+        folderSize = folderSize.coerceIn(0.55f, 0.95f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -89,6 +107,9 @@ data class LauncherSettings(
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
+        put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble())
+        put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock)
+        put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
         put("animSpeed", animSpeed.toDouble())
@@ -97,6 +118,12 @@ data class LauncherSettings(
     }
 
     companion object {
+        /**
+         * Ölçü düzeni sürümü. 2: iOS ekran görüntüsünden ölçülen yeni varsayılanlar. Daha eski kayıtlarda
+         * simge/aralık/etiket/dock ölçüleri yeni varsayılanlara çekilir (diğer ayarlar korunur).
+         */
+        const val METRICS_VERSION = 2
+
         /** Eksik veya hatalı alanlar varsayılan değerle doldurulur (eski yedeklerle uyumlu). */
         fun fromJson(o: JSONObject): LauncherSettings {
             val d = LauncherSettings()
@@ -134,7 +161,19 @@ data class LauncherSettings(
                 lowPower = o.optBoolean("lowPower", d.lowPower),
                 addNewToHome = o.optBoolean("addNewToHome", d.addNewToHome),
                 recents = if (rec == null) emptyList() else List(rec.length()) { rec.optString(it) }.filter { it.isNotEmpty() },
-            ).sanitized()
+                dockBottom = f("dockBottom", d.dockBottom),
+                folderSize = f("folderSize", d.folderSize),
+                topSwipe = runCatching { SwipeAction.valueOf(o.optString("topSwipe")) }.getOrDefault(d.topSwipe),
+                midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe")) }.getOrDefault(d.midSwipe),
+                doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
+            ).let { loaded ->
+                if (o.optInt("metricsVersion", 1) >= METRICS_VERSION) loaded
+                else loaded.copy(
+                    iconScale = d.iconScale, hSpacing = d.hSpacing, vSpacing = d.vSpacing,
+                    labelGap = d.labelGap, labelSize = d.labelSize, rows = d.rows,
+                    dockHeight = d.dockHeight, dockWidth = d.dockWidth, dockBottom = d.dockBottom,
+                )
+            }.sanitized()
         }
     }
 }
@@ -167,7 +206,7 @@ class SettingsStore(private val context: Context) {
             columns = p[Keys.columns] ?: d.columns,
             rows = p[Keys.rows] ?: d.rows,
             showLabels = p[Keys.showLabels] ?: d.showLabels,
-            iconScale = p[Keys.iconScale] ?: d.iconScale,
+            // Eski (0.5) kayıtlarda simge ölçüsü yeni varsayılana çekilir (ölçü düzeni 2).
             iconGlass = p[Keys.iconGlass] ?: d.iconGlass,
             glassStrength = p[Keys.glassStrength] ?: d.glassStrength,
             recents = (p[Keys.recents] ?: "").split("|").filter { it.isNotEmpty() },

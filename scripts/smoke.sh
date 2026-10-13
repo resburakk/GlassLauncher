@@ -19,11 +19,14 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 adb shell input swipe $cx 5 $cx $((H*5/10)) 300; step "kontrol paneli"
 adb shell input keyevent KEYCODE_BACK; step "geri"
 # İlk simgeye uzun bas ve bırak (bağlam menüsü)
-ix=$((W*18/100)); iy=$((H*12/100))
+ix=$((W*15/100)); iy=$((H*14/100))
 adb shell input swipe $ix $iy $ix $iy 900; step "uzun basma menüsü"
 adb shell input keyevent KEYCODE_BACK; step "geri"
 # Uzun bas ve sürükle (düzenleme modu + taşıma)
 adb shell input swipe $ix $iy $((W*60/100)) $((H*25/100)) 2500; step "sürükle-bırak" 4
+adb shell input keyevent KEYCODE_BACK; step "geri"
+# Boş alana çift dokun (kilitleme / izin penceresi)
+adb shell input tap $cx $((H*62/100)); adb shell input tap $cx $((H*62/100)); step "çift dokunma"
 adb shell input keyevent KEYCODE_BACK; step "geri"
 # Son sayfalara (Uygulama Arşivi) git
 for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 200; sleep 1; done; step "arşiv" 3

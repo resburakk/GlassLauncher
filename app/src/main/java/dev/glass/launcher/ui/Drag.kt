@@ -239,12 +239,14 @@ suspend fun PointerInputScope.detectHomeDrag(
     }
 }
 
-private val CellLabelStyle = TextStyle(
+/** iOS ana ekran etiketi: beyaz, normal kalınlık, yumuşak ve hafif koyu gölge. */
+internal val CellLabelStyle = TextStyle(
     color = Color.White,
-    fontSize = 11.sp,
-    fontWeight = FontWeight.Medium,
+    fontSize = 12.sp,
+    fontWeight = FontWeight.Normal,
+    letterSpacing = 0.1.sp,
     textAlign = TextAlign.Center,
-    shadow = Shadow(Color(0x66000000), Offset(0f, 1f), 4f),
+    shadow = Shadow(Color(0x73000000), Offset(0f, 1.5f), 5f),
 )
 
 /**
@@ -331,13 +333,14 @@ internal fun DraggableCell(
             iconContent()
             if (showLabel) {
                 val st = LocalLauncherSettings.current
+                val pt = LocalPt.current
                 Text(
                     label,
-                    style = CellLabelStyle.copy(fontSize = st.labelSize.sp),
+                    style = CellLabelStyle.copy(fontSize = (st.labelSize * pt.value).sp),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = st.labelGap.dp, start = 4.dp, end = 4.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(top = pt * st.labelGap, start = 2.dp, end = 2.dp).fillMaxWidth(),
                 )
             }
         }

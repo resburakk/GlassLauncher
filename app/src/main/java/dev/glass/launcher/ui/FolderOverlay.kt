@@ -95,11 +95,11 @@ fun FolderOverlay(
         Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { keyboard?.hide(); onClose() }) },
         contentAlignment = Alignment.Center,
     ) {
-        val panelW = maxWidth * 0.88f
+        val panelW = maxWidth * settings.folderSize
         val inner = panelW - 40.dp
         val pitch = inner / 3f
-        val icon = pitch * 0.62f
-        val rowH = icon + 28.dp
+        val icon = pitch * 0.66f
+        val rowH = icon + 26.dp
         val pages = folder.keys.chunked(9)
         val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, maxOf(pages.size - 1, 0))) {
             maxOf(pages.size, 1)
