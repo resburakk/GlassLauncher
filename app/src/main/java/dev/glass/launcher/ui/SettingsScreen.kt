@@ -77,6 +77,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Dock("Dock", Glyph.Widget, Color(0xFF32ADE6)),
     Folders("Klasörler", Glyph.Folder, Color(0xFF64D2FF)),
     Fonts("Yazı Tipi", Glyph.Pencil, Color(0xFFFF9F0A)),
+    Menu("Açılır Menü", Glyph.Edit, Color(0xFFAF52DE)),
     Glass("Liquid Glass", Glyph.Search, Color(0xFF30B0C7)),
     Wallpaper("Duvar Kâğıdı", Glyph.Wallpaper, Color(0xFF34C759)),
     Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
@@ -148,6 +149,7 @@ fun SettingsScreen(
                         SettingsPage.Dock -> DockPage(s, onChange)
                         SettingsPage.Folders -> FoldersPage(s, onChange)
                         SettingsPage.Fonts -> FontsPage(s, onChange)
+                        SettingsPage.Menu -> MenuPage(s, onChange)
                         SettingsPage.Glass -> GlassPage(s, onChange)
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
@@ -175,7 +177,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
     }
     val groups = listOf(
         listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders, SettingsPage.Fonts),
-        listOf(SettingsPage.Glass, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
+        listOf(SettingsPage.Glass, SettingsPage.Menu, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
         listOf(SettingsPage.Widgets, SettingsPage.Library),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
     )
@@ -203,6 +205,25 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f) { v -> onChange { it.copy(vSpacing = v) } }
     }
     Footer("Uygulama adlarının yazı ayarları \"Yazı Tipi\" sayfasında.")
+}
+
+@Composable
+private fun MenuPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group("Görünüm") {
+        ToggleRow("Koyu menü", s.menuDark) { v -> onChange { it.copy(menuDark = v) } }
+        RowDivider()
+        SliderRow("Cam açıklığı", pct(s.menuOpacity), s.menuOpacity, 0.1f..0.95f) { v -> onChange { it.copy(menuOpacity = v) } }
+        RowDivider()
+        SliderRow("Köşe yuvarlaklığı", "${s.menuCorner.roundToInt()} pt", s.menuCorner, 10f..44f) { v -> onChange { it.copy(menuCorner = v) } }
+    }
+    Group("Boyutlar") {
+        SliderRow("Genişlik", "${s.menuWidth.roundToInt()} pt", s.menuWidth, 200f..330f) { v -> onChange { it.copy(menuWidth = v) } }
+        RowDivider()
+        SliderRow("Satır yüksekliği", "${s.menuRowHeight.roundToInt()} pt", s.menuRowHeight, 36f..64f) { v -> onChange { it.copy(menuRowHeight = v) } }
+        RowDivider()
+        SliderRow("Yazı boyutu", "${s.menuTextSize.roundToInt()} pt", s.menuTextSize, 13f..22f) { v -> onChange { it.copy(menuTextSize = v) } }
+    }
+    Footer("Bir simgeye basılı tutunca açılan menü. Bulanıklık, kenar çizgisi ve parlaklık Liquid Glass sayfasındaki genel ayarları izler.")
 }
 
 @Composable

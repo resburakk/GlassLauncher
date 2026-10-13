@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.composed
 import android.content.pm.ShortcutInfo
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -124,7 +128,7 @@ fun ContextMenuOverlay(
             if (req.place == CellPlace.Library) {
                 if (!onHome) add(MenuAction("Ana Ekrana Ekle", Glyph.Plus) { onAddToHome() })
             } else {
-                add(MenuAction("Ana Ekrandan Kaldır", Glyph.Minus) { onRemoveFromHome() })
+                add(MenuAction("Ana Ekrandan Kaldır", Glyph.Minus, destructive = true) { onRemoveFromHome() })
             }
             if (!app.isSystem) add(MenuAction("Uygulamayı Sil", Glyph.Trash, destructive = true) { vm.uninstall(app) })
         } else if (folder != null) {
@@ -156,48 +160,65 @@ fun ContextMenuOverlay(
             }
         }
 
+        // iOS 26 menüsü: tek parça açık buzlu cam, simge solda + yazı sağda, ayırıcı yok.
+        val st = LocalLauncherSettings.current
+        val u = LocalPt.current
+        val corner = u * st.menuCorner
+        val menuW = u * st.menuWidth
+        val textColor = if (st.menuDark) Color.White else Color(0xF21C1C1E)
+        val red = Color(0xFFFF3B30)
         val gapPx = with(density) { 10.dp.toPx() }
         val marginPx = with(density) { 12.dp.toPx() }
+        // Simgeye yakından uzağa: kısayollar → işlemler → kaldırma. Menü simgenin üstünde açılırsa ters çevrilir.
+        val rows: List<@Composable () -> Unit> = buildList {
+            shortcuts.forEach { (info, icon) ->
+                add {
+                    MenuRow(
+                        title = info.shortLabel?.toString() ?: "",
+                        color = textColor,
+                        leading = { if (icon != null) Image(icon, null, Modifier.size(22.dp).clip(RoundedCornerShape(5.dp))) },
+                        onClick = { vm.startShortcut(info); onClose() },
+                    )
+                }
+            }
+            actions.forEach { a ->
+                val c = if (a.destructive) red else textColor
+                add {
+                    MenuRow(
+                        title = a.title,
+                        color = c,
+                        leading = { a.glyph?.let { GlyphIcon(it, c, 20.dp) } },
+                        onClick = { a.run(); onClose() },
+                    )
+                }
+            }
+        }
         Layout(
             modifier = Modifier.fillMaxSize(),
             content = {
-                Box(Modifier.width(250.dp)) {
-                BlurBackdrop(22.dp, Modifier.matchParentSize())
-                Column(
-                    Modifier
-                        .width(250.dp)
-                        .liquidGlass(RoundedCornerShape(22.dp), strength, 18.dp, panel = true)
-                        .background(Color(0x30000000))
-                        .pointerInput(Unit) { detectTapGestures { } }
-                ) {
-                    shortcuts.forEachIndexed { i, (info, icon) ->
-                        MenuRow(
-                            title = info.shortLabel?.toString() ?: "",
-                            leading = {
-                                if (icon != null) Image(icon, null, Modifier.size(22.dp).clip(RoundedCornerShape(5.dp)))
-                            },
-                            onClick = { vm.startShortcut(info); onClose() },
-                        )
-                        if (i < shortcuts.lastIndex) Hairline()
+                // İki sürüm: alta açılan (normal sıra) ve üste açılan (ters sıra). Yerleşimde biri seçilir.
+                listOf(false, true).forEach { reversed ->
+                    Box(Modifier.width(menuW)) {
+                        BlurBackdrop(corner, Modifier.matchParentSize())
+                        Column(
+                            Modifier
+                                .width(menuW)
+                                .menuGlass(RoundedCornerShape(corner), st.menuOpacity, st.menuDark)
+                                .pointerInput(Unit) { detectTapGestures { } }
+                                .padding(vertical = u * 6f)
+                        ) {
+                            (if (reversed) rows.asReversed() else rows).forEach { it() }
+                        }
                     }
-                    if (shortcuts.isNotEmpty()) Box(Modifier.fillMaxWidth().height(7.dp).background(Color(0x33000000)))
-                    actions.forEachIndexed { i, a ->
-                        MenuRow(
-                            title = a.title,
-                            color = if (a.destructive) Red else Color.White,
-                            trailing = { a.glyph?.let { GlyphIcon(it, if (a.destructive) Red else Color.White, 18.dp) } },
-                            onClick = { a.run(); onClose() },
-                        )
-                        if (i < actions.lastIndex) Hairline()
-                    }
-                }
                 }
             },
         ) { measurables, constraints ->
-            val p = measurables.first().measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val loose = constraints.copy(minWidth = 0, minHeight = 0)
+            val down = measurables[0].measure(loose)
+            val below = req.cellRect.bottom + gapPx + down.height < constraints.maxHeight - marginPx
+            val p = if (below) down else measurables[1].measure(loose)
             val maxX = (constraints.maxWidth - p.width - marginPx).coerceAtLeast(marginPx)
             val x = req.iconRect.left.coerceIn(marginPx, maxX)
-            val below = req.cellRect.bottom + gapPx + p.height < constraints.maxHeight - marginPx
             val y = if (below) req.cellRect.bottom + gapPx else req.iconRect.top - gapPx - p.height
             val py = y.coerceAtLeast(marginPx)
             // Büyüme noktası: simgenin menüye en yakın kenarı (menü altta ise üst kenar, üstte ise alt kenar).
@@ -216,34 +237,55 @@ fun ContextMenuOverlay(
     }
 }
 
-@Composable
-private fun Hairline() {
-    Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color(0x40FFFFFF)))
+/** Menü camı: açık (süt beyazı) ya da koyu buzlu cam; kenar çizgisi ve parlaklık genel cam ayarlarını izler. */
+private fun Modifier.menuGlass(shape: RoundedCornerShape, opacity: Float, dark: Boolean): Modifier = composed {
+    val st = LocalLauncherSettings.current
+    val fill = if (dark) {
+        Brush.verticalGradient(listOf(Color.Black.copy(alpha = opacity * 0.75f), Color.Black.copy(alpha = opacity * 0.85f)))
+    } else {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = opacity), Color.White.copy(alpha = (opacity * 0.85f))))
+    }
+    this
+        .shadow(24.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
+        .clip(shape)
+        .background(fill)
+        .glassBrightness(st.glassBrightness)
+        .then(
+            if (st.glassRimWidth > 0f && st.glassRimGlow > 0f) Modifier.border(
+                st.glassRimWidth.dp,
+                Brush.verticalGradient(
+                    listOf(
+                        Color.White.copy(alpha = (0.7f * st.glassRimGlow).coerceAtMost(1f)),
+                        Color.White.copy(alpha = (0.3f * st.glassRimGlow).coerceAtMost(1f)),
+                    )
+                ),
+                shape,
+            ) else Modifier
+        )
 }
 
 @Composable
 private fun MenuRow(
     title: String,
-    color: Color = Color.White,
+    color: Color,
     leading: (@Composable () -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null,
     onClick: () -> Unit,
 ) {
+    val st = LocalLauncherSettings.current
+    val u = LocalPt.current
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier
+            .fillMaxWidth()
+            .height(u * st.menuRowHeight)
+            .clickable(onClick = onClick)
+            .padding(horizontal = u * 18f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (leading != null) {
-            leading()
-            Spacer(Modifier.width(12.dp))
-        }
+        Box(Modifier.width(u * 26f), contentAlignment = Alignment.CenterStart) { leading?.invoke() }
+        Spacer(Modifier.width(u * 10f))
         Text(
-            title, color = color, fontSize = 16.sp, fontWeight = FontWeight.Normal,
-            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
+            title, color = color, fontSize = (st.menuTextSize * u.value).sp, fontWeight = FontWeight.Normal,
+            fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
         )
-        if (trailing != null) {
-            Spacer(Modifier.width(10.dp))
-            trailing()
-        }
     }
 }

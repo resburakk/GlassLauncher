@@ -87,6 +87,14 @@ data class LauncherSettings(
     /** Dock üstündeki "Ara" düğmesinin yazı boyutu (pt) ve kalınlığı (300–700). */
     val pillTextSize: Float = 14f,
     val pillTextWeight: Float = 600f,
+    /** Basılı tutma menüsü görünümü (iOS 26). */
+    val menuCorner: Float = 30f,
+    val menuWidth: Float = 260f,
+    val menuTextSize: Float = 17f,
+    val menuRowHeight: Float = 48f,
+    /** Menü camının açıklığı (beyaz dolgu yoğunluğu). */
+    val menuOpacity: Float = 0.62f,
+    val menuDark: Boolean = false,
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
@@ -142,6 +150,11 @@ data class LauncherSettings(
         glassOpacity = glassOpacity.coerceIn(0f, 2f),
         pillTextSize = pillTextSize.coerceIn(9f, 24f),
         pillTextWeight = pillTextWeight.coerceIn(300f, 700f),
+        menuCorner = menuCorner.coerceIn(10f, 44f),
+        menuWidth = menuWidth.coerceIn(200f, 330f),
+        menuTextSize = menuTextSize.coerceIn(13f, 22f),
+        menuRowHeight = menuRowHeight.coerceIn(36f, 64f),
+        menuOpacity = menuOpacity.coerceIn(0.1f, 0.95f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -163,6 +176,9 @@ data class LauncherSettings(
         put("glassBlur", glassBlur.toDouble()); put("glassBrightness", glassBrightness.toDouble())
         put("glassRimGlow", glassRimGlow.toDouble()); put("glassOpacity", glassOpacity.toDouble())
         put("pillTextSize", pillTextSize.toDouble()); put("pillTextWeight", pillTextWeight.toDouble())
+        put("menuCorner", menuCorner.toDouble()); put("menuWidth", menuWidth.toDouble())
+        put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
+        put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary)
         put("metricsVersion", METRICS_VERSION)
@@ -230,6 +246,12 @@ data class LauncherSettings(
                 glassOpacity = f("glassOpacity", d.glassOpacity),
                 pillTextSize = f("pillTextSize", d.pillTextSize),
                 pillTextWeight = f("pillTextWeight", d.pillTextWeight),
+                menuCorner = f("menuCorner", d.menuCorner),
+                menuWidth = f("menuWidth", d.menuWidth),
+                menuTextSize = f("menuTextSize", d.menuTextSize),
+                menuRowHeight = f("menuRowHeight", d.menuRowHeight),
+                menuOpacity = f("menuOpacity", d.menuOpacity),
+                menuDark = o.optBoolean("menuDark", d.menuDark),
                 dockCorner = f("dockCorner", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),
