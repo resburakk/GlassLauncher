@@ -37,9 +37,15 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 # 3) Uzun bas + sürükle
 adb shell input swipe $ix $iy $((W*60/100)) $((H*25/100)) 2500; step "sürükle-bırak" 4
 adb shell input keyevent KEYCODE_BACK; step "geri"
+# Takvim'i Saat'in üstüne sürükleyip bekleyerek klasör oluştur, sonra aç
+jx=$((W*38/100))
+adb shell input motionevent DOWN $ix $iy; sleep 0.7
+for f in 1 2 3 4 5 6 7 8; do adb shell input motionevent MOVE $((ix + (jx-ix)*f/8)) $iy; sleep 0.08; done
+sleep 1.5
+adb shell input motionevent UP $jx $iy; step "klasör oluştur" 2
+adb shell input keyevent KEYCODE_BACK; step "geri" 2
 shot 04a-surukle-sonrasi
-# Bırakılan yerde klasör oluştuysa aç
-adb shell input tap $((W*60/100)) $((H*25/100)); step "klasör" 2
+adb shell input tap $jx $iy; step "klasör" 2
 shot 04b-klasor
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
