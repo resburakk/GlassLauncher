@@ -310,6 +310,7 @@ fun LibraryGroupOverlay(
         val pitch = inner / 4f
         val icon = pitch * 0.72f
         val rowH = icon + 26.dp
+        val maxGridH = maxHeight * 0.6f
         Column(
             Modifier
                 .width(panelW)
@@ -325,7 +326,7 @@ fun LibraryGroupOverlay(
             )
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
-                modifier = Modifier.fillMaxWidth().height(minOf(rowH * ((group.apps.size + 3) / 4), maxHeight * 0.6f)),
+                modifier = Modifier.fillMaxWidth().height(minOf(rowH * ((group.apps.size + 3) / 4), maxGridH)),
             ) {
                 items(group.apps, key = { it.key }) { app ->
                     Box(Modifier.fillMaxWidth().height(rowH), contentAlignment = Alignment.TopCenter) {
