@@ -66,6 +66,8 @@ data class LauncherSettings(
     val folderOpacity: Float = 1f,
     /** Açık klasör panelinin ekran genişliğine oranı. */
     val folderSize: Float = 0.74f,
+    /** Açık klasör panelinin köşe yuvarlaklığı (pt; iOS 26 ≈ 34). */
+    val folderCorner: Float = 34f,
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
@@ -108,6 +110,7 @@ data class LauncherSettings(
         pillOffset = pillOffset.coerceIn(-60f, 60f),
         folderOpacity = folderOpacity.coerceIn(0f, 2f),
         folderSize = folderSize.coerceIn(0.55f, 0.95f),
+        folderCorner = folderCorner.coerceIn(8f, 80f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -123,7 +126,7 @@ data class LauncherSettings(
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
-        put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble())
+        put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble()); put("folderCorner", folderCorner.toDouble())
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock)
         put("metricsVersion", METRICS_VERSION)
@@ -180,6 +183,7 @@ data class LauncherSettings(
                 recents = if (rec == null) emptyList() else List(rec.length()) { rec.optString(it) }.filter { it.isNotEmpty() },
                 dockBottom = f("dockBottom", d.dockBottom),
                 folderSize = f("folderSize", d.folderSize),
+                folderCorner = f("folderCorner", d.folderCorner),
                 dockCorner = f("dockCorner", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),

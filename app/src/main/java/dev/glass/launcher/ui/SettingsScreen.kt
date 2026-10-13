@@ -1,5 +1,6 @@
 package dev.glass.launcher.ui
 
+import kotlin.math.roundToInt
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -297,6 +298,10 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
         RowDivider()
         SliderRow("Açık klasör boyutu", pct(s.folderSize), s.folderSize, 0.55f..0.95f) { v ->
             onChange { it.copy(folderSize = v) }
+        }
+        RowDivider()
+        SliderRow("Açık klasör köşe yuvarlaklığı", "${s.folderCorner.roundToInt()} pt", s.folderCorner, 8f..80f) { v ->
+            onChange { it.copy(folderCorner = v) }
         }
     }
     Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")

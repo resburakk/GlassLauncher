@@ -41,6 +41,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -109,7 +110,7 @@ fun FolderOverlay(
         val topPad = u * 29f
         val bottomPad = u * 15f
         val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
-        val panelShape = RoundedCornerShape(u * 34f)
+        val panelShape = RoundedCornerShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
         val pages = folder.keys.chunked(9)
         val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, maxOf(pages.size - 1, 0))) {
             maxOf(pages.size, 1)
@@ -138,20 +139,21 @@ fun FolderOverlay(
             onReorder(key, idx)
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Panel ekranın TAM ortasında (üstten/alttan eşit); ad, panelin hemen üstüne yerleşir.
+        Layout(content = {
         // Klasör adı panelin ÜSTÜNDE, iOS'taki gibi büyük ve kalın; dokununca düzenlenir.
         BasicTextField(
             value = name,
             onValueChange = { name = it.take(30) },
             singleLine = true,
             textStyle = TextStyle(
-                color = Color.White, fontSize = (u.value * 30f).sp, fontWeight = FontWeight.Bold,
+                color = Color.White, fontSize = (u.value * 28f).sp, fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center, fontFamily = AppFont, shadow = IosTextShadow,
             ),
             cursorBrush = SolidColor(Color.White),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
-            modifier = Modifier.width(panelW).padding(bottom = u * 22f),
+            modifier = Modifier.width(panelW),
         )
         Column(
             Modifier
@@ -218,6 +220,17 @@ fun FolderOverlay(
                 }
             }
         }
+        }, modifier = Modifier.fillMaxSize()) { ms, c ->
+            val loose = c.copy(minWidth = 0, minHeight = 0)
+            val title = ms[0].measure(loose)
+            val panel = ms[1].measure(loose)
+            val gap = (u * 22f).roundToPx()
+            layout(c.maxWidth, c.maxHeight) {
+                val px = (c.maxWidth - panel.width) / 2
+                val py = (c.maxHeight - panel.height) / 2
+                panel.place(px, py)
+                title.place((c.maxWidth - title.width) / 2, (py - gap - title.height).coerceAtLeast(0))
+            }
         }
     }
 }
