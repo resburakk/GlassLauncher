@@ -3,8 +3,13 @@
 APK="$1"
 adb install -r "$APK" || { echo "::error::Kurulum başarısız"; exit 1; }
 adb logcat -c
+# Varsayılan ana ekran yap (gerçek kullanım gibi)
+adb shell cmd role add-role-holder --user 0 android.app.role.HOME dev.glass.launcher || true
 adb shell am start -W -n dev.glass.launcher/.MainActivity
 sleep 20
+adb shell input keyevent KEYCODE_HOME; sleep 4
+mkdir -p shots
+adb exec-out screencap -p > shots/01-ana-ekran.png
 
 size=$(adb shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1)
 W=${size%x*}; H=${size#*x}
@@ -21,6 +26,7 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 # İlk simgeye uzun bas ve bırak (bağlam menüsü)
 ix=$((W*15/100)); iy=$((H*14/100))
 adb shell input swipe $ix $iy $ix $iy 900; step "uzun basma menüsü"
+adb exec-out screencap -p > shots/02-menu.png
 adb shell input keyevent KEYCODE_BACK; step "geri"
 # Uzun bas ve sürükle (düzenleme modu + taşıma)
 adb shell input swipe $ix $iy $((W*60/100)) $((H*25/100)) 2500; step "sürükle-bırak" 4
@@ -30,9 +36,11 @@ adb shell input tap $cx $((H*62/100)); adb shell input tap $cx $((H*62/100)); st
 adb shell input keyevent KEYCODE_BACK; step "geri"
 # Son sayfalara (Uygulama Arşivi) git
 for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 200; sleep 1; done; step "arşiv" 3
+adb exec-out screencap -p > shots/03-arsiv.png
 adb shell input tap $cx $((H*10/100)); step "arşiv araması"
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 4
+adb exec-out screencap -p > shots/04-ayarlar.png
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
 adb logcat -d > logcat.txt
