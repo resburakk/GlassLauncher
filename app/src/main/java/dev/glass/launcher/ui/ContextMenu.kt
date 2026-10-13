@@ -167,7 +167,7 @@ fun ContextMenuOverlay(
                     Modifier
                         .width(250.dp)
                         .liquidGlass(RoundedCornerShape(22.dp), strength, 18.dp, panel = true)
-                        .background(Color(0x40000000))
+                        .background(Color(0x30000000))
                         .pointerInput(Unit) { detectTapGestures { } }
                 ) {
                     shortcuts.forEachIndexed { i, (info, icon) ->

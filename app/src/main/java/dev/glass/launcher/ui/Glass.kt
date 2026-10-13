@@ -42,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.layout.LayoutCoordinates
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
@@ -256,13 +257,21 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
         val b = c.boundsInRoot()
         // Açılış animasyonundaki ölçek de hesaba katılır; köşe yarıçapı ölçekle küçülür.
         val k = if (c.size.width > 0) b.width / c.size.width else 1f
-        reg.regions[key] = RoundRect(b, CornerRadius((cr * k).coerceAtMost(minOf(b.width, b.height) / 2f)))
+        val rr = RoundRect(b, CornerRadius((cr * k).coerceAtMost(minOf(b.width, b.height) / 2f)))
+        if (reg.regions[key] != rr) reg.regions[key] = rr
     }
     DisposableEffect(reg, key) { onDispose { reg.regions.remove(key) } }
-    // Yaylı açılış animasyonu sırasında (≈0.5 sn) alan birkaç kez yeniden ölçülür; bulanıklık menüyle büyür.
+    // Yaylı açılış animasyonu (ölçek katmanda olduğu için yerleşim bildirimi gelmez) boyunca alan
+    // HER KAREDE yeniden ölçülür; bulanıklık menüyle birlikte büyür. Sonra seyrek kontrol yeterli.
     LaunchedEffect(key) {
-        repeat(14) {
-            delay(40)
+        val start = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            update()
+            if (now - start > 1_400_000_000L) break
+        }
+        while (true) {
+            delay(300)
             update()
         }
     }
@@ -278,7 +287,7 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
  * İçerik katmanına uygulanır: içeriği net çizer, ardından [GlassRegions]'daki alanlara içeriğin bulanık
  * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
  */
-fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 24.dp): Modifier = composed {
+fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = composed {
     val blurLayer = rememberGraphicsLayer()
     val r = with(LocalDensity.current) { radius.toPx() }
     val reduced = LocalGlass.current.reduced
