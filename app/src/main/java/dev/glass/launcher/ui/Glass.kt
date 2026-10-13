@@ -1,5 +1,8 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -288,17 +291,38 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
  * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
  */
 fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = composed {
-    val blurLayer = rememberGraphicsLayer()
+    // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
+    val node = remember { android.graphics.RenderNode("glassRegionBlur") }
     val r = with(LocalDensity.current) { radius.toPx() }
     val reduced = LocalGlass.current.reduced
+    val effect = remember(r) {
+        android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
+    }
     this.drawWithContent {
         drawContent()
-        val list = reg.regions.values
+        val list = reg.regions.values.toList()
         if (reduced || list.isEmpty()) return@drawWithContent
-        blurLayer.renderEffect = BlurEffect(r, r, TileMode.Clamp)
-        blurLayer.record { this@drawWithContent.drawContent() }
-        list.forEach { rr ->
-            clipPath(Path().apply { addRoundRect(rr) }) { drawLayer(blurLayer) }
+        val w = size.width.toInt(); val h = size.height.toInt()
+        if (w <= 0 || h <= 0) return@drawWithContent
+        node.setPosition(0, 0, w, h)
+        node.setRenderEffect(effect)
+        val rc = node.beginRecording(w, h)
+        val prev = drawContext.canvas
+        try {
+            drawContext.canvas = androidx.compose.ui.graphics.Canvas(rc)
+            drawContent()
+        } finally {
+            drawContext.canvas = prev
+            node.endRecording()
+        }
+        drawIntoCanvas { c ->
+            val nc = c.nativeCanvas
+            list.forEach { rr ->
+                nc.save()
+                nc.clipPath(Path().apply { addRoundRect(rr) }.asAndroidPath())
+                nc.drawRenderNode(node)
+                nc.restore()
+            }
         }
     }
 }
