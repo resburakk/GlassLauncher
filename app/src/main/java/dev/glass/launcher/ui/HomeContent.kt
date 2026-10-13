@@ -316,7 +316,7 @@ internal fun HomeContent(
             modifier = Modifier.fillMaxSize().onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
-                Box(Modifier.fillMaxSize().padding(top = statusTop + 10.dp, bottom = navBottom)) {
+                Box(Modifier.fillMaxSize().padding(top = statusTop + 10.dp)) {
                     LibraryPage(
                         vm = vm, groups = groups, allApps = allApps, settings = settings,
                         drag = drag, edit = edit, jiggle = jiggle,

@@ -153,7 +153,8 @@ fun LibraryPage(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp),
+                    // Son satır gezinme çubuğunun üstüne kadar kaydırılabilsin.
+                    contentPadding = PaddingValues(bottom = 64.dp),
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     items(groups, key = { it.title }) { g ->
