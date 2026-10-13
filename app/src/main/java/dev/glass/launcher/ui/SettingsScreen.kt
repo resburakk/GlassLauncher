@@ -314,6 +314,10 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
         SliderRow("Arşiv açık klasör köşesi", "${s.libraryGroupCorner.roundToInt()} pt", s.libraryGroupCorner, 8f..80f) { v ->
             onChange { it.copy(libraryGroupCorner = v) }
         }
+        RowDivider()
+        SliderRow("Açık klasör adı boyutu", "${s.openFolderTitleSize.roundToInt()} pt", s.openFolderTitleSize, 10f..40f) { v ->
+            onChange { it.copy(openFolderTitleSize = v) }
+        }
     }
     Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")
 }

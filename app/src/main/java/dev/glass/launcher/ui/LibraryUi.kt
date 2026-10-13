@@ -364,7 +364,7 @@ fun LibraryGroupOverlay(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             group.title,
-            style = CellLabelStyle.copy(fontSize = (settings.labelSize * u.value).sp),
+            style = CellLabelStyle.copy(fontSize = (settings.openFolderTitleSize * u.value).sp),
             modifier = Modifier.width(panelW).padding(bottom = u * 14f),
         )
         Column(
