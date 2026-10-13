@@ -619,6 +619,8 @@ fun HomeScreen(
 
 @Composable
 internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onClick: () -> Unit) {
+    Box(Modifier.height(height), contentAlignment = Alignment.Center) {
+    BlurBackdrop(CircleShape, Modifier.matchParentSize())
     Box(
         Modifier
             .height(height)
@@ -631,6 +633,7 @@ internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onCl
             text, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
             style = LocalTextStyle.current.copy(shadow = IosTextShadow),
         )
+    }
     }
 }
 

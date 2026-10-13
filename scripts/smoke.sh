@@ -22,6 +22,8 @@ shot 01-ana-ekran
 adb shell input motionevent DOWN $ix $iy
 sleep 0.8
 shot 02-menu-basili
+sleep 1.5
+shot 02b-menu-basili-2sn
 adb shell input motionevent UP $ix $iy
 step "menü (bırakıldı)" 2
 shot 03-menu

@@ -36,7 +36,8 @@ import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import dev.glass.launcher.data.Blurred
 import dev.glass.launcher.data.LauncherSettings
@@ -90,10 +91,9 @@ fun Modifier.liquidGlass(
 ): Modifier = composed {
     val look = LocalGlass.current
     val s = strength
+    // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalContentBackdrop.current else null
     val bd = if (look.reduced || content != null) null else look.backdrop
-    val blurLayer = if (content != null) rememberGraphicsLayer() else null
-    val blurPx = with(LocalDensity.current) { 26.dp.toPx() }
     // Gerçek bulanıklık varken dolgu daha ince tutulur; cam arkasındaki renkleri göstersin.
     val fill = if (bd != null || content != null) 0.55f else 1f
     val base = if (look.dark) {
@@ -113,7 +113,7 @@ fun Modifier.liquidGlass(
             else Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
         )
         .then(
-            if (bd != null || content != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() }
+            if (bd != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() }
             else Modifier
         )
         .clip(shape)
@@ -121,14 +121,7 @@ fun Modifier.liquidGlass(
             if (bd != null) Modifier.drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin) }
             else Modifier
         )
-        .then(
-            if (content != null && blurLayer != null) Modifier.drawBehind {
-                // Kayıtlı içerik katmanını bulanık bir katmana çiz, bu yüzeyin konumuna göre kaydır.
-                blurLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
-                blurLayer.record(this, layoutDirection, content.size) { drawLayer(content) }
-                translate(-origin.x, -origin.y) { drawLayer(blurLayer) }
-            } else Modifier
-        )
+
         .background(base)
         .then(
             if (look.reduced) Modifier
@@ -223,4 +216,27 @@ fun SearchGlyph(color: Color, glyphSize: Dp) {
             cap = StrokeCap.Round,
         )
     }
+}
+
+/**
+ * Bir menünün/düğmenin YALNIZCA kendi arkasını gerçekten bulanıklaştırır: kayıtlı launcher içeriğini bu
+ * kutunun konumuna kaydırarak çizer ve kutunun kendi katmanına bulanıklık efekti uygular. Panelin arkasına
+ * (aynı boyutta, [shape] ile) yerleştirilir; panelin kendi içeriği bulanıklaşmaz.
+ */
+@Composable
+fun BlurBackdrop(shape: Shape, modifier: Modifier = Modifier, radius: Dp = 24.dp) {
+    val content = LocalContentBackdrop.current ?: return
+    if (LocalGlass.current.reduced) return
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    val r = with(LocalDensity.current) { radius.toPx() }
+    Box(
+        modifier
+            .onGloballyPositioned { origin = it.positionInRoot() }
+            .graphicsLayer {
+                renderEffect = BlurEffect(r, r, TileMode.Clamp)
+                this.shape = shape
+                clip = true
+            }
+            .drawBehind { translate(-origin.x, -origin.y) { drawLayer(content) } }
+    )
 }

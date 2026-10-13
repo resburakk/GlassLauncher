@@ -161,6 +161,8 @@ fun ContextMenuOverlay(
         Layout(
             modifier = Modifier.fillMaxSize(),
             content = {
+                Box(Modifier.width(250.dp)) {
+                BlurBackdrop(RoundedCornerShape(22.dp), Modifier.matchParentSize())
                 Column(
                     Modifier
                         .width(250.dp)
@@ -188,6 +190,7 @@ fun ContextMenuOverlay(
                         )
                         if (i < actions.lastIndex) Hairline()
                     }
+                }
                 }
             },
         ) { measurables, constraints ->
