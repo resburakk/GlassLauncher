@@ -272,6 +272,15 @@ fun HomeScreen(
     // Otomatik kalite: Pil Tasarrufu açıksa veya kaydırmada kare süreleri uzunsa efektler sadeleşir.
     val reduced = settings.lowPower || (settings.autoQuality && (powerSave || degraded))
     val useBackdrop = settings.launcherWallpaper && settings.realBlur && !reduced
+    // Tanı kaydı (yalnızca durum değişince): kalite düşürme nedenleri ve pencere bulanıklığı desteği.
+    LaunchedEffect(reduced, powerSave, degraded) {
+        android.util.Log.i(
+            "GlassDiag",
+            "reduced=$reduced lowPower=${settings.lowPower} autoQuality=${settings.autoQuality} " +
+                "powerSave=$powerSave degraded=$degraded " +
+                "crossWindowBlur=${context.getSystemService(android.view.WindowManager::class.java).isCrossWindowBlurEnabled}",
+        )
+    }
     CompositionLocalProvider(
         LocalLauncherSettings provides settings,
         LocalMotion provides motion,
