@@ -74,6 +74,8 @@ data class LauncherSettings(
     val libraryGroupCorner: Float = 34f,
     /** Tüm cam yüzeylerdeki beyaz kenar çizgisinin kalınlığı (pt; 0 = çizgi yok). */
     val glassRimWidth: Float = 1f,
+    /** Açık klasörün (ana ekran ve arşiv) adının yazı boyutu (pt). */
+    val openFolderTitleSize: Float = 12f,
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
@@ -120,6 +122,7 @@ data class LauncherSettings(
         libraryTileCorner = libraryTileCorner.coerceIn(8f, 40f),
         libraryGroupCorner = libraryGroupCorner.coerceIn(8f, 80f),
         glassRimWidth = glassRimWidth.coerceIn(0f, 4f),
+        openFolderTitleSize = openFolderTitleSize.coerceIn(8f, 36f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -137,7 +140,7 @@ data class LauncherSettings(
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
         put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble()); put("folderCorner", folderCorner.toDouble())
         put("libraryTileCorner", libraryTileCorner.toDouble()); put("libraryGroupCorner", libraryGroupCorner.toDouble())
-        put("glassRimWidth", glassRimWidth.toDouble())
+        put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock)
         put("metricsVersion", METRICS_VERSION)
@@ -198,6 +201,7 @@ data class LauncherSettings(
                 libraryTileCorner = f("libraryTileCorner", d.libraryTileCorner),
                 libraryGroupCorner = f("libraryGroupCorner", d.libraryGroupCorner),
                 glassRimWidth = f("glassRimWidth", d.glassRimWidth),
+                openFolderTitleSize = f("openFolderTitleSize", d.openFolderTitleSize),
                 dockCorner = f("dockCorner", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),

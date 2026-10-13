@@ -147,7 +147,7 @@ fun FolderOverlay(
             onValueChange = { name = it.take(30) },
             singleLine = true,
             // Açık klasörün adı, klasörün dışındaki etiketle aynı stilde.
-            textStyle = CellLabelStyle.copy(fontSize = (settings.labelSize * u.value).sp),
+            textStyle = CellLabelStyle.copy(fontSize = (settings.openFolderTitleSize * u.value).sp),
             cursorBrush = SolidColor(Color.White),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
