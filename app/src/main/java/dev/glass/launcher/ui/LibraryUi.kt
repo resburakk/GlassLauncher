@@ -113,7 +113,7 @@ fun LibraryPage(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
+                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp, fontFamily = AppFont),
                         cursorBrush = SolidColor(Color.White),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
@@ -309,7 +309,8 @@ fun LibraryGroupOverlay(
         val panelW = maxWidth * 0.9f
         val inner = panelW - 32.dp
         val pitch = inner / 4f
-        val icon = pitch * 0.72f
+        // Simgeler ana ekranla aynı boyutta (sığmazsa küçülür).
+        val icon = minOf(LocalHomeMetrics.current?.icon ?: (pitch * 0.72f), pitch * 0.92f)
         val rowH = icon + 26.dp
         val maxGridH = maxHeight * 0.6f
         Column(

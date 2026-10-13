@@ -4,6 +4,6 @@
     <string name="make_default">Varsayılan ana ekran yap</string>
     <string name="make_default_hint">Home tuşunun bu uygulamayı açması için seçin.</string>
     <string name="settings_label">Glass Ayarları</string>
-    <string name="lock_service_label">Glass Launcher – Çift dokunarak kilitle</string>
-    <string name="lock_service_description">Ana ekranda boş bir yere çift dokunduğunuzda telefonu kilitler. Ekran içeriğini okumaz ve hiçbir veri toplamaz; yalnızca sistemin kilitleme eylemini çağırır.</string>
+    <string name="lock_service_label">Glass Launcher – Kilit ve Kontrol Merkezi</string>
+    <string name="lock_service_description">Ana ekranda boş bir yere çift dokunduğunuzda telefonu kilitler ve üstten kaydırınca telefonun kendi Kontrol Merkezi\'ni açar. Ekran içeriğini okumaz ve hiçbir veri toplamaz.</string>
 </resources>

@@ -19,7 +19,14 @@ private val Context.dataStore by preferencesDataStore(name = "launcher_settings"
 enum class IconStyle(val title: String) { Original("Orijinal"), Light("Açık"), Dark("Koyu"), Tinted("Renkli") }
 
 /** Ana ekranda aşağı kaydırma hareketinin yapacağı iş. */
-enum class SwipeAction(val title: String) { ControlCenter("Kontrol Merkezi"), Search("Arama"), None("Hiçbiri") }
+enum class SwipeAction(val title: String) {
+    /** Telefonun kendi Kontrol Merkezi (hızlı ayarlar). */
+    ControlCenter("Kontrol Merkezi"),
+    /** Telefonun kendi bildirim gölgesi. */
+    Notifications("Bildirimler"),
+    Search("Arama"),
+    None("Hiçbiri"),
+}
 
 /** Cam yüzeylerin tonu. Otomatik: duvar kâğıdının parlaklığına göre. */
 enum class ThemeMode(val title: String) { Auto("Otomatik"), Light("Açık"), Dark("Koyu") }
@@ -49,6 +56,12 @@ data class LauncherSettings(
     val dockOpacity: Float = 1f,
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
     val dockBottom: Float = 15f,
+    /** Dock köşe yuvarlaklığı (yüksekliğe oran; 0.5 = hap şekli). */
+    val dockCorner: Float = 0.34f,
+    /** Arama düğmesi boyut çarpanı. */
+    val pillScale: Float = 1f,
+    /** Arama düğmesinin ortalanmış konumdan yukarı (+) / aşağı (−) kayması (pt). */
+    val pillOffset: Float = 0f,
     // Klasörler
     val folderOpacity: Float = 1f,
     /** Açık klasör panelinin ekran genişliğine oranı. */
@@ -90,6 +103,9 @@ data class LauncherSettings(
         dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
         dockOpacity = dockOpacity.coerceIn(0f, 2f),
         dockBottom = dockBottom.coerceIn(0f, 60f),
+        dockCorner = dockCorner.coerceIn(0.08f, 0.5f),
+        pillScale = pillScale.coerceIn(0.7f, 1.5f),
+        pillOffset = pillOffset.coerceIn(-60f, 60f),
         folderOpacity = folderOpacity.coerceIn(0f, 2f),
         folderSize = folderSize.coerceIn(0.55f, 0.95f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
@@ -108,6 +124,7 @@ data class LauncherSettings(
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
         put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble())
+        put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock)
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
@@ -163,6 +180,9 @@ data class LauncherSettings(
                 recents = if (rec == null) emptyList() else List(rec.length()) { rec.optString(it) }.filter { it.isNotEmpty() },
                 dockBottom = f("dockBottom", d.dockBottom),
                 folderSize = f("folderSize", d.folderSize),
+                dockCorner = f("dockCorner", d.dockCorner),
+                pillScale = f("pillScale", d.pillScale),
+                pillOffset = f("pillOffset", d.pillOffset),
                 topSwipe = runCatching { SwipeAction.valueOf(o.optString("topSwipe")) }.getOrDefault(d.topSwipe),
                 midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe")) }.getOrDefault(d.midSwipe),
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),

@@ -97,6 +97,9 @@ class DragState {
         private set
     var hoverId by mutableStateOf<String?>(null)
         private set
+    /** Parmak gerçekten kaydırıldı mı? (Uzun basmada menü açıkken hayalet simge gösterilmez.) */
+    var moved by mutableStateOf(false)
+        private set
     /** Dokunuşa açık katman (klasör açıkken Folder). */
     var activeLayer by mutableStateOf(DragLayer.Home)
 
@@ -128,6 +131,11 @@ class DragState {
         dropHandler = t.onDrop
         dragIsApp = t.isApp
         hoverId = null
+        moved = false
+    }
+
+    fun markMoved() {
+        moved = true
     }
 
     fun move(p: Offset) {
@@ -158,15 +166,19 @@ class DragState {
         key = null
         hoverId = null
         dropHandler = null
+        moved = false
     }
 }
+
+/** Uzun basma süresi: sistem varsayılanından (≈500 ms) kısa; menü daha çabuk ve kolay açılır. */
+const val LONG_PRESS_MS = 300L
 
 /**
  * Kök katmana takılan tek hareket algılayıcı.
  * - Kısa dokunuş: hiçbir şey tüketilmez, hücrenin tıklaması çalışır.
  * - Kaydırma (uzun basmadan önce): hiçbir şey tüketilmez, sayfa kaydırıcı çalışır.
- * - Uzun basma bir hücre üzerinde, parmak kıpırdamadan bırakılırsa: iOS gibi bağlam menüsü.
- * - Uzun basma + sürükleme: düzenleme modu ve sürükle-bırak.
+ * - Uzun basma bir hücre üzerinde: iOS gibi menü HEMEN (parmak ekrandayken) açılır. Parmak kaydırılırsa
+ *   menü kapanır, düzenleme modu + sürükle-bırak başlar; kaydırmadan bırakılırsa menü açık kalır.
  * - Uzun basma boş alanda: düzenleme modu.
  * - Düzenleme modunda bir hücreyi doğrudan sürüklemek de sürüklemeyi başlatır (iOS gibi).
  */
@@ -175,9 +187,8 @@ suspend fun PointerInputScope.detectHomeDrag(
     enabled: () -> Boolean,
     isEditing: () -> Boolean,
     onLongPressEmpty: () -> Unit,
-    onLifted: () -> Unit,
-    onDragStarted: () -> Unit,
     onMenu: (DragTarget) -> Unit,
+    onDragStarted: () -> Unit,
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -187,7 +198,7 @@ suspend fun PointerInputScope.detectHomeDrag(
         val hit = drag.hitTest(down.position)
 
         // 0 = vazgeç (dokunma veya kaydırma), 1 = düzenleme modunda doğrudan sürükleme, null = uzun basma
-        val outcome: Int? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+        val outcome: Int? = withTimeoutOrNull(LONG_PRESS_MS) {
             var r = -1
             while (r < 0) {
                 val ev = awaitPointerEvent(PointerEventPass.Initial)
@@ -208,7 +219,12 @@ suspend fun PointerInputScope.detectHomeDrag(
             onLongPressEmpty()
         } else {
             drag.start(hit, down.position)
-            if (moved) onDragStarted() else onLifted()
+            if (moved) {
+                drag.markMoved()
+                onDragStarted()
+            } else {
+                onMenu(hit)
+            }
         }
 
         // Parmak kalkana kadar tüm olayları tüket: alttaki katmanlar (pager, tıklama) tepki vermez.
@@ -218,8 +234,10 @@ suspend fun PointerInputScope.detectHomeDrag(
             val c = ev.changes.firstOrNull { it.id == down.id }
             if (c != null) last = c.position
             if (drag.isDragging && c != null) {
-                if (!moved && (c.position - down.position).getDistance() > slop) {
+                // Menü açıkken biraz daha geniş tolerans: titreyen parmak menüyü kapatmasın.
+                if (!moved && (c.position - down.position).getDistance() > slop * 2f) {
                     moved = true
+                    drag.markMoved()
                     onDragStarted()
                 }
                 drag.move(c.position)
@@ -232,8 +250,7 @@ suspend fun PointerInputScope.detectHomeDrag(
                 drag.move(last)
                 drag.finish()
             } else {
-                drag.clear()
-                if (hit != null) onMenu(hit)
+                drag.clear() // menü açık kalır
             }
         }
     }
@@ -246,7 +263,8 @@ internal val CellLabelStyle = TextStyle(
     fontWeight = FontWeight.Normal,
     letterSpacing = 0.1.sp,
     textAlign = TextAlign.Center,
-    shadow = Shadow(Color(0x73000000), Offset(0f, 1.5f), 5f),
+    fontFamily = AppFont,
+    shadow = IosTextShadow,
 )
 
 /**

@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -90,7 +93,7 @@ fun SearchOverlay(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 17.sp),
+                        textStyle = TextStyle(color = Color.White, fontSize = 17.sp, fontFamily = AppFont),
                         cursorBrush = SolidColor(Color.White),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { results.firstOrNull()?.let { open(it) } }),
@@ -117,15 +120,28 @@ fun SearchOverlay(
                     "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
                 )
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .liquidGlass(RoundedCornerShape(26.dp), strength * 0.8f, 6.dp)
-                        .padding(vertical = 14.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                ) {
-                    suggestions.forEach { app ->
-                        AppCell(app, vm, 56.dp, 76.dp, 84.dp, true, iconGlass, strength) { open(app) }
+                // Öneri kutusu ana ekrandaki dock ile birebir aynı ölçüde (genişlik, yükseklik, köşe,
+                // simge boyutu ve aralığı); simgeler ana ekranla aynı boyutta.
+                val hm = LocalHomeMetrics.current
+                if (hm != null) {
+                    val st = LocalLauncherSettings.current
+                    val screenW = LocalConfiguration.current.screenWidthDp.dp
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterHorizontally)
+                            .requiredWidth(screenW - hm.dockMarginX * 2f)
+                            .height(hm.dockH)
+                            .liquidGlass(RoundedCornerShape(hm.dockCorner), strength * st.dockOpacity, 6.dp)
+                    ) {
+                        suggestions.take(4).forEachIndexed { i, app ->
+                            Box(
+                                Modifier
+                                    .align(Alignment.CenterStart)
+                                    .offset(x = hm.dockInnerStart + hm.dockPitch * i.toFloat())
+                            ) {
+                                AppCell(app, vm, hm.dockIcon, hm.dockPitch, hm.dockIcon, false, iconGlass, strength) { open(app) }
+                            }
+                        }
                     }
                 }
             } else if (results.isEmpty()) {

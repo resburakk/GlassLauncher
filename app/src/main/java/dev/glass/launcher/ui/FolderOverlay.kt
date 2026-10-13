@@ -95,11 +95,14 @@ fun FolderOverlay(
         Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { keyboard?.hide(); onClose() }) },
         contentAlignment = Alignment.Center,
     ) {
-        val panelW = maxWidth * settings.folderSize
+        // Simgeler ana ekranla AYNI boyutta; klasör boyutu ayarı yalnızca simgeler arası boşluğu değiştirir.
+        val hm = LocalHomeMetrics.current
+        val icon = hm?.icon ?: (maxWidth * 0.16f)
+        val minPanel = icon * 3.3f + 40.dp
+        val panelW = maxOf(maxWidth * settings.folderSize, minPanel).coerceAtMost(maxWidth - 16.dp)
         val inner = panelW - 40.dp
         val pitch = inner / 3f
-        val icon = pitch * 0.66f
-        val rowH = icon + 26.dp
+        val rowH = icon + (hm?.let { it.pitchY - it.icon } ?: 30.dp).coerceAtMost(icon * 0.55f)
         val pages = folder.keys.chunked(9)
         val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, maxOf(pages.size - 1, 0))) {
             maxOf(pages.size, 1)
@@ -143,7 +146,7 @@ fun FolderOverlay(
                 onValueChange = { name = it.take(30) },
                 singleLine = true,
                 textStyle = TextStyle(
-                    color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center,
+                    color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontFamily = AppFont,
                 ),
                 cursorBrush = SolidColor(Color.White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),

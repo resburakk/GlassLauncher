@@ -6,6 +6,16 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.PowerManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.unit.Dp
+import dev.glass.launcher.service.SystemPanels
 import android.provider.Settings
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
@@ -90,7 +100,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.glass.launcher.data.FolderItem
 import kotlin.math.roundToInt
 
-enum class Overlay { None, Search, Control, Settings, Folder, Menu, Group, Widgets, LockPrompt }
+enum class Overlay { None, Search, Settings, Folder, Menu, Group, Widgets, LockPrompt }
+
+/** İzin penceresinin hangi özellik için açıldığı. */
+enum class LockReason { Lock, Panels }
+
+/** Tüm ekranın (ve sistem duvar kâğıdının) bulanıklaştığı katmanlar; küçük menüler bu listede değildir. */
+private val FullBlurOverlays = setOf(Overlay.Search, Overlay.Settings, Overlay.Folder, Overlay.Group, Overlay.Widgets)
 
 /**
  * Ana ekran katmanları arasında köprü: bırakma işlemi ve sayfa geçişleri ana ekran içeriğinde
@@ -145,8 +161,26 @@ fun HomeScreen(
     val settingsNow by rememberUpdatedState(settings)
     val editNow by rememberUpdatedState(editMode)
 
-    val blur by animateDpAsState(if (overlay == Overlay.None) 0.dp else 22.dp, motion.tween(260), label = "blur")
-    val scrim by animateFloatAsState(if (overlay == Overlay.None) 0f else 0.35f, motion.tween(260), label = "scrim")
+    // Tam ekran bulanıklık yalnızca büyük katmanlarda; menü ve küçük pencerelerde yalnızca kendileri bulanık.
+    val fullBlur = overlay in FullBlurOverlays
+    val blurAmount by animateFloatAsState(if (fullBlur) 1f else 0f, motion.tween(280), label = "blurAmount")
+    val blur = 22.dp * blurAmount
+    val scrim by animateFloatAsState(
+        when {
+            fullBlur -> 0.28f
+            overlay == Overlay.Menu || overlay == Overlay.LockPrompt -> 0.10f
+            else -> 0f
+        },
+        motion.tween(260), label = "scrim",
+    )
+    // Arşive geçiş oranı (HomeContent yazar); arka plan geçiş sırasında kademeli bulanıklaşır.
+    val libProgress = remember { mutableFloatStateOf(0f) }
+    val windowBlur = LocalWindowBlur.current
+    LaunchedEffect(windowBlur) {
+        // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
+        snapshotFlow { maxOf(blurAmount, libProgress.floatValue) }.collect { f -> windowBlur?.invoke(f) }
+    }
+    var lockReason by remember { mutableStateOf(LockReason.Lock) }
 
     // Sallanma animasyonu yalnızca düzenleme modunda çalışır (pil).
     val jiggle: State<Float> = if (editMode) {
@@ -203,6 +237,11 @@ fun HomeScreen(
 
     val density = LocalDensity.current
     val context = LocalContext.current
+    val statusTopDp = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+    // Ana ekran ölçüleri (klasör, arama ve arşiv katmanları da aynı simge boyutunu kullanır).
+    val homeMetrics = if (rootSize.width > 0) with(density) {
+        HomeMetrics.compute(rootSize.width.toDp(), rootSize.height.toDp(), statusTopDp, settings)
+    } else null
     val topInsetPx = WindowInsets.statusBars.getTop(density)
     val topZonePx = topInsetPx + with(density) { 72.dp.toPx() }
     val suggestions = remember(recents, allApps) { (recents + allApps).distinctBy { it.key }.take(4) }
@@ -237,6 +276,7 @@ fun HomeScreen(
         LocalLauncherSettings provides settings,
         LocalMotion provides motion,
         LocalPt provides HomeMetrics.pt(LocalConfiguration.current.screenWidthDp.dp),
+        LocalHomeMetrics provides homeMetrics,
         LocalGlass provides GlassLook(
             dark = dark,
             reduced = reduced,
@@ -262,8 +302,9 @@ fun HomeScreen(
                             editMode = true
                         }
                     },
-                    onLifted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                     onDragStarted = {
+                        // Menü açıkken parmak kaydırıldı: menü kapanır, sürükleme başlar (iOS gibi).
+                        if (overlayNow == Overlay.Menu) closeOverlay()
                         editMode = true
                         val k = drag.key
                         if (k != null && (overlayNow == Overlay.Group || bridge.onLibrary)) {
@@ -274,6 +315,7 @@ fun HomeScreen(
                         }
                     },
                     onMenu = { t ->
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         openFolderId = null
                         menu = MenuRequest(t.itemId, t.place, t.iconRect, t.cellRect, t.iconDp)
                         overlay = Overlay.Menu
@@ -286,7 +328,10 @@ fun HomeScreen(
                 detectTapGestures(onDoubleTap = {
                     val st = settingsNow
                     if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && st.doubleTapLock) {
-                        if (!LockService.lock()) overlay = Overlay.LockPrompt
+                        if (!LockService.lock()) {
+                            lockReason = LockReason.Lock
+                            overlay = Overlay.LockPrompt
+                        }
                     }
                 })
             }
@@ -300,7 +345,15 @@ fun HomeScreen(
                             // Hangi hareketin ne açacağı Ayarlar > Hareketler'den seçilir.
                             val action = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
                             when (action) {
-                                SwipeAction.ControlCenter -> overlay = Overlay.Control
+                                // Telefonun KENDİ Kontrol Merkezi / bildirimleri.
+                                SwipeAction.ControlCenter -> if (!SystemPanels.openControlCenter(context)) {
+                                    lockReason = LockReason.Panels
+                                    overlay = Overlay.LockPrompt
+                                }
+                                SwipeAction.Notifications -> if (!SystemPanels.openNotifications(context)) {
+                                    lockReason = LockReason.Panels
+                                    overlay = Overlay.LockPrompt
+                                }
                                 SwipeAction.Search -> overlay = Overlay.Search
                                 SwipeAction.None -> Unit
                             }
@@ -312,11 +365,26 @@ fun HomeScreen(
                 )
             }
     ) {
+        // İçerik katmanı kaydedilir: üstteki menü/düğmeler bunu bulanıklaştırıp yalnızca kendi arkalarında gösterir.
+        val contentLayer = rememberGraphicsLayer()
+        val maxBlurPx = with(density) { 22.dp.toPx() }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .drawWithContent {
+                    contentLayer.record { this@drawWithContent.drawContent() }
+                    drawLayer(contentLayer)
+                }
+        ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
         if (settings.launcherWallpaper && wp != null) {
             Image(
-                wp, null, Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier),
+                wp, null,
+                Modifier.fillMaxSize().graphicsLayer {
+                    val r = maxBlurPx * maxOf(blurAmount, libProgress.floatValue)
+                    renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
+                },
                 contentScale = ContentScale.Crop,
             )
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = settings.wallpaperDim)))
@@ -339,9 +407,13 @@ fun HomeScreen(
                 onOpenSearch = { overlay = Overlay.Search },
                 onOpenFolder = { f, c -> openFolderAt(f, c) },
                 onOpenGroup = { g -> group = g; overlay = Overlay.Group },
+                libProgress = libProgress,
             )
         }
+        }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
+
+        CompositionLocalProvider(LocalContentBackdrop provides contentLayer) {
 
         AnimatedVisibility(
             overlay == Overlay.Search,
@@ -349,13 +421,6 @@ fun HomeScreen(
             exit = fadeOut(motion.tween(140)),
         ) {
             SearchOverlay(vm, allApps, suggestions, settings.glassStrength, settings.iconGlass, onClose = { closeOverlay() })
-        }
-        AnimatedVisibility(
-            overlay == Overlay.Control,
-            enter = slideInVertically(motion.spring()) { -it / 2 } + fadeIn(motion.tween(200)),
-            exit = slideOutVertically(motion.tween(200)) { -it / 2 } + fadeOut(motion.tween(160)),
-        ) {
-            ControlPanel(settings.glassStrength, onClose = { closeOverlay() })
         }
         AnimatedVisibility(
             overlay == Overlay.Settings,
@@ -477,6 +542,7 @@ fun HomeScreen(
             exit = fadeOut(motion.tween(140)),
         ) {
             LockPrompt(
+                reason = lockReason,
                 strength = settings.glassStrength,
                 onOpenSettings = {
                     closeOverlay()
@@ -494,31 +560,35 @@ fun HomeScreen(
             )
         }
 
-        // Düzenleme modu üst çubuğu
+        // Düzenleme modu düğmeleri: durum çubuğu ile ilk simge satırının TAM ortasında, köşelerinden
+        // yayla açılır; arkaları yalnızca kendileri bulanık cam.
+        val btnH = 30.dp
+        val btnY = homeMetrics?.let { (statusTopDp + it.firstTop) / 2f - btnH / 2f } ?: (statusTopDp + 8.dp)
+        val showEditBar = editMode && overlay == Overlay.None
         AnimatedVisibility(
-            editMode && overlay == Overlay.None,
-            modifier = Modifier.align(Alignment.TopCenter),
-            enter = fadeIn(),
-            exit = fadeOut(),
+            showEditBar,
+            modifier = Modifier.align(Alignment.TopStart).offset(x = 16.dp, y = btnY),
+            enter = scaleIn(motion.bouncy(), initialScale = 0.4f, transformOrigin = TransformOrigin(0f, 0f)) + fadeIn(motion.tween(160)),
+            exit = scaleOut(motion.tween(160), targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 0f)) + fadeOut(motion.tween(140)),
         ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.statusBars)
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GlassButton("+", settings.glassStrength) { overlay = Overlay.Widgets }
-                    GlassButton("Ayarlar", settings.glassStrength) { overlay = Overlay.Settings }
-                }
-                GlassButton("Bitti", settings.glassStrength) { editMode = false }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GlassButton("+", settings.glassStrength, btnH) { overlay = Overlay.Widgets }
+                GlassButton("Ayarlar", settings.glassStrength, btnH) { overlay = Overlay.Settings }
             }
+        }
+        AnimatedVisibility(
+            showEditBar,
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = (-16).dp, y = btnY),
+            enter = scaleIn(motion.bouncy(), initialScale = 0.4f, transformOrigin = TransformOrigin(1f, 0f)) + fadeIn(motion.tween(160)),
+            exit = scaleOut(motion.tween(160), targetScale = 0.6f, transformOrigin = TransformOrigin(1f, 0f)) + fadeOut(motion.tween(140)),
+        ) {
+            GlassButton("Bitti", settings.glassStrength, btnH) { editMode = false }
+        }
         }
 
         // Sürüklenen öğenin hayalet simgesi (tüm katmanların üstünde)
         val dk = drag.key
-        if (dk != null) {
+        if (dk != null && drag.moved) {
             val gs = drag.ghostSize
             val gw = with(density) { (gs?.width ?: drag.iconDp).toPx() }
             val gh = with(density) { (gs?.height ?: drag.iconDp).toPx() }
@@ -548,15 +618,20 @@ fun HomeScreen(
 }
 
 @Composable
-internal fun GlassButton(text: String, strength: Float, onClick: () -> Unit) {
+internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onClick: () -> Unit) {
     Box(
         Modifier
-            .height(34.dp)
-            .liquidGlass(CircleShape, strength, 4.dp)
+            .height(height)
+            .liquidGlass(CircleShape, strength, 6.dp, panel = true)
             .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp),
+            .padding(horizontal = 15.dp),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+    ) {
+        Text(
+            text, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            style = LocalTextStyle.current.copy(shadow = IosTextShadow),
+        )
+    }
 }
 
 /** Telefonun Pil Tasarrufu modu (değişince güncellenir; yalnızca launcher ekrandayken dinlenir). */
@@ -577,7 +652,13 @@ private fun rememberPowerSaveMode(): Boolean {
 
 /** Çift dokunarak kilitleme için Erişilebilirlik izni yoksa gösterilen açıklama penceresi. */
 @Composable
-private fun LockPrompt(strength: Float, onOpenSettings: () -> Unit, onDisable: () -> Unit, onClose: () -> Unit) {
+private fun LockPrompt(
+    reason: LockReason,
+    strength: Float,
+    onOpenSettings: () -> Unit,
+    onDisable: () -> Unit,
+    onClose: () -> Unit,
+) {
     Box(
         Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
         contentAlignment = Alignment.Center,
@@ -585,18 +666,24 @@ private fun LockPrompt(strength: Float, onOpenSettings: () -> Unit, onDisable: (
         Column(
             Modifier
                 .padding(28.dp)
-                .liquidGlass(RoundedCornerShape(28.dp), strength, 18.dp)
-                .background(Color(0x66000000))
+                .liquidGlass(RoundedCornerShape(28.dp), strength, 18.dp, panel = true)
+                .background(Color(0x40000000))
                 .pointerInput(Unit) { detectTapGestures { } }
                 .padding(20.dp),
         ) {
-            Text("Çift dokunarak kilitle", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(
+                if (reason == LockReason.Lock) "Çift dokunarak kilitle" else "Kontrol Merkezi",
+                color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.Bold,
+            )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Telefonu kilitleyebilmek için Android, Glass Launcher'ın Erişilebilirlik hizmetini açmanızı istiyor.\n\n" +
+                (if (reason == LockReason.Lock)
+                    "Telefonu kilitleyebilmek için Android, Glass Launcher'ın Erişilebilirlik hizmetini açmanızı istiyor.\n\n"
+                else
+                    "Telefonun kendi Kontrol Merkezi'ni açabilmek için Android, Glass Launcher'ın Erişilebilirlik hizmetini açmanızı istiyor.\n\n") +
                     "Ayarlar > Erişilebilirlik > Yüklü uygulamalar (veya İndirilen uygulamalar) bölümünde " +
-                    "\"Glass Launcher – Çift dokunarak kilitle\"yi açın.\n\n" +
-                    "Bu hizmet ekran içeriğini okumaz ve veri toplamaz; yalnızca kilitleme komutunu verir. " +
+                    "\"Glass Launcher – Kilit ve Kontrol Merkezi\"ni açın.\n\n" +
+                    "Bu hizmet ekran içeriğini okumaz ve veri toplamaz; yalnızca kilitleme ve panel açma komutlarını verir. " +
                     "Parmak izi ve yüz tanıma ile açma çalışmaya devam eder.",
                 color = Color(0xFFE5E5EA), fontSize = 14.sp, lineHeight = 19.sp,
             )

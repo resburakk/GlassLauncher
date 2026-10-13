@@ -21,6 +21,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -130,12 +134,20 @@ fun ContextMenuOverlay(
         }
     }
 
+    // Açılış: simgeden yayla büyüyerek (iOS 26 gibi esnek); simge de hafifçe kalkar.
+    val motion = LocalMotion.current
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { appear.animateTo(1f, motion.bouncy()) }
+
     Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) }) {
         // Kaldırılmış simge
         Box(
             Modifier
                 .offset { IntOffset(req.iconRect.left.roundToInt(), req.iconRect.top.roundToInt()) }
-                .graphicsLayer { scaleX = 1.06f; scaleY = 1.06f }
+                .graphicsLayer {
+                    val k = 1f + 0.08f * appear.value
+                    scaleX = k; scaleY = k
+                }
         ) {
             when {
                 widget != null -> Unit // widget yerinde kalır; yalnızca menü gösterilir
@@ -152,8 +164,8 @@ fun ContextMenuOverlay(
                 Column(
                     Modifier
                         .width(250.dp)
-                        .liquidGlass(RoundedCornerShape(22.dp), strength, 18.dp)
-                        .background(Color(0x59000000))
+                        .liquidGlass(RoundedCornerShape(22.dp), strength, 18.dp, panel = true)
+                        .background(Color(0x40000000))
                         .pointerInput(Unit) { detectTapGestures { } }
                 ) {
                     shortcuts.forEachIndexed { i, (info, icon) ->
@@ -184,8 +196,18 @@ fun ContextMenuOverlay(
             val x = req.iconRect.left.coerceIn(marginPx, maxX)
             val below = req.cellRect.bottom + gapPx + p.height < constraints.maxHeight - marginPx
             val y = if (below) req.cellRect.bottom + gapPx else req.iconRect.top - gapPx - p.height
+            val py = y.coerceAtLeast(marginPx)
+            // Büyüme noktası: simgenin menüye en yakın kenarı (menü altta ise üst kenar, üstte ise alt kenar).
+            val ox = ((req.iconRect.center.x - x) / p.width.coerceAtLeast(1)).coerceIn(0f, 1f)
+            val oy = if (below) 0f else 1f
             layout(constraints.maxWidth, constraints.maxHeight) {
-                p.place(x.roundToInt(), y.coerceAtLeast(marginPx).roundToInt())
+                p.placeWithLayer(x.roundToInt(), py.roundToInt()) {
+                    val a = appear.value
+                    transformOrigin = TransformOrigin(ox, oy)
+                    scaleX = 0.25f + 0.75f * a
+                    scaleY = 0.25f + 0.75f * a
+                    alpha = a.coerceIn(0f, 1f)
+                }
             }
         }
     }

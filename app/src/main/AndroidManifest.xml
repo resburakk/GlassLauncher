@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <!-- Yalnızca kullanıcı "sistem duvar kâğıdı olarak da ayarla" seçerse kullanılır. -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Üstten kaydırınca telefonun kendi Kontrol Merkezi'ni / bildirim gölgesini açmak için. -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
 
     <!-- Paket görünürlüğü: QUERY_ALL_PACKAGES yerine yalnızca başlatılabilir uygulamalar sorgulanır -->
     <queries>

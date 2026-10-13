@@ -13,6 +13,9 @@ import dev.glass.launcher.data.LauncherSettings
  */
 val LocalPt = staticCompositionLocalOf { 1.dp }
 
+/** Ana ekran ölçüleri; klasör, arama ve arşiv katmanları simgeleri ana ekranla aynı boyutta çizmek için okur. */
+val LocalHomeMetrics = staticCompositionLocalOf<HomeMetrics?> { null }
+
 /**
  * Ana ekran ölçüleri — kullanıcının paylaştığı iOS 26 ekran görüntüsünden (iPhone 16 Pro, 402×874 pt)
  * piksel ölçümüyle alınmıştır:
@@ -41,6 +44,7 @@ data class HomeMetrics(
     val dockIcon: Dp,
     val dockPitch: Dp,
     val dockInnerStart: Dp,
+    val dockCorner: Dp,
     val pillW: Dp,
     val pillH: Dp,
     /** Arama hapının merkezinin ekran tepesine uzaklığı. */
@@ -87,18 +91,18 @@ data class HomeMetrics(
             val dockInnerStart = (innerW - dockIcon - dockPitch * 3f) / 2f
 
             // Arama hapı ve satır sayısı: hap, simge dizisinin altı ile dock arasında simetrik durur.
-            val pillW = u * 77f
-            val pillH = u * 29f
+            val pillW = u * 77f * s.pillScale
+            val pillH = u * 29f * s.pillScale
             val minGap = u * 14f
             val avail = dockTop - minGap * 2f - pillH - firstTop - icon - labelBlock
             val fit = (avail / pitchY).toInt() + 1
             val rows = fit.coerceIn(1, s.rows)
             val gridBottom = firstTop + pitchY * (rows - 1).toFloat() + icon + labelBlock
-            val pillCenterY = (gridBottom + dockTop) / 2f
+            val pillCenterY = (gridBottom + dockTop) / 2f - u * s.pillOffset
 
             return HomeMetrics(
                 u, cols, rows, icon, pitchX, pitchY, marginX, firstTop, gridBottom,
-                dockH, dockMarginX, dockTop, dockIcon, dockPitch, dockInnerStart,
+                dockH, dockMarginX, dockTop, dockIcon, dockPitch, dockInnerStart, dockH * s.dockCorner,
                 pillW, pillH, pillCenterY,
             )
         }

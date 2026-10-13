@@ -31,6 +31,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -44,6 +45,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.platform.LocalView
@@ -108,6 +111,8 @@ internal fun HomeContent(
     onOpenSearch: () -> Unit,
     onOpenFolder: (FolderItem, Offset) -> Unit,
     onOpenGroup: (LibraryGroup) -> Unit,
+    /** Arşive geçiş oranı (0 = ana ekran, 1 = arşiv); arka plan bulanıklığı için üst bileşen okur. */
+    libProgress: MutableFloatState,
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -227,6 +232,10 @@ internal fun HomeContent(
             derivedStateOf {
                 (pagerState.currentPage + pagerState.currentPageOffsetFraction - (libIndex - 1)).coerceIn(0f, 1f)
             }
+        }
+
+        LaunchedEffect(libIndex) {
+            snapshotFlow { libFraction }.collect { libProgress.floatValue = it }
         }
 
         // Sayfa kaydırılırken noktalar, durunca arama hapı görünür (iOS 16+ davranışı).
@@ -437,7 +446,7 @@ internal fun HomeContent(
                         .width(dockW)
                         .height(m.dockH)
                         .onGloballyPositioned { dockRect = it.boundsInRoot() }
-                        .liquidGlass(RoundedCornerShape(m.dockH * 0.34f), settings.glassStrength * settings.dockOpacity, 14.dp)
+                        .liquidGlass(RoundedCornerShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp)
                 ) {
                     shownDock.forEachIndexed { i, dk ->
                       key(dk) {
@@ -481,9 +490,13 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: Float, onClick: (
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val pt = m.pt.value
-        SearchGlyph(Color.White, m.pt * 13f)
-        Spacer(Modifier.width(m.pt * 5f))
-        Text("Ara", color = Color.White, fontSize = (14f * pt).sp, fontWeight = FontWeight.SemiBold)
+        val k = m.pillH / (m.pt * 29f) // arama düğmesi boyut çarpanı
+        SearchGlyph(Color.White, m.pt * 13f * k)
+        Spacer(Modifier.width(m.pt * 5f * k))
+        Text(
+            "Ara", color = Color.White, fontSize = (14f * pt * k).sp, fontWeight = FontWeight.SemiBold,
+            style = LocalTextStyle.current.copy(shadow = IosTextShadow),
+        )
     }
 }
 
@@ -492,7 +505,8 @@ private val LabelStyle = TextStyle(
     fontSize = 11.sp,
     fontWeight = FontWeight.Medium,
     textAlign = TextAlign.Center,
-    shadow = Shadow(Color(0x66000000), Offset(0f, 1f), 4f),
+    fontFamily = AppFont,
+    shadow = IosTextShadow,
 )
 
 /**

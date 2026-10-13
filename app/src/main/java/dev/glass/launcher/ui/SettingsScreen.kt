@@ -271,7 +271,20 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         SliderRow("Cam yoğunluğu", pct(s.dockOpacity), s.dockOpacity, 0f..2f) { v -> onChange { it.copy(dockOpacity = v) } }
         RowDivider()
         SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f) { v -> onChange { it.copy(dockBottom = v) } }
+        RowDivider()
+        SliderRow("Köşe yuvarlaklığı", pct(s.dockCorner / 0.5f), s.dockCorner, 0.08f..0.5f) { v -> onChange { it.copy(dockCorner = v) } }
     }
+    Group("Arama düğmesi") {
+        SliderRow("Boyut", pct(s.pillScale), s.pillScale, 0.7f..1.5f) { v -> onChange { it.copy(pillScale = v) } }
+        RowDivider()
+        val pos = when {
+            s.pillOffset > 0.5f -> "${s.pillOffset.toInt()} pt yukarı"
+            s.pillOffset < -0.5f -> "${(-s.pillOffset).toInt()} pt aşağı"
+            else -> "Ortada"
+        }
+        SliderRow("Konum", pos, s.pillOffset, -60f..60f) { v -> onChange { it.copy(pillOffset = v) } }
+    }
+    Footer("Konum \"Ortada\" iken arama düğmesi, simge dizisi ile dock arasında tam ortada durur.")
     Footer("Dock simgelerini değiştirmek için düzenleme modunda simgeleri dock'a sürükleyin.")
 }
 
@@ -359,25 +372,13 @@ private fun AnimationsPage(s: LauncherSettings, onChange: ((LauncherSettings) ->
 @Composable
 private fun GesturesPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     val ctx = LocalContext.current
-    Group("Ekranın üstünden aşağı kaydırma") {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SwipeAction.entries.forEach { a ->
-                Chip(a.title, s.topSwipe == a, Modifier.weight(1f)) { onChange { it.copy(topSwipe = a) } }
-            }
-        }
-    }
-    Group("Ortadan (boş alandan) aşağı kaydırma") {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SwipeAction.entries.forEach { a ->
-                Chip(a.title, s.midSwipe == a, Modifier.weight(1f)) { onChange { it.copy(midSwipe = a) } }
-            }
-        }
-    }
+    Group("Ekranın üstünden aşağı kaydırma") { SwipeChoices(s.topSwipe) { a -> onChange { it.copy(topSwipe = a) } } }
+    Group("Ortadan (boş alandan) aşağı kaydırma") { SwipeChoices(s.midSwipe) { a -> onChange { it.copy(midSwipe = a) } } }
     Footer(
-        "Sistemin bildirim gölgesi her zaman durum çubuğundan (en üst kenardan) aşağı çekilerek açılır; " +
-            "launcher bunu engelleyemez veya değiştiremez."
+        "Kontrol Merkezi ve Bildirimler, telefonun KENDİ panelleridir. Güvenilir çalışması için aşağıdaki " +
+            "Erişilebilirlik izni önerilir; izin kapalıyken de denenir ama bazı telefonlarda engellenebilir."
     )
-    Group("Çift dokunma") {
+    Group("Çift dokunma ve izin") {
         ToggleRow("Boş alana çift dokununca kilitle", s.doubleTapLock) { v -> onChange { it.copy(doubleTapLock = v) } }
         RowDivider()
         val enabled = LockService.isEnabled(ctx)
@@ -393,8 +394,8 @@ private fun GesturesPage(s: LauncherSettings, onChange: ((LauncherSettings) -> L
     }
     Footer(
         "Kilitleme için Android, Erişilebilirlik hizmetinin açılmasını ister: Ayarlar > Erişilebilirlik > Yüklü " +
-            "uygulamalar > \"Glass Launcher – Çift dokunarak kilitle\". Hizmet ekran içeriğini okumaz; yalnızca " +
-            "kilitleme komutunu verir. Parmak izi/yüz tanıma ile açma çalışmaya devam eder."
+            "uygulamalar > \"Glass Launcher – Kilit ve Kontrol Merkezi\". Hizmet ekran içeriğini okumaz; yalnızca " +
+            "kilitleme ve panel açma komutlarını verir. Parmak izi/yüz tanıma ile açma çalışmaya devam eder."
     )
 }
 
@@ -646,4 +647,15 @@ private fun Chip(text: String, selected: Boolean, modifier: Modifier, onClick: (
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = Color.White, fontSize = 14.sp, maxLines = 1) }
+}
+
+@Composable
+private fun SwipeChoices(selected: SwipeAction, onSelect: (SwipeAction) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SwipeAction.entries.chunked(2).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { a -> Chip(a.title, selected == a, Modifier.weight(1f)) { onSelect(a) } }
+            }
+        }
+    }
 }

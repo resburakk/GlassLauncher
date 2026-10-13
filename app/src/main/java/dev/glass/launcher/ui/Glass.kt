@@ -31,6 +31,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.BlurEffect
+import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.layer.GraphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
+import androidx.compose.ui.graphics.rememberGraphicsLayer
+import androidx.compose.ui.platform.LocalDensity
 import dev.glass.launcher.data.Blurred
 import dev.glass.launcher.data.LauncherSettings
 
@@ -53,6 +60,18 @@ data class GlassLook(
 
 val LocalGlass = staticCompositionLocalOf { GlassLook() }
 
+/**
+ * Launcher içeriğinin (duvar kâğıdı kopyası + simgeler) kaydedilmiş çizim katmanı. Üst katmandaki menü ve
+ * düğmeler bunu bulanıklaştırarak yalnızca KENDİ arkalarını gerçekten bulanık gösterir (tüm ekran değil).
+ */
+val LocalContentBackdrop = staticCompositionLocalOf<GraphicsLayer?> { null }
+
+/**
+ * Sistem duvar kâğıdını bulanıklaştırma (0 = net, 1 = tam bulanık). Activity, Android 12+ pencere arkası
+ * bulanıklığıyla uygular; cihaz desteklemiyorsa etkisizdir.
+ */
+val LocalWindowBlur = staticCompositionLocalOf<((Float) -> Unit)?> { null }
+
 /** Geçerli ayarlar; simge ve etiket çizen bileşenler buradan okur. */
 val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
 
@@ -62,12 +81,21 @@ val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
  * duvar kâğıdı seçiliyse [GlassBackdrop] ile ayrıca çizilir (Android, sistem duvar kâğıdının arkasını
  * bulanıklaştırmaya izin vermez).
  */
-fun Modifier.liquidGlass(shape: Shape, strength: Float = 1f, elevation: Dp = 14.dp): Modifier = composed {
+fun Modifier.liquidGlass(
+    shape: Shape,
+    strength: Float = 1f,
+    elevation: Dp = 14.dp,
+    /** true: üst katman paneli — arkasındaki launcher içeriğini gerçek zamanlı bulanıklaştırır. */
+    panel: Boolean = false,
+): Modifier = composed {
     val look = LocalGlass.current
     val s = strength
-    val bd = if (look.reduced) null else look.backdrop
+    val content = if (panel && !look.reduced) LocalContentBackdrop.current else null
+    val bd = if (look.reduced || content != null) null else look.backdrop
+    val blurLayer = if (content != null) rememberGraphicsLayer() else null
+    val blurPx = with(LocalDensity.current) { 26.dp.toPx() }
     // Gerçek bulanıklık varken dolgu daha ince tutulur; cam arkasındaki renkleri göstersin.
-    val fill = if (bd != null) 0.55f else 1f
+    val fill = if (bd != null || content != null) 0.55f else 1f
     val base = if (look.dark) {
         Brush.verticalGradient(listOf(black((0.30f * s + 0.08f) * fill), black((0.42f * s + 0.08f) * fill)))
     } else {
@@ -84,11 +112,22 @@ fun Modifier.liquidGlass(shape: Shape, strength: Float = 1f, elevation: Dp = 14.
             if (look.reduced || elevation == 0.dp) Modifier
             else Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
         )
-        .then(if (bd != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() } else Modifier)
+        .then(
+            if (bd != null || content != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() }
+            else Modifier
+        )
         .clip(shape)
         .then(
             if (bd != null) Modifier.drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin) }
             else Modifier
+        )
+        .then(
+            if (content != null && blurLayer != null) Modifier.drawBehind {
+                // Kayıtlı içerik katmanını bulanık bir katmana çiz, bu yüzeyin konumuna göre kaydır.
+                blurLayer.renderEffect = BlurEffect(blurPx, blurPx, TileMode.Clamp)
+                blurLayer.record(this, layoutDirection, content.size) { drawLayer(content) }
+                translate(-origin.x, -origin.y) { drawLayer(blurLayer) }
+            } else Modifier
         )
         .background(base)
         .then(

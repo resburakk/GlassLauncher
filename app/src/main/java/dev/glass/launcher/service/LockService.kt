@@ -31,6 +31,12 @@ class LockService : AccessibilityService() {
         /** Kilitlediyse true; hizmet kapalıysa false. */
         fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true
 
+        /** Sistemin Kontrol Merkezi'ni (hızlı ayarlar) açar; hizmet kapalıysa false. */
+        fun quickSettings(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS) == true
+
+        /** Sistemin bildirim gölgesini açar; hizmet kapalıysa false. */
+        fun notifications(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS) == true
+
         /** Hizmet sistem ayarlarında etkin mi? */
         fun isEnabled(ctx: Context): Boolean {
             val me = ComponentName(ctx, LockService::class.java).flattenToString()
