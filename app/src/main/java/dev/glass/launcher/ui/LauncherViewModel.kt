@@ -50,6 +50,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val layout: StateFlow<HomeLayout> = _layout
 
     private var base: HomeLayout? = null
+    /** Kayıtlı yerleşim yüklü uygulamalarla en az bir kez uzlaştırıldı mı? */
+    @Volatile private var layoutReady = false
 
     init {
         reloadWallpaper()
@@ -62,6 +64,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 val changed = next != base
                 base = next
                 _layout.value = next
+                layoutReady = true
                 if (changed) la.settingsStore.saveLayout(next.toJson())
             }
         }
@@ -182,11 +185,16 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun loadPhoto(name: String, maxSide: Int): ImageBitmap? = la.wallpaperRepository.loadPhoto(name, maxSide)
 
     /** Bağlantısı kopmuş sistem widget'larını (ör. uygulaması kaldırılmış) yerleşimden çıkarır. */
-    fun pruneWidgets() {
+    fun pruneWidgets(pendingId: Int?) {
+        // Yerleşim henüz yüklenmediyse hiçbir şeyi silme (kullanıcının widget'ları yanlışlıkla gitmesin).
+        if (!layoutReady) return
         val host = la.widgetHost
         val bad = _layout.value.widgets.filter { it.kind == WidgetKind.System && host.info(it.appWidgetId) == null }
         if (bad.isNotEmpty()) editLayout { l -> bad.fold(l) { acc, w -> acc.removeItem(w.id) } }
-        host.deleteOrphans(_layout.value.widgets.map { it.appWidgetId }.filter { it >= 0 }.toSet())
+        val keep = _layout.value.widgets.map { it.appWidgetId }.filter { it >= 0 }.toMutableSet()
+        // Ekleme akışı sürerken (izin/yapılandırma ekranı açıkken) ayrılmış kimlik silinmemeli.
+        pendingId?.let { keep += it }
+        host.deleteOrphans(keep)
     }
 
     // --- Yedekleme ---

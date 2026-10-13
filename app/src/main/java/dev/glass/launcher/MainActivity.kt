@@ -74,7 +74,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         super.onStart()
         wallpaperManager.addOnColorsChangedListener(colorsListener, Handler(Looper.getMainLooper()))
         widgetHost.startListening()
-        vm.pruneWidgets()
+        vm.pruneWidgets(pending?.id)
     }
 
     override fun onStop() {
