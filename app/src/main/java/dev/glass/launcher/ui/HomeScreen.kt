@@ -19,7 +19,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +48,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -68,13 +69,14 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -98,6 +100,11 @@ import kotlin.math.roundToInt
 
 enum class Overlay { None, Search, Control, Settings, Folder }
 
+/** Ana ekranın bırakma işlemini klasör katmanına taşımak için küçük köprü. */
+class DropBridge {
+    var home: ((String, Offset, String?) -> Unit)? = null
+}
+
 /**
  * AŞAMA 3c: düzenleme modu (sallanma), sürükle-bırak, klasörler (3×3), kalıcı yerleşim.
  * Hareketler: boş alanda uzun bas = düzenleme modu, aşağı kaydır = arama, üst bölgeden aşağı = panel.
@@ -111,6 +118,9 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
     val settings by vm.settings.collectAsStateWithLifecycle()
 
     val drag = remember { DragState() }
+    val haptic = LocalHapticFeedback.current
+    val bridge = remember { DropBridge() }
+    val folderPages = remember { mutableStateMapOf<String, Int>() }
     var overlay by remember { mutableStateOf(Overlay.None) }
     var editMode by remember { mutableStateOf(false) }
     var openFolderId by remember { mutableStateOf<String?>(null) }
@@ -153,27 +163,30 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
         openFolderId = null
     }
 
+    SideEffect { drag.activeLayer = if (overlay == Overlay.Folder) DragLayer.Folder else DragLayer.Home }
+
     Box(
         Modifier
             .fillMaxSize()
-            // Sürükleme sırasında tüm hareketi EN ÜST katmanda (Initial geçişi) alır ve tüketir;
-            // böylece sayfa kaydırıcı ve diğer dedektörler hareketi çalamaz.
+            // Uzun basma + sürükleme tek yerde, kök katmanda algılanır (bkz. detectHomeDrag).
             .pointerInput(drag) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        if (drag.key == null) continue
-                        val change = event.changes.first()
-                        drag.pos = change.position
-                        event.changes.forEach { it.consume() }
-                        if (!change.pressed) drag.finish()
-                    }
-                }
+                detectHomeDrag(
+                    drag = drag,
+                    enabled = { overlayNow == Overlay.None || overlayNow == Overlay.Folder },
+                    isEditing = { editNow },
+                    onLongPressEmpty = {
+                        if (overlayNow == Overlay.None && !editNow) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            editMode = true
+                        }
+                    },
+                    onDragStarted = {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        editMode = true
+                    },
+                )
             }
             .onSizeChanged { rootSize = it }
-            .pointerInput(Unit) {
-                detectTapGestures(onLongPress = { if (overlayNow == Overlay.None && !editNow) editMode = true })
-            }
             .pointerInput(topZonePx) {
                 var startY = 0f
                 var total = 0f
@@ -197,12 +210,13 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 byKey = byKey,
                 settings = settings,
                 drag = drag,
+                bridge = bridge,
+                folderPages = folderPages,
                 edit = editMode,
                 jiggle = jiggle,
                 isDefaultHome = isDefaultHome,
                 onRequestDefault = onRequestDefault,
                 onOpenSearch = { overlay = Overlay.Search },
-                onStartEdit = { editMode = true },
                 onOpenFolder = { f, c ->
                     folderOrigin = TransformOrigin(
                         c.x / rootSize.width.coerceAtLeast(1),
@@ -250,11 +264,19 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                     drag = drag,
                     jiggle = jiggle,
                     edit = editMode,
-                    onStartEdit = { editMode = true },
+                    initialPage = folderPages[f.id] ?: 0,
+                    onPageChanged = { folderPages[f.id] = it },
                     onRename = { name -> vm.editLayout { it.renameFolder(f.id, name) } },
                     onReorder = { key, idx -> vm.editLayout { it.reorderInFolder(f.id, key, idx) } },
-                    onMoveOut = { key ->
-                        vm.editLayout { it.moveAppToGrid(key, it.items.size) }
+                    onDropOutside = { key, pos, hover ->
+                        // Klasör dışına bırakılan uygulama ana ekrana taşınır (bırakıldığı yere).
+                        closeOverlay()
+                        bridge.home?.invoke(key, pos, hover)
+                    },
+                    onDragLeftPanel = {
+                        // iOS gibi: sürüklerken panelden çıkınca klasör kapanır, sürükleme ana ekranda sürer.
+                        val k = drag.key
+                        if (k != null) drag.redirectDrop { p, h -> bridge.home?.invoke(k, p, h) }
                         closeOverlay()
                     },
                     onClose = { closeOverlay() },
@@ -322,12 +344,13 @@ private fun HomeContent(
     byKey: Map<String, AppInfo>,
     settings: LauncherSettings,
     drag: DragState,
+    bridge: DropBridge,
+    folderPages: Map<String, Int>,
     edit: Boolean,
     jiggle: State<Float>,
     isDefaultHome: Boolean,
     onRequestDefault: () -> Unit,
     onOpenSearch: () -> Unit,
-    onStartEdit: () -> Unit,
     onOpenFolder: (FolderItem, Offset) -> Unit,
 ) {
     val density = LocalDensity.current
@@ -376,24 +399,31 @@ private fun HomeContent(
             }
         }
 
-        fun handleDrop(id: String, pos: Offset) {
+        fun handleDrop(id: String, pos: Offset, hover: String?) {
             val cur = vm.layout.value
             val isApp = byKey.containsKey(id)
-            val iconPx = with(density) { m.icon.toPx() }
+            val topLevel = cur.items.any { it.id == id }
 
             // 1) Dock bölgesi
             if (dockRect.height > 0f && pos.y >= dockRect.top - with(density) { 12.dp.toPx() }) {
-                if (!isApp) return
+                if (!isApp) return // klasörler dock'a konmaz (iOS'ta da)
                 val dockPitchPx = with(density) { m.dockPitch.toPx() }
                 val dockIconPx = with(density) { m.dockIcon.toPx() }
                 val first = dockRect.left + with(density) { m.dockInnerStart.toPx() }
-                val slot = ((pos.x - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx)
-                    .let { floor(it).toInt() }.coerceIn(0, 3)
+                val slot = floor((pos.x - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx)
+                    .toInt().coerceIn(0, 3)
                 vm.editLayout { it.moveToDock(id, slot) }
                 return
             }
 
-            // 2) Ana ekran ızgarası
+            // 2) Bir simgenin üzerine bırakıldı: klasör oluştur / klasöre ekle
+            if (hover != null && isApp) {
+                vm.editLayout { it.mergeInto(hover, id) }
+                return
+            }
+
+            // 3) Ana ekran ızgarasında bir hücreye
+            val iconPx = with(density) { m.icon.toPx() }
             val pitchXPx = with(density) { m.pitchX.toPx() }
             val pitchYPx = with(density) { m.pitchY.toPx() }
             val marginPx = with(density) { m.marginX.toPx() }
@@ -402,20 +432,10 @@ private fun HomeContent(
             val col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
             val idx = pagerState.currentPage * m.perPage + row * m.columns + col
-
-            val target = cur.items.getOrNull(idx)
-            val cx = gridOrigin.x + marginPx + col * pitchXPx + iconPx / 2f
-            val cy = gridOrigin.y + row * pitchYPx + iconPx / 2f
-            val inCenter = (pos - Offset(cx, cy)).getDistance() < iconPx * 0.5f
-
-            if (target != null && target.id != id && inCenter && isApp) {
-                vm.editLayout { it.mergeInto(target.id, id) }
-            } else if (cur.dock.contains(id)) {
-                vm.editLayout { it.moveAppToGrid(id, idx) }
-            } else {
-                vm.editLayout { it.moveItem(id, idx) }
-            }
+            if (topLevel) vm.editLayout { it.moveItem(id, idx) }
+            else vm.editLayout { it.moveAppToGrid(id, idx) } // dock'tan veya klasörden
         }
+        SideEffect { bridge.home = ::handleDrop }
 
         Column(Modifier.fillMaxSize()) {
             if (!isDefaultHome) {
@@ -455,21 +475,23 @@ private fun HomeContent(
                                             DraggableCell(
                                                 id = item.id, label = app.label, showLabel = settings.showLabels,
                                                 icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                                drag = drag, acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                                drag = drag, layer = DragLayer.Home, isApp = true,
+                                                acceptsMerge = true, edit = edit, jiggle = jiggle,
                                                 onClick = { if (!edit) vm.launch(app) },
-                                                onDragStart = onStartEdit,
-                                                onDrop = { p -> handleDrop(item.id, p) },
+                                                onDrop = { p, h -> handleDrop(item.id, p, h) },
                                             ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
                                         }
                                     }
                                     is FolderItem -> DraggableCell(
                                         id = item.id, label = item.name, showLabel = settings.showLabels,
                                         icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                        drag = drag, acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                        drag = drag, layer = DragLayer.Home, isApp = false,
+                                        acceptsMerge = true, edit = edit, jiggle = jiggle,
                                         onClick = { c -> onOpenFolder(item, c) },
-                                        onDragStart = onStartEdit,
-                                        onDrop = { p -> handleDrop(item.id, p) },
-                                    ) { FolderIcon(item, byKey, vm, m.icon, settings.glassStrength) }
+                                        onDrop = { p, h -> handleDrop(item.id, p, h) },
+                                    ) {
+                                        FolderIcon(item, byKey, vm, m.icon, settings.glassStrength, folderPages[item.id] ?: 0)
+                                    }
                                 }
                             }
                         }
@@ -512,10 +534,10 @@ private fun HomeContent(
                                 DraggableCell(
                                     id = key, label = app.label, showLabel = false,
                                     icon = m.dockIcon, pitchX = m.dockPitch, cellHeight = m.dockIcon,
-                                    drag = drag, acceptsMerge = false, edit = edit, jiggle = jiggle,
+                                    drag = drag, layer = DragLayer.Home, isApp = true,
+                                    acceptsMerge = false, edit = edit, jiggle = jiggle,
                                     onClick = { if (!edit) vm.launch(app) },
-                                    onDragStart = onStartEdit,
-                                    onDrop = { p -> handleDrop(key, p) },
+                                    onDrop = { p, h -> handleDrop(key, p, h) },
                                 ) { AppIconImage(app, vm, m.dockIcon, settings.iconGlass, settings.glassStrength) }
                             }
                         }

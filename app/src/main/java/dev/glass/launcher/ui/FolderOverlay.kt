@@ -22,6 +22,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,8 +41,6 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +52,7 @@ import androidx.compose.ui.unit.sp
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.FolderItem
 import dev.glass.launcher.data.LauncherSettings
-import kotlin.math.floor
+import kotlinx.coroutines.delay
 
 /**
  * Açık klasör: ekranın ortasında cam panel, üstte düzenlenebilir ad, 3×3 sayfalar (yatay kaydırma).
@@ -66,14 +67,15 @@ fun FolderOverlay(
     drag: DragState,
     jiggle: State<Float>,
     edit: Boolean,
-    onStartEdit: () -> Unit,
+    initialPage: Int,
+    onPageChanged: (Int) -> Unit,
     onRename: (String) -> Unit,
     onReorder: (String, Int) -> Unit,
-    onMoveOut: (String) -> Unit,
+    onDropOutside: (String, Offset, String?) -> Unit,
+    onDragLeftPanel: () -> Unit,
     onClose: () -> Unit,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
-    val density = LocalDensity.current
 
     var name by remember(folder.id) { mutableStateOf(folder.name) }
     val nameNow by rememberUpdatedState(name)
@@ -98,12 +100,33 @@ fun FolderOverlay(
         val pitch = inner / 3f
         val icon = pitch * 0.62f
         val rowH = icon + 28.dp
-        val pitchPx = with(density) { pitch.toPx() }
-        val rowHPx = with(density) { rowH.toPx() }
-
         val pages = folder.keys.chunked(9)
-        val pagerState = rememberPagerState { maxOf(pages.size, 1) }
-        var gridOrigin by remember { mutableStateOf(Offset.Zero) }
+        val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, maxOf(pages.size - 1, 0))) {
+            maxOf(pages.size, 1)
+        }
+        val pageChanged by rememberUpdatedState(onPageChanged)
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.currentPage }.collect { pageChanged(it) }
+        }
+
+        // Sürüklenen uygulama panelden çıkıp kısa süre dışarıda kalırsa klasör kapanır (iOS davranışı).
+        val outside by remember {
+            derivedStateOf { drag.isDragging && panelRect != Rect.Zero && !panelRect.contains(drag.pos) }
+        }
+        val leftPanel by rememberUpdatedState(onDragLeftPanel)
+        LaunchedEffect(outside) {
+            if (outside) {
+                delay(450)
+                leftPanel()
+            }
+        }
+
+        fun reorderAt(key: String, pos: Offset) {
+            // Bırakılan noktadaki hücrenin yerine geçer; boş alana bırakılırsa sona gider.
+            val hit = drag.targetsIn(DragLayer.Folder).firstOrNull { it.cellRect.contains(pos) }?.id
+            val idx = hit?.let { folder.keys.indexOf(it) }?.takeIf { it >= 0 } ?: (folder.keys.size - 1)
+            onReorder(key, idx)
+        }
 
         Column(
             Modifier
@@ -133,8 +156,7 @@ fun FolderOverlay(
                 userScrollEnabled = drag.key == null,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(rowH * 3)
-                    .onGloballyPositioned { gridOrigin = it.positionInRoot() },
+                        .height(rowH * 3),
             ) { page ->
                 val keys = pages.getOrNull(page).orEmpty()
                 Column(Modifier.fillMaxSize()) {
@@ -149,19 +171,12 @@ fun FolderOverlay(
                                     DraggableCell(
                                         id = k, label = app.label, showLabel = settings.showLabels,
                                         icon = icon, pitchX = pitch, cellHeight = rowH,
-                                        drag = drag, acceptsMerge = false, edit = edit, jiggle = jiggle,
+                                        drag = drag, layer = DragLayer.Folder, isApp = true,
+                                        acceptsMerge = false, edit = edit, jiggle = jiggle,
                                         onClick = { if (!edit) { vm.launch(app); onClose() } },
-                                        onDragStart = onStartEdit,
-                                        onDrop = { pos ->
-                                            if (panelRect.contains(pos)) {
-                                                val col = floor((pos.x - gridOrigin.x) / pitchPx).toInt().coerceIn(0, 2)
-                                                val r = floor((pos.y - gridOrigin.y) / rowHPx).toInt().coerceIn(0, 2)
-                                                val idx = (pagerState.currentPage * 9 + r * 3 + col)
-                                                    .coerceAtMost(folder.keys.size - 1)
-                                                onReorder(k, idx)
-                                            } else {
-                                                onMoveOut(k)
-                                            }
+                                        onDrop = { pos, hover ->
+                                            if (panelRect.contains(pos)) reorderAt(k, pos)
+                                            else onDropOutside(k, pos, hover)
                                         },
                                     ) { AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength) }
                                 }

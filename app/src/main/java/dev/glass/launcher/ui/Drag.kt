@@ -1,7 +1,11 @@
 package dev.glass.launcher.ui
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,20 +20,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -40,42 +46,160 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Shadow
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.FolderItem
 
-enum class DragSource { Grid, Dock, Folder }
+/** Sürüklenebilir öğenin bulunduğu katman. Klasör açıkken yalnızca klasör katmanı dokunuşa açıktır. */
+enum class DragLayer { Home, Folder }
 
-/** Sürüklenen öğenin durumu. Konum, pencere (kök) koordinatlarındadır. */
+/** Ekranda görünen, sürüklenebilir bir hücrenin kaydı. Konumlar kök (pencere) koordinatındadır. */
+class DragTarget(val id: String) {
+    var layer: DragLayer = DragLayer.Home
+    var isApp: Boolean = true
+    var acceptsMerge: Boolean = false
+    var iconDp: Dp = 60.dp
+    var cellRect: Rect = Rect.Zero
+    var iconRect: Rect = Rect.Zero
+    var onDrop: (Offset, String?) -> Unit = { _, _ -> }
+}
+
+/**
+ * Sürükle-bırak denetleyicisi.
+ *
+ * Tasarım: hücreler kendileri hareket algılamaz; yalnızca konumlarını buraya kaydeder. Uzun basma ve
+ * sürükleme kök katmanda, olayların ilk geçişinde (Initial) tek bir yerde algılanır. Sürükleme başladığı
+ * anda tüm olaylar tüketilir; böylece sayfa kaydırıcı (pager) parmağı çalamaz ve sayfa kaymaz.
+ */
 @Stable
 class DragState {
+    private val targets = HashMap<String, DragTarget>()
+
     var key by mutableStateOf<String?>(null)
         private set
     var pos by mutableStateOf(Offset.Zero)
+        private set
     var iconDp by mutableStateOf(60.dp)
         private set
+    var hoverId by mutableStateOf<String?>(null)
+        private set
+    /** Dokunuşa açık katman (klasör açıkken Folder). */
+    var activeLayer by mutableStateOf(DragLayer.Home)
 
-    /** Bırakıldığında çağrılacak işlem; sürükleme başlarken hücre tarafından verilir. */
-    private var dropHandler: ((Offset) -> Unit)? = null
+    private var dropHandler: ((Offset, String?) -> Unit)? = null
+    private var dragIsApp = true
 
-    fun start(id: String, icon: Dp, at: Offset, onDrop: (Offset) -> Unit) {
-        key = id
-        iconDp = icon
+    val isDragging: Boolean get() = key != null
+
+    fun register(t: DragTarget) {
+        targets[t.id] = t
+    }
+
+    fun unregister(t: DragTarget) {
+        if (targets[t.id] === t) targets.remove(t.id)
+    }
+
+    fun target(id: String): DragTarget? = targets[id]
+
+    fun hitTest(p: Offset): DragTarget? =
+        targets.values.firstOrNull { it.layer == activeLayer && it.cellRect.contains(p) }
+
+    fun targetsIn(layer: DragLayer): Collection<DragTarget> = targets.values.filter { it.layer == layer }
+
+    fun start(t: DragTarget, at: Offset) {
+        key = t.id
+        iconDp = t.iconDp
         pos = at
-        dropHandler = onDrop
+        dropHandler = t.onDrop
+        dragIsApp = t.isApp
+        hoverId = null
+    }
+
+    fun move(p: Offset) {
+        pos = p
+        val k = key ?: return
+        // Klasör oluşturma/ekleme hedefi: yalnızca uygulama sürüklenirken, simgenin merkezine yakınsa.
+        hoverId = if (!dragIsApp) null else targets.values.firstOrNull {
+            it.id != k && it.acceptsMerge && it.layer == activeLayer &&
+                (p - it.iconRect.center).getDistance() < it.iconRect.width * 0.42f
+        }?.id
     }
 
     /** Parmak kalkınca: önce hayalet kaldırılır, sonra bırakma işlemi uygulanır. */
     fun finish() {
         val p = pos
+        val hover = hoverId
         val h = dropHandler
         clear()
-        h?.invoke(p)
+        h?.invoke(p, hover)
+    }
+
+    /** Bırakma işlemini değiştirir (ör. klasörden ana ekrana geçişte). */
+    fun redirectDrop(handler: (Offset, String?) -> Unit) {
+        if (key != null) dropHandler = handler
     }
 
     fun clear() {
         key = null
+        hoverId = null
         dropHandler = null
+    }
+}
+
+/**
+ * Kök katmana takılan tek hareket algılayıcı.
+ * - Kısa dokunuş: hiçbir şey tüketilmez, hücrenin tıklaması çalışır.
+ * - Kaydırma (uzun basmadan önce): hiçbir şey tüketilmez, sayfa kaydırıcı çalışır.
+ * - Uzun basma bir hücre üzerinde: düzenleme modu + sürükleme başlar.
+ * - Uzun basma boş alanda: düzenleme modu.
+ * - Düzenleme modunda bir hücreyi doğrudan sürüklemek de sürüklemeyi başlatır (iOS gibi).
+ */
+suspend fun PointerInputScope.detectHomeDrag(
+    drag: DragState,
+    enabled: () -> Boolean,
+    isEditing: () -> Boolean,
+    onLongPressEmpty: () -> Unit,
+    onDragStarted: () -> Unit,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        if (!enabled()) return@awaitEachGesture
+        val slop = viewConfiguration.touchSlop
+        val editing = isEditing()
+        val hit = drag.hitTest(down.position)
+
+        // 0 = vazgeç (dokunma veya kaydırma), 1 = düzenleme modunda doğrudan sürükleme, null = uzun basma
+        val outcome: Int? = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+            var r = -1
+            while (r < 0) {
+                val ev = awaitPointerEvent(PointerEventPass.Initial)
+                val c = ev.changes.firstOrNull { it.id == down.id }
+                r = when {
+                    c == null || !c.pressed || ev.changes.size > 1 -> 0
+                    (c.position - down.position).getDistance() > slop ->
+                        if (editing && hit != null) 1 else 0
+                    else -> -1
+                }
+            }
+            r
+        }
+        if (outcome == 0) return@awaitEachGesture
+
+        if (hit == null) {
+            onLongPressEmpty()
+        } else {
+            drag.start(hit, down.position)
+            onDragStarted()
+        }
+
+        // Parmak kalkana kadar tüm olayları tüket: alttaki katmanlar (pager, tıklama) tepki vermez.
+        while (true) {
+            val ev = awaitPointerEvent(PointerEventPass.Initial)
+            val c = ev.changes.firstOrNull { it.id == down.id }
+            if (drag.isDragging && c != null) drag.move(c.position)
+            ev.changes.forEach { it.consume() }
+            if (c == null || !c.pressed) break
+        }
+        if (drag.isDragging) drag.finish()
     }
 }
 
@@ -88,8 +212,8 @@ private val CellLabelStyle = TextStyle(
 )
 
 /**
- * Uzun basınca sürüklenebilen hücre (uygulama veya klasör). Düzenleme modunda hafifçe sallanır.
- * Üzerine başka bir öğe getirilince büyür (klasör oluşturma/ekleme ipucu).
+ * Sürüklenebilir hücre (uygulama veya klasör). Hareket algılamaz; konumunu [DragState]'e kaydeder.
+ * Düzenleme modunda hafifçe sallanır; üzerine bir uygulama getirilince büyür (klasör ipucu).
  */
 @Composable
 internal fun DraggableCell(
@@ -100,52 +224,58 @@ internal fun DraggableCell(
     pitchX: Dp,
     cellHeight: Dp,
     drag: DragState,
+    layer: DragLayer,
+    isApp: Boolean,
     acceptsMerge: Boolean,
     edit: Boolean,
     jiggle: State<Float>,
     onClick: (Offset) -> Unit,
-    onDragStart: () -> Unit,
-    onDrop: (Offset) -> Unit,
+    onDrop: (Offset, String?) -> Unit,
     iconContent: @Composable () -> Unit,
 ) {
-    var origin by remember { mutableStateOf(Offset.Zero) } // sütunun sol-üst köşesi (kök koordinat)
     val density = LocalDensity.current
     val iconPx = with(density) { icon.toPx() }
     val pitchPx = with(density) { pitchX.toPx() }
-    val center = Offset(pitchPx / 2f, iconPx / 2f)
+    val cellHPx = with(density) { cellHeight.toPx() }
 
-    val hovered by remember(iconPx, pitchPx, acceptsMerge) {
-        derivedStateOf {
-            val k = drag.key
-            acceptsMerge && k != null && k != id && (drag.pos - (origin + center)).getDistance() < iconPx * 0.5f
-        }
+    val target = remember(id) { DragTarget(id) }
+    target.layer = layer
+    target.isApp = isApp
+    target.acceptsMerge = acceptsMerge
+    target.iconDp = icon
+    target.onDrop = onDrop
+    DisposableEffect(target, drag) {
+        drag.register(target)
+        onDispose { drag.unregister(target) }
     }
-    val hoverScale by animateFloatAsState(if (hovered) 1.14f else 1f, label = "hover")
+
+    val hovered = drag.hoverId == id
+    val hoverScale by animateFloatAsState(
+        if (hovered) 1.16f else 1f,
+        spring(dampingRatio = 0.6f, stiffness = 500f),
+        label = "hover",
+    )
     val sign = remember(id) { if ((id.hashCode() and 1) == 0) 1f else -1f }
-    val onDropNow by rememberUpdatedState(onDrop)
-    val onStartNow by rememberUpdatedState(onDragStart)
-    val onClickNow by rememberUpdatedState(onClick)
+    val interaction = remember { MutableInteractionSource() }
 
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
                 .requiredWidth(pitchX)
-                .onGloballyPositioned { origin = it.positionInRoot() }
+                .onGloballyPositioned { c ->
+                    val o = c.positionInRoot()
+                    target.cellRect = Rect(o.x, o.y, o.x + pitchPx, o.y + cellHPx)
+                    val left = o.x + (pitchPx - iconPx) / 2f
+                    target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
+                }
                 .graphicsLayer {
                     alpha = if (drag.key == id) 0f else 1f
                     scaleX = hoverScale
                     scaleY = hoverScale
                     rotationZ = if (edit) jiggle.value * sign else 0f
                 }
-                // Dokunma ve uzun basma tek dedektörde; sürükleme sonrası hareketi kök katman izler.
-                .pointerInput(id) {
-                    detectTapGestures(
-                        onTap = { onClickNow(origin + center) },
-                        onLongPress = { local ->
-                            drag.start(id, icon, origin + local) { p -> onDropNow(p) }
-                            onStartNow()
-                        },
-                    )
+                .clickable(interactionSource = interaction, indication = null) {
+                    onClick(target.iconRect.center)
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
@@ -164,7 +294,7 @@ internal fun DraggableCell(
     }
 }
 
-/** Kapalı klasör: 3×3 ızgarada ilk sayfanın en çok 9 küçük simgesi. */
+/** Kapalı klasör: 3×3 ızgarada, klasörde en son görüntülenen sayfanın en çok 9 küçük simgesi. */
 @Composable
 internal fun FolderIcon(
     folder: FolderItem,
@@ -172,13 +302,16 @@ internal fun FolderIcon(
     vm: LauncherViewModel,
     icon: Dp,
     strength: Float,
+    page: Int = 0,
 ) {
     val pad = icon * 0.10f
     val gap = icon * 0.04f
     val mini = (icon - pad * 2f - gap * 2f) / 3f
+    val pageCount = (folder.keys.size + 8) / 9
+    val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
     Box(Modifier.size(icon).liquidGlass(RoundedCornerShape(icon * 0.225f), strength * 0.8f, 2.dp)) {
         Column(Modifier.padding(pad), verticalArrangement = Arrangement.spacedBy(gap)) {
-            folder.keys.take(9).chunked(3).forEach { row ->
+            shown.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                     row.forEach { k ->
                         val app = byKey[k]
