@@ -142,6 +142,14 @@ class MainActivity : ComponentActivity(), WidgetRequester {
      * penceresi duvar kâğıdını gösterdiği için arkasındaki duvar kâğıdı bulanıklaşır. Sık güncellemeyi
      * önlemek için yarıçap 6 px adımlarla değiştirilir. Cihaz/ayar desteklemiyorsa sessizce etkisizdir.
      */
+    private val blurRelayout = Runnable {
+        runCatching {
+            window.attributes = window.attributes
+            window.decorView.requestLayout()
+            window.decorView.invalidate()
+        }
+    }
+
     fun setWallpaperBlur(fraction: Float) {
         if (!windowManager.isCrossWindowBlurEnabled && lastBlur <= 0) return
         val r = ((fraction.coerceIn(0f, 1f) * MAX_WALLPAPER_BLUR) / 6f).toInt() * 6
@@ -158,6 +166,11 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                     blurBehindRadius = 0
                 }
             }
+            // Bazı cihazlarda/emülatörde yeni yarıçap ancak bir sonraki pencere yerleşiminde uygulanır;
+            // hareket bittikten sonra yerleşimi tetikleyerek bulanıklığın kesin uygulanmasını sağla.
+            val d = window.decorView
+            d.removeCallbacks(blurRelayout)
+            d.postDelayed(blurRelayout, 120)
         }
     }
 
