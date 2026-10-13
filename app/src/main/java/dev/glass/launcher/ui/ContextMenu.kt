@@ -41,6 +41,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -199,11 +200,16 @@ fun ContextMenuOverlay(
                 }
             }
         }
+        // Yön baştan hesaplanır ve yalnızca TEK menü oluşturulur (gösterilmeyen ikinci bir menünün
+        // bulanıklık alanı ekranda hayalet dikdörtgen bırakıyordu).
+        val screenH = LocalWindowInfo.current.containerSize.height
+        val menuHpx = with(density) { (u * 12f + u * st.menuRowHeight * rows.size).toPx() }
+        val below = screenH <= 0 || req.cellRect.bottom + gapPx + menuHpx < screenH - marginPx
         Layout(
             modifier = Modifier.fillMaxSize(),
             content = {
-                // İki sürüm: alta açılan (normal sıra) ve üste açılan (ters sıra). Yerleşimde biri seçilir.
-                listOf(false, true).forEach { reversed ->
+                run {
+                    val reversed = !below
                     Box(Modifier.width(menuW)) {
                         BlurBackdrop(corner, Modifier.matchParentSize())
                         Column(
@@ -219,10 +225,7 @@ fun ContextMenuOverlay(
                 }
             },
         ) { measurables, constraints ->
-            val loose = constraints.copy(minWidth = 0, minHeight = 0)
-            val down = measurables[0].measure(loose)
-            val below = req.cellRect.bottom + gapPx + down.height < constraints.maxHeight - marginPx
-            val p = if (below) down else measurables[1].measure(loose)
+            val p = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0))
             val maxX = (constraints.maxWidth - p.width - marginPx).coerceAtLeast(marginPx)
             val x = req.iconRect.left.coerceIn(marginPx, maxX)
             val y = if (below) req.cellRect.bottom + gapPx else req.iconRect.top - gapPx - p.height
