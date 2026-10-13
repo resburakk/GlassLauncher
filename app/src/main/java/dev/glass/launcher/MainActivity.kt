@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         val r = ((fraction.coerceIn(0f, 1f) * MAX_WALLPAPER_BLUR) / 6f).toInt() * 6
         if (r == lastBlur) return
         lastBlur = r
-        if (r == 0 || r == 90) android.util.Log.i("GlassDiag", "wallpaperBlur r=$r f=$fraction")
+        if (r == 0 || r == 90) android.util.Log.i("GlassDiag", "t=${android.os.SystemClock.uptimeMillis()} wallpaperBlur r=$r")
         runCatching {
             window.attributes = window.attributes.apply {
                 if (r > 0) {
