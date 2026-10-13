@@ -397,6 +397,7 @@ internal fun HomeContent(
 
         // Alt bölüm: arama hapı / sayfa noktaları ve dock. Arşive geçerken aşağı kayar.
         val hideShiftPx = with(density) { (maxHeight - m.pillCenterY + m.pillH).toPx() }
+        val dockW = maxWidth - m.dockMarginX * 2f
         Box(
             Modifier
                 .fillMaxSize()
@@ -433,7 +434,7 @@ internal fun HomeContent(
                 Box(
                     Modifier
                         .offset(x = m.dockMarginX, y = m.dockTop)
-                        .width(maxWidth - m.dockMarginX * 2f)
+                        .width(dockW)
                         .height(m.dockH)
                         .onGloballyPositioned { dockRect = it.boundsInRoot() }
                         .liquidGlass(RoundedCornerShape(m.dockH * 0.34f), settings.glassStrength * settings.dockOpacity, 14.dp)
