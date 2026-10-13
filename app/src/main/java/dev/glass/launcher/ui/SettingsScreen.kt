@@ -291,6 +291,9 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
 
 @Composable
 private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group("Uygulama arşivi") {
+        ToggleRow("Uygulama arşivi sayfası", s.showLibrary) { v -> onChange { it.copy(showLibrary = v) } }
+    }
     Group(null) {
         SliderRow("Klasör cam yoğunluğu", pct(s.folderOpacity), s.folderOpacity, 0f..2f) { v ->
             onChange { it.copy(folderOpacity = v) }

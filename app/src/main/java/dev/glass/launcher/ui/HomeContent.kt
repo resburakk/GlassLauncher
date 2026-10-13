@@ -133,7 +133,7 @@ internal fun HomeContent(
         // Sürüklerken son sayfa doluysa yeni boş bir sayfa görünür.
         val homeCount = pageTotal + if (dragging && lastFull) 1 else 0
         val libIndex = homeCount
-        val pagerState = rememberPagerState { homeCount + 1 }
+        val pagerState = rememberPagerState { homeCount + if (settings.showLibrary) 1 else 0 }
 
         var gridOrigin by remember { mutableStateOf(Offset.Zero) }
         var dockRect by remember { mutableStateOf(Rect.Zero) }
@@ -311,7 +311,7 @@ internal fun HomeContent(
 
         SideEffect {
             bridge.home = ::handleDrop
-            bridge.goToPage = { p -> scope.launch { pagerState.animateScrollToPage(p.coerceIn(0, libIndex)) } }
+            bridge.goToPage = { p -> scope.launch { pagerState.animateScrollToPage(p.coerceIn(0, pagerState.pageCount - 1)) } }
             bridge.goToLastHomePage = { scope.launch { pagerState.animateScrollToPage(maxOf(pageTotal - 1, 0)) } }
             bridge.onLibrary = pagerState.currentPage == libIndex
             vm.currentPageStart = placements.indexOfFirst { it.page == pagerState.currentPage }

@@ -83,6 +83,8 @@ data class LauncherSettings(
     val midSwipe: SwipeAction = SwipeAction.Search,
     /** Boş alana çift dokununca ekranı kilitle (Erişilebilirlik hizmeti gerekir). */
     val doubleTapLock: Boolean = true,
+    /** Uygulama arşivi sayfası (ana ekranın sağı). Varsayılan kapalı: sayfa hiç görünmez. */
+    val showLibrary: Boolean = false,
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
     val theme: ThemeMode = ThemeMode.Auto,
@@ -142,7 +144,7 @@ data class LauncherSettings(
         put("libraryTileCorner", libraryTileCorner.toDouble()); put("libraryGroupCorner", libraryGroupCorner.toDouble())
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
-        put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock)
+        put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary)
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
@@ -208,6 +210,7 @@ data class LauncherSettings(
                 topSwipe = runCatching { SwipeAction.valueOf(o.optString("topSwipe")) }.getOrDefault(d.topSwipe),
                 midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe")) }.getOrDefault(d.midSwipe),
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
+                showLibrary = o.optBoolean("showLibrary", d.showLibrary),
             ).let { loaded ->
                 if (o.optInt("metricsVersion", 1) >= METRICS_VERSION) loaded
                 else loaded.copy(
