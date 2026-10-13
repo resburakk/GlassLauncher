@@ -23,6 +23,8 @@ data class LauncherSettings(
     val glassStrength: Float = 1f,
     /** Son başlatılan uygulamalar (ComponentName.flattenToString), en yenisi başta. */
     val recents: List<String> = emptyList(),
+    /** Yeni kurulan uygulamalar ana ekrana mı eklensin (kapalıysa yalnızca Uygulama Arşivi'nde). */
+    val addNewToHome: Boolean = true,
 )
 
 class SettingsStore(private val context: Context) {
@@ -35,6 +37,7 @@ class SettingsStore(private val context: Context) {
         val glassStrength = floatPreferencesKey("glass_strength")
         val recents = stringPreferencesKey("recents")
         val layout = stringPreferencesKey("home_layout")
+        val addNewToHome = booleanPreferencesKey("add_new_to_home")
     }
 
     private fun read(p: Preferences): LauncherSettings {
@@ -47,6 +50,7 @@ class SettingsStore(private val context: Context) {
             iconGlass = p[Keys.iconGlass] ?: d.iconGlass,
             glassStrength = (p[Keys.glassStrength] ?: d.glassStrength).coerceIn(0.5f, 1.5f),
             recents = (p[Keys.recents] ?: "").split("|").filter { it.isNotEmpty() },
+            addNewToHome = p[Keys.addNewToHome] ?: d.addNewToHome,
         )
     }
 
@@ -58,6 +62,7 @@ class SettingsStore(private val context: Context) {
         p[Keys.iconGlass] = s.iconGlass
         p[Keys.glassStrength] = s.glassStrength
         p[Keys.recents] = s.recents.joinToString("|")
+        p[Keys.addNewToHome] = s.addNewToHome
     }
 
     val settings: Flow<LauncherSettings> = context.dataStore.data.map { read(it) }

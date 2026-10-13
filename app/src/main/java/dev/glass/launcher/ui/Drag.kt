@@ -52,8 +52,16 @@ import dev.glass.launcher.data.FolderItem
 /** Sürüklenebilir öğenin bulunduğu katman. Klasör açıkken yalnızca klasör katmanı dokunuşa açıktır. */
 enum class DragLayer { Home, Folder }
 
-/** Ekranda görünen, sürüklenebilir bir hücrenin kaydı. Konumlar kök (pencere) koordinatındadır. */
+/** Hücrenin nerede durduğu (uzun basma menüsündeki seçenekleri belirler). */
+enum class CellPlace { Grid, Dock, Folder, Library }
+
+/**
+ * Ekranda görünen, sürüklenebilir bir hücrenin kaydı. Konumlar kök (pencere) koordinatındadır.
+ * [id] kayıt kimliğidir (aynı uygulama hem ana ekranda hem arşivde görünebilir); [itemId] sürüklenen öğedir.
+ */
 class DragTarget(val id: String) {
+    var itemId: String = id
+    var place: CellPlace = CellPlace.Grid
     var layer: DragLayer = DragLayer.Home
     var isApp: Boolean = true
     var acceptsMerge: Boolean = false
@@ -106,7 +114,7 @@ class DragState {
     fun targetsIn(layer: DragLayer): Collection<DragTarget> = targets.values.filter { it.layer == layer }
 
     fun start(t: DragTarget, at: Offset) {
-        key = t.id
+        key = t.itemId
         iconDp = t.iconDp
         pos = at
         dropHandler = t.onDrop
@@ -119,9 +127,9 @@ class DragState {
         val k = key ?: return
         // Klasör oluşturma/ekleme hedefi: yalnızca uygulama sürüklenirken, simgenin merkezine yakınsa.
         hoverId = if (!dragIsApp) null else targets.values.firstOrNull {
-            it.id != k && it.acceptsMerge && it.layer == activeLayer &&
+            it.itemId != k && it.acceptsMerge && it.layer == activeLayer &&
                 (p - it.iconRect.center).getDistance() < it.iconRect.width * 0.42f
-        }?.id
+        }?.itemId
     }
 
     /** Parmak kalkınca: önce hayalet kaldırılır, sonra bırakma işlemi uygulanır. */
@@ -149,7 +157,8 @@ class DragState {
  * Kök katmana takılan tek hareket algılayıcı.
  * - Kısa dokunuş: hiçbir şey tüketilmez, hücrenin tıklaması çalışır.
  * - Kaydırma (uzun basmadan önce): hiçbir şey tüketilmez, sayfa kaydırıcı çalışır.
- * - Uzun basma bir hücre üzerinde: düzenleme modu + sürükleme başlar.
+ * - Uzun basma bir hücre üzerinde, parmak kıpırdamadan bırakılırsa: iOS gibi bağlam menüsü.
+ * - Uzun basma + sürükleme: düzenleme modu ve sürükle-bırak.
  * - Uzun basma boş alanda: düzenleme modu.
  * - Düzenleme modunda bir hücreyi doğrudan sürüklemek de sürüklemeyi başlatır (iOS gibi).
  */
@@ -158,7 +167,9 @@ suspend fun PointerInputScope.detectHomeDrag(
     enabled: () -> Boolean,
     isEditing: () -> Boolean,
     onLongPressEmpty: () -> Unit,
+    onLifted: () -> Unit,
     onDragStarted: () -> Unit,
+    onMenu: (DragTarget) -> Unit,
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -184,22 +195,39 @@ suspend fun PointerInputScope.detectHomeDrag(
         }
         if (outcome == 0) return@awaitEachGesture
 
+        var moved = outcome == 1
         if (hit == null) {
             onLongPressEmpty()
         } else {
             drag.start(hit, down.position)
-            onDragStarted()
+            if (moved) onDragStarted() else onLifted()
         }
 
         // Parmak kalkana kadar tüm olayları tüket: alttaki katmanlar (pager, tıklama) tepki vermez.
+        var last = down.position
         while (true) {
             val ev = awaitPointerEvent(PointerEventPass.Initial)
             val c = ev.changes.firstOrNull { it.id == down.id }
-            if (drag.isDragging && c != null) drag.move(c.position)
+            if (c != null) last = c.position
+            if (drag.isDragging && c != null) {
+                if (!moved && (c.position - down.position).getDistance() > slop) {
+                    moved = true
+                    onDragStarted()
+                }
+                drag.move(c.position)
+            }
             ev.changes.forEach { it.consume() }
             if (c == null || !c.pressed) break
         }
-        if (drag.isDragging) drag.finish()
+        if (drag.isDragging) {
+            if (moved) {
+                drag.move(last)
+                drag.finish()
+            } else {
+                drag.clear()
+                if (hit != null) onMenu(hit)
+            }
+        }
     }
 }
 
@@ -218,6 +246,8 @@ private val CellLabelStyle = TextStyle(
 @Composable
 internal fun DraggableCell(
     id: String,
+    itemId: String = id,
+    place: CellPlace = CellPlace.Grid,
     label: String,
     showLabel: Boolean,
     icon: Dp,
@@ -239,6 +269,8 @@ internal fun DraggableCell(
     val cellHPx = with(density) { cellHeight.toPx() }
 
     val target = remember(id) { DragTarget(id) }
+    target.itemId = itemId
+    target.place = place
     target.layer = layer
     target.isApp = isApp
     target.acceptsMerge = acceptsMerge
@@ -249,13 +281,13 @@ internal fun DraggableCell(
         onDispose { drag.unregister(target) }
     }
 
-    val hovered = drag.hoverId == id
+    val hovered = drag.hoverId == itemId
     val hoverScale by animateFloatAsState(
         if (hovered) 1.16f else 1f,
         spring(dampingRatio = 0.6f, stiffness = 500f),
         label = "hover",
     )
-    val sign = remember(id) { if ((id.hashCode() and 1) == 0) 1f else -1f }
+    val sign = remember(itemId) { if ((itemId.hashCode() and 1) == 0) 1f else -1f }
     val interaction = remember { MutableInteractionSource() }
 
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
@@ -269,7 +301,7 @@ internal fun DraggableCell(
                     target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
                 }
                 .graphicsLayer {
-                    alpha = if (drag.key == id) 0f else 1f
+                    alpha = if (drag.key == itemId) 0f else 1f
                     scaleX = hoverScale
                     scaleY = hoverScale
                     rotationZ = if (edit) jiggle.value * sign else 0f

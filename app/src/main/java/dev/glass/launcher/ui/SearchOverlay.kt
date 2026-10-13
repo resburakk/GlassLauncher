@@ -44,7 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.glass.launcher.data.AppInfo
-import java.util.Locale
+import dev.glass.launcher.data.SearchRanker
 
 /** Spotlight benzeri arama: cam arama kutusu, 4 simgelik öneri satırı, anlık sonuçlar, otomatik klavye. */
 @Composable
@@ -59,17 +59,14 @@ fun SearchOverlay(
     var query by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    val tr = remember { Locale("tr", "TR") }
 
     LaunchedEffect(Unit) {
         focus.requestFocus()
         keyboard?.show()
     }
 
-    val results = remember(query, allApps) {
-        val q = query.trim().lowercase(tr)
-        if (q.isEmpty()) emptyList() else allApps.filter { it.label.lowercase(tr).contains(q) }
-    }
+    // Türkçe karakter duyarsız, sıralı çevrimdışı arama ("cevi" → "Çeviri", "gm" → "Google Maps").
+    val results = remember(query, allApps) { SearchRanker.rank(query, allApps) { it.label } }
 
     fun close() { keyboard?.hide(); onClose() }
     fun open(app: AppInfo) { keyboard?.hide(); vm.launch(app); onClose() }

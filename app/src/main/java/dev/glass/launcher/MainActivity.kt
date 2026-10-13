@@ -3,6 +3,7 @@ package dev.glass.launcher
 import android.app.WallpaperColors
 import android.app.WallpaperManager
 import android.app.role.RoleManager
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -67,6 +68,12 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightStatusBars = darkText
             isAppearanceLightNavigationBars = darkText
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // Launcher zaten öndeyken Home tuşu: iOS gibi ilk sayfaya dön, açık katmanları kapat.
+        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) vm.onHomePressed()
     }
 
     private fun updateDefault() {

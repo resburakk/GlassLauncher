@@ -10,8 +10,15 @@ class AppInfo(
     val user: UserHandle,
     val label: String,
     val activityInfo: LauncherActivityInfo,
+    /** Uygulama Arşivi kategorisi. */
+    val category: AppCategory = AppCategory.Other,
+    /** İlk kurulum zamanı (ms). */
+    val installTime: Long = 0L,
+    /** Kaldırılamayan sistem uygulaması mı? */
+    val isSystem: Boolean = false,
 ) {
     val key: String = "${componentName.flattenToString()}#${user.hashCode()}"
+    val packageName: String get() = componentName.packageName
     override fun equals(other: Any?) = other is AppInfo && other.key == key && other.label == label
     override fun hashCode() = key.hashCode()
 }

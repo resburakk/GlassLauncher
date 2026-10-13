@@ -86,6 +86,10 @@ fun SettingsSheet(
                 ChoiceRow("En çok satır", listOf(5, 6, 7), s.rows) { v -> onChange { it.copy(rows = v) } }
             }
 
+            Group("Uygulama Arşivi") {
+                ToggleRow("Yeni uygulamaları ana ekrana ekle", s.addNewToHome) { v -> onChange { it.copy(addNewToHome = v) } }
+            }
+
             Group("Liquid Glass") {
                 ToggleRow("Simge kenar ışığı", s.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
                 RowDivider()

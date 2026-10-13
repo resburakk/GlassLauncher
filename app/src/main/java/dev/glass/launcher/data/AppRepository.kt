@@ -5,7 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.MediaStore
+import android.content.pm.ApplicationInfo
 import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
+import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
@@ -48,7 +52,19 @@ class AppRepository(private val context: Context) {
             val list = withContext(Dispatchers.Default) {
                 launcherApps.profiles.flatMap { profile ->
                     launcherApps.getActivityList(null, profile).map { info ->
-                        AppInfo(info.componentName, profile, info.label.toString(), info)
+                        val ai = info.applicationInfo
+                        val system = (ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
+                            (ai.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0
+                        val label = info.label.toString()
+                        AppInfo(
+                            componentName = info.componentName,
+                            user = profile,
+                            label = label,
+                            activityInfo = info,
+                            category = AppCategorizer.categorize(info.componentName.packageName, label, ai.category, system),
+                            installTime = info.firstInstallTime,
+                            isSystem = system,
+                        )
                     }
                 }.sortedWith { a, b -> collator.compare(a.label, b.label) }
             }
@@ -70,9 +86,54 @@ class AppRepository(private val context: Context) {
         }.filter { it != "android" }.distinct()
     }
 
-    fun launch(app: AppInfo) {
+    fun launch(app: AppInfo, sourceBounds: Rect? = null) {
         runCatching {
-            launcherApps.startMainActivity(app.componentName, app.user, null, null)
+            launcherApps.startMainActivity(app.componentName, app.user, sourceBounds, null)
         }
+    }
+
+    /** Sistemin "Uygulama bilgisi" ekranı. */
+    fun openAppInfo(app: AppInfo) {
+        runCatching { launcherApps.startAppDetailsActivity(app.componentName, app.user, null, null) }
+    }
+
+    /** Sistemin kaldırma onay penceresini açar (kaldırma kararını kullanıcı verir). */
+    fun uninstall(app: AppInfo) {
+        runCatching {
+            val i = Intent(Intent.ACTION_DELETE, Uri.parse("package:${app.packageName}"))
+                .putExtra(Intent.EXTRA_USER, app.user)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(i)
+        }
+    }
+
+    /**
+     * Uygulama kısayolları (uzun basma menüsü). Android bunları yalnızca VARSAYILAN ana ekran
+     * uygulamasına verir; değilse boş liste döner.
+     */
+    suspend fun shortcuts(app: AppInfo): List<ShortcutInfo> = withContext(Dispatchers.Default) {
+        runCatching {
+            if (!launcherApps.hasShortcutHostPermission()) return@runCatching emptyList()
+            val q = LauncherApps.ShortcutQuery()
+                .setPackage(app.packageName)
+                .setActivity(app.componentName)
+                .setQueryFlags(
+                    LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                        LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED
+                )
+            launcherApps.getShortcuts(q, app.user).orEmpty()
+                .filter { it.isEnabled }
+                .sortedBy { it.rank }
+                .take(4)
+        }.getOrDefault(emptyList())
+    }
+
+    suspend fun shortcutIcon(info: ShortcutInfo, density: Int): Drawable? = withContext(Dispatchers.Default) {
+        runCatching { launcherApps.getShortcutIconDrawable(info, density) }.getOrNull()
+    }
+
+    fun startShortcut(info: ShortcutInfo) {
+        runCatching { launcherApps.startShortcut(info, null, null) }
     }
 }

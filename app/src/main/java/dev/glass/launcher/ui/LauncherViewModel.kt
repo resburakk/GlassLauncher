@@ -1,20 +1,30 @@
 package dev.glass.launcher.ui
 
 import android.app.Application
+import android.content.pm.ShortcutInfo
+import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.glass.launcher.LauncherApp
+import dev.glass.launcher.data.AppCategory
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.HomeLayout
 import dev.glass.launcher.data.LauncherSettings
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+
+/** Uygulama Arşivi'nde bir kategori kutusu. */
+data class LibraryGroup(val title: String, val apps: List<AppInfo>)
 
 class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val la = app as LauncherApp
@@ -39,11 +49,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             base = la.settingsStore.layoutJson.first()?.let { HomeLayout.fromJson(it) }
-            repo.apps.collect { list ->
+            val addNew = la.settingsStore.settings.map { it.addNewToHome }.distinctUntilChanged()
+            combine(repo.apps, addNew) { list, add -> list to add }.collect { (list, add) ->
                 if (list.isEmpty()) return@collect // liste henüz yüklenmedi: kayıtlı düzeni budama
-                val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages)
+                val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages, add)
+                val changed = next != base
                 base = next
                 _layout.value = next
+                if (changed) la.settingsStore.saveLayout(next.toJson())
             }
         }
     }
@@ -52,12 +65,39 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         s.recents.mapNotNull { r -> all.firstOrNull { it.componentName.flattenToString() == r } }
     }.stateIn(viewModelScope, eager, emptyList())
 
+    /**
+     * Uygulama Arşivi grupları: Öneriler (son kullanılanlar), Son Eklenenler, ardından kategoriler.
+     * Boş kategoriler gösterilmez.
+     */
+    val libraryGroups: StateFlow<List<LibraryGroup>> = combine(repo.apps, recentApps) { all, recent ->
+        val groups = ArrayList<LibraryGroup>()
+        if (recent.isNotEmpty()) groups += LibraryGroup("Öneriler", recent)
+        val newest = all.filter { it.installTime > 0 }.sortedByDescending { it.installTime }.take(8)
+        if (newest.isNotEmpty()) groups += LibraryGroup("Son Eklenenler", newest)
+        val byCat = all.groupBy { it.category }
+        AppCategory.entries.forEach { c ->
+            byCat[c]?.takeIf { it.isNotEmpty() }?.let { groups += LibraryGroup(c.title, it) }
+        }
+        groups
+    }.stateIn(viewModelScope, eager, emptyList())
+
     val iconCache = la.iconCache
 
-    fun launch(app: AppInfo) {
-        repo.launch(app)
+    private val _homePressed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    /** Launcher öndeyken Home tuşuna basıldı: katmanları kapat, ilk sayfaya dön. */
+    val homePressed: SharedFlow<Unit> = _homePressed
+    fun onHomePressed() { _homePressed.tryEmit(Unit) }
+
+    fun launch(app: AppInfo, bounds: Rect? = null) {
+        repo.launch(app, bounds)
         viewModelScope.launch { la.settingsStore.addRecent(app.componentName.flattenToString()) }
     }
+
+    fun openAppInfo(app: AppInfo) = repo.openAppInfo(app)
+    fun uninstall(app: AppInfo) = repo.uninstall(app)
+    suspend fun shortcuts(app: AppInfo): List<ShortcutInfo> = repo.shortcuts(app)
+    suspend fun shortcutIcon(info: ShortcutInfo, density: Int): Drawable? = repo.shortcutIcon(info, density)
+    fun startShortcut(info: ShortcutInfo) = repo.startShortcut(info)
 
     fun updateSettings(block: (LauncherSettings) -> LauncherSettings) {
         viewModelScope.launch { la.settingsStore.update(block) }

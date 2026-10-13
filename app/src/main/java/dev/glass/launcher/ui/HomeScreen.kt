@@ -16,98 +16,71 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredWidth
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.union
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.State
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.glass.launcher.R
-import dev.glass.launcher.data.AppInfo
-import dev.glass.launcher.data.AppItem
 import dev.glass.launcher.data.FolderItem
-import dev.glass.launcher.data.HomeLayout
-import dev.glass.launcher.data.LauncherSettings
-import kotlinx.coroutines.delay
-import kotlin.math.floor
 import kotlin.math.roundToInt
 
-enum class Overlay { None, Search, Control, Settings, Folder }
+enum class Overlay { None, Search, Control, Settings, Folder, Menu, Group }
 
-/** Ana ekranın bırakma işlemini klasör katmanına taşımak için küçük köprü. */
+/**
+ * Ana ekran katmanları arasında köprü: bırakma işlemi ve sayfa geçişleri ana ekran içeriğinde
+ * (pager'ın olduğu yerde) tanımlıdır; üst katmanlar (klasör, arşiv, Home tuşu) bunları buradan çağırır.
+ */
 class DropBridge {
     var home: ((String, Offset, String?) -> Unit)? = null
+    var goToPage: ((Int) -> Unit)? = null
+    var goToLastHomePage: (() -> Unit)? = null
+    /** Şu an Uygulama Arşivi sayfasında mıyız (arama hareketi orada kapalı). */
+    var onLibrary: Boolean = false
 }
 
 /**
- * AŞAMA 3c: düzenleme modu (sallanma), sürükle-bırak, klasörler (3×3), kalıcı yerleşim.
- * Hareketler: boş alanda uzun bas = düzenleme modu, aşağı kaydır = arama, üst bölgeden aşağı = panel.
+ * Ana ekran kökü: içerik + üst katmanlar (arama, kontrol paneli, ayarlar, klasör, bağlam menüsü,
+ * arşiv kategorisi) + sürüklenen simgenin hayaleti.
+ * Hareketler: uzun bas = menü/düzenleme, sürükle = taşı, aşağı kaydır = arama, üstten aşağı = panel.
  */
 @Composable
 fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: () -> Unit) {
@@ -115,16 +88,20 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
     val byKey by vm.appsByKey.collectAsStateWithLifecycle()
     val allApps by vm.apps.collectAsStateWithLifecycle()
     val recents by vm.recentApps.collectAsStateWithLifecycle()
+    val groups by vm.libraryGroups.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
 
     val drag = remember { DragState() }
     val haptic = LocalHapticFeedback.current
     val bridge = remember { DropBridge() }
     val folderPages = remember { mutableStateMapOf<String, Int>() }
+
     var overlay by remember { mutableStateOf(Overlay.None) }
     var editMode by remember { mutableStateOf(false) }
     var openFolderId by remember { mutableStateOf<String?>(null) }
     var folderOrigin by remember { mutableStateOf(TransformOrigin.Center) }
+    var menu by remember { mutableStateOf<MenuRequest?>(null) }
+    var group by remember { mutableStateOf<LibraryGroup?>(null) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     val overlayNow by rememberUpdatedState(overlay)
     val editNow by rememberUpdatedState(editMode)
@@ -142,11 +119,26 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
         )
     } else remember { mutableStateOf(0f) }
 
+    fun closeOverlay() {
+        overlay = Overlay.None
+        openFolderId = null
+        menu = null
+    }
+
     BackHandler(enabled = true) {
-        if (overlay != Overlay.None) {
-            overlay = Overlay.None
-            openFolderId = null
-        } else if (editMode) editMode = false
+        if (overlay != Overlay.None) closeOverlay() else if (editMode) editMode = false
+    }
+
+    LaunchedEffect(vm) {
+        vm.homePressed.collect {
+            closeOverlay()
+            editMode = false
+            bridge.goToPage?.invoke(0)
+        }
+    }
+
+    SideEffect {
+        drag.activeLayer = if (overlay == Overlay.Folder || overlay == Overlay.Group) DragLayer.Folder else DragLayer.Home
     }
 
     val density = LocalDensity.current
@@ -154,16 +146,23 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
     val topZonePx = topInsetPx + with(density) { 72.dp.toPx() }
     val suggestions = remember(recents, allApps) { (recents + allApps).distinctBy { it.key }.take(4) }
 
+    // Kapanış animasyonu sırasında son klasör/kategori/menü içeriği ekranda kalsın diye tutulur.
     val folderHolder = remember { arrayOfNulls<FolderItem>(1) }
     val openFolder = layout.items.firstOrNull { it.id == openFolderId } as? FolderItem
     if (openFolder != null) folderHolder[0] = openFolder
+    val groupHolder = remember { arrayOfNulls<LibraryGroup>(1) }
+    if (group != null) groupHolder[0] = group
+    val menuHolder = remember { arrayOfNulls<MenuRequest>(1) }
+    if (menu != null) menuHolder[0] = menu
 
-    fun closeOverlay() {
-        overlay = Overlay.None
-        openFolderId = null
+    fun openFolderAt(f: FolderItem, center: Offset) {
+        folderOrigin = TransformOrigin(
+            center.x / rootSize.width.coerceAtLeast(1),
+            center.y / rootSize.height.coerceAtLeast(1),
+        )
+        openFolderId = f.id
+        overlay = Overlay.Folder
     }
-
-    SideEffect { drag.activeLayer = if (overlay == Overlay.Folder) DragLayer.Folder else DragLayer.Home }
 
     Box(
         Modifier
@@ -172,17 +171,31 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
             .pointerInput(drag) {
                 detectHomeDrag(
                     drag = drag,
-                    enabled = { overlayNow == Overlay.None || overlayNow == Overlay.Folder },
+                    enabled = {
+                        overlayNow == Overlay.None || overlayNow == Overlay.Folder || overlayNow == Overlay.Group
+                    },
                     isEditing = { editNow },
                     onLongPressEmpty = {
-                        if (overlayNow == Overlay.None && !editNow) {
+                        if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             editMode = true
                         }
                     },
+                    onLifted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
                     onDragStarted = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         editMode = true
+                        val k = drag.key
+                        if (k != null && (overlayNow == Overlay.Group || bridge.onLibrary)) {
+                            // Arşivden sürüklenen uygulama ana ekrana taşınır (iOS gibi arşiv kayar).
+                            if (overlayNow == Overlay.Group) closeOverlay()
+                            drag.redirectDrop { p, h -> bridge.home?.invoke(k, p, h) }
+                            bridge.goToLastHomePage?.invoke()
+                        }
+                    },
+                    onMenu = { t ->
+                        openFolderId = null
+                        menu = MenuRequest(t.itemId, t.place, t.iconRect, t.cellRect, t.iconDp)
+                        overlay = Overlay.Menu
                     },
                 )
             }
@@ -193,7 +206,7 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 detectVerticalDragGestures(
                     onDragStart = { startY = it.y; total = 0f },
                     onDragEnd = {
-                        if (overlayNow == Overlay.None && !editNow && total > 80.dp.toPx()) {
+                        if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && total > 80.dp.toPx()) {
                             overlay = if (startY < topZonePx) Overlay.Control else Overlay.Search
                         }
                         total = 0f
@@ -208,6 +221,8 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 vm = vm,
                 layout = layout,
                 byKey = byKey,
+                allApps = allApps,
+                groups = groups,
                 settings = settings,
                 drag = drag,
                 bridge = bridge,
@@ -217,14 +232,8 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 isDefaultHome = isDefaultHome,
                 onRequestDefault = onRequestDefault,
                 onOpenSearch = { overlay = Overlay.Search },
-                onOpenFolder = { f, c ->
-                    folderOrigin = TransformOrigin(
-                        c.x / rootSize.width.coerceAtLeast(1),
-                        c.y / rootSize.height.coerceAtLeast(1),
-                    )
-                    openFolderId = f.id
-                    overlay = Overlay.Folder
-                },
+                onOpenFolder = { f, c -> openFolderAt(f, c) },
+                onOpenGroup = { g -> group = g; overlay = Overlay.Group },
             )
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
@@ -283,6 +292,44 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 )
             }
         }
+        AnimatedVisibility(
+            overlay == Overlay.Group,
+            enter = scaleIn(tween(240), initialScale = 0.85f) + fadeIn(tween(200)),
+            exit = scaleOut(tween(180), targetScale = 0.85f) + fadeOut(tween(160)),
+        ) {
+            groupHolder[0]?.let { g ->
+                LibraryGroupOverlay(
+                    group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
+                    onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
+                    onClose = { closeOverlay() },
+                )
+            }
+        }
+        AnimatedVisibility(
+            overlay == Overlay.Menu,
+            enter = fadeIn(tween(160)) + scaleIn(tween(200), initialScale = 0.92f),
+            exit = fadeOut(tween(140)),
+        ) {
+            menuHolder[0]?.let { req ->
+                val folder = layout.items.firstOrNull { it.id == req.itemId } as? FolderItem
+                ContextMenuOverlay(
+                    req = req,
+                    vm = vm,
+                    app = byKey[req.itemId],
+                    folder = folder,
+                    onHome = req.itemId in layout.homeKeys,
+                    strength = settings.glassStrength,
+                    iconGlass = settings.iconGlass,
+                    byKey = byKey,
+                    onEditHome = { editMode = true },
+                    onRemoveFromHome = { vm.editLayout { it.removeFromHome(req.itemId) } },
+                    onAddToHome = { vm.editLayout { it.addToHome(req.itemId) } },
+                    onOpenFolder = { folder?.let { f -> openFolderAt(f, req.iconRect.center) } },
+                    onDissolveFolder = { vm.editLayout { it.dissolveFolder(req.itemId) } },
+                    onClose = { if (overlay == Overlay.Menu) closeOverlay() },
+                )
+            }
+        }
 
         // Düzenleme modu üst çubuğu
         AnimatedVisibility(
@@ -317,7 +364,7 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                     AppIconImage(app, vm, drag.iconDp, settings.iconGlass, settings.glassStrength)
                 } else {
                     (layout.items.firstOrNull { it.id == dk } as? FolderItem)?.let {
-                        FolderIcon(it, byKey, vm, drag.iconDp, settings.glassStrength)
+                        FolderIcon(it, byKey, vm, drag.iconDp, settings.glassStrength, folderPages[it.id] ?: 0)
                     }
                 }
             }
@@ -326,7 +373,7 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
 }
 
 @Composable
-private fun GlassButton(text: String, strength: Float, onClick: () -> Unit) {
+internal fun GlassButton(text: String, strength: Float, onClick: () -> Unit) {
     Box(
         Modifier
             .height(34.dp)
@@ -335,277 +382,4 @@ private fun GlassButton(text: String, strength: Float, onClick: () -> Unit) {
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
-}
-
-@Composable
-private fun HomeContent(
-    vm: LauncherViewModel,
-    layout: HomeLayout,
-    byKey: Map<String, AppInfo>,
-    settings: LauncherSettings,
-    drag: DragState,
-    bridge: DropBridge,
-    folderPages: Map<String, Int>,
-    edit: Boolean,
-    jiggle: State<Float>,
-    isDefaultHome: Boolean,
-    onRequestDefault: () -> Unit,
-    onOpenSearch: () -> Unit,
-    onOpenFolder: (FolderItem, Offset) -> Unit,
-) {
-    val density = LocalDensity.current
-    BoxWithConstraints(
-        Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
-    ) {
-        val m = HomeMetrics.compute(maxWidth, maxHeight, settings)
-        val items = layout.items
-        val pages = items.chunked(m.perPage)
-        val dragging = drag.key != null
-        val lastFull = (pages.lastOrNull()?.size ?: 0) >= m.perPage
-        // Sürüklerken son sayfa doluysa yeni boş bir sayfa görünür.
-        val pageCount = maxOf(pages.size, 1) + if (dragging && lastFull) 1 else 0
-        val pagerState = rememberPagerState { pageCount }
-
-        var gridOrigin by remember { mutableStateOf(Offset.Zero) }
-        var dockRect by remember { mutableStateOf(Rect.Zero) }
-
-        // Sayfa kaydırılırken noktalar, durunca arama hapı görünür (iOS 16+ davranışı).
-        var showDots by remember { mutableStateOf(false) }
-        LaunchedEffect(pagerState.isScrollInProgress) {
-            if (pagerState.isScrollInProgress) showDots = true else { delay(900); showDots = false }
-        }
-        val dotsAlpha by animateFloatAsState(if (showDots) 1f else 0f, tween(220), label = "dots")
-
-        // Sürüklerken ekran kenarında bekleyince sayfa değişir.
-        val widthPx = with(density) { maxWidth.toPx() }
-        val edgePx = with(density) { 36.dp.toPx() }
-        val edge by remember(widthPx, edgePx) {
-            derivedStateOf {
-                when {
-                    drag.key == null -> 0
-                    drag.pos.x < edgePx -> -1
-                    drag.pos.x > widthPx - edgePx -> 1
-                    else -> 0
-                }
-            }
-        }
-        LaunchedEffect(edge) {
-            if (edge != 0) {
-                while (true) {
-                    delay(650)
-                    val target = pagerState.currentPage + edge
-                    if (target in 0 until pagerState.pageCount) pagerState.animateScrollToPage(target)
-                }
-            }
-        }
-
-        fun handleDrop(id: String, pos: Offset, hover: String?) {
-            val cur = vm.layout.value
-            val isApp = byKey.containsKey(id)
-            val topLevel = cur.items.any { it.id == id }
-
-            // 1) Dock bölgesi
-            if (dockRect.height > 0f && pos.y >= dockRect.top - with(density) { 12.dp.toPx() }) {
-                if (!isApp) return // klasörler dock'a konmaz (iOS'ta da)
-                val dockPitchPx = with(density) { m.dockPitch.toPx() }
-                val dockIconPx = with(density) { m.dockIcon.toPx() }
-                val first = dockRect.left + with(density) { m.dockInnerStart.toPx() }
-                val slot = floor((pos.x - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx)
-                    .toInt().coerceIn(0, 3)
-                vm.editLayout { it.moveToDock(id, slot) }
-                return
-            }
-
-            // 2) Bir simgenin üzerine bırakıldı: klasör oluştur / klasöre ekle
-            if (hover != null && isApp) {
-                vm.editLayout { it.mergeInto(hover, id) }
-                return
-            }
-
-            // 3) Ana ekran ızgarasında bir hücreye
-            val iconPx = with(density) { m.icon.toPx() }
-            val pitchXPx = with(density) { m.pitchX.toPx() }
-            val pitchYPx = with(density) { m.pitchY.toPx() }
-            val marginPx = with(density) { m.marginX.toPx() }
-            val x = pos.x - gridOrigin.x
-            val y = pos.y - gridOrigin.y
-            val col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
-            val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
-            val idx = pagerState.currentPage * m.perPage + row * m.columns + col
-            if (topLevel) vm.editLayout { it.moveItem(id, idx) }
-            else vm.editLayout { it.moveAppToGrid(id, idx) } // dock'tan veya klasörden
-        }
-        SideEffect { bridge.home = ::handleDrop }
-
-        Column(Modifier.fillMaxSize()) {
-            if (!isDefaultHome) {
-                Column(
-                    Modifier
-                        .padding(12.dp)
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0x66000000))
-                        .padding(14.dp)
-                ) {
-                    Text(stringResource(R.string.make_default_hint), color = Color.White, fontSize = 13.sp)
-                    Button(onClick = onRequestDefault) { Text(stringResource(R.string.make_default)) }
-                }
-            }
-
-            Spacer(Modifier.height(m.topPad))
-
-            HorizontalPager(
-                state = pagerState,
-                userScrollEnabled = !dragging,
-                modifier = Modifier.weight(1f).onGloballyPositioned { gridOrigin = it.positionInRoot() },
-            ) { page ->
-                val pageItems = pages.getOrNull(page).orEmpty()
-                // Üstten hizalı sabit ızgara: eksik satırlar boş kalır, simgeler yayılmaz.
-                Column(Modifier.fillMaxSize().padding(start = m.marginX)) {
-                    pageItems.chunked(m.columns).forEach { row ->
-                        Row(
-                            Modifier.height(m.pitchY),
-                            horizontalArrangement = Arrangement.spacedBy(m.pitchX - m.icon)
-                        ) {
-                            row.forEach { item ->
-                                when (item) {
-                                    is AppItem -> {
-                                        val app = byKey[item.key]
-                                        if (app != null) {
-                                            DraggableCell(
-                                                id = item.id, label = app.label, showLabel = settings.showLabels,
-                                                icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                                drag = drag, layer = DragLayer.Home, isApp = true,
-                                                acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                                onClick = { if (!edit) vm.launch(app) },
-                                                onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                            ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
-                                        }
-                                    }
-                                    is FolderItem -> DraggableCell(
-                                        id = item.id, label = item.name, showLabel = settings.showLabels,
-                                        icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                        drag = drag, layer = DragLayer.Home, isApp = false,
-                                        acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                        onClick = { c -> onOpenFolder(item, c) },
-                                        onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                    ) {
-                                        FolderIcon(item, byKey, vm, m.icon, settings.glassStrength, folderPages[item.id] ?: 0)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Box(
-                Modifier.fillMaxWidth().height(HomeMetrics.IndicatorHeight),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(Modifier.graphicsLayer { alpha = dotsAlpha }) {
-                    repeat(pagerState.pageCount) { i ->
-                        Box(
-                            Modifier.padding(3.dp).size(7.dp).clip(CircleShape)
-                                .background(if (i == pagerState.currentPage) Color.White else Color(0x66FFFFFF))
-                        )
-                    }
-                }
-                SearchPill(m, settings.glassStrength, 1f - dotsAlpha, onOpenSearch)
-            }
-
-            Box(Modifier.fillMaxWidth().height(m.dockReserve), contentAlignment = Alignment.TopCenter) {
-                Box(
-                    Modifier
-                        .padding(horizontal = m.dockMarginX)
-                        .fillMaxWidth()
-                        .height(m.dockH)
-                        .onGloballyPositioned { dockRect = it.boundsInRoot() }
-                        .liquidGlass(RoundedCornerShape(m.dockH * 0.38f), settings.glassStrength, 14.dp)
-                ) {
-                    Row(
-                        Modifier.fillMaxSize().padding(start = m.dockInnerStart),
-                        horizontalArrangement = Arrangement.spacedBy(m.dockPitch - m.dockIcon),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        layout.dock.forEach { key ->
-                            val app = byKey[key]
-                            if (app != null) {
-                                DraggableCell(
-                                    id = key, label = app.label, showLabel = false,
-                                    icon = m.dockIcon, pitchX = m.dockPitch, cellHeight = m.dockIcon,
-                                    drag = drag, layer = DragLayer.Home, isApp = true,
-                                    acceptsMerge = false, edit = edit, jiggle = jiggle,
-                                    onClick = { if (!edit) vm.launch(app) },
-                                    onDrop = { p, h -> handleDrop(key, p, h) },
-                                ) { AppIconImage(app, vm, m.dockIcon, settings.iconGlass, settings.glassStrength) }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchPill(m: HomeMetrics, strength: Float, alpha: Float, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .graphicsLayer { this.alpha = alpha }
-            .width(m.pillW)
-            .height(m.pillH)
-            .liquidGlass(CircleShape, strength * 0.8f, 6.dp)
-            .then(if (alpha > 0.5f) Modifier.clickable(onClick = onClick) else Modifier),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SearchGlyph(Color.White, 14.dp)
-        Spacer(Modifier.width(6.dp))
-        Text("Ara", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-private val LabelStyle = TextStyle(
-    color = Color.White,
-    fontSize = 11.sp,
-    fontWeight = FontWeight.Medium,
-    textAlign = TextAlign.Center,
-    shadow = Shadow(Color(0x66000000), Offset(0f, 1f), 4f),
-)
-
-@Composable
-internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: Boolean, strength: Float) {
-    val px = with(LocalDensity.current) { icon.roundToPx() }
-    val bmp by produceState<ImageBitmap?>(null, app.key, px) { value = vm.iconCache.get(app, px) }
-    Box(Modifier.size(icon).glassIcon(RoundedCornerShape(icon * 0.225f), glass, strength)) {
-        bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize()) }
-    }
-}
-
-/** Sürüklenmeyen basit hücre (arama sonuçları vb.). */
-@Composable
-internal fun AppCell(
-    app: AppInfo, vm: LauncherViewModel,
-    icon: Dp, pitchX: Dp, cellHeight: Dp, showLabel: Boolean,
-    glass: Boolean, strength: Float, onClick: () -> Unit,
-) {
-    Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
-        Column(
-            Modifier.requiredWidth(pitchX).clickable(onClick = onClick),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            AppIconImage(app, vm, icon, glass, strength)
-            if (showLabel) {
-                Text(
-                    app.label,
-                    style = LabelStyle,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 5.dp, start = 4.dp, end = 4.dp).fillMaxWidth()
-                )
-            }
-        }
-    }
 }
