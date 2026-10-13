@@ -1,6 +1,13 @@
 package dev.glass.launcher.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.PowerManager
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -108,6 +115,10 @@ fun HomeScreen(
     val groups by vm.libraryGroups.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val wallpaper by vm.wallpaper.collectAsStateWithLifecycle()
+    val blurred by vm.blurredWallpaper.collectAsStateWithLifecycle()
+    val degraded by vm.degraded.collectAsStateWithLifecycle()
+    val powerSave = rememberPowerSaveMode()
+    val motion = Motion(if (settings.lowPower) maxOf(settings.animSpeed, 1.4f) else settings.animSpeed)
     val requester = LocalWidgetRequester.current
 
     val drag = remember { DragState() }
@@ -125,8 +136,8 @@ fun HomeScreen(
     val overlayNow by rememberUpdatedState(overlay)
     val editNow by rememberUpdatedState(editMode)
 
-    val blur by animateDpAsState(if (overlay == Overlay.None) 0.dp else 22.dp, tween(260), label = "blur")
-    val scrim by animateFloatAsState(if (overlay == Overlay.None) 0f else 0.35f, tween(260), label = "scrim")
+    val blur by animateDpAsState(if (overlay == Overlay.None) 0.dp else 22.dp, motion.tween(260), label = "blur")
+    val scrim by animateFloatAsState(if (overlay == Overlay.None) 0f else 0.35f, motion.tween(260), label = "scrim")
 
     // Sallanma animasyonu yalnızca düzenleme modunda çalışır (pil).
     val jiggle: State<Float> = if (editMode) {
@@ -209,9 +220,19 @@ fun HomeScreen(
         ThemeMode.Light -> false
         ThemeMode.Dark -> true
     }
+    // Otomatik kalite: Pil Tasarrufu açıksa veya kaydırmada kare süreleri uzunsa efektler sadeleşir.
+    val reduced = settings.lowPower || (settings.autoQuality && (powerSave || degraded))
+    val useBackdrop = settings.launcherWallpaper && settings.realBlur && !reduced
     CompositionLocalProvider(
         LocalLauncherSettings provides settings,
-        LocalGlass provides GlassLook(dark = dark, reduced = settings.lowPower),
+        LocalMotion provides motion,
+        LocalGlass provides GlassLook(
+            dark = dark,
+            reduced = reduced,
+            backdrop = if (useBackdrop) blurred else null,
+            rootW = rootSize.width.toFloat(),
+            rootH = rootSize.height.toFloat(),
+        ),
     ) {
     Box(
         Modifier
@@ -298,22 +319,22 @@ fun HomeScreen(
 
         AnimatedVisibility(
             overlay == Overlay.Search,
-            enter = fadeIn(tween(180)) + scaleIn(initialScale = 0.96f),
-            exit = fadeOut(tween(140)),
+            enter = fadeIn(motion.tween(180)) + scaleIn(motion.spring(), initialScale = 0.96f),
+            exit = fadeOut(motion.tween(140)),
         ) {
             SearchOverlay(vm, allApps, suggestions, settings.glassStrength, settings.iconGlass, onClose = { closeOverlay() })
         }
         AnimatedVisibility(
             overlay == Overlay.Control,
-            enter = slideInVertically { -it / 2 } + fadeIn(tween(200)),
-            exit = slideOutVertically { -it / 2 } + fadeOut(tween(160)),
+            enter = slideInVertically(motion.spring()) { -it / 2 } + fadeIn(motion.tween(200)),
+            exit = slideOutVertically(motion.tween(200)) { -it / 2 } + fadeOut(motion.tween(160)),
         ) {
             ControlPanel(settings.glassStrength, onClose = { closeOverlay() })
         }
         AnimatedVisibility(
             overlay == Overlay.Settings,
-            enter = slideInVertically { it } + fadeIn(tween(200)),
-            exit = slideOutVertically { it } + fadeOut(tween(160)),
+            enter = slideInVertically(motion.spring(0.9f, 400f)) { it } + fadeIn(motion.tween(200)),
+            exit = slideOutVertically(motion.tween(220)) { it } + fadeOut(motion.tween(160)),
         ) {
             SettingsScreen(
                 vm = vm, s = settings, isDefaultHome = isDefaultHome, onRequestDefault = onRequestDefault,
@@ -323,15 +344,16 @@ fun HomeScreen(
         }
         AnimatedVisibility(
             overlay == Overlay.Widgets,
-            enter = slideInVertically { it } + fadeIn(tween(200)),
-            exit = slideOutVertically { it } + fadeOut(tween(160)),
+            enter = slideInVertically(motion.spring(0.9f, 400f)) { it } + fadeIn(motion.tween(200)),
+            exit = slideOutVertically(motion.tween(220)) { it } + fadeOut(motion.tween(160)),
         ) {
             WidgetPicker(vm, settings.glassStrength, onClose = { closeOverlay() })
         }
         AnimatedVisibility(
             overlay == Overlay.Folder && openFolder != null,
-            enter = scaleIn(tween(260), initialScale = 0.25f, transformOrigin = folderOrigin) + fadeIn(tween(200)),
-            exit = scaleOut(tween(200), targetScale = 0.25f, transformOrigin = folderOrigin) + fadeOut(tween(160)),
+            // iOS gibi: klasör simgesinin yerinden yayla büyüyerek açılır, kapanırken oraya küçülür.
+            enter = scaleIn(motion.bouncy(), initialScale = 0.2f, transformOrigin = folderOrigin) + fadeIn(motion.tween(180)),
+            exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = folderOrigin) + fadeOut(motion.tween(200)),
         ) {
             folderHolder[0]?.let { f ->
                 FolderOverlay(
@@ -363,8 +385,8 @@ fun HomeScreen(
         }
         AnimatedVisibility(
             overlay == Overlay.Group,
-            enter = scaleIn(tween(240), initialScale = 0.85f) + fadeIn(tween(200)),
-            exit = scaleOut(tween(180), targetScale = 0.85f) + fadeOut(tween(160)),
+            enter = scaleIn(motion.bouncy(), initialScale = 0.85f) + fadeIn(motion.tween(200)),
+            exit = scaleOut(motion.tween(180), targetScale = 0.85f) + fadeOut(motion.tween(160)),
         ) {
             groupHolder[0]?.let { g ->
                 LibraryGroupOverlay(
@@ -376,8 +398,8 @@ fun HomeScreen(
         }
         AnimatedVisibility(
             overlay == Overlay.Menu,
-            enter = fadeIn(tween(160)) + scaleIn(tween(200), initialScale = 0.92f),
-            exit = fadeOut(tween(140)),
+            enter = fadeIn(motion.tween(160)) + scaleIn(motion.bouncy(), initialScale = 0.9f),
+            exit = fadeOut(motion.tween(140)),
         ) {
             menuHolder[0]?.let { req ->
                 val folder = layout.items.firstOrNull { it.id == req.itemId } as? FolderItem
@@ -486,4 +508,20 @@ internal fun GlassButton(text: String, strength: Float, onClick: () -> Unit) {
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) { Text(text, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold) }
+}
+
+/** Telefonun Pil Tasarrufu modu (değişince güncellenir; yalnızca launcher ekrandayken dinlenir). */
+@Composable
+private fun rememberPowerSaveMode(): Boolean {
+    val ctx = LocalContext.current
+    val pm = remember { ctx.getSystemService(PowerManager::class.java) }
+    var on by remember { mutableStateOf(pm.isPowerSaveMode) }
+    DisposableEffect(ctx) {
+        val r = object : BroadcastReceiver() {
+            override fun onReceive(c: Context?, i: Intent?) { on = pm.isPowerSaveMode }
+        }
+        ctx.registerReceiver(r, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED), Context.RECEIVER_NOT_EXPORTED)
+        onDispose { runCatching { ctx.unregisterReceiver(r) } }
+    }
+    return on
 }

@@ -10,6 +10,7 @@ import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.UserHandle
@@ -86,9 +87,10 @@ class AppRepository(private val context: Context) {
         }.filter { it != "android" }.distinct()
     }
 
-    fun launch(app: AppInfo, sourceBounds: Rect? = null) {
+    /** [options]: simgeden büyüyen açılış animasyonu (ActivityOptions). Animasyonu sistem çizer. */
+    fun launch(app: AppInfo, sourceBounds: Rect? = null, options: Bundle? = null) {
         runCatching {
-            launcherApps.startMainActivity(app.componentName, app.user, sourceBounds, null)
+            launcherApps.startMainActivity(app.componentName, app.user, sourceBounds, options)
         }
     }
 

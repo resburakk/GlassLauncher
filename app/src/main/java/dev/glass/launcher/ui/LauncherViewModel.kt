@@ -3,9 +3,11 @@ package dev.glass.launcher.ui
 import android.app.Application
 import android.content.pm.ShortcutInfo
 import android.graphics.Rect
+import android.os.Bundle
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
+import dev.glass.launcher.data.Blurred
 import dev.glass.launcher.data.IconLook
 import dev.glass.launcher.data.WidgetItem
 import dev.glass.launcher.data.WidgetKind
@@ -97,8 +99,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val homePressed: SharedFlow<Unit> = _homePressed
     fun onHomePressed() { _homePressed.tryEmit(Unit) }
 
-    fun launch(app: AppInfo, bounds: Rect? = null) {
-        repo.launch(app, bounds)
+    fun launch(app: AppInfo, bounds: Rect? = null, options: Bundle? = null) {
+        repo.launch(app, bounds, options)
         viewModelScope.launch { la.settingsStore.addRecent(app.componentName.flattenToString()) }
     }
 
@@ -137,14 +139,29 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val _wallpaper = MutableStateFlow<ImageBitmap?>(null)
     val wallpaper: StateFlow<ImageBitmap?> = _wallpaper
 
+    private val _blurred = MutableStateFlow<Blurred?>(null)
+    /** Cam yüzeylerin arkasında gösterilen bulanık duvar kâğıdı (yalnızca launcher duvar kâğıdı seçiliyse). */
+    val blurredWallpaper: StateFlow<Blurred?> = _blurred
+
     fun reloadWallpaper() {
-        viewModelScope.launch { _wallpaper.value = la.wallpaperRepository.load() }
+        viewModelScope.launch {
+            _wallpaper.value = la.wallpaperRepository.load()
+            _blurred.value = la.wallpaperRepository.loadBlurred()
+        }
     }
+
+    // --- Otomatik kalite ---
+
+    private val _degraded = MutableStateFlow(false)
+    /** Kaydırma sırasında kare süreleri uzun ölçüldüyse true (bu oturum boyunca cam efektleri sadeleşir). */
+    val degraded: StateFlow<Boolean> = _degraded
+    fun reportSlowFrames() { _degraded.value = true }
 
     fun setWallpaper(uri: Uri, alsoSystem: Boolean) {
         viewModelScope.launch {
             if (la.wallpaperRepository.save(uri)) {
                 _wallpaper.value = la.wallpaperRepository.load()
+                _blurred.value = la.wallpaperRepository.loadBlurred()
                 la.settingsStore.update { it.copy(launcherWallpaper = true) }
                 if (alsoSystem) la.wallpaperRepository.applyToSystem()
             }
@@ -155,6 +172,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             la.wallpaperRepository.clear()
             _wallpaper.value = null
+            _blurred.value = null
             la.settingsStore.update { it.copy(launcherWallpaper = false) }
         }
     }

@@ -2,6 +2,7 @@ package dev.glass.launcher.data
 
 import android.app.WallpaperManager
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
@@ -9,6 +10,9 @@ import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+
+/** Bulanık duvar kâğıdı kopyası ve orijinal görselin boyutu (ekrana yerleşim hesabı için). */
+class Blurred(val image: ImageBitmap, val srcW: Int, val srcH: Int)
 
 /**
  * Launcher'ın kendi duvar kâğıdı (Photo Picker ile seçilir, izin gerekmez).
@@ -44,6 +48,29 @@ class WallpaperRepository(private val context: Context) {
     }
 
     suspend fun clear() = withContext(Dispatchers.IO) { file.delete() }
+
+    /**
+     * Cam yüzeyler için önceden bulanıklaştırılmış küçük kopya (bir kez üretilir, çizimde ölçeklenir).
+     * Küçük boyuta indirip kutu bulanıklığı uygulamak, her karede bulanıklık hesaplamaktan çok daha ucuzdur.
+     */
+    suspend fun loadBlurred(): Blurred? = withContext(Dispatchers.Default) {
+        val f = file
+        if (!f.exists()) return@withContext null
+        runCatching {
+            var srcW = 0
+            var srcH = 0
+            val small = ImageDecoder.decodeBitmap(ImageDecoder.createSource(f)) { decoder, info, _ ->
+                srcW = info.size.width
+                srcH = info.size.height
+                val k = BLUR_W / srcW.toFloat()
+                decoder.setTargetSize(BLUR_W, (srcH * k).toInt().coerceAtLeast(1))
+                decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+            }.copy(Bitmap.Config.ARGB_8888, true)
+            BlurUtil.boxBlur(small, radius = 4, passes = 3)
+            BlurUtil.saturate(small, 1.25f)
+            Blurred(small.asImageBitmap(), srcW, srcH)
+        }.getOrNull()
+    }
 
     /** Kopyalanan görseli sistem duvar kâğıdı (ana ekran) olarak da ayarlar. SET_WALLPAPER izni gerekir. */
     suspend fun applyToSystem(): Boolean = withContext(Dispatchers.IO) {
@@ -87,5 +114,8 @@ class WallpaperRepository(private val context: Context) {
         }.getOrNull()
     }
 
-    private companion object { const val MAX_SIDE = 1600f }
+    private companion object {
+        const val MAX_SIDE = 1600f
+        const val BLUR_W = 120
+    }
 }

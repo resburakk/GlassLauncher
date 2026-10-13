@@ -41,6 +41,13 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.IntOffset
+import android.app.ActivityOptions
+import dev.glass.launcher.data.HomeItem
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,6 +81,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.floor
 
+/** Izgara hücresi; page = -1 dock'u, col o durumda dock yuvasını gösterir. */
+private data class Cell(val page: Int, val row: Int, val col: Int)
+
 /**
  * Ana ekran içeriği: sayfalı ızgara + en sonda Uygulama Arşivi sayfası, sayfa noktaları/arama hapı ve dock.
  * Arşive geçerken dock ve arama hapı aşağı kayarak kaybolur (iOS gibi).
@@ -103,11 +113,12 @@ internal fun HomeContent(
         Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout))
     ) {
         val m = HomeMetrics.compute(maxWidth, maxHeight, settings)
+        val motion = LocalMotion.current
+        val view = LocalView.current
         val items = layout.items
         // Uygulamalar 1×1, widget'lar N×M hücre: sayfalara yerleştir.
         val placements = remember(items, m.columns, m.rows) { GridPacker.pack(items, m.columns, m.rows) }
         val pageTotal = if (items.isEmpty()) 1 else GridPacker.pageCount(placements)
-        val byPage = remember(placements) { placements.groupBy { it.page } }
         val dragging = drag.key != null
         val lastFull = GridPacker.isPageFull(placements, pageTotal - 1, m.columns, m.rows)
         // Sürüklerken son sayfa doluysa yeni boş bir sayfa görünür.
@@ -117,6 +128,94 @@ internal fun HomeContent(
 
         var gridOrigin by remember { mutableStateOf(Offset.Zero) }
         var dockRect by remember { mutableStateOf(Rect.Zero) }
+
+        // --- Canlı yer değiştirme (iOS gibi): sürüklerken diğer simgeler kayarak yer açar ---
+        var preview by remember { mutableStateOf<List<HomeItem>?>(null) }
+        var dockPreview by remember { mutableStateOf<List<String>?>(null) }
+        val targetCell by remember(m, libIndex) {
+            derivedStateOf {
+                val k = drag.key
+                when {
+                    k == null || drag.hoverId != null -> null
+                    pagerState.currentPage >= libIndex -> null
+                    dockRect.height > 0f && drag.pos.y >= dockRect.top - with(density) { 12.dp.toPx() } -> {
+                        val dockPitchPx = with(density) { m.dockPitch.toPx() }
+                        val dockIconPx = with(density) { m.dockIcon.toPx() }
+                        val first = dockRect.left + with(density) { m.dockInnerStart.toPx() }
+                        val slot = floor((drag.pos.x - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx).toInt().coerceIn(0, 3)
+                        Cell(-1, 0, slot)
+                    }
+                    else -> {
+                        val iconPx = with(density) { m.icon.toPx() }
+                        val pitchXPx = with(density) { m.pitchX.toPx() }
+                        val pitchYPx = with(density) { m.pitchY.toPx() }
+                        val marginPx = with(density) { m.marginX.toPx() }
+                        val col = floor((drag.pos.x - gridOrigin.x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx)
+                            .toInt().coerceIn(0, m.columns - 1)
+                        val row = floor((drag.pos.y - gridOrigin.y) / pitchYPx).toInt().coerceIn(0, m.rows - 1)
+                        Cell(pagerState.currentPage, row, col)
+                    }
+                }
+            }
+        }
+        val dragKey = drag.key
+        LaunchedEffect(targetCell, dragKey) {
+            if (dragKey == null) {
+                preview = null
+                dockPreview = null
+                return@LaunchedEffect
+            }
+            val cell = targetCell ?: return@LaunchedEffect // klasör hedefi üzerinde: düzen sabit kalır
+            delay((140 / motion.speed).toLong())
+            val cur = vm.layout.value
+            val without = cur.items.filter { it.id != dragKey }
+            if (cell.page < 0) {
+                // Dock üzerinde: ızgaradaki boşluk kapanır; dock'ta yer varsa simgeler kayar.
+                preview = without
+                val isApp = byKey.containsKey(dragKey)
+                dockPreview = if (isApp && (dragKey in cur.dock || cur.dock.size < 4)) {
+                    (cur.dock - dragKey).toMutableList().apply { add(cell.col.coerceIn(0, size), dragKey) }
+                } else null
+                return@LaunchedEffect
+            }
+            dockPreview = cur.dock - dragKey
+            val idx = GridPacker.insertionIndex(GridPacker.pack(without, m.columns, m.rows), cell.page, cell.row, cell.col, m.columns)
+            val dragged = cur.items.firstOrNull { it.id == dragKey }
+                ?: if (byKey.containsKey(dragKey)) AppItem(dragKey) else return@LaunchedEffect
+            preview = without.toMutableList().apply { add(idx.coerceIn(0, size), dragged) }
+        }
+        val shownItems = preview ?: items
+        val shownPlacements = remember(shownItems, m.columns, m.rows) { GridPacker.pack(shownItems, m.columns, m.rows) }
+        val byPage = remember(shownPlacements) { shownPlacements.groupBy { it.page } }
+        val shownDock = dockPreview ?: layout.dock
+
+        // Otomatik kalite: kaydırma sırasında kare sürelerini örnekle (ek kare istemez; zaten çizilen kareler).
+        LaunchedEffect(pagerState.isScrollInProgress, settings.autoQuality) {
+            if (!settings.autoQuality || !pagerState.isScrollInProgress) return@LaunchedEffect
+            val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
+            val budget = (1_000_000_000L / refresh).toLong()
+            var last = 0L
+            var n = 0
+            var slow = 0
+            while (n < 40) {
+                withFrameNanos { t ->
+                    if (last != 0L) {
+                        n++
+                        if (t - last > budget * 18 / 10) slow++
+                    }
+                    last = t
+                }
+            }
+            if (slow > n / 3) vm.reportSlowFrames()
+        }
+
+        /** Uygulamayı, simgesinden büyüyen sistem animasyonuyla açar. */
+        fun launchFrom(app: AppInfo, r: Rect) {
+            val opts = runCatching {
+                ActivityOptions.makeScaleUpAnimation(view, r.left.toInt(), r.top.toInt(), r.width.toInt(), r.height.toInt()).toBundle()
+            }.getOrNull()
+            vm.launch(app, android.graphics.Rect(r.left.toInt(), r.top.toInt(), r.right.toInt(), r.bottom.toInt()), opts)
+        }
 
         // 0 = ana ekran, 1 = tamamen Uygulama Arşivi
         val libFraction by remember(libIndex) {
@@ -130,7 +229,7 @@ internal fun HomeContent(
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (pagerState.isScrollInProgress) showDots = true else { delay(900); showDots = false }
         }
-        val dotsAlpha by animateFloatAsState(if (showDots) 1f else 0f, tween(220), label = "dots")
+        val dotsAlpha by animateFloatAsState(if (showDots) 1f else 0f, motion.tween(220), label = "dots")
 
         // Sürüklerken ekran kenarında bekleyince sayfa değişir (arşive geçmez).
         val widthPx = with(density) { maxWidth.toPx() }
@@ -243,9 +342,13 @@ internal fun HomeContent(
                 // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
                 Box(Modifier.fillMaxSize().padding(bottom = bottomReserve)) {
                     pagePl.forEach { pl ->
+                      key(pl.item.id) {
                         val x = m.marginX + m.pitchX * pl.col.toFloat()
                         val y = m.pitchY * pl.row.toFloat()
-                        Box(Modifier.offset(x, y)) {
+                        // Yer değişince simge yeni konumuna yayla kayar.
+                        val ax by animateDpAsState(x, motion.reflow(), label = "x")
+                        val ay by animateDpAsState(y, motion.reflow(), label = "y")
+                        Box(Modifier.offset { IntOffset(ax.roundToPx(), ay.roundToPx()) }) {
                             when (val item = pl.item) {
                                 is AppItem -> {
                                     val app = byKey[item.key]
@@ -256,7 +359,7 @@ internal fun HomeContent(
                                             icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                             drag = drag, layer = DragLayer.Home, isApp = true,
                                             acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                            onClick = { if (!edit) vm.launch(app) },
+                                            onClick = { r -> if (!edit) launchFrom(app, r) },
                                             onDrop = { p, h -> handleDrop(item.id, p, h) },
                                         ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
                                     }
@@ -267,7 +370,7 @@ internal fun HomeContent(
                                     icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                     drag = drag, layer = DragLayer.Home, isApp = false,
                                     acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                    onClick = { c -> onOpenFolder(item, c) },
+                                    onClick = { r -> onOpenFolder(item, r.center) },
                                     onDrop = { p, h -> handleDrop(item.id, p, h) },
                                 ) {
                                     FolderIcon(
@@ -285,6 +388,7 @@ internal fun HomeContent(
                                 }
                             }
                         }
+                      }
                     }
                 }
             }
@@ -331,24 +435,29 @@ internal fun HomeContent(
                             .onGloballyPositioned { dockRect = it.boundsInRoot() }
                             .liquidGlass(RoundedCornerShape(m.dockH * 0.38f), settings.glassStrength * settings.dockOpacity, 14.dp)
                     ) {
-                        Row(
-                            Modifier.fillMaxSize().padding(start = m.dockInnerStart),
-                            horizontalArrangement = Arrangement.spacedBy(m.dockPitch - m.dockIcon),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            layout.dock.forEach { key ->
-                                val app = byKey[key]
+                        Box(Modifier.fillMaxSize()) {
+                            shownDock.forEachIndexed { i, dk ->
+                              key(dk) {
+                                val app = byKey[dk]
                                 if (app != null) {
-                                    DraggableCell(
-                                        id = key, place = CellPlace.Dock,
-                                        label = app.label, showLabel = false,
-                                        icon = m.dockIcon, pitchX = m.dockPitch, cellHeight = m.dockIcon,
-                                        drag = drag, layer = DragLayer.Home, isApp = true,
-                                        acceptsMerge = false, edit = edit, jiggle = jiggle,
-                                        onClick = { if (!edit) vm.launch(app) },
-                                        onDrop = { p, h -> handleDrop(key, p, h) },
-                                    ) { AppIconImage(app, vm, m.dockIcon, settings.iconGlass, settings.glassStrength) }
+                                    val dx by animateDpAsState(m.dockInnerStart + m.dockPitch * i.toFloat(), motion.reflow(), label = "dx")
+                                    Box(
+                                        Modifier
+                                            .align(Alignment.CenterStart)
+                                            .offset { IntOffset(dx.roundToPx(), 0) }
+                                    ) {
+                                        DraggableCell(
+                                            id = dk, place = CellPlace.Dock,
+                                            label = app.label, showLabel = false,
+                                            icon = m.dockIcon, pitchX = m.dockPitch, cellHeight = m.dockIcon,
+                                            drag = drag, layer = DragLayer.Home, isApp = true,
+                                            acceptsMerge = false, edit = edit, jiggle = jiggle,
+                                            onClick = { r -> if (!edit) launchFrom(app, r) },
+                                            onDrop = { p, h -> handleDrop(dk, p, h) },
+                                        ) { AppIconImage(app, vm, m.dockIcon, settings.iconGlass, settings.glassStrength) }
+                                    }
                                 }
+                              }
                             }
                         }
                     }

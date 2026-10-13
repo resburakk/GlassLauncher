@@ -20,6 +20,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.FilterQuality
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import dev.glass.launcher.data.Blurred
 import dev.glass.launcher.data.LauncherSettings
 
 private fun al(x: Float) = x.coerceIn(0f, 1f)
@@ -30,8 +42,13 @@ private fun black(a: Float) = Color.Black.copy(alpha = al(a))
 @Immutable
 data class GlassLook(
     val dark: Boolean = false,
-    /** Düşük güç / otomatik kalite düşürme: gölge ve parlama katmanları azaltılır. */
+    /** Düşük güç / otomatik kalite düşürme: gölge, parlama ve bulanıklık katmanları kapatılır. */
     val reduced: Boolean = false,
+    /** Launcher duvar kâğıdının bulanık kopyası (gerçek arka plan bulanıklığı için); yoksa null. */
+    val backdrop: Blurred? = null,
+    /** Duvar kâğıdının çizildiği kök alanın boyutu (px). */
+    val rootW: Float = 0f,
+    val rootH: Float = 0f,
 )
 
 val LocalGlass = staticCompositionLocalOf { GlassLook() }
@@ -48,11 +65,15 @@ val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
 fun Modifier.liquidGlass(shape: Shape, strength: Float = 1f, elevation: Dp = 14.dp): Modifier = composed {
     val look = LocalGlass.current
     val s = strength
+    val bd = if (look.reduced) null else look.backdrop
+    // Gerçek bulanıklık varken dolgu daha ince tutulur; cam arkasındaki renkleri göstersin.
+    val fill = if (bd != null) 0.55f else 1f
     val base = if (look.dark) {
-        Brush.verticalGradient(listOf(black(0.30f * s + 0.08f), black(0.42f * s + 0.08f)))
+        Brush.verticalGradient(listOf(black((0.30f * s + 0.08f) * fill), black((0.42f * s + 0.08f) * fill)))
     } else {
-        Brush.verticalGradient(listOf(white(0.30f * s), white(0.12f * s)))
+        Brush.verticalGradient(listOf(white(0.30f * s * fill), white(0.12f * s * fill)))
     }
+    var origin by remember { mutableStateOf(Offset.Zero) }
     val rim = if (look.dark) {
         Brush.linearGradient(listOf(white(0.45f * s), white(0.05f * s), white(0.25f * s)))
     } else {
@@ -63,7 +84,12 @@ fun Modifier.liquidGlass(shape: Shape, strength: Float = 1f, elevation: Dp = 14.
             if (look.reduced || elevation == 0.dp) Modifier
             else Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
         )
+        .then(if (bd != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() } else Modifier)
         .clip(shape)
+        .then(
+            if (bd != null) Modifier.drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin) }
+            else Modifier
+        )
         .background(base)
         .then(
             if (look.reduced) Modifier
@@ -86,6 +112,41 @@ fun Modifier.liquidGlass(shape: Shape, strength: Float = 1f, elevation: Dp = 14.
             }
         )
         .border(1.dp, rim, shape)
+}
+
+/**
+ * Bulanık duvar kâğıdının bu yüzeyin arkasına düşen bölümünü çizer. Kaynak bölge %4 küçültülür: içerik
+ * hafifçe büyümüş görünür ve kenarlarda kayar — camdaki ışık kırılmasına benzer bir "mercek" hissi verir.
+ */
+private fun DrawScope.drawBackdrop(bd: Blurred, rootW: Float, rootH: Float, origin: Offset) {
+    if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
+    val img = bd.image
+    // Duvar kâğıdı kökte ContentScale.Crop ile çizilir: aynı eşlemeyi bulanık kopyaya uygula.
+    val scale = maxOf(rootW / bd.srcW, rootH / bd.srcH)
+    val offX = (rootW - bd.srcW * scale) / 2f
+    val offY = (rootH - bd.srcH * scale) / 2f
+    val k = img.width.toFloat() / bd.srcW // orijinal → küçük kopya
+    val lens = 1.04f
+    val cx = origin.x + size.width / 2f
+    val cy = origin.y + size.height / 2f
+    val halfW = size.width / 2f / lens
+    val halfH = size.height / 2f / lens
+    val sl = ((cx - halfW - offX) / scale * k)
+    val st = ((cy - halfH - offY) / scale * k)
+    val sw = (halfW * 2f / scale * k)
+    val sh = (halfH * 2f / scale * k)
+    val il = sl.toInt().coerceIn(0, img.width - 1)
+    val itop = st.toInt().coerceIn(0, img.height - 1)
+    val iw = sw.toInt().coerceIn(1, img.width - il)
+    val ih = sh.toInt().coerceIn(1, img.height - itop)
+    drawImage(
+        img,
+        srcOffset = IntOffset(il, itop),
+        srcSize = IntSize(iw, ih),
+        dstOffset = IntOffset.Zero,
+        dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+        filterQuality = FilterQuality.Low,
+    )
 }
 
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */

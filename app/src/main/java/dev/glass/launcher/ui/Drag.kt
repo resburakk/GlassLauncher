@@ -21,6 +21,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -265,7 +267,7 @@ internal fun DraggableCell(
     acceptsMerge: Boolean,
     edit: Boolean,
     jiggle: State<Float>,
-    onClick: (Offset) -> Unit,
+    onClick: (Rect) -> Unit,
     onDrop: (Offset, String?) -> Unit,
     iconContent: @Composable () -> Unit,
 ) {
@@ -287,14 +289,23 @@ internal fun DraggableCell(
         onDispose { drag.unregister(target) }
     }
 
-    val hovered = drag.hoverId == itemId
-    val hoverScale by animateFloatAsState(
-        if (hovered) 1.16f else 1f,
-        spring(dampingRatio = 0.6f, stiffness = 500f),
-        label = "hover",
-    )
-    val sign = remember(itemId) { if ((itemId.hashCode() and 1) == 0) 1f else -1f }
+    // Yalnızca bu hücrenin "üzerinde mi" sonucu değişince yeniden çizilir (tüm ızgara değil).
+    val hovered by remember(itemId) { derivedStateOf { drag.hoverId == itemId } }
     val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val motion = LocalMotion.current
+    // iOS gibi: üzerine simge gelince büyür, basılınca hafifçe küçülüp kararır.
+    val scale by animateFloatAsState(
+        when {
+            hovered -> 1.16f
+            pressed -> 0.92f
+            else -> 1f
+        },
+        motion.spring(damping = 0.6f, stiffness = 600f),
+        label = "cellScale",
+    )
+    val dim by animateFloatAsState(if (pressed) 0.75f else 1f, motion.tween(90), label = "cellDim")
+    val sign = remember(itemId) { if ((itemId.hashCode() and 1) == 0) 1f else -1f }
 
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
         Column(
@@ -307,13 +318,13 @@ internal fun DraggableCell(
                     target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
                 }
                 .graphicsLayer {
-                    alpha = if (drag.key == itemId) 0f else 1f
-                    scaleX = hoverScale
-                    scaleY = hoverScale
+                    alpha = if (drag.key == itemId) 0f else dim
+                    scaleX = scale
+                    scaleY = scale
                     rotationZ = if (edit) jiggle.value * sign else 0f
                 }
                 .clickable(interactionSource = interaction, indication = null) {
-                    onClick(target.iconRect.center)
+                    onClick(target.iconRect)
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
