@@ -167,6 +167,8 @@ fun HomeScreen(
     val blur = 22.dp * blurAmount
     val scrim by animateFloatAsState(
         when {
+            // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
+            overlay == Overlay.Folder || overlay == Overlay.Group -> 0.06f
             fullBlur -> 0.28f
             overlay == Overlay.Menu || overlay == Overlay.LockPrompt -> 0.10f
             else -> 0f

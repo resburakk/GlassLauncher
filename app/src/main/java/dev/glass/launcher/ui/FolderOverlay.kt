@@ -1,6 +1,8 @@
 package dev.glass.launcher.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -95,14 +97,19 @@ fun FolderOverlay(
         Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { keyboard?.hide(); onClose() }) },
         contentAlignment = Alignment.Center,
     ) {
-        // Simgeler ana ekranla AYNI boyutta; klasör boyutu ayarı yalnızca simgeler arası boşluğu değiştirir.
+        // iOS 26 ölçüleri (402 pt genişlikte): panel ≈304×344 pt, köşe 34 pt, iç kenar 27.5 pt yan / 29 pt üst;
+        // simgeler, sütun ve satır aralığı ANA EKRANLA AYNI. "Açık klasör boyutu" ayarı aralığı ölçekler.
         val hm = LocalHomeMetrics.current
-        val icon = hm?.icon ?: (maxWidth * 0.16f)
-        val minPanel = icon * 3.3f + 40.dp
-        val panelW = maxOf(maxWidth * settings.folderSize, minPanel).coerceAtMost(maxWidth - 16.dp)
-        val inner = panelW - 40.dp
-        val pitch = inner / 3f
-        val rowH = icon + (hm?.let { it.pitchY - it.icon } ?: 30.dp).coerceAtMost(icon * 0.55f)
+        val u = hm?.pt ?: (maxWidth / 402f)
+        val icon = hm?.icon ?: (u * 65f)
+        val k = (settings.folderSize / 0.756f).coerceIn(0.75f, 1.3f)
+        val pitch = ((hm?.pitchX ?: (u * 92f)) * k).coerceAtLeast(icon + 4.dp)
+        val rowH = ((hm?.pitchY ?: (u * 98f)) * k).coerceAtLeast(icon + 24.dp)
+        val sidePad = u * 27.5f
+        val topPad = u * 29f
+        val bottomPad = u * 15f
+        val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
+        val panelShape = RoundedCornerShape(u * 34f)
         val pages = folder.keys.chunked(9)
         val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, maxOf(pages.size - 1, 0))) {
             maxOf(pages.size, 1)
@@ -131,29 +138,40 @@ fun FolderOverlay(
             onReorder(key, idx)
         }
 
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Klasör adı panelin ÜSTÜNDE, iOS'taki gibi büyük ve kalın; dokununca düzenlenir.
+        BasicTextField(
+            value = name,
+            onValueChange = { name = it.take(30) },
+            singleLine = true,
+            textStyle = TextStyle(
+                color = Color.White, fontSize = (u.value * 30f).sp, fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center, fontFamily = AppFont, shadow = IosTextShadow,
+            ),
+            cursorBrush = SolidColor(Color.White),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
+            modifier = Modifier.width(panelW).padding(bottom = u * 22f),
+        )
         Column(
             Modifier
                 .width(panelW)
                 .onGloballyPositioned { panelRect = it.boundsInRoot() }
-                .liquidGlass(RoundedCornerShape(38.dp), settings.glassStrength, 18.dp)
-                .background(Color(0x40000000))
+                // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar; gölge YOK (yarı saydam panelde
+                // gölge içeriden koyu bir kare gibi görünüyordu).
+                .clip(panelShape)
+                .background(
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.20f), Color.White.copy(alpha = 0.12f)))
+                )
+                .border(
+                    1.2.dp,
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.35f))),
+                    panelShape,
+                )
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(20.dp),
+                .padding(top = topPad, bottom = bottomPad),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            BasicTextField(
-                value = name,
-                onValueChange = { name = it.take(30) },
-                singleLine = true,
-                textStyle = TextStyle(
-                    color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, fontFamily = AppFont,
-                ),
-                cursorBrush = SolidColor(Color.White),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-            )
-
             HorizontalPager(
                 state = pagerState,
                 userScrollEnabled = drag.key == null,
@@ -165,7 +183,7 @@ fun FolderOverlay(
                 Column(Modifier.fillMaxSize()) {
                     keys.chunked(3).forEach { row ->
                         Row(
-                            Modifier.height(rowH).padding(start = (pitch - icon) / 2f),
+                            Modifier.height(rowH).padding(start = sidePad),
                             horizontalArrangement = Arrangement.spacedBy(pitch - icon),
                         ) {
                             row.forEach { k ->
@@ -190,7 +208,7 @@ fun FolderOverlay(
             }
 
             if (pages.size > 1) {
-                Row(Modifier.padding(top = 10.dp)) {
+                Row(Modifier.padding(top = 2.dp)) {
                     repeat(pages.size) { i ->
                         Box(
                             Modifier.padding(3.dp).size(7.dp).clip(CircleShape)
@@ -199,6 +217,7 @@ fun FolderOverlay(
                     }
                 }
             }
+        }
         }
     }
 }

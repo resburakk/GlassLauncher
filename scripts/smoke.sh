@@ -37,6 +37,11 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 # 3) Uzun bas + sürükle
 adb shell input swipe $ix $iy $((W*60/100)) $((H*25/100)) 2500; step "sürükle-bırak" 4
 adb shell input keyevent KEYCODE_BACK; step "geri"
+shot 04a-surukle-sonrasi
+# Bırakılan yerde klasör oluştuysa aç
+adb shell input tap $((W*60/100)) $((H*25/100)); step "klasör" 2
+shot 04b-klasor
+adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # 4) Sayfalar, arama
 adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
