@@ -4,6 +4,11 @@ import android.app.Application
 import android.content.pm.ShortcutInfo
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
+import android.net.Uri
+import androidx.compose.ui.graphics.ImageBitmap
+import dev.glass.launcher.data.IconLook
+import dev.glass.launcher.data.WidgetItem
+import dev.glass.launcher.data.WidgetKind
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.glass.launcher.LauncherApp
@@ -47,6 +52,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private var base: HomeLayout? = null
 
     init {
+        reloadWallpaper()
         viewModelScope.launch {
             base = la.settingsStore.layoutJson.first()?.let { HomeLayout.fromJson(it) }
             val addNew = la.settingsStore.settings.map { it.addNewToHome }.distinctUntilChanged()
@@ -98,6 +104,108 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun shortcuts(app: AppInfo): List<ShortcutInfo> = repo.shortcuts(app)
     suspend fun shortcutIcon(info: ShortcutInfo, density: Int): Drawable? = repo.shortcutIcon(info, density)
     fun startShortcut(info: ShortcutInfo) = repo.startShortcut(info)
+
+    // --- Simgeler ---
+
+    fun iconLook(app: AppInfo, s: LauncherSettings): IconLook =
+        IconLook(s.iconStyle, s.tintColor, s.customIcons[app.key])
+
+    fun setCustomIcon(app: AppInfo, uri: Uri) {
+        viewModelScope.launch {
+            val name = la.iconCache.importCustomIcon(app.key, uri) ?: return@launch
+            la.settingsStore.update { st ->
+                st.customIcons[app.key]?.let { old -> la.iconCache.deleteCustomIcon(old) }
+                st.copy(customIcons = st.customIcons + (app.key to name))
+            }
+        }
+    }
+
+    fun resetCustomIcon(app: AppInfo) {
+        viewModelScope.launch {
+            la.settingsStore.update { st ->
+                st.customIcons[app.key]?.let { old -> la.iconCache.deleteCustomIcon(old) }
+                st.copy(customIcons = st.customIcons - app.key)
+            }
+        }
+    }
+
+    // --- Duvar kâğıdı (launcher'ın kendi kopyası; gerçek bulanıklık için) ---
+
+    private val _wallpaper = MutableStateFlow<ImageBitmap?>(null)
+    val wallpaper: StateFlow<ImageBitmap?> = _wallpaper
+
+    fun reloadWallpaper() {
+        viewModelScope.launch { _wallpaper.value = la.wallpaperRepository.load() }
+    }
+
+    fun setWallpaper(uri: Uri, alsoSystem: Boolean) {
+        viewModelScope.launch {
+            if (la.wallpaperRepository.save(uri)) {
+                _wallpaper.value = la.wallpaperRepository.load()
+                la.settingsStore.update { it.copy(launcherWallpaper = true) }
+                if (alsoSystem) la.wallpaperRepository.applyToSystem()
+            }
+        }
+    }
+
+    fun clearWallpaper() {
+        viewModelScope.launch {
+            la.wallpaperRepository.clear()
+            _wallpaper.value = null
+            la.settingsStore.update { it.copy(launcherWallpaper = false) }
+        }
+    }
+
+    // --- Widget'lar ---
+
+    val widgetHost get() = la.widgetHost
+
+    /** Ana ekranda görünen sayfanın ilk öğesinin listedeki sırası (yeni widget'lar buraya eklenir). */
+    var currentPageStart: Int = 0
+
+    fun addWidget(w: WidgetItem) = editLayout { it.addWidget(w, currentPageStart) }
+
+    fun removeWidget(w: WidgetItem) {
+        if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
+        if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
+        editLayout { it.removeItem(w.id) }
+    }
+
+    fun setWidgetPhoto(w: WidgetItem, uri: Uri) {
+        viewModelScope.launch {
+            val name = la.wallpaperRepository.savePhoto(uri) ?: return@launch
+            if (w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
+            editLayout { it.setWidgetData(w.id, name) }
+        }
+    }
+
+    suspend fun loadPhoto(name: String, maxSide: Int): ImageBitmap? = la.wallpaperRepository.loadPhoto(name, maxSide)
+
+    /** Bağlantısı kopmuş sistem widget'larını (ör. uygulaması kaldırılmış) yerleşimden çıkarır. */
+    fun pruneWidgets() {
+        val host = la.widgetHost
+        val bad = _layout.value.widgets.filter { it.kind == WidgetKind.System && host.info(it.appWidgetId) == null }
+        if (bad.isNotEmpty()) editLayout { l -> bad.fold(l) { acc, w -> acc.removeItem(w.id) } }
+        host.deleteOrphans(_layout.value.widgets.map { it.appWidgetId }.filter { it >= 0 }.toSet())
+    }
+
+    // --- Yedekleme ---
+
+    suspend fun exportBackup(): String = la.settingsStore.exportJson(_layout.value, settings.value)
+
+    /** Başarılıysa true. Bu cihaza bağlı olmayan sistem widget'ları geri yüklenemez ve atlanır. */
+    suspend fun importBackup(json: String): Boolean {
+        val imported = la.settingsStore.importJson(json) ?: return false
+        val host = la.widgetHost
+        val cleaned = imported.copy(
+            items = imported.items.filter { it !is WidgetItem || it.kind != WidgetKind.System || host.info(it.appWidgetId) != null }
+        )
+        val next = HomeLayout.reconcile(cleaned, repo.apps.value, repo.defaultDockPackages, settings.value.addNewToHome)
+        base = next
+        _layout.value = next
+        la.settingsStore.saveLayout(next.toJson())
+        return true
+    }
 
     fun updateSettings(block: (LauncherSettings) -> LauncherSettings) {
         viewModelScope.launch { la.settingsStore.update(block) }

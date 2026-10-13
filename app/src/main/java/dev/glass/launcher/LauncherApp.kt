@@ -5,6 +5,7 @@ import dev.glass.launcher.data.AppRepository
 import dev.glass.launcher.data.IconCache
 import dev.glass.launcher.data.SettingsStore
 import dev.glass.launcher.data.WallpaperRepository
+import dev.glass.launcher.widget.WidgetHostManager
 
 class LauncherApp : Application() {
     lateinit var appRepository: AppRepository
@@ -16,13 +17,16 @@ class LauncherApp : Application() {
 
     lateinit var wallpaperRepository: WallpaperRepository
         private set
+    lateinit var widgetHost: WidgetHostManager
+        private set
 
     override fun onCreate() {
         super.onCreate()
         appRepository = AppRepository(this)
-        iconCache = IconCache()
+        iconCache = IconCache(this)
         settingsStore = SettingsStore(this)
         wallpaperRepository = WallpaperRepository(this)
+        widgetHost = WidgetHostManager(this)
         appRepository.start()
     }
 }

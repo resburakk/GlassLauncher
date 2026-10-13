@@ -1,6 +1,18 @@
 package dev.glass.launcher.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.layout.ContentScale
+import dev.glass.launcher.data.ThemeMode
+import dev.glass.launcher.data.WidgetItem
+import dev.glass.launcher.data.WidgetKind
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -63,7 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.glass.launcher.data.FolderItem
 import kotlin.math.roundToInt
 
-enum class Overlay { None, Search, Control, Settings, Folder, Menu, Group }
+enum class Overlay { None, Search, Control, Settings, Folder, Menu, Group, Widgets }
 
 /**
  * Ana ekran katmanları arasında köprü: bırakma işlemi ve sayfa geçişleri ana ekran içeriğinde
@@ -83,13 +95,20 @@ class DropBridge {
  * Hareketler: uzun bas = menü/düzenleme, sürükle = taşı, aşağı kaydır = arama, üstten aşağı = panel.
  */
 @Composable
-fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: () -> Unit) {
+fun HomeScreen(
+    vm: LauncherViewModel,
+    isDefaultHome: Boolean,
+    onRequestDefault: () -> Unit,
+    openSettingsRequest: Int = 0,
+) {
     val layout by vm.layout.collectAsStateWithLifecycle()
     val byKey by vm.appsByKey.collectAsStateWithLifecycle()
     val allApps by vm.apps.collectAsStateWithLifecycle()
     val recents by vm.recentApps.collectAsStateWithLifecycle()
     val groups by vm.libraryGroups.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val wallpaper by vm.wallpaper.collectAsStateWithLifecycle()
+    val requester = LocalWidgetRequester.current
 
     val drag = remember { DragState() }
     val haptic = LocalHapticFeedback.current
@@ -129,6 +148,27 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
         if (overlay != Overlay.None) closeOverlay() else if (editMode) editMode = false
     }
 
+    LaunchedEffect(openSettingsRequest) {
+        if (openSettingsRequest > 0) {
+            closeOverlay()
+            overlay = Overlay.Settings
+        }
+    }
+
+    // Görsel seçiciler (izin gerektirmez): özel simge ve fotoğraf widget'ı için.
+    var iconTarget by remember { mutableStateOf<String?>(null) }
+    val iconPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val app = iconTarget?.let { byKey[it] }
+        if (uri != null && app != null) vm.setCustomIcon(app, uri)
+        iconTarget = null
+    }
+    var photoTarget by remember { mutableStateOf<String?>(null) }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        val w = photoTarget?.let { id -> vm.layout.value.widgets.firstOrNull { it.id == id } }
+        if (uri != null && w != null) vm.setWidgetPhoto(w, uri)
+        photoTarget = null
+    }
+
     LaunchedEffect(vm) {
         vm.homePressed.collect {
             closeOverlay()
@@ -164,6 +204,15 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
         overlay = Overlay.Folder
     }
 
+    val dark = when (settings.theme) {
+        ThemeMode.Auto -> isSystemInDarkTheme()
+        ThemeMode.Light -> false
+        ThemeMode.Dark -> true
+    }
+    CompositionLocalProvider(
+        LocalLauncherSettings provides settings,
+        LocalGlass provides GlassLook(dark = dark, reduced = settings.lowPower),
+    ) {
     Box(
         Modifier
             .fillMaxSize()
@@ -216,6 +265,15 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 )
             }
     ) {
+        // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
+        val wp = wallpaper
+        if (settings.launcherWallpaper && wp != null) {
+            Image(
+                wp, null, Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier),
+                contentScale = ContentScale.Crop,
+            )
+            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = settings.wallpaperDim)))
+        }
         Box(Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)) {
             HomeContent(
                 vm = vm,
@@ -257,7 +315,18 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
             enter = slideInVertically { it } + fadeIn(tween(200)),
             exit = slideOutVertically { it } + fadeOut(tween(160)),
         ) {
-            SettingsSheet(settings, onChange = { vm.updateSettings(it) }, onClose = { closeOverlay() })
+            SettingsScreen(
+                vm = vm, s = settings, isDefaultHome = isDefaultHome, onRequestDefault = onRequestDefault,
+                onAddWidget = { overlay = Overlay.Widgets },
+                onClose = { closeOverlay() },
+            )
+        }
+        AnimatedVisibility(
+            overlay == Overlay.Widgets,
+            enter = slideInVertically { it } + fadeIn(tween(200)),
+            exit = slideOutVertically { it } + fadeOut(tween(160)),
+        ) {
+            WidgetPicker(vm, settings.glassStrength, onClose = { closeOverlay() })
         }
         AnimatedVisibility(
             overlay == Overlay.Folder && openFolder != null,
@@ -312,11 +381,14 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
         ) {
             menuHolder[0]?.let { req ->
                 val folder = layout.items.firstOrNull { it.id == req.itemId } as? FolderItem
+                val widget = layout.items.firstOrNull { it.id == req.itemId } as? WidgetItem
                 ContextMenuOverlay(
                     req = req,
                     vm = vm,
                     app = byKey[req.itemId],
                     folder = folder,
+                    widget = widget,
+                    hasCustomIcon = settings.customIcons.containsKey(req.itemId),
                     onHome = req.itemId in layout.homeKeys,
                     strength = settings.glassStrength,
                     iconGlass = settings.iconGlass,
@@ -326,6 +398,26 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                     onAddToHome = { vm.editLayout { it.addToHome(req.itemId) } },
                     onOpenFolder = { folder?.let { f -> openFolderAt(f, req.iconRect.center) } },
                     onDissolveFolder = { vm.editLayout { it.dissolveFolder(req.itemId) } },
+                    onChangeIcon = {
+                        iconTarget = req.itemId
+                        iconPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    },
+                    onResetIcon = { byKey[req.itemId]?.let { vm.resetCustomIcon(it) } },
+                    onResizeWidget = { sz -> vm.editLayout { it.resizeWidget(req.itemId, sz.spanX, sz.spanY) } },
+                    onEditWidget = when {
+                        widget == null -> null
+                        widget.kind == WidgetKind.Photo -> {
+                            {
+                                photoTarget = widget.id
+                                photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }
+                        }
+                        widget.kind == WidgetKind.System && vm.widgetHost.isConfigurable(widget.appWidgetId) -> {
+                            { requester?.reconfigure(widget.appWidgetId) }
+                        }
+                        else -> null
+                    },
+                    onRemoveWidget = { widget?.let { vm.removeWidget(it) } },
                     onClose = { if (overlay == Overlay.Menu) closeOverlay() },
                 )
             }
@@ -345,7 +437,10 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                GlassButton("Ayarlar", settings.glassStrength) { overlay = Overlay.Settings }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GlassButton("+", settings.glassStrength) { overlay = Overlay.Widgets }
+                    GlassButton("Ayarlar", settings.glassStrength) { overlay = Overlay.Settings }
+                }
                 GlassButton("Bitti", settings.glassStrength) { editMode = false }
             }
         }
@@ -353,14 +448,22 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
         // Sürüklenen öğenin hayalet simgesi (tüm katmanların üstünde)
         val dk = drag.key
         if (dk != null) {
-            val px = with(density) { drag.iconDp.toPx() }
+            val gs = drag.ghostSize
+            val gw = with(density) { (gs?.width ?: drag.iconDp).toPx() }
+            val gh = with(density) { (gs?.height ?: drag.iconDp).toPx() }
             Box(
                 Modifier
-                    .offset { IntOffset((drag.pos.x - px / 2f).roundToInt(), (drag.pos.y - px / 2f).roundToInt()) }
-                    .graphicsLayer { scaleX = 1.12f; scaleY = 1.12f; alpha = 0.94f }
+                    .offset { IntOffset((drag.pos.x - gw / 2f).roundToInt(), (drag.pos.y - gh / 2f).roundToInt()) }
+                    .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f; alpha = 0.94f }
             ) {
                 val app = byKey[dk]
-                if (app != null) {
+                if (gs != null) {
+                    // Widget hayaleti: aynı boyutta cam kutu
+                    Box(
+                        Modifier.size(gs.width, gs.height)
+                            .liquidGlass(RoundedCornerShape(widgetCorner(gs.width)), settings.glassStrength, 16.dp)
+                    )
+                } else if (app != null) {
                     AppIconImage(app, vm, drag.iconDp, settings.iconGlass, settings.glassStrength)
                 } else {
                     (layout.items.firstOrNull { it.id == dk } as? FolderItem)?.let {
@@ -369,6 +472,7 @@ fun HomeScreen(vm: LauncherViewModel, isDefaultHome: Boolean, onRequestDefault: 
                 }
             }
         }
+    }
     }
 }
 

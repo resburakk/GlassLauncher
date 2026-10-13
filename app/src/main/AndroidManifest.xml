@@ -3,6 +3,8 @@
 
     <!-- Yalnızca sistemin "Uygulamayı kaldır" onay penceresini açmak için (kaldırma kararını kullanıcı verir). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Yalnızca kullanıcı "sistem duvar kâğıdı olarak da ayarla" seçerse kullanılır. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
 
     <!-- Paket görünürlüğü: QUERY_ALL_PACKAGES yerine yalnızca başlatılabilir uygulamalar sorgulanır -->
     <queries>
@@ -54,5 +56,18 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <!-- Uygulama listesinde "Glass Ayarları" olarak görünür: ayarları açar (launcher varsayılan değilken de). -->
+        <activity-alias
+            android:name=".SettingsEntry"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/settings_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
     </application>
 </manifest>

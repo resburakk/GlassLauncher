@@ -3,4 +3,5 @@
     <string name="app_name">Glass Launcher</string>
     <string name="make_default">Varsayılan ana ekran yap</string>
     <string name="make_default_hint">Home tuşunun bu uygulamayı açması için seçin.</string>
+    <string name="settings_label">Glass Ayarları</string>
 </resources>

@@ -1,5 +1,6 @@
 package dev.glass.launcher.data
 
+import android.app.WallpaperManager
 import android.content.Context
 import android.graphics.ImageDecoder
 import android.net.Uri
@@ -43,6 +44,48 @@ class WallpaperRepository(private val context: Context) {
     }
 
     suspend fun clear() = withContext(Dispatchers.IO) { file.delete() }
+
+    /** Kopyalanan görseli sistem duvar kâğıdı (ana ekran) olarak da ayarlar. SET_WALLPAPER izni gerekir. */
+    suspend fun applyToSystem(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val wm = context.getSystemService(WallpaperManager::class.java)
+            file.inputStream().use { wm.setStream(it, null, true, WallpaperManager.FLAG_SYSTEM) }
+            true
+        }.getOrDefault(false)
+    }
+
+    // --- Fotoğraf widget'ı görselleri ---
+
+    private val photoDir: File get() = File(context.filesDir, "photos").apply { mkdirs() }
+
+    suspend fun savePhoto(uri: Uri): String? = withContext(Dispatchers.IO) {
+        runCatching {
+            val name = "photo_${System.currentTimeMillis()}.img"
+            context.contentResolver.openInputStream(uri)!!.use { input ->
+                File(photoDir, name).outputStream().use { input.copyTo(it) }
+            }
+            name
+        }.getOrNull()
+    }
+
+    fun deletePhoto(name: String) {
+        runCatching { File(photoDir, name).delete() }
+    }
+
+    suspend fun loadPhoto(name: String, maxSide: Int): ImageBitmap? = withContext(Dispatchers.IO) {
+        val f = File(photoDir, name)
+        if (!f.exists()) return@withContext null
+        runCatching {
+            ImageDecoder.decodeBitmap(ImageDecoder.createSource(f)) { decoder, info, _ ->
+                val longest = maxOf(info.size.width, info.size.height).toFloat()
+                val s = minOf(1f, maxSide / longest)
+                decoder.setTargetSize(
+                    (info.size.width * s).toInt().coerceAtLeast(1),
+                    (info.size.height * s).toInt().coerceAtLeast(1),
+                )
+            }.asImageBitmap()
+        }.getOrNull()
+    }
 
     private companion object { const val MAX_SIDE = 1600f }
 }

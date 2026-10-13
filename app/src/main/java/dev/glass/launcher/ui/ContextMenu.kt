@@ -41,6 +41,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.FolderItem
+import dev.glass.launcher.data.WidgetItem
+import dev.glass.launcher.data.WidgetKind
 import kotlin.math.roundToInt
 
 /** Uzun basma menüsünün açıldığı hücre. */
@@ -69,6 +71,8 @@ fun ContextMenuOverlay(
     vm: LauncherViewModel,
     app: AppInfo?,
     folder: FolderItem?,
+    widget: WidgetItem?,
+    hasCustomIcon: Boolean,
     onHome: Boolean,
     strength: Float,
     iconGlass: Boolean,
@@ -78,6 +82,11 @@ fun ContextMenuOverlay(
     onAddToHome: () -> Unit,
     onOpenFolder: () -> Unit,
     onDissolveFolder: () -> Unit,
+    onChangeIcon: () -> Unit,
+    onResetIcon: () -> Unit,
+    onResizeWidget: (WidgetSize) -> Unit,
+    onEditWidget: (() -> Unit)?,
+    onRemoveWidget: () -> Unit,
     onClose: () -> Unit,
 ) {
     val ctx = LocalContext.current
@@ -92,8 +101,21 @@ fun ContextMenuOverlay(
     }
 
     val actions = buildList {
-        if (app != null) {
+        if (widget != null) {
+            onEditWidget?.let { edit ->
+                add(MenuAction(if (widget.kind == WidgetKind.Photo) "Fotoğrafı Değiştir" else "Widget'ı Düzenle", Glyph.Pencil) { edit() })
+            }
+            WidgetSize.entries.forEach { sz ->
+                if (sz.spanX != widget.spanX || sz.spanY != widget.spanY) {
+                    add(MenuAction("Boyut: ${sz.title}", Glyph.Widget) { onResizeWidget(sz) })
+                }
+            }
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
+            add(MenuAction("Widget'ı Kaldır", Glyph.Minus, destructive = true) { onRemoveWidget() })
+        } else if (app != null) {
+            add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
+            add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
+            if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
             add(MenuAction("Uygulama Bilgisi", Glyph.Info) { vm.openAppInfo(app) })
             if (req.place == CellPlace.Library) {
                 if (!onHome) add(MenuAction("Ana Ekrana Ekle", Glyph.Plus) { onAddToHome() })
@@ -116,6 +138,7 @@ fun ContextMenuOverlay(
                 .graphicsLayer { scaleX = 1.06f; scaleY = 1.06f }
         ) {
             when {
+                widget != null -> Unit // widget yerinde kalır; yalnızca menü gösterilir
                 app != null -> AppIconImage(app, vm, req.iconDp, iconGlass, strength)
                 folder != null -> FolderIcon(folder, byKey, vm, req.iconDp, strength)
             }

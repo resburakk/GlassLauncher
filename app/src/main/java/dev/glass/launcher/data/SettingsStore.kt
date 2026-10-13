@@ -1,7 +1,6 @@
 package dev.glass.launcher.data
 
 import android.content.Context
-import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -11,24 +10,144 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
 
 private val Context.dataStore by preferencesDataStore(name = "launcher_settings")
 
+/** Simge görünümleri (bkz. [IconRenderer]). */
+enum class IconStyle(val title: String) { Original("Orijinal"), Light("Açık"), Dark("Koyu"), Tinted("Renkli") }
+
+/** Cam yüzeylerin tonu. Otomatik: duvar kâğıdının parlaklığına göre. */
+enum class ThemeMode(val title: String) { Auto("Otomatik"), Light("Açık"), Dark("Koyu") }
+
 data class LauncherSettings(
+    // Ana ekran
     val columns: Int = 4,
     val rows: Int = 6,
     val showLabels: Boolean = true,
+    val hSpacing: Float = 1f,
+    val vSpacing: Float = 1f,
+    val labelGap: Float = 5f,
+    val labelSize: Float = 11f,
+    // Simgeler
     val iconScale: Float = 1.1f,
+    val iconStyle: IconStyle = IconStyle.Original,
+    val tintColor: Int = 0xFF64D2FF.toInt(),
+    val iconCorner: Float = 0.225f,
     val iconGlass: Boolean = true,
+    /** Uygulama anahtarı → özel simge dosya adı (filesDir/icons altında). */
+    val customIcons: Map<String, String> = emptyMap(),
+    // Dock
+    val dockHeight: Float = 1f,
+    val dockWidth: Float = 1f,
+    val dockOpacity: Float = 1f,
+    // Klasörler
+    val folderOpacity: Float = 1f,
+    // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
-    /** Son başlatılan uygulamalar (ComponentName.flattenToString), en yenisi başta. */
-    val recents: List<String> = emptyList(),
+    val theme: ThemeMode = ThemeMode.Auto,
+    val launcherWallpaper: Boolean = false,
+    val wallpaperDim: Float = 0f,
+    // Animasyonlar
+    val animSpeed: Float = 1f,
+    // Performans
+    val realBlur: Boolean = true,
+    val autoQuality: Boolean = true,
+    val lowPower: Boolean = false,
+    // Uygulama Arşivi
     /** Yeni kurulan uygulamalar ana ekrana mı eklensin (kapalıysa yalnızca Uygulama Arşivi'nde). */
     val addNewToHome: Boolean = true,
-)
+    /** Son başlatılan uygulamalar (ComponentName.flattenToString), en yenisi başta. */
+    val recents: List<String> = emptyList(),
+) {
+    fun sanitized(): LauncherSettings = copy(
+        columns = columns.coerceIn(3, 6),
+        rows = rows.coerceIn(4, 8),
+        hSpacing = hSpacing.coerceIn(0.8f, 1.3f),
+        vSpacing = vSpacing.coerceIn(0.8f, 1.4f),
+        labelGap = labelGap.coerceIn(0f, 14f),
+        labelSize = labelSize.coerceIn(9f, 15f),
+        iconScale = iconScale.coerceIn(0.7f, 1.4f),
+        iconCorner = iconCorner.coerceIn(0.05f, 0.5f),
+        dockHeight = dockHeight.coerceIn(0.8f, 1.3f),
+        dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
+        dockOpacity = dockOpacity.coerceIn(0f, 2f),
+        folderOpacity = folderOpacity.coerceIn(0f, 2f),
+        glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
+        wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
+        animSpeed = animSpeed.coerceIn(0.5f, 2f),
+        recents = recents.take(8),
+    )
 
+    fun toJson(): JSONObject = JSONObject().apply {
+        put("columns", columns); put("rows", rows); put("showLabels", showLabels)
+        put("hSpacing", hSpacing.toDouble()); put("vSpacing", vSpacing.toDouble())
+        put("labelGap", labelGap.toDouble()); put("labelSize", labelSize.toDouble())
+        put("iconScale", iconScale.toDouble()); put("iconStyle", iconStyle.name); put("tintColor", tintColor)
+        put("iconCorner", iconCorner.toDouble()); put("iconGlass", iconGlass)
+        put("customIcons", JSONObject(customIcons as Map<*, *>))
+        put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
+        put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
+        put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
+        put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
+        put("animSpeed", animSpeed.toDouble())
+        put("realBlur", realBlur); put("autoQuality", autoQuality); put("lowPower", lowPower)
+        put("addNewToHome", addNewToHome); put("recents", JSONArray(recents))
+    }
+
+    companion object {
+        /** Eksik veya hatalı alanlar varsayılan değerle doldurulur (eski yedeklerle uyumlu). */
+        fun fromJson(o: JSONObject): LauncherSettings {
+            val d = LauncherSettings()
+            fun f(k: String, def: Float) = if (o.has(k)) o.optDouble(k, def.toDouble()).toFloat() else def
+            val icons = o.optJSONObject("customIcons")
+            val iconMap = buildMap {
+                icons?.keys()?.forEach { k -> put(k, icons.optString(k)) }
+            }
+            val rec = o.optJSONArray("recents")
+            return LauncherSettings(
+                columns = o.optInt("columns", d.columns),
+                rows = o.optInt("rows", d.rows),
+                showLabels = o.optBoolean("showLabels", d.showLabels),
+                hSpacing = f("hSpacing", d.hSpacing),
+                vSpacing = f("vSpacing", d.vSpacing),
+                labelGap = f("labelGap", d.labelGap),
+                labelSize = f("labelSize", d.labelSize),
+                iconScale = f("iconScale", d.iconScale),
+                iconStyle = runCatching { IconStyle.valueOf(o.optString("iconStyle")) }.getOrDefault(d.iconStyle),
+                tintColor = o.optInt("tintColor", d.tintColor),
+                iconCorner = f("iconCorner", d.iconCorner),
+                iconGlass = o.optBoolean("iconGlass", d.iconGlass),
+                customIcons = iconMap,
+                dockHeight = f("dockHeight", d.dockHeight),
+                dockWidth = f("dockWidth", d.dockWidth),
+                dockOpacity = f("dockOpacity", d.dockOpacity),
+                folderOpacity = f("folderOpacity", d.folderOpacity),
+                glassStrength = f("glassStrength", d.glassStrength),
+                theme = runCatching { ThemeMode.valueOf(o.optString("theme")) }.getOrDefault(d.theme),
+                launcherWallpaper = o.optBoolean("launcherWallpaper", d.launcherWallpaper),
+                wallpaperDim = f("wallpaperDim", d.wallpaperDim),
+                animSpeed = f("animSpeed", d.animSpeed),
+                realBlur = o.optBoolean("realBlur", d.realBlur),
+                autoQuality = o.optBoolean("autoQuality", d.autoQuality),
+                lowPower = o.optBoolean("lowPower", d.lowPower),
+                addNewToHome = o.optBoolean("addNewToHome", d.addNewToHome),
+                recents = if (rec == null) emptyList() else List(rec.length()) { rec.optString(it) }.filter { it.isNotEmpty() },
+            ).sanitized()
+        }
+    }
+}
+
+/**
+ * Ayarlar ve ana ekran yerleşimi DataStore'da saklanır (uygulama kapanınca/çökünce kaybolmaz).
+ * Ayarlar tek bir JSON değeri olarak tutulur; böylece yedekleme/geri yükleme aynı biçimi kullanır.
+ */
 class SettingsStore(private val context: Context) {
     private object Keys {
+        val settings = stringPreferencesKey("settings_v2")
+        val layout = stringPreferencesKey("home_layout")
+        // Eski sürüm (0.5) anahtarları — yalnızca ilk geçişte okunur.
         val columns = intPreferencesKey("columns")
         val rows = intPreferencesKey("rows")
         val showLabels = booleanPreferencesKey("show_labels")
@@ -36,33 +155,24 @@ class SettingsStore(private val context: Context) {
         val iconGlass = booleanPreferencesKey("icon_glass")
         val glassStrength = floatPreferencesKey("glass_strength")
         val recents = stringPreferencesKey("recents")
-        val layout = stringPreferencesKey("home_layout")
         val addNewToHome = booleanPreferencesKey("add_new_to_home")
     }
 
     private fun read(p: Preferences): LauncherSettings {
+        p[Keys.settings]?.let { json ->
+            return runCatching { LauncherSettings.fromJson(JSONObject(json)) }.getOrDefault(LauncherSettings())
+        }
         val d = LauncherSettings()
         return LauncherSettings(
-            columns = (p[Keys.columns] ?: d.columns).coerceIn(3, 6),
-            rows = (p[Keys.rows] ?: d.rows).coerceIn(4, 8),
+            columns = p[Keys.columns] ?: d.columns,
+            rows = p[Keys.rows] ?: d.rows,
             showLabels = p[Keys.showLabels] ?: d.showLabels,
-            iconScale = (p[Keys.iconScale] ?: d.iconScale).coerceIn(0.7f, 1.4f),
+            iconScale = p[Keys.iconScale] ?: d.iconScale,
             iconGlass = p[Keys.iconGlass] ?: d.iconGlass,
-            glassStrength = (p[Keys.glassStrength] ?: d.glassStrength).coerceIn(0.5f, 1.5f),
+            glassStrength = p[Keys.glassStrength] ?: d.glassStrength,
             recents = (p[Keys.recents] ?: "").split("|").filter { it.isNotEmpty() },
             addNewToHome = p[Keys.addNewToHome] ?: d.addNewToHome,
-        )
-    }
-
-    private fun write(p: MutablePreferences, s: LauncherSettings) {
-        p[Keys.columns] = s.columns
-        p[Keys.rows] = s.rows
-        p[Keys.showLabels] = s.showLabels
-        p[Keys.iconScale] = s.iconScale
-        p[Keys.iconGlass] = s.iconGlass
-        p[Keys.glassStrength] = s.glassStrength
-        p[Keys.recents] = s.recents.joinToString("|")
-        p[Keys.addNewToHome] = s.addNewToHome
+        ).sanitized()
     }
 
     val settings: Flow<LauncherSettings> = context.dataStore.data.map { read(it) }
@@ -75,10 +185,31 @@ class SettingsStore(private val context: Context) {
     }
 
     suspend fun update(block: (LauncherSettings) -> LauncherSettings) {
-        context.dataStore.edit { p -> write(p, block(read(p))) }
+        context.dataStore.edit { p -> p[Keys.settings] = block(read(p)).sanitized().toJson().toString() }
     }
 
     suspend fun addRecent(component: String) = update {
         it.copy(recents = (listOf(component) + it.recents.filter { r -> r != component }).take(8))
+    }
+
+    /** Yedekleme: ayarlar + yerleşim tek JSON belgesinde. */
+    suspend fun exportJson(layout: HomeLayout, current: LauncherSettings): String = JSONObject()
+        .put("app", "GlassLauncher")
+        .put("format", 1)
+        .put("settings", current.toJson())
+        .put("layout", layout.toJsonObject())
+        .toString(2)
+
+    /** Geri yükleme: geçersiz belge için null döner; geçerliyse ayarları yazar ve yerleşimi döndürür. */
+    suspend fun importJson(json: String): HomeLayout? {
+        val o = runCatching { JSONObject(json) }.getOrNull() ?: return null
+        if (o.optString("app") != "GlassLauncher") return null
+        val layout = o.optJSONObject("layout")?.let { HomeLayout.fromJsonObject(it) } ?: return null
+        val s = o.optJSONObject("settings")?.let { LauncherSettings.fromJson(it) } ?: LauncherSettings()
+        context.dataStore.edit {
+            it[Keys.settings] = s.toJson().toString()
+            it[Keys.layout] = layout.toJson()
+        }
+        return layout
     }
 }

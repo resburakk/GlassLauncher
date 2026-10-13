@@ -1,0 +1,595 @@
+package dev.glass.launcher.ui
+
+import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.glass.launcher.BuildConfig
+import dev.glass.launcher.data.IconStyle
+import dev.glass.launcher.data.LauncherSettings
+import dev.glass.launcher.data.ThemeMode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.Locale
+
+private val Blue = Color(0xFF0A84FF)
+private val RowBg = Color(0xFF1C1C1E)
+private val Divider = Color(0xFF38383A)
+private val Muted = Color(0xFF8E8E93)
+private val PageBg = Color(0xFF000000)
+
+/** Ayarlar alt sayfaları (iOS Ayarlar düzeni). */
+private enum class SettingsPage(val title: String, val glyph: Glyph, val color: Color) {
+    Home("Ana Ekran", Glyph.Grid, Color(0xFF0A84FF)),
+    Icons("Simgeler", Glyph.Edit, Color(0xFF5E5CE6)),
+    Dock("Dock", Glyph.Widget, Color(0xFF32ADE6)),
+    Folders("Klasörler", Glyph.Folder, Color(0xFF64D2FF)),
+    Glass("Liquid Glass", Glyph.Search, Color(0xFF30B0C7)),
+    Wallpaper("Duvar Kâğıdı", Glyph.Wallpaper, Color(0xFF34C759)),
+    Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
+    Widgets("Widget'lar", Glyph.Widget, Color(0xFFFF375F)),
+    Library("Uygulama Arşivi", Glyph.Grid, Color(0xFFBF5AF2)),
+    Backup("Yedekleme ve Geri Yükleme", Glyph.Folder, Color(0xFF8E8E93)),
+    Performance("Performans", Glyph.Info, Color(0xFFFF453A)),
+    About("Hakkında", Glyph.Info, Color(0xFF636366)),
+}
+
+/**
+ * Tam ekran, iOS tarzı (gruplanmış liste) Türkçe ayarlar. Değişiklikler anında uygulanır ve
+ * DataStore'a yazılır; uygulama kapansa da kaybolmaz.
+ */
+@Composable
+fun SettingsScreen(
+    vm: LauncherViewModel,
+    s: LauncherSettings,
+    isDefaultHome: Boolean,
+    onRequestDefault: () -> Unit,
+    onAddWidget: () -> Unit,
+    onClose: () -> Unit,
+) {
+    var page by rememberSaveable { mutableStateOf<String?>(null) }
+    val onChange: ((LauncherSettings) -> LauncherSettings) -> Unit = { vm.updateSettings(it) }
+
+    BackHandler { if (page != null) page = null else onClose() }
+
+    Box(Modifier.fillMaxSize().background(PageBg)) {
+        AnimatedContent(
+            targetState = page,
+            transitionSpec = {
+                if (targetState != null) {
+                    slideInHorizontally(tween(260)) { it } togetherWith slideOutHorizontally(tween(260)) { -it / 3 }
+                } else {
+                    slideInHorizontally(tween(260)) { -it / 3 } togetherWith slideOutHorizontally(tween(260)) { it }
+                }
+            },
+            label = "settingsNav",
+        ) { current ->
+            val p = current?.let { name -> SettingsPage.entries.firstOrNull { it.name == name } }
+            Column(Modifier.fillMaxSize().background(PageBg).windowInsetsPadding(WindowInsets.safeDrawing)) {
+                // Üst çubuk
+                Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (p != null) {
+                        Text(
+                            "‹ Ayarlar", color = Blue, fontSize = 17.sp,
+                            modifier = Modifier.clickable { page = null }.padding(8.dp),
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    Text(
+                        "Bitti", color = Blue, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.clickable { onClose() }.padding(8.dp),
+                    )
+                }
+                Column(
+                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
+                ) {
+                    Text(
+                        p?.title ?: "Ayarlar", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+                    )
+                    when (p) {
+                        null -> RootPage(isDefaultHome, onRequestDefault) { page = it.name }
+                        SettingsPage.Home -> HomePage(s, onChange)
+                        SettingsPage.Icons -> IconsPage(s, onChange)
+                        SettingsPage.Dock -> DockPage(s, onChange)
+                        SettingsPage.Folders -> FoldersPage(s, onChange)
+                        SettingsPage.Glass -> GlassPage(s, onChange)
+                        SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
+                        SettingsPage.Animations -> AnimationsPage(s, onChange)
+                        SettingsPage.Widgets -> WidgetsPage(onAddWidget)
+                        SettingsPage.Library -> LibraryPageSettings(s, onChange)
+                        SettingsPage.Backup -> BackupPage(vm)
+                        SettingsPage.Performance -> PerformancePage(s, onChange)
+                        SettingsPage.About -> AboutPage()
+                    }
+                    Spacer(Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open: (SettingsPage) -> Unit) {
+    if (!isDefaultHome) {
+        Group(null) {
+            NavRow("Varsayılan ana ekran yap", Glyph.Check, Color(0xFF30D158)) { onRequestDefault() }
+        }
+        Footer("Home tuşunun Glass Launcher'ı açması için gereklidir. Uygulama kısayolları da yalnızca varsayılan ana ekranda çalışır.")
+    }
+    val groups = listOf(
+        listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders),
+        listOf(SettingsPage.Glass, SettingsPage.Wallpaper, SettingsPage.Animations),
+        listOf(SettingsPage.Widgets, SettingsPage.Library),
+        listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
+    )
+    groups.forEach { g ->
+        Group(null) {
+            g.forEachIndexed { i, p ->
+                NavRow(p.title, p.glyph, p.color) { open(p) }
+                if (i < g.lastIndex) RowDivider(inset = 56.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group("Düzen") {
+        ChoiceRow("Sütun sayısı", listOf(3, 4, 5), s.columns) { v -> onChange { it.copy(columns = v) } }
+        RowDivider()
+        ChoiceRow("En çok satır", listOf(5, 6, 7), s.rows) { v -> onChange { it.copy(rows = v) } }
+    }
+    Footer("Satır sayısı ekran yüksekliğine göre gerekirse azaltılır.")
+    Group("Aralıklar") {
+        SliderRow("Yatay aralık", pct(s.hSpacing), s.hSpacing, 0.8f..1.3f) { v -> onChange { it.copy(hSpacing = v) } }
+        RowDivider()
+        SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f) { v -> onChange { it.copy(vSpacing = v) } }
+    }
+    Group("Uygulama adları") {
+        ToggleRow("Adları göster", s.showLabels) { v -> onChange { it.copy(showLabels = v) } }
+        RowDivider()
+        SliderRow("Simgeye uzaklık", "${s.labelGap.toInt()} dp", s.labelGap, 0f..14f) { v -> onChange { it.copy(labelGap = v) } }
+        RowDivider()
+        SliderRow("Yazı boyutu", "${"%.1f".format(Locale.US, s.labelSize)} sp", s.labelSize, 9f..15f) { v ->
+            onChange { it.copy(labelSize = v) }
+        }
+    }
+}
+
+private val TintPalette = listOf(
+    0xFF64D2FF, 0xFF0A84FF, 0xFF5E5CE6, 0xFFBF5AF2, 0xFFFF375F, 0xFFFF9F0A, 0xFFFFD60A, 0xFF30D158,
+).map { it.toInt() }
+
+@Composable
+private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group("Boyut") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Küçük" to 0.9f, "Normal" to 1.1f, "Büyük" to 1.25f).forEach { (t, v) ->
+                Chip(t, kotlin.math.abs(s.iconScale - v) < 0.02f, Modifier.weight(1f)) { onChange { it.copy(iconScale = v) } }
+            }
+        }
+        RowDivider()
+        SliderRow("Simge boyutu", pct(s.iconScale), s.iconScale, 0.7f..1.4f) { v -> onChange { it.copy(iconScale = v) } }
+    }
+    Group("Görünüm") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconStyle.entries.forEach { st ->
+                Chip(st.title, s.iconStyle == st, Modifier.weight(1f)) { onChange { it.copy(iconStyle = st) } }
+            }
+        }
+        if (s.iconStyle == IconStyle.Tinted) {
+            RowDivider()
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                TintPalette.forEach { c ->
+                    Box(
+                        Modifier
+                            .size(30.dp)
+                            .clip(CircleShape)
+                            .background(Color(c))
+                            .then(if (s.tintColor == c) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                            .clickable { onChange { it.copy(tintColor = c) } }
+                    )
+                }
+            }
+        }
+    }
+    Footer(
+        "Açık/Koyu: simgenin arka planı açık veya koyu zeminle değiştirilir. Renkli: simge tek renk çizilir " +
+            "(uygulama monokrom katman sunuyorsa o kullanılır; sunmuyorsa parlaklıktan üretilir)."
+    )
+    Group("Şekil") {
+        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.225f), s.iconCorner, 0.05f..0.5f) { v ->
+            onChange { it.copy(iconCorner = v) }
+        }
+        RowDivider()
+        ToggleRow("Cam kenar ışığı", s.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
+    }
+    Footer("Tek bir uygulamanın simgesini değiştirmek için simgesine basılı tutup \"Simgeyi Değiştir\"i seçin.")
+}
+
+@Composable
+private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group(null) {
+        SliderRow("Yükseklik", pct(s.dockHeight), s.dockHeight, 0.8f..1.3f) { v -> onChange { it.copy(dockHeight = v) } }
+        RowDivider()
+        SliderRow("Genişlik", pct(s.dockWidth), s.dockWidth, 0.85f..1.05f) { v -> onChange { it.copy(dockWidth = v) } }
+        RowDivider()
+        SliderRow("Cam yoğunluğu", pct(s.dockOpacity), s.dockOpacity, 0f..2f) { v -> onChange { it.copy(dockOpacity = v) } }
+    }
+    Footer("Dock simgelerini değiştirmek için düzenleme modunda simgeleri dock'a sürükleyin.")
+}
+
+@Composable
+private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group(null) {
+        SliderRow("Klasör cam yoğunluğu", pct(s.folderOpacity), s.folderOpacity, 0f..2f) { v ->
+            onChange { it.copy(folderOpacity = v) }
+        }
+    }
+    Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")
+}
+
+@Composable
+private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group(null) {
+        SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f) { v -> onChange { it.copy(glassStrength = v) } }
+    }
+    Group("Tema") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ThemeMode.entries.forEach { t -> Chip(t.title, s.theme == t, Modifier.weight(1f)) { onChange { it.copy(theme = t) } } }
+        }
+    }
+    Footer("Otomatik: telefonun açık/koyu moduna uyar. Koyu temada cam yüzeyler koyu tonlanır.")
+    Group("Bulanıklık") {
+        ToggleRow("Gerçek arka plan bulanıklığı", s.realBlur) { v -> onChange { it.copy(realBlur = v) } }
+    }
+    Footer(
+        "Android, başka uygulamaların (sistem duvar kâğıdı dahil) arkasını bulanıklaştırmaya izin vermez. " +
+            "Gerçek bulanıklık yalnızca Duvar Kâğıdı bölümünden launcher'a bir görsel seçtiğinizde çalışır."
+    )
+}
+
+@Composable
+private fun WallpaperPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    val ctx = LocalContext.current
+    var alsoSystem by rememberSaveable { mutableStateOf(true) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.setWallpaper(uri, alsoSystem)
+    }
+    Group(null) {
+        NavRow("Görsel seç", Glyph.Wallpaper, Color(0xFF34C759)) {
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        }
+        RowDivider(inset = 56.dp)
+        ToggleRow("Sistem duvar kâğıdı olarak da ayarla", alsoSystem) { alsoSystem = it }
+    }
+    Footer("Görsel seçici izin gerektirmez. Seçilen görsel launcher'da gösterilir ve gerçek cam bulanıklığı için kullanılır.")
+    if (s.launcherWallpaper) {
+        Group(null) {
+            SliderRow("Karartma", pct(s.wallpaperDim / 0.6f), s.wallpaperDim, 0f..0.6f) { v -> onChange { it.copy(wallpaperDim = v) } }
+            RowDivider()
+            ActionRow("Launcher duvar kâğıdını kaldır", destructive = true) { vm.clearWallpaper() }
+        }
+    }
+    Group(null) {
+        ActionRow("Sistem duvar kâğıdı ayarlarını aç") {
+            runCatching {
+                ctx.startActivity(
+                    Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Duvar kâğıdı")
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimationsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    val label = when {
+        s.animSpeed < 0.8f -> "Yavaş"
+        s.animSpeed > 1.25f -> "Hızlı"
+        else -> "Normal"
+    }
+    Group(null) {
+        SliderRow("Animasyon hızı", label, s.animSpeed, 0.5f..2f) { v -> onChange { it.copy(animSpeed = v) } }
+    }
+    Footer("Klasör, menü, arama ve sayfa geçişlerini etkiler. Uygulama açılış animasyonunu sistem çizer; launcher tamamen kontrol edemez.")
+}
+
+@Composable
+private fun WidgetsPage(onAddWidget: () -> Unit) {
+    Group(null) {
+        NavRow("Widget ekle", Glyph.Plus, Color(0xFFFF375F)) { onAddWidget() }
+    }
+    Footer(
+        "Saat, analog saat, takvim, pil ve fotoğraf widget'ları launcher'ın kendi widget'larıdır. Diğer uygulamaların " +
+            "gerçek Android widget'ları da eklenebilir; ilk eklemede sistem izin isteyebilir. Widget'ı taşımak için " +
+            "sürükleyin, boyutunu değiştirmek veya kaldırmak için basılı tutup bırakın."
+    )
+}
+
+@Composable
+private fun LibraryPageSettings(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group(null) {
+        ToggleRow("Yeni uygulamaları ana ekrana ekle", s.addNewToHome) { v -> onChange { it.copy(addNewToHome = v) } }
+    }
+    Footer("Kapalıyken yeni kurulan uygulamalar yalnızca Uygulama Arşivi'nde görünür. Kategoriler, uygulamanın bildirdiği türe ve adına göre tahmin edilir.")
+}
+
+@Composable
+private fun BackupPage(vm: LauncherViewModel) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var status by remember { mutableStateOf<String?>(null) }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val json = vm.exportBackup()
+            val ok = withContext(Dispatchers.IO) {
+                runCatching {
+                    ctx.contentResolver.openOutputStream(uri)!!.use { it.write(json.toByteArray()) }
+                }.isSuccess
+            }
+            status = if (ok) "Yedek kaydedildi." else "Yedek kaydedilemedi."
+        }
+    }
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val json = withContext(Dispatchers.IO) {
+                runCatching { ctx.contentResolver.openInputStream(uri)!!.use { it.readBytes().decodeToString() } }.getOrNull()
+            }
+            val ok = json != null && vm.importBackup(json)
+            status = if (ok) "Yedek geri yüklendi." else "Dosya geçerli bir Glass Launcher yedeği değil."
+        }
+    }
+    Group(null) {
+        ActionRow("Ana ekranı dışa aktar (JSON)") { exporter.launch("glass-launcher-yedek.json") }
+        RowDivider()
+        ActionRow("Yedekten geri yükle") { importer.launch(arrayOf("application/json", "text/plain", "*/*")) }
+    }
+    status?.let { Footer(it) }
+    Footer(
+        "Yedekte yerleşim (sayfalar, klasörler, dock, widget'lar) ve tüm ayarlar bulunur. Özel simge ve fotoğraf " +
+            "görselleri ile başka bir cihaza ait sistem widget'ları yedeğe dahil edilemez; geri yüklemede atlanır."
+    )
+}
+
+@Composable
+private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group(null) {
+        ToggleRow("Otomatik kalite", s.autoQuality) { v -> onChange { it.copy(autoQuality = v) } }
+        RowDivider()
+        ToggleRow("Düşük güç modu", s.lowPower) { v -> onChange { it.copy(lowPower = v) } }
+    }
+    Footer(
+        "Otomatik kalite: kare süresi uzarsa veya telefon Pil Tasarrufu modundaysa cam efektleri (bulanıklık, " +
+            "gölge, parlama) sadeleştirilir. Düşük güç modu bunları her zaman sadeleştirir ve sallanma/saniye " +
+            "ibresi gibi sürekli animasyonları azaltır."
+    )
+}
+
+@Composable
+private fun AboutPage() {
+    Group(null) {
+        InfoRow("Sürüm", BuildConfig.VERSION_NAME)
+        RowDivider()
+        InfoRow("Lisans", "Kişisel kullanım; reklam ve takip yok")
+    }
+    Group("İzinler ve neden gerektikleri") {
+        TextBlock(
+            "• Uygulama listesi: yalnızca başlatılabilir uygulamalar sorgulanır (QUERY_ALL_PACKAGES kullanılmaz).\n" +
+                "• REQUEST_DELETE_PACKAGES: \"Uygulamayı Sil\" seçildiğinde sistemin kaldırma onay penceresini açmak için. " +
+                "Kaldırma kararını her zaman siz verirsiniz.\n" +
+                "• SET_WALLPAPER: yalnızca \"Sistem duvar kâğıdı olarak da ayarla\" açıkken seçilen görseli uygulamak için.\n" +
+                "• İnternet izni yoktur; launcher tamamen çevrimdışı çalışır.\n" +
+                "• Fotoğraf, duvar kâğıdı ve özel simge seçimi sistemin görsel seçicisiyle yapılır; depolama izni gerekmez.\n" +
+                "• Widget bağlama izni Android tarafından widget eklerken bir kez sorulur."
+        )
+    }
+    Group("Gizlilik") {
+        TextBlock("Analitik, reklam veya takip yoktur. Tüm ayarlar ve yerleşim yalnızca telefonda saklanır; hiçbir veri dışarı gönderilmez.")
+    }
+    Group("Bilinen sınırlamalar (Android / MagicOS)") {
+        TextBlock(
+            "• Gerçek arka plan bulanıklığı yalnızca launcher'a seçilen duvar kâğıdı üzerinde çalışır.\n" +
+                "• Bildirim gölgesi, Wi-Fi/Bluetooth anahtarları ve uygulama açılış animasyonu sisteme aittir; " +
+                "üstten açılan panel bunlara kısayol verir.\n" +
+                "• Uygulama kısayolları yalnızca varsayılan ana ekranken gelir.\n" +
+                "• MagicOS pil yönetimi arka plandaki uygulamaları kapatabilir; launcher etkilenirse Ayarlar > Pil > " +
+                "Uygulama başlatma bölümünden Glass Launcher'ı \"Elle yönet\" olarak ayarlayın.\n" +
+                "• MagicOS'un kendi simge temaları bazı simgeleri plaka içinde verebilir; launcher bunu kırparak düzeltmeye çalışır."
+        )
+    }
+}
+
+// --- Ortak satır bileşenleri ---
+
+private fun pct(v: Float) = "%${(v * 100).toInt()}"
+
+@Composable
+private fun Group(title: String?, content: @Composable ColumnScope.() -> Unit) {
+    if (title != null) {
+        Text(
+            title.uppercase(Locale("tr", "TR")), color = Muted, fontSize = 13.sp,
+            modifier = Modifier.padding(start = 16.dp, top = 22.dp, bottom = 6.dp),
+        )
+    } else {
+        Spacer(Modifier.height(20.dp))
+    }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(RowBg), content = content)
+}
+
+@Composable
+private fun Footer(text: String) {
+    Text(text, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp))
+}
+
+@Composable
+private fun RowDivider(inset: androidx.compose.ui.unit.Dp = 16.dp) {
+    Box(Modifier.padding(start = inset).fillMaxWidth().height(0.5.dp).background(Divider))
+}
+
+@Composable
+private fun NavRow(title: String, glyph: Glyph, color: Color, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(29.dp).clip(RoundedCornerShape(7.dp)).background(color), contentAlignment = Alignment.Center) {
+            GlyphIcon(glyph, Color.White, 18.dp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text("›", color = Muted, fontSize = 22.sp)
+    }
+}
+
+@Composable
+private fun ActionRow(title: String, destructive: Boolean = false, onClick: () -> Unit) {
+    Text(
+        title, color = if (destructive) Color(0xFFFF453A) else Blue, fontSize = 17.sp,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
+    )
+}
+
+@Composable
+private fun InfoRow(title: String, value: String) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp)) {
+        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Muted, fontSize = 17.sp)
+    }
+}
+
+@Composable
+private fun TextBlock(text: String) {
+    Text(text, color = Color(0xFFD1D1D6), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(16.dp))
+}
+
+@Composable
+private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Switch(
+            checked = checked,
+            onCheckedChange = onChecked,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Color(0xFF34C759),
+                checkedThumbColor = Color.White,
+                checkedBorderColor = Color.Transparent,
+                uncheckedTrackColor = Color(0xFF39393D),
+                uncheckedThumbColor = Color.White,
+                uncheckedBorderColor = Color.Transparent,
+            ),
+        )
+    }
+}
+
+@Composable
+private fun SliderRow(
+    title: String, valueText: String, value: Float, range: ClosedFloatingPointRange<Float>,
+    onValue: (Float) -> Unit,
+) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth()) {
+            Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            Text(valueText, color = Muted, fontSize = 17.sp)
+        }
+        Slider(
+            value = value.coerceIn(range.start, range.endInclusive), onValueChange = onValue, valueRange = range,
+            colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Blue,
+                inactiveTrackColor = Color(0xFF48484A),
+            ),
+        )
+    }
+}
+
+@Composable
+private fun ChoiceRow(title: String, options: List<Int>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            options.forEach { o ->
+                Box(
+                    Modifier
+                        .width(42.dp)
+                        .height(32.dp)
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(if (o == selected) Blue else Color(0xFF3A3A3C))
+                        .clickable { onSelect(o) },
+                    contentAlignment = Alignment.Center,
+                ) { Text("$o", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Chip(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (selected) Blue else Color(0xFF3A3A3C))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, color = Color.White, fontSize = 14.sp, maxLines = 1) }
+}

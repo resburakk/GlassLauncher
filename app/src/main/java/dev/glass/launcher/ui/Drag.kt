@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.glass.launcher.data.AppInfo
@@ -66,6 +67,8 @@ class DragTarget(val id: String) {
     var isApp: Boolean = true
     var acceptsMerge: Boolean = false
     var iconDp: Dp = 60.dp
+    /** Widget'lar için hayalet boyutu (uygulamalarda null: simge boyutu kullanılır). */
+    var ghostSize: DpSize? = null
     var cellRect: Rect = Rect.Zero
     var iconRect: Rect = Rect.Zero
     var onDrop: (Offset, String?) -> Unit = { _, _ -> }
@@ -87,6 +90,8 @@ class DragState {
     var pos by mutableStateOf(Offset.Zero)
         private set
     var iconDp by mutableStateOf(60.dp)
+        private set
+    var ghostSize by mutableStateOf<DpSize?>(null)
         private set
     var hoverId by mutableStateOf<String?>(null)
         private set
@@ -116,6 +121,7 @@ class DragState {
     fun start(t: DragTarget, at: Offset) {
         key = t.itemId
         iconDp = t.iconDp
+        ghostSize = t.ghostSize
         pos = at
         dropHandler = t.onDrop
         dragIsApp = t.isApp
@@ -313,13 +319,14 @@ internal fun DraggableCell(
         ) {
             iconContent()
             if (showLabel) {
+                val st = LocalLauncherSettings.current
                 Text(
                     label,
-                    style = CellLabelStyle,
+                    style = CellLabelStyle.copy(fontSize = st.labelSize.sp),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 5.dp, start = 4.dp, end = 4.dp).fillMaxWidth(),
+                    modifier = Modifier.padding(top = st.labelGap.dp, start = 4.dp, end = 4.dp).fillMaxWidth(),
                 )
             }
         }
@@ -354,4 +361,50 @@ internal fun FolderIcon(
             }
         }
     }
+}
+
+/**
+ * Ana ekrandaki widget hücresi: konumunu sürükle-bırak sistemine kaydeder; uzun basınca menü,
+ * sürükleyince taşıma. Düzenleme modunda sallanır. İçerik dokunuşları (sistem widget'ları) olduğu gibi çalışır.
+ */
+@Composable
+internal fun WidgetCell(
+    id: String,
+    width: Dp,
+    height: Dp,
+    drag: DragState,
+    edit: Boolean,
+    jiggle: State<Float>,
+    onDrop: (Offset, String?) -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val density = LocalDensity.current
+    val wPx = with(density) { width.toPx() }
+    val hPx = with(density) { height.toPx() }
+    val target = remember(id) { DragTarget(id) }
+    target.itemId = id
+    target.place = CellPlace.Grid
+    target.layer = DragLayer.Home
+    target.isApp = false
+    target.acceptsMerge = false
+    target.iconDp = width
+    target.ghostSize = DpSize(width, height)
+    target.onDrop = onDrop
+    DisposableEffect(target, drag) {
+        drag.register(target)
+        onDispose { drag.unregister(target) }
+    }
+    Box(
+        Modifier
+            .size(width, height)
+            .onGloballyPositioned { c ->
+                val o = c.positionInRoot()
+                target.cellRect = Rect(o.x, o.y, o.x + wPx, o.y + hPx)
+                target.iconRect = target.cellRect
+            }
+            .graphicsLayer {
+                alpha = if (drag.key == id) 0f else 1f
+                rotationZ = if (edit) jiggle.value * 0.5f else 0f
+            }
+    ) { content() }
 }

@@ -8,6 +8,34 @@ sealed interface HomeItem { val id: String }
 data class AppItem(val key: String) : HomeItem { override val id: String get() = key }
 data class FolderItem(override val id: String, val name: String, val keys: List<String>) : HomeItem
 
+/** Widget türleri: sistem (AppWidgetHost) veya launcher'ın kendi widget'ları. */
+enum class WidgetKind(val code: String, val title: String) {
+    System("sys", "Widget"),
+    DigitalClock("clock", "Saat"),
+    AnalogClock("analog", "Analog Saat"),
+    Calendar("calendar", "Takvim"),
+    Battery("battery", "Pil"),
+    Photo("photo", "Fotoğraf");
+
+    companion object {
+        fun of(code: String) = entries.firstOrNull { it.code == code } ?: System
+    }
+}
+
+/**
+ * Ana ekranda birden çok hücre kaplayan widget. [spanX]×[spanY] hücre boyutudur
+ * (iOS: küçük 2×2, orta 4×2, büyük 4×4). [appWidgetId] yalnızca sistem widget'larında anlamlıdır.
+ * [data] türe özgü ek bilgi (ör. fotoğraf dosyası adı).
+ */
+data class WidgetItem(
+    override val id: String,
+    val kind: WidgetKind,
+    val spanX: Int,
+    val spanY: Int,
+    val appWidgetId: Int = -1,
+    val data: String = "",
+) : HomeItem
+
 /**
  * Ana ekran yerleşimi. [items] düz bir listedir; sayfalara ekranda sütun×satır sayısına göre bölünür.
  * [dock] en çok 4 uygulama anahtarı içerir. [libraryOnly] ana ekrandan kaldırılmış, yalnızca
@@ -28,6 +56,7 @@ data class HomeLayout(
                 when (item) {
                     is AppItem -> add(item.key)
                     is FolderItem -> addAll(item.keys)
+                    is WidgetItem -> Unit
                 }
             }
         }
@@ -42,6 +71,7 @@ data class HomeLayout(
                     1 -> out += AppItem(item.keys[0]) // tek uygulamalı klasör çözülür
                     else -> out += item
                 }
+                is WidgetItem -> out += item
             }
         }
         return copy(items = out)
@@ -52,6 +82,7 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> if (item.key == key) null else item
                 is FolderItem -> item.copy(keys = item.keys - key)
+                is WidgetItem -> item
             }
         },
         dock = dock - key,
@@ -94,7 +125,7 @@ data class HomeLayout(
 
     /** [draggedKey] uygulamasını [targetId] öğesinin üzerine bırakır: yeni klasör oluşur veya klasöre eklenir. */
     fun mergeInto(targetId: String, draggedKey: String, newFolderName: String = "Klasör"): HomeLayout {
-        if (targetId == draggedKey || items.none { it.id == targetId }) return this
+        if (targetId == draggedKey || items.none { it.id == targetId && it !is WidgetItem }) return this
         // Uygulama zaten bu klasördeyse (klasörden çıkarıp kendi klasörüne bırakma) değişiklik yok.
         if (items.any { it is FolderItem && it.id == targetId && draggedKey in it.keys }) return this
         val base = withoutKey(draggedKey)
@@ -103,6 +134,7 @@ data class HomeLayout(
             else when (item) {
                 is AppItem -> FolderItem(UUID.randomUUID().toString(), newFolderName, listOf(item.key, draggedKey))
                 is FolderItem -> item.copy(keys = item.keys + draggedKey)
+                is WidgetItem -> item
             }
         }
         return base.copy(items = newItems)
@@ -142,7 +174,28 @@ data class HomeLayout(
         return base.copy(items = base.items + AppItem(key))
     }
 
-    fun toJson(): String {
+    /** Widget'ı [index] konumuna ekler (iOS: geçerli sayfanın başına). */
+    fun addWidget(w: WidgetItem, index: Int): HomeLayout {
+        val list = items.toMutableList()
+        list.add(index.coerceIn(0, list.size), w)
+        return copy(items = list)
+    }
+
+    fun removeItem(id: String): HomeLayout = copy(items = items.filter { it.id != id })
+
+    fun resizeWidget(id: String, spanX: Int, spanY: Int): HomeLayout = copy(
+        items = items.map { if (it is WidgetItem && it.id == id) it.copy(spanX = spanX, spanY = spanY) else it }
+    )
+
+    fun setWidgetData(id: String, data: String): HomeLayout = copy(
+        items = items.map { if (it is WidgetItem && it.id == id) it.copy(data = data) else it }
+    )
+
+    val widgets: List<WidgetItem> get() = items.filterIsInstance<WidgetItem>()
+
+    fun toJson(): String = toJsonObject().toString()
+
+    fun toJsonObject(): JSONObject {
         val arr = JSONArray()
         for (item in items) {
             arr.put(
@@ -150,26 +203,43 @@ data class HomeLayout(
                     is AppItem -> JSONObject().put("t", "a").put("k", item.key)
                     is FolderItem -> JSONObject().put("t", "f").put("id", item.id)
                         .put("n", item.name).put("k", JSONArray(item.keys))
+                    is WidgetItem -> JSONObject().put("t", "w").put("id", item.id)
+                        .put("k", item.kind.code).put("sx", item.spanX).put("sy", item.spanY)
+                        .put("aw", item.appWidgetId).put("d", item.data)
                 }
             )
         }
         return JSONObject()
-            .put("v", 2)
+            .put("v", 3)
             .put("items", arr)
             .put("dock", JSONArray(dock))
             .put("lib", JSONArray(libraryOnly))
-            .toString()
     }
 
     companion object {
         fun fromJson(json: String): HomeLayout? = try {
-            val o = JSONObject(json)
+            fromJsonObject(JSONObject(json))
+        } catch (e: Exception) {
+            null
+        }
+
+        fun fromJsonObject(o: JSONObject): HomeLayout? = try {
             val ia = o.getJSONArray("items")
             val items = ArrayList<HomeItem>()
             for (i in 0 until ia.length()) {
                 val j = ia.getJSONObject(i)
-                if (j.getString("t") == "a") {
+                val t = j.getString("t")
+                if (t == "a") {
                     items += AppItem(j.getString("k"))
+                } else if (t == "w") {
+                    items += WidgetItem(
+                        id = j.optString("id").ifEmpty { UUID.randomUUID().toString() },
+                        kind = WidgetKind.of(j.optString("k")),
+                        spanX = j.optInt("sx", 2).coerceIn(1, 6),
+                        spanY = j.optInt("sy", 2).coerceIn(1, 6),
+                        appWidgetId = j.optInt("aw", -1),
+                        data = j.optString("d"),
+                    )
                 } else {
                     val ka = j.getJSONArray("k")
                     items += FolderItem(
@@ -222,6 +292,7 @@ data class HomeLayout(
                         val ks = item.keys.filter { it in valid && seen.add(it) }
                         if (ks.isNotEmpty()) items += item.copy(keys = ks)
                     }
+                    is WidgetItem -> items += item
                 }
             }
             val lib = ArrayList<String>()

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
@@ -65,6 +66,8 @@ import dev.glass.launcher.R
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.AppItem
 import dev.glass.launcher.data.FolderItem
+import dev.glass.launcher.data.GridPacker
+import dev.glass.launcher.data.WidgetItem
 import dev.glass.launcher.data.HomeLayout
 import dev.glass.launcher.data.LauncherSettings
 import kotlinx.coroutines.delay
@@ -101,11 +104,14 @@ internal fun HomeContent(
     ) {
         val m = HomeMetrics.compute(maxWidth, maxHeight, settings)
         val items = layout.items
-        val pages = items.chunked(m.perPage)
+        // Uygulamalar 1×1, widget'lar N×M hücre: sayfalara yerleştir.
+        val placements = remember(items, m.columns, m.rows) { GridPacker.pack(items, m.columns, m.rows) }
+        val pageTotal = if (items.isEmpty()) 1 else GridPacker.pageCount(placements)
+        val byPage = remember(placements) { placements.groupBy { it.page } }
         val dragging = drag.key != null
-        val lastFull = (pages.lastOrNull()?.size ?: 0) >= m.perPage
+        val lastFull = GridPacker.isPageFull(placements, pageTotal - 1, m.columns, m.rows)
         // Sürüklerken son sayfa doluysa yeni boş bir sayfa görünür.
-        val homeCount = maxOf(pages.size, 1) + if (dragging && lastFull) 1 else 0
+        val homeCount = pageTotal + if (dragging && lastFull) 1 else 0
         val libIndex = homeCount
         val pagerState = rememberPagerState { homeCount + 1 }
 
@@ -173,7 +179,7 @@ internal fun HomeContent(
                 return
             }
 
-            // 3) Ana ekran ızgarasında bir hücreye
+            // 3) Ana ekran ızgarasında bir hücreye (widget'lar hesaba katılarak)
             val iconPx = with(density) { m.icon.toPx() }
             val pitchXPx = with(density) { m.pitchX.toPx() }
             val pitchYPx = with(density) { m.pitchY.toPx() }
@@ -182,7 +188,10 @@ internal fun HomeContent(
             val y = pos.y - gridOrigin.y
             val col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
-            val idx = pagerState.currentPage * m.perPage + row * m.columns + col
+            val without = cur.items.filter { it.id != id }
+            val idx = GridPacker.insertionIndex(
+                GridPacker.pack(without, m.columns, m.rows), pagerState.currentPage, row, col, m.columns,
+            )
             if (topLevel) vm.editLayout { it.moveItem(id, idx) }
             else vm.editLayout { it.moveAppToGrid(id, idx) } // dock, klasör veya arşivden
         }
@@ -190,8 +199,10 @@ internal fun HomeContent(
         SideEffect {
             bridge.home = ::handleDrop
             bridge.goToPage = { p -> scope.launch { pagerState.animateScrollToPage(p.coerceIn(0, libIndex)) } }
-            bridge.goToLastHomePage = { scope.launch { pagerState.animateScrollToPage(maxOf(pages.size - 1, 0)) } }
+            bridge.goToLastHomePage = { scope.launch { pagerState.animateScrollToPage(maxOf(pageTotal - 1, 0)) } }
             bridge.onLibrary = pagerState.currentPage == libIndex
+            vm.currentPageStart = placements.indexOfFirst { it.page == pagerState.currentPage }
+                .let { if (it < 0) items.size else it }
         }
 
         val bottomReserve = HomeMetrics.IndicatorHeight + m.dockReserve
@@ -228,41 +239,49 @@ internal fun HomeContent(
                     )
                     return@HorizontalPager
                 }
-                val pageItems = pages.getOrNull(page).orEmpty()
-                // Üstten hizalı sabit ızgara: eksik satırlar boş kalır, simgeler yayılmaz.
-                Column(Modifier.fillMaxSize().padding(start = m.marginX, bottom = bottomReserve)) {
-                    pageItems.chunked(m.columns).forEach { row ->
-                        Row(
-                            Modifier.height(m.pitchY),
-                            horizontalArrangement = Arrangement.spacedBy(m.pitchX - m.icon)
-                        ) {
-                            row.forEach { item ->
-                                when (item) {
-                                    is AppItem -> {
-                                        val app = byKey[item.key]
-                                        if (app != null) {
-                                            DraggableCell(
-                                                id = item.id, place = CellPlace.Grid,
-                                                label = app.label, showLabel = settings.showLabels,
-                                                icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                                drag = drag, layer = DragLayer.Home, isApp = true,
-                                                acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                                onClick = { if (!edit) vm.launch(app) },
-                                                onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                            ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
-                                        }
+                val pagePl = byPage[page].orEmpty()
+                // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
+                Box(Modifier.fillMaxSize().padding(bottom = bottomReserve)) {
+                    pagePl.forEach { pl ->
+                        val x = m.marginX + m.pitchX * pl.col.toFloat()
+                        val y = m.pitchY * pl.row.toFloat()
+                        Box(Modifier.offset(x, y)) {
+                            when (val item = pl.item) {
+                                is AppItem -> {
+                                    val app = byKey[item.key]
+                                    if (app != null) {
+                                        DraggableCell(
+                                            id = item.id, place = CellPlace.Grid,
+                                            label = app.label, showLabel = settings.showLabels,
+                                            icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
+                                            drag = drag, layer = DragLayer.Home, isApp = true,
+                                            acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                            onClick = { if (!edit) vm.launch(app) },
+                                            onDrop = { p, h -> handleDrop(item.id, p, h) },
+                                        ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
                                     }
-                                    is FolderItem -> DraggableCell(
-                                        id = item.id, place = CellPlace.Grid,
-                                        label = item.name, showLabel = settings.showLabels,
-                                        icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
-                                        drag = drag, layer = DragLayer.Home, isApp = false,
-                                        acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                        onClick = { c -> onOpenFolder(item, c) },
-                                        onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                    ) {
-                                        FolderIcon(item, byKey, vm, m.icon, settings.glassStrength, folderPages[item.id] ?: 0)
-                                    }
+                                }
+                                is FolderItem -> DraggableCell(
+                                    id = item.id, place = CellPlace.Grid,
+                                    label = item.name, showLabel = settings.showLabels,
+                                    icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
+                                    drag = drag, layer = DragLayer.Home, isApp = false,
+                                    acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                    onClick = { c -> onOpenFolder(item, c) },
+                                    onDrop = { p, h -> handleDrop(item.id, p, h) },
+                                ) {
+                                    FolderIcon(
+                                        item, byKey, vm, m.icon, settings.glassStrength * settings.folderOpacity,
+                                        folderPages[item.id] ?: 0,
+                                    )
+                                }
+                                is WidgetItem -> {
+                                    val w = m.widgetWidth(pl.spanX)
+                                    val h = m.widgetHeight(pl.spanY)
+                                    WidgetCell(
+                                        id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = jiggle,
+                                        onDrop = { p, hv -> handleDrop(item.id, p, hv) },
+                                    ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
                                 }
                             }
                         }
@@ -310,7 +329,7 @@ internal fun HomeContent(
                             .fillMaxWidth()
                             .height(m.dockH)
                             .onGloballyPositioned { dockRect = it.boundsInRoot() }
-                            .liquidGlass(RoundedCornerShape(m.dockH * 0.38f), settings.glassStrength, 14.dp)
+                            .liquidGlass(RoundedCornerShape(m.dockH * 0.38f), settings.glassStrength * settings.dockOpacity, 14.dp)
                     ) {
                         Row(
                             Modifier.fillMaxSize().padding(start = m.dockInnerStart),
@@ -365,11 +384,17 @@ private val LabelStyle = TextStyle(
     shadow = Shadow(Color(0x66000000), Offset(0f, 1f), 4f),
 )
 
+/**
+ * Uygulama simgesi: seçili görünüm (orijinal/açık/koyu/renkli veya özel görsel) ve ayarlanabilir köşe
+ * yuvarlaklığıyla. Bitmap ekrandaki boyutta, arka planda üretilir ve önbelleğe alınır.
+ */
 @Composable
 internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: Boolean, strength: Float) {
+    val st = LocalLauncherSettings.current
     val px = with(LocalDensity.current) { icon.roundToPx() }
-    val bmp by produceState<ImageBitmap?>(null, app.key, px) { value = vm.iconCache.get(app, px) }
-    Box(Modifier.size(icon).glassIcon(RoundedCornerShape(icon * 0.225f), glass, strength)) {
+    val look = vm.iconLook(app, st)
+    val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
+    Box(Modifier.size(icon).glassIcon(RoundedCornerShape(icon * st.iconCorner), glass, strength)) {
         bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize()) }
     }
 }
