@@ -155,6 +155,8 @@ fun HomeScreen(
     var openFolderId by remember { mutableStateOf<String?>(null) }
     var folderOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     var menu by remember { mutableStateOf<MenuRequest?>(null) }
+    // Klasör/arşiv kategorisi açıkken basılı tutulan simgenin menüsü (klasör açık kalır).
+    var folderMenu by remember { mutableStateOf<MenuRequest?>(null) }
     var group by remember { mutableStateOf<LibraryGroup?>(null) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     val overlayNow by rememberUpdatedState(overlay)
@@ -171,7 +173,8 @@ fun HomeScreen(
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
             overlay == Overlay.Folder || overlay == Overlay.Group -> 0.06f
             fullBlur -> 0.28f
-            overlay == Overlay.Menu || overlay == Overlay.LockPrompt -> 0.10f
+            overlay == Overlay.Menu -> 0.18f
+            overlay == Overlay.LockPrompt -> 0.10f
             else -> 0f
         },
         motion.tween(260), label = "scrim",
@@ -199,10 +202,12 @@ fun HomeScreen(
         overlay = Overlay.None
         openFolderId = null
         menu = null
+        folderMenu = null
     }
 
     BackHandler(enabled = true) {
-        if (overlay != Overlay.None) closeOverlay() else if (editMode) editMode = false
+        if (folderMenu != null) folderMenu = null
+        else if (overlay != Overlay.None) closeOverlay() else if (editMode) editMode = false
     }
 
     LaunchedEffect(openSettingsRequest) {
@@ -317,6 +322,7 @@ fun HomeScreen(
                     onDragStarted = {
                         // Menü açıkken parmak kaydırıldı: menü kapanır, sürükleme başlar (iOS gibi).
                         if (overlayNow == Overlay.Menu) closeOverlay()
+                        folderMenu = null
                         editMode = true
                         val k = drag.key
                         if (k != null && (overlayNow == Overlay.Group || bridge.onLibrary)) {
@@ -328,9 +334,15 @@ fun HomeScreen(
                     },
                     onMenu = { t ->
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        openFolderId = null
-                        menu = MenuRequest(t.itemId, t.place, t.iconRect, t.cellRect, t.iconDp)
-                        overlay = Overlay.Menu
+                        val req = MenuRequest(t.itemId, t.place, t.iconRect, t.cellRect, t.iconDp)
+                        if (overlayNow == Overlay.Folder || overlayNow == Overlay.Group) {
+                            // Klasör açık kalır; menü onun üstünde açılır.
+                            folderMenu = req
+                        } else {
+                            openFolderId = null
+                            menu = req
+                            overlay = Overlay.Menu
+                        }
                     },
                 )
             }
@@ -495,6 +507,48 @@ fun HomeScreen(
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
                     onClose = { closeOverlay() },
                 )
+            }
+        }
+        // Klasörün üstünde açılan menü: arka plan hafifçe kararır, simge klasördeki yerinde kalır.
+        val folderMenuHolder = remember { arrayOfNulls<MenuRequest>(1) }
+        if (folderMenu != null) folderMenuHolder[0] = folderMenu
+        AnimatedVisibility(
+            folderMenu != null,
+            enter = fadeIn(motion.tween(160)),
+            exit = fadeOut(motion.tween(140)),
+        ) {
+            folderMenuHolder[0]?.let { req ->
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
+                    ContextMenuOverlay(
+                        req = req,
+                        vm = vm,
+                        app = byKey[req.itemId],
+                        folder = null,
+                        widget = null,
+                        hasCustomIcon = settings.customIcons.containsKey(req.itemId),
+                        onHome = req.itemId in layout.homeKeys,
+                        strength = settings.glassStrength,
+                        iconGlass = settings.iconGlass,
+                        byKey = byKey,
+                        onEditHome = { editMode = true },
+                        onRemoveFromHome = { vm.editLayout { it.removeFromHome(req.itemId) } },
+                        onAddToHome = { vm.editLayout { it.addToHome(req.itemId) } },
+                        onOpenFolder = {},
+                        onDissolveFolder = {},
+                        onChangeIcon = {
+                            iconTarget = req.itemId
+                            iconPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        },
+                        onResetIcon = { byKey[req.itemId]?.let { vm.resetCustomIcon(it) } },
+                        onResizeWidget = {},
+                        onEditWidget = null,
+                        onRemoveWidget = {},
+                        onClose = { folderMenu = null },
+                        onRemoveFromFolder = { vm.editLayout { it.takeOutOfFolder(req.itemId) } },
+                        overPanel = true,
+                    )
+                }
             }
         }
         AnimatedVisibility(

@@ -96,6 +96,10 @@ fun ContextMenuOverlay(
     onEditWidget: (() -> Unit)?,
     onRemoveWidget: () -> Unit,
     onClose: () -> Unit,
+    /** Klasörün içinden açıldıysa: uygulamayı klasörden çıkarır. */
+    onRemoveFromFolder: () -> Unit = {},
+    /** Menü açık bir panelin (klasör) üstünde: cam biraz daha dolgun olur, panel içi dikkat dağıtmaz. */
+    overPanel: Boolean = false,
 ) {
     val ctx = LocalContext.current
     val density = LocalDensity.current
@@ -127,6 +131,8 @@ fun ContextMenuOverlay(
             add(MenuAction("Uygulama Bilgisi", Glyph.Info) { vm.openAppInfo(app) })
             if (req.place == CellPlace.Library) {
                 if (!onHome) add(MenuAction("Ana Ekrana Ekle", Glyph.Plus) { onAddToHome() })
+            } else if (req.place == CellPlace.Folder) {
+                add(MenuAction("Klasörden Çıkar", Glyph.Minus) { onRemoveFromFolder() })
             } else {
                 add(MenuAction("Ana Ekrandan Kaldır", Glyph.Minus, destructive = true) { onRemoveFromHome() })
             }
@@ -203,7 +209,7 @@ fun ContextMenuOverlay(
                         Column(
                             Modifier
                                 .width(menuW)
-                                .menuGlass(RoundedCornerShape(corner), st.menuOpacity, st.menuDark)
+                                .menuGlass(RoundedCornerShape(corner), (st.menuOpacity + if (overPanel) 0.2f else 0f).coerceAtMost(0.95f), st.menuDark)
                                 .pointerInput(Unit) { detectTapGestures { } }
                                 .padding(vertical = u * 6f)
                         ) {

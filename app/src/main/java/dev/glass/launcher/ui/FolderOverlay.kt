@@ -182,7 +182,7 @@ fun FolderOverlay(
                                 val app = byKey[k]
                                 if (app != null) {
                                     DraggableCell(
-                                        id = k, label = app.label, showLabel = settings.showLabels,
+                                        id = k, place = CellPlace.Folder, label = app.label, showLabel = settings.showLabels,
                                         icon = icon, pitchX = pitch, cellHeight = rowH,
                                         drag = drag, layer = DragLayer.Folder, isApp = true,
                                         acceptsMerge = false, edit = edit, jiggle = jiggle,

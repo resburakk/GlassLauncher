@@ -174,6 +174,12 @@ data class HomeLayout(
         return base.copy(items = base.items + AppItem(key))
     }
 
+    /** Klasördeki uygulamayı klasörden çıkarıp ana ekranın sonuna koyar. */
+    fun takeOutOfFolder(key: String): HomeLayout {
+        val base = withoutKey(key)
+        return base.copy(items = base.items + AppItem(key))
+    }
+
     /** Widget'ı [index] konumuna ekler (iOS: geçerli sayfanın başına). */
     fun addWidget(w: WidgetItem, index: Int): HomeLayout {
         val list = items.toMutableList()
