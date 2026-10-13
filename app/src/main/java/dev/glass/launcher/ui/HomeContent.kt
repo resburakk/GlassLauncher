@@ -325,7 +325,8 @@ internal fun HomeContent(
             modifier = Modifier.fillMaxSize().onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
-                Box(Modifier.fillMaxSize().padding(top = statusTop + 10.dp)) {
+                // Arama çubuğu, ana ekrandaki ilk simge satırıyla AYNI üst çizgiden başlar.
+                Box(Modifier.fillMaxSize().padding(top = m.firstTop)) {
                     LibraryPage(
                         vm = vm, groups = groups, allApps = allApps, settings = settings,
                         drag = drag, edit = edit, jiggle = jiggle,
