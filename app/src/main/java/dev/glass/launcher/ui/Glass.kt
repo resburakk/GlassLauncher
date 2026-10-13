@@ -105,7 +105,10 @@ fun Modifier.liquidGlass(
     panel: Boolean = false,
 ): Modifier = composed {
     val look = LocalGlass.current
-    val rimW = LocalLauncherSettings.current.glassRimWidth
+    val st = LocalLauncherSettings.current
+    val rimW = st.glassRimWidth
+    val op = st.glassOpacity
+    val glow = st.glassRimGlow
     val s = strength
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalGlassRegions.current else null
@@ -113,15 +116,15 @@ fun Modifier.liquidGlass(
     // Gerçek bulanıklık varken dolgu daha ince tutulur; cam arkasındaki renkleri göstersin.
     val fill = if (bd != null || content != null) 0.55f else 1f
     val base = if (look.dark) {
-        Brush.verticalGradient(listOf(black((0.30f * s + 0.08f) * fill), black((0.42f * s + 0.08f) * fill)))
+        Brush.verticalGradient(listOf(black((0.30f * s + 0.08f) * fill * op), black((0.42f * s + 0.08f) * fill * op)))
     } else {
-        Brush.verticalGradient(listOf(white(0.30f * s * fill), white(0.12f * s * fill)))
+        Brush.verticalGradient(listOf(white(0.30f * s * fill * op), white(0.12f * s * fill * op)))
     }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val rim = if (look.dark) {
-        Brush.linearGradient(listOf(white(0.45f * s), white(0.05f * s), white(0.25f * s)))
+        Brush.linearGradient(listOf(white(0.45f * s * glow), white(0.05f * s * glow), white(0.25f * s * glow)))
     } else {
-        Brush.linearGradient(listOf(white(0.80f * s), white(0.10f * s), white(0.50f * s)))
+        Brush.linearGradient(listOf(white(0.80f * s * glow), white(0.10f * s * glow), white(0.50f * s * glow)))
     }
     this
         .then(
@@ -139,13 +142,14 @@ fun Modifier.liquidGlass(
         )
 
         .background(base)
+        .glassBrightness(st.glassBrightness)
         .then(
             if (look.reduced) Modifier
             else Modifier.drawWithContent {
                 drawContent()
                 drawRect(
                     Brush.radialGradient(
-                        listOf(white((if (look.dark) 0.12f else 0.24f) * s), Color.Transparent),
+                        listOf(white((if (look.dark) 0.12f else 0.24f) * s * glow), Color.Transparent),
                         center = Offset(size.width * 0.2f, 0f),
                         radius = size.width * 0.7f,
                     )
@@ -295,7 +299,7 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
     // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
     val node = remember { android.graphics.RenderNode("glassRegionContent") }
     val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
-    val r = with(LocalDensity.current) { radius.toPx() }
+    val r = with(LocalDensity.current) { radius.toPx() }.coerceAtLeast(0.5f)
     val reduced = LocalGlass.current.reduced
     val effect = remember(r) {
         android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
@@ -334,4 +338,32 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
             }
         }
     }
+}
+
+/** Parlaklık ayarı: pozitifse beyaz, negatifse siyah ince bir katman ekler. */
+fun Modifier.glassBrightness(b: Float): Modifier = when {
+    b > 0.01f -> this.background(white(0.35f * b))
+    b < -0.01f -> this.background(black(0.35f * -b))
+    else -> this
+}
+
+/**
+ * Açık tonlu buzlu cam panel (klasörler ve arşiv kutuları). Saydamlık, parlaklık, kenar ışığı ve
+ * çizgi kalınlığı ayarlarını uygular.
+ */
+fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier = composed {
+    val st = LocalLauncherSettings.current
+    val op = st.glassOpacity
+    val glow = st.glassRimGlow
+    this
+        .clip(shape)
+        .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
+        .glassBrightness(st.glassBrightness)
+        .then(
+            if (st.glassRimWidth > 0f && glow > 0f) Modifier.border(
+                st.glassRimWidth.dp,
+                Brush.verticalGradient(listOf(white(rimTop * glow), white(rimBottom * glow))),
+                shape,
+            ) else Modifier
+        )
 }

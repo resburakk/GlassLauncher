@@ -159,15 +159,7 @@ fun FolderOverlay(
                 .onGloballyPositioned { panelRect = it.boundsInRoot() }
                 // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar; gölge YOK (yarı saydam panelde
                 // gölge içeriden koyu bir kare gibi görünüyordu).
-                .clip(panelShape)
-                .background(
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
-                )
-                .border(
-                    settings.glassRimWidth.dp,
-                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.35f))),
-                    panelShape,
-                )
+                .lightGlass(panelShape, 0.75f, 0.35f)
                 .pointerInput(Unit) { detectTapGestures { } }
                 .padding(top = topPad, bottom = bottomPad),
             horizontalAlignment = Alignment.CenterHorizontally,

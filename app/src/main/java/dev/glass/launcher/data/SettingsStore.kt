@@ -76,6 +76,14 @@ data class LauncherSettings(
     val glassRimWidth: Float = 1f,
     /** Açık klasörün (ana ekran ve arşiv) adının yazı boyutu (pt). */
     val openFolderTitleSize: Float = 20f,
+    /** Cam bulanıklığının şiddeti (çarpan; 0 = bulanıklık yok, 1 = varsayılan, 2 = iki katı). */
+    val glassBlur: Float = 1f,
+    /** Cam parlaklığı (−1 = koyu, 0 = varsayılan, +1 = açık). */
+    val glassBrightness: Float = 0f,
+    /** Kenardaki ışık parlamasının gücü (çarpan; 0 = yok). */
+    val glassRimGlow: Float = 1f,
+    /** Cam dolgusunun yoğunluğu; düşük = daha saydam (çarpan). */
+    val glassOpacity: Float = 1f,
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
@@ -125,6 +133,10 @@ data class LauncherSettings(
         libraryGroupCorner = libraryGroupCorner.coerceIn(8f, 80f),
         glassRimWidth = glassRimWidth.coerceIn(0f, 4f),
         openFolderTitleSize = openFolderTitleSize.coerceIn(10f, 40f),
+        glassBlur = glassBlur.coerceIn(0f, 2f),
+        glassBrightness = glassBrightness.coerceIn(-1f, 1f),
+        glassRimGlow = glassRimGlow.coerceIn(0f, 2f),
+        glassOpacity = glassOpacity.coerceIn(0f, 2f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -143,6 +155,8 @@ data class LauncherSettings(
         put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble()); put("folderCorner", folderCorner.toDouble())
         put("libraryTileCorner", libraryTileCorner.toDouble()); put("libraryGroupCorner", libraryGroupCorner.toDouble())
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
+        put("glassBlur", glassBlur.toDouble()); put("glassBrightness", glassBrightness.toDouble())
+        put("glassRimGlow", glassRimGlow.toDouble()); put("glassOpacity", glassOpacity.toDouble())
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary)
         put("metricsVersion", METRICS_VERSION)
@@ -204,6 +218,10 @@ data class LauncherSettings(
                 libraryGroupCorner = f("libraryGroupCorner", d.libraryGroupCorner),
                 glassRimWidth = f("glassRimWidth", d.glassRimWidth),
                 openFolderTitleSize = f("openFolderTitleSize", d.openFolderTitleSize),
+                glassBlur = f("glassBlur", d.glassBlur),
+                glassBrightness = f("glassBrightness", d.glassBrightness),
+                glassRimGlow = f("glassRimGlow", d.glassRimGlow),
+                glassOpacity = f("glassOpacity", d.glassOpacity),
                 dockCorner = f("dockCorner", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),

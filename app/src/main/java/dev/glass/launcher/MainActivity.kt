@@ -152,7 +152,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     fun setWallpaperBlur(fraction: Float) {
         if (!windowManager.isCrossWindowBlurEnabled && lastBlur <= 0) return
-        val r = ((fraction.coerceIn(0f, 1f) * MAX_WALLPAPER_BLUR) / 6f).toInt() * 6
+        val r = ((fraction.coerceIn(0f, 2f) * MAX_WALLPAPER_BLUR) / 6f).toInt() * 6
         if (r == lastBlur) return
         lastBlur = r
         runCatching {

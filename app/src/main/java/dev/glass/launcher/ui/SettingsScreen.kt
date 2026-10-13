@@ -330,6 +330,18 @@ private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         SliderRow("Beyaz çizgi kalınlığı", "${"%.1f".format(s.glassRimWidth)} pt", s.glassRimWidth, 0f..4f) { v ->
             onChange { it.copy(glassRimWidth = v) }
         }
+        RowDivider()
+        SliderRow("Bulanıklık şiddeti", pct(s.glassBlur), s.glassBlur, 0f..2f) { v -> onChange { it.copy(glassBlur = v) } }
+        RowDivider()
+        SliderRow(
+            "Parlaklık",
+            when { s.glassBrightness > 0.01f -> "+${(s.glassBrightness * 100).roundToInt()}"; s.glassBrightness < -0.01f -> "${(s.glassBrightness * 100).roundToInt()}"; else -> "0" },
+            s.glassBrightness, -1f..1f,
+        ) { v -> onChange { it.copy(glassBrightness = v) } }
+        RowDivider()
+        SliderRow("Kenar ışığı", pct(s.glassRimGlow), s.glassRimGlow, 0f..2f) { v -> onChange { it.copy(glassRimGlow = v) } }
+        RowDivider()
+        SliderRow("Dolgu yoğunluğu (saydamlık)", pct(s.glassOpacity), s.glassOpacity, 0f..2f) { v -> onChange { it.copy(glassOpacity = v) } }
     }
     Group("Tema") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

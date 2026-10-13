@@ -164,7 +164,8 @@ fun HomeScreen(
     // Tam ekran bulanıklık yalnızca büyük katmanlarda; menü ve küçük pencerelerde yalnızca kendileri bulanık.
     val fullBlur = overlay in FullBlurOverlays
     val blurAmount by animateFloatAsState(if (fullBlur) 1f else 0f, motion.tween(280), label = "blurAmount")
-    val blur = 22.dp * blurAmount
+    val blurK by rememberUpdatedState(settings.glassBlur)
+    val blur = 22.dp * blurAmount * settings.glassBlur
     val scrim by animateFloatAsState(
         when {
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
@@ -180,7 +181,7 @@ fun HomeScreen(
     val windowBlur = LocalWindowBlur.current
     LaunchedEffect(windowBlur) {
         // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
-        snapshotFlow { maxOf(blurAmount, libProgress.floatValue) }.collect { f -> windowBlur?.invoke(f) }
+        snapshotFlow { maxOf(blurAmount, libProgress.floatValue) }.collect { f -> windowBlur?.invoke(f * blurK) }
     }
     var lockReason by remember { mutableStateOf(LockReason.Lock) }
 
@@ -383,7 +384,7 @@ fun HomeScreen(
             Modifier
                 .fillMaxSize()
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
-                .glassRegionBlur(glassRegions)
+                .glassRegionBlur(glassRegions, 30.dp * settings.glassBlur)
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
@@ -391,7 +392,7 @@ fun HomeScreen(
             Image(
                 wp, null,
                 Modifier.fillMaxSize().graphicsLayer {
-                    val r = maxBlurPx * maxOf(blurAmount, libProgress.floatValue)
+                    val r = maxBlurPx * maxOf(blurAmount, libProgress.floatValue) * settings.glassBlur
                     renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
                 },
                 contentScale = ContentScale.Crop,
