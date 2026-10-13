@@ -2,8 +2,6 @@ package dev.glass.launcher.ui
 
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 
@@ -13,10 +11,12 @@ import androidx.compose.runtime.staticCompositionLocalOf
  */
 @Immutable
 data class Motion(val speed: Float = 1f) {
-    fun <T> tween(ms: Int): FiniteAnimationSpec<T> = tween((ms / speed).toInt().coerceAtLeast(1))
+    // Dikkat: kütüphane işlevleri tam adıyla çağrılır; aksi halde bu üye işlevler kendini çağırır (sonsuz döngü).
+    fun <T> tween(ms: Int): FiniteAnimationSpec<T> =
+        androidx.compose.animation.core.tween(durationMillis = (ms / speed).toInt().coerceAtLeast(1))
 
     fun <T> spring(damping: Float = 0.82f, stiffness: Float = Spring.StiffnessMediumLow): FiniteAnimationSpec<T> =
-        spring(dampingRatio = damping, stiffness = stiffness * speed * speed)
+        androidx.compose.animation.core.spring(dampingRatio = damping, stiffness = stiffness * speed * speed)
 
     /** Klasör/menü açılışı gibi "esnek" geçişler. */
     fun <T> bouncy(): FiniteAnimationSpec<T> = spring(damping = 0.74f, stiffness = 420f)
