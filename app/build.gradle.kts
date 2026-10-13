@@ -12,16 +12,31 @@ android {
         applicationId = "dev.glass.launcher"
         minSdk = 33
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.5.1"
+        versionCode = 10
+        versionName = "1.0.0"
+    }
+
+    // Kişisel kullanım için sabit imza anahtarı: her derleme aynı anahtarla imzalanır, böylece yeni APK
+    // eskisinin üzerine (kaldırmadan) kurulabilir. Anahtar depoda olduğu için yalnızca kişisel kullanım
+    // içindir; uygulama mağazası için kullanılmamalıdır.
+    signingConfigs {
+        create("personal") {
+            storeFile = rootProject.file("keystore/glass-launcher.jks")
+            storePassword = "glasslauncher"
+            keyAlias = "glass"
+            keyPassword = "glasslauncher"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("personal")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug") // yalnızca kişisel kullanım için
+            signingConfig = signingConfigs.getByName("personal")
         }
     }
     compileOptions {
@@ -32,6 +47,15 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+        textReport = true
+        textOutput = file("build/reports/lint.txt")
     }
 }
 
@@ -47,4 +71,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.datastore:datastore-preferences:1.1.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
