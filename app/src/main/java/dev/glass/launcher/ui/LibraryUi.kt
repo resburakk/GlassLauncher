@@ -1,5 +1,12 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.clip
@@ -80,6 +87,25 @@ fun LibraryPage(
     onOpenGroup: (LibraryGroup) -> Unit,
 ) {
     var searching by remember { mutableStateOf(false) }
+    val gridState = rememberLazyGridState()
+    // Ekran en üstteyken aşağı çekilirse arama moduna geçer (arama çubuğuna dokunulmuş gibi).
+    val pullDown = remember(gridState) {
+        object : NestedScrollConnection {
+            var acc = 0f
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < 0f) acc = 0f
+                return Offset.Zero
+            }
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                val atTop = gridState.firstVisibleItemIndex == 0 && gridState.firstVisibleItemScrollOffset == 0
+                if (source == NestedScrollSource.UserInput && available.y > 0f && atTop) {
+                    acc += available.y
+                    if (acc > 120f) { searching = true; acc = 0f }
+                }
+                return Offset.Zero
+            }
+        }
+    }
     var query by remember { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
@@ -99,7 +125,7 @@ fun LibraryPage(
     }
 
     val u = LocalPt.current
-    Column(Modifier.fillMaxSize().padding(horizontal = u * 29f)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = u * 29f).nestedScroll(pullDown)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
@@ -109,6 +135,7 @@ fun LibraryPage(
                     .clickable(remember { MutableInteractionSource() }, null) { searching = true }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
             ) {
                 SearchGlyph(Color(0xCCFFFFFF), LocalPt.current * 17f)
                 Spacer(Modifier.width(8.dp))
@@ -125,7 +152,8 @@ fun LibraryPage(
                                 endSearch(); vm.launch(it)
                             }
                         }),
-                        modifier = Modifier.weight(1f).focusRequester(focus),
+                        // İkon + yazı bir bütün olarak ortada kalır; metin genişledikçe sağa-sola kaymaz.
+                        modifier = Modifier.width(IntrinsicSize.Min).widthIn(max = 260.dp).focusRequester(focus),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
                                 if (query.isEmpty()) Text("Uygulama Arşivi", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
@@ -154,9 +182,10 @@ fun LibraryPage(
                 val gap = u * 24f
                 val tile = (maxWidth - gap) / 2f
                 LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalArrangement = Arrangement.spacedBy(u * 24f),
+                    verticalArrangement = Arrangement.spacedBy(u * 12f),
                     // Son satır gezinme çubuğunun üstüne kadar kaydırılabilsin.
                     contentPadding = PaddingValues(bottom = 64.dp),
                     modifier = Modifier.fillMaxSize(),
@@ -231,7 +260,7 @@ private fun CategoryTile(
             g.title, color = Color.White, fontSize = (u.value * 13f).sp, fontWeight = FontWeight.Medium,
             fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = u * 10f).width(tile),
+            modifier = Modifier.padding(top = u * 4f).width(tile),
         )
     }
 }
@@ -240,14 +269,17 @@ private fun CategoryTile(
 @Composable
 private fun MiniCluster(vm: LauncherViewModel, apps: List<AppInfo>, size: Dp, onOpen: () -> Unit) {
     val gap = size * 0.1f
-    val mini = (size - gap) / 2f
-    Column(
+    // Küçük simgeler, dördüncü hücrenin ortasında biraz daha küçük durur.
+    val mini = ((size - gap) / 2f) * 0.8f
+    Box(
         Modifier.size(size).clickable(remember { MutableInteractionSource() }, null, onClick = onOpen),
-        verticalArrangement = Arrangement.spacedBy(gap),
+        contentAlignment = Alignment.Center,
     ) {
-        apps.chunked(2).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                row.forEach { AppIconImage(it, vm, mini, false, 0f) }
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            apps.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    row.forEach { AppIconImage(it, vm, mini, false, 0f) }
+                }
             }
         }
     }
@@ -344,9 +376,10 @@ fun LibraryGroupOverlay(
                 .padding(top = u * 29f, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            // Açık klasörün adı, klasörün dışındaki etiketle aynı stilde.
             Text(
-                group.title, color = Color.White, fontSize = (u.value * 28f).sp, fontWeight = FontWeight.Medium,
-                fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
+                group.title,
+                style = CellLabelStyle.copy(fontSize = (settings.labelSize * u.value).sp),
                 modifier = Modifier.padding(bottom = u * 16f),
             )
             LazyVerticalGrid(
