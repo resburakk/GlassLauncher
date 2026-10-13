@@ -284,7 +284,7 @@ private fun BatteryWidget(w: WidgetItem) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = if (w.spanX >= 4) Arrangement.Start else Arrangement.Center,
     ) {
-        BoxWithConstraints(Modifier.size(if (w.spanX >= 4) 96.dp else 110.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(if (w.spanX >= 4) 96.dp else 110.dp), contentAlignment = Alignment.Center) {
             val stroke = with(LocalDensity.current) { 9.dp.toPx() }
             Canvas(Modifier.fillMaxSize()) {
                 val inset = stroke / 2f
