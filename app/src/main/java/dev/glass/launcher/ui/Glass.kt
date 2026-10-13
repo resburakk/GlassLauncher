@@ -298,6 +298,7 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
     val effect = remember(r) {
         android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     }
+    val lastDiag = remember { longArrayOf(0L) }
     this.drawWithContent {
         drawContent()
         val list = reg.regions.values.toList()
@@ -321,7 +322,13 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
                 nc.save()
                 nc.clipPath(Path().apply { addRoundRect(rr) }.asAndroidPath())
                 nc.drawRenderNode(node)
+                nc.drawColor(0x40FF0000)
                 nc.restore()
+            }
+            val now = System.currentTimeMillis()
+            if (now - lastDiag[0] > 400) {
+                lastDiag[0] = now
+                android.util.Log.i("GlassDiag", "regions n=${list.size} " + list.joinToString { "${it.left.toInt()},${it.top.toInt()},${it.right.toInt()},${it.bottom.toInt()}" } + " size=${w}x$h hw=${nc.isHardwareAccelerated}")
             }
         }
     }
