@@ -193,7 +193,15 @@ private fun CategoryTile(
         Box(
             Modifier
                 .size(tile)
-                .liquidGlass(RoundedCornerShape(u * 20f), settings.glassStrength * 0.8f, 4.dp)
+                .clip(RoundedCornerShape(u * 20f))
+                .background(
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
+                )
+                .border(
+                    1.dp,
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.6f), Color.White.copy(alpha = 0.25f))),
+                    RoundedCornerShape(u * 20f),
+                )
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
