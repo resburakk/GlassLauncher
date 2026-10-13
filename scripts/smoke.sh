@@ -52,7 +52,9 @@ shot 06-cift-dokunma
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # 6) Arşiv
-for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 200; sleep 1; done; step "arşiv" 3
+for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 200; sleep 1; done
+shot 07a-arsiv-hemen
+step "arşiv" 3
 adb shell log -t GlassDiag "t=$(adb shell cat /proc/uptime | cut -d. -f1)s shot 07-arsiv"
 shot 07-arsiv
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
