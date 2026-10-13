@@ -1,5 +1,6 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.CompositingStrategy
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -469,6 +470,8 @@ fun HomeScreen(
             exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = folderOrigin) + fadeOut(motion.tween(200)),
         ) {
             folderHolder[0]?.let { f ->
+                // Klasör katmanı da menünün arkasında bulanıklaşır (ayrı katmanda: alttaki ana ekran silinmez).
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, 30.dp * settings.glassBlur)) {
                 FolderOverlay(
                     folder = f,
                     byKey = byKey,
@@ -494,6 +497,7 @@ fun HomeScreen(
                     },
                     onClose = { closeOverlay() },
                 )
+                }
             }
         }
         AnimatedVisibility(
@@ -502,11 +506,13 @@ fun HomeScreen(
             exit = scaleOut(motion.tween(180), targetScale = 0.85f) + fadeOut(motion.tween(160)),
         ) {
             groupHolder[0]?.let { g ->
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, 30.dp * settings.glassBlur)) {
                 LibraryGroupOverlay(
                     group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
                     onClose = { closeOverlay() },
                 )
+                }
             }
         }
         // Klasörün üstünde açılan menü: arka plan hafifçe kararır, simge klasördeki yerinde kalır.
