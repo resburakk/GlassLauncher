@@ -1,6 +1,9 @@
 package dev.glass.launcher
 
 import android.app.Application
+import android.os.Build
+import android.util.Log
+import java.io.File
 import dev.glass.launcher.data.AppRepository
 import dev.glass.launcher.data.IconCache
 import dev.glass.launcher.data.SettingsStore
@@ -22,11 +25,39 @@ class LauncherApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        installCrashRecorder()
         appRepository = AppRepository(this)
         iconCache = IconCache(this)
         settingsStore = SettingsStore(this)
         wallpaperRepository = WallpaperRepository(this)
         widgetHost = WidgetHostManager(this)
         appRepository.start()
+    }
+
+    /**
+     * Çökme olursa yığın izini dosyaya yazar; bir sonraki açılışta launcher bunu gösterir (kopyalanıp
+     * geliştiriciye iletilebilir). Ayarlar ve yerleşim DataStore'da olduğu için çökmeden etkilenmez.
+     */
+    private fun installCrashRecorder() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            runCatching {
+                File(filesDir, CRASH_FILE).writeText(
+                    "Glass Launcher ${BuildConfig.VERSION_NAME} — Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})\n\n" +
+                        Log.getStackTraceString(e)
+                )
+            }
+            previous?.uncaughtException(t, e)
+        }
+    }
+
+    fun takeLastCrash(): String? {
+        val f = File(filesDir, CRASH_FILE)
+        if (!f.exists()) return null
+        return runCatching { f.readText() }.getOrNull().also { f.delete() }
+    }
+
+    companion object {
+        const val CRASH_FILE = "last_crash.txt"
     }
 }

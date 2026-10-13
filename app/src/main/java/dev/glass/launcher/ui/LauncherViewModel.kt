@@ -56,7 +56,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     @Volatile private var layoutReady = false
 
     init {
-        reloadWallpaper()
         viewModelScope.launch {
             base = la.settingsStore.layoutJson.first()?.let { HomeLayout.fromJson(it) }
             val addNew = la.settingsStore.settings.map { it.addNewToHome }.distinctUntilChanged()
@@ -243,5 +242,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         base = next
         _layout.value = next
         viewModelScope.launch { la.settingsStore.saveLayout(next.toJson()) }
+    }
+
+    // Sınıfın EN SONUNDA olmalı: tüm alanlar (ör. _wallpaper) ilklendirildikten sonra çalışır.
+    // (Daha önce başta çağrılıyordu; coroutine ilklendirilmemiş alanı yakalayıp açılışta çöküyordu.)
+    init {
+        reloadWallpaper()
     }
 }

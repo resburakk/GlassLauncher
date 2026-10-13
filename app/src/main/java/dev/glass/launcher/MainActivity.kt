@@ -17,6 +17,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import dev.glass.launcher.ui.CrashScreen
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
@@ -59,7 +61,13 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         updateDefault()
         applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
         if (isSettingsEntry(intent)) openSettingsRequest++
+        val lastCrash = (application as LauncherApp).takeLastCrash()
         setContent {
+            var crash by remember { mutableStateOf(lastCrash) }
+            crash?.let { text ->
+                CrashScreen(text, onContinue = { crash = null })
+                return@setContent
+            }
             CompositionLocalProvider(LocalWidgetRequester provides this) {
                 HomeScreen(
                     vm, isDefault,
