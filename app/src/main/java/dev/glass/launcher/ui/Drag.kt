@@ -375,8 +375,8 @@ internal fun FolderIcon(
     strength: Float,
     page: Int = 0,
 ) {
-    // Mini simgeler kutunun %20'si, aralarında %3 boşluk; 3×3 blok kutunun ortasında toplu durur.
-    val mini = icon * 0.20f
+    // Mini simgeler kutunun %22'si, aralarında %3 boşluk; 3×3 blok kutunun ortasında toplu durur.
+    val mini = icon * 0.22f
     val gap = icon * 0.03f
     val block = mini * 3f + gap * 2f
     val pageCount = (folder.keys.size + 8) / 9
