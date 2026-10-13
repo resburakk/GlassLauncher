@@ -1,5 +1,8 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -95,25 +98,26 @@ fun LibraryPage(
         searching = false
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
+    val u = LocalPt.current
+    Column(Modifier.fillMaxSize().padding(horizontal = u * 29f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
                     .weight(1f)
-                    .height(42.dp)
+                    .height(LocalPt.current * 43f)
                     .liquidGlass(CircleShape, strength, 4.dp)
                     .clickable(remember { MutableInteractionSource() }, null) { searching = true }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SearchGlyph(Color(0xCCFFFFFF), 16.dp)
+                SearchGlyph(Color(0xCCFFFFFF), LocalPt.current * 17f)
                 Spacer(Modifier.width(8.dp))
                 if (searching) {
                     BasicTextField(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 16.sp, fontFamily = AppFont),
+                        textStyle = TextStyle(color = Color.White, fontSize = 17.sp, fontFamily = AppFont, shadow = IosTextShadow),
                         cursorBrush = SolidColor(Color.White),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
@@ -124,13 +128,13 @@ fun LibraryPage(
                         modifier = Modifier.weight(1f).focusRequester(focus),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (query.isEmpty()) Text("Uygulama Arşivi", color = Color(0x99FFFFFF), fontSize = 16.sp)
+                                if (query.isEmpty()) Text("Uygulama Arşivi", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
                                 inner()
                             }
                         },
                     )
                 } else {
-                    Text("Uygulama Arşivi", color = Color(0xB3FFFFFF), fontSize = 16.sp)
+                    Text("Uygulama Arşivi", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
                 }
             }
             if (searching) {
@@ -141,18 +145,18 @@ fun LibraryPage(
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(u * 20f))
 
         if (searching) {
             LibrarySearchList(vm, allApps, query, settings) { app -> endSearch(); vm.launch(app) }
         } else {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-                val gap = 18.dp
+                val gap = u * 24f
                 val tile = (maxWidth - gap) / 2f
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(u * 24f),
                     // Son satır gezinme çubuğunun üstüne kadar kaydırılabilsin.
                     contentPadding = PaddingValues(bottom = 64.dp),
                     modifier = Modifier.fillMaxSize(),
@@ -178,8 +182,9 @@ private fun CategoryTile(
     onDrop: (String, androidx.compose.ui.geometry.Offset, String?) -> Unit,
     onOpen: () -> Unit,
 ) {
-    val pad = tile * 0.09f
-    val gap = tile * 0.08f
+    val u = LocalPt.current
+    val pad = u * 12.6f
+    val gap = u * 12.8f
     val big = (tile - pad * 2f - gap) / 2f
     val bigApps = if (g.apps.size <= 4) g.apps.take(4) else g.apps.take(3)
     val rest = if (g.apps.size <= 4) emptyList() else g.apps.drop(3).take(4)
@@ -188,7 +193,7 @@ private fun CategoryTile(
         Box(
             Modifier
                 .size(tile)
-                .liquidGlass(RoundedCornerShape(tile * 0.2f), settings.glassStrength * 0.8f, 4.dp)
+                .liquidGlass(RoundedCornerShape(u * 20f), settings.glassStrength * 0.8f, 4.dp)
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -215,9 +220,10 @@ private fun CategoryTile(
             }
         }
         Text(
-            g.title, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+            g.title, color = Color.White, fontSize = (u.value * 13f).sp, fontWeight = FontWeight.Medium,
+            fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 6.dp).width(tile),
+            modifier = Modifier.padding(top = u * 10f).width(tile),
         )
     }
 }
@@ -225,7 +231,7 @@ private fun CategoryTile(
 /** Kutunun dördüncü köşesi: 2×2 küçük simge, dokununca kategorinin tamamı açılır. */
 @Composable
 private fun MiniCluster(vm: LauncherViewModel, apps: List<AppInfo>, size: Dp, onOpen: () -> Unit) {
-    val gap = size * 0.08f
+    val gap = size * 0.1f
     val mini = (size - gap) / 2f
     Column(
         Modifier.size(size).clickable(remember { MutableInteractionSource() }, null, onClick = onOpen),
@@ -306,8 +312,9 @@ fun LibraryGroupOverlay(
         Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
         contentAlignment = Alignment.Center,
     ) {
+        val u = LocalPt.current
         val panelW = maxWidth * 0.9f
-        val inner = panelW - 32.dp
+        val inner = panelW - u * 54f
         val pitch = inner / 4f
         // Simgeler ana ekranla aynı boyutta (sığmazsa küçülür).
         val icon = minOf(LocalHomeMetrics.current?.icon ?: (pitch * 0.72f), pitch * 0.92f)
@@ -316,15 +323,23 @@ fun LibraryGroupOverlay(
         Column(
             Modifier
                 .width(panelW)
-                .liquidGlass(RoundedCornerShape(36.dp), settings.glassStrength, 18.dp)
-                .background(Color(0x40000000))
+                .clip(RoundedCornerShape(settings.folderCorner.dp))
+                .background(
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
+                )
+                .border(
+                    1.2.dp,
+                    Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.35f))),
+                    RoundedCornerShape(settings.folderCorner.dp),
+                )
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(16.dp),
+                .padding(top = u * 29f, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                group.title, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp),
+                group.title, color = Color.White, fontSize = (u.value * 28f).sp, fontWeight = FontWeight.Medium,
+                fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
+                modifier = Modifier.padding(bottom = u * 16f),
             )
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
