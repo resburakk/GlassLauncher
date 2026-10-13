@@ -105,6 +105,7 @@ fun Modifier.liquidGlass(
     panel: Boolean = false,
 ): Modifier = composed {
     val look = LocalGlass.current
+    val rimW = LocalLauncherSettings.current.glassRimWidth
     val s = strength
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalGlassRegions.current else null
@@ -158,7 +159,7 @@ fun Modifier.liquidGlass(
                 )
             }
         )
-        .border(1.dp, rim, shape)
+        .then(if (rimW > 0f) Modifier.border(rimW.dp, rim, shape) else Modifier)
 }
 
 /**

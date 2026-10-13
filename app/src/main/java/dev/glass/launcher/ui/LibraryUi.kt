@@ -193,14 +193,14 @@ private fun CategoryTile(
         Box(
             Modifier
                 .size(tile)
-                .clip(RoundedCornerShape(u * 20f))
+                .clip(RoundedCornerShape(u * settings.libraryTileCorner))
                 .background(
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
                 )
                 .border(
-                    1.dp,
+                    settings.glassRimWidth.dp,
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.6f), Color.White.copy(alpha = 0.25f))),
-                    RoundedCornerShape(u * 20f),
+                    RoundedCornerShape(u * settings.libraryTileCorner),
                 )
                 .padding(pad)
         ) {
@@ -331,14 +331,14 @@ fun LibraryGroupOverlay(
         Column(
             Modifier
                 .width(panelW)
-                .clip(RoundedCornerShape(settings.folderCorner.dp))
+                .clip(RoundedCornerShape(u * settings.libraryGroupCorner))
                 .background(
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
                 )
                 .border(
-                    1.2.dp,
+                    settings.glassRimWidth.dp,
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.35f))),
-                    RoundedCornerShape(settings.folderCorner.dp),
+                    RoundedCornerShape(u * settings.libraryGroupCorner),
                 )
                 .pointerInput(Unit) { detectTapGestures { } }
                 .padding(top = u * 29f, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),

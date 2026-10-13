@@ -166,7 +166,7 @@ fun FolderOverlay(
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.24f), Color.White.copy(alpha = 0.15f)))
                 )
                 .border(
-                    1.2.dp,
+                    settings.glassRimWidth.dp,
                     Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.75f), Color.White.copy(alpha = 0.35f))),
                     panelShape,
                 )

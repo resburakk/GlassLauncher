@@ -303,6 +303,14 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
         SliderRow("Açık klasör köşe yuvarlaklığı", "${s.folderCorner.roundToInt()} pt", s.folderCorner, 8f..80f) { v ->
             onChange { it.copy(folderCorner = v) }
         }
+        RowDivider()
+        SliderRow("Arşiv kapalı klasör köşesi", "${s.libraryTileCorner.roundToInt()} pt", s.libraryTileCorner, 8f..40f) { v ->
+            onChange { it.copy(libraryTileCorner = v) }
+        }
+        RowDivider()
+        SliderRow("Arşiv açık klasör köşesi", "${s.libraryGroupCorner.roundToInt()} pt", s.libraryGroupCorner, 8f..80f) { v ->
+            onChange { it.copy(libraryGroupCorner = v) }
+        }
     }
     Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")
 }
@@ -311,6 +319,10 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
 private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group(null) {
         SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f) { v -> onChange { it.copy(glassStrength = v) } }
+        RowDivider()
+        SliderRow("Beyaz çizgi kalınlığı", "${"%.1f".format(s.glassRimWidth)} pt", s.glassRimWidth, 0f..4f) { v ->
+            onChange { it.copy(glassRimWidth = v) }
+        }
     }
     Group("Tema") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
