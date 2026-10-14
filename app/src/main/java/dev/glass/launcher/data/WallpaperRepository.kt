@@ -63,6 +63,42 @@ class WallpaperRepository(private val context: Context) {
 
     suspend fun clear() = withContext(Dispatchers.IO) { file.delete().also { _version.value++ } }
 
+    /** Sistem duvar kâğıdını okuma izni var mı? (Android 13+: "Tüm dosyalara erişim".) */
+    fun canReadSystemWallpaper(): Boolean = runCatching { android.os.Environment.isExternalStorageManager() }.getOrDefault(false)
+
+    private val prefs get() = context.getSharedPreferences("wallpaper_sync", Context.MODE_PRIVATE)
+
+    /**
+     * Sistem duvar kâğıdını launcher kopyası olarak alır (cam bulanıklığı ve kırılma için). Yalnızca
+     * duvar kâğıdı değiştiyse kopyalar ([force] hariç). Canlı duvar kâğıdında veya izin yoksa false döner.
+     * Görüntü cihazda kalır; hiçbir yere gönderilmez.
+     */
+    suspend fun syncFromSystem(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+        if (!canReadSystemWallpaper()) return@withContext false
+        runCatching {
+            val wm = context.getSystemService(WallpaperManager::class.java)
+            val id = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
+            if (!force && id >= 0 && id == prefs.getInt("lastId", -1) && file.exists()) return@runCatching true
+            val tmp = File(context.filesDir, "wallpaper.tmp")
+            // Önce orijinal dosya (tam çözünürlük); yoksa çizilebilir nesneden üret.
+            val pfd = runCatching { wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+            if (pfd != null) {
+                pfd.use { p -> android.os.ParcelFileDescriptor.AutoCloseInputStream(p).use { input -> tmp.outputStream().use { input.copyTo(it) } } }
+            } else {
+                val d = wm.drawable ?: return@runCatching false
+                val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
+                    ?: android.graphics.Bitmap.createBitmap(
+                        d.intrinsicWidth.coerceAtLeast(1), d.intrinsicHeight.coerceAtLeast(1), android.graphics.Bitmap.Config.ARGB_8888,
+                    ).also { b -> d.setBounds(0, 0, b.width, b.height); d.draw(android.graphics.Canvas(b)) }
+                tmp.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            if (!tmp.renameTo(file)) return@runCatching false
+            prefs.edit().putInt("lastId", id).apply()
+            _version.value++
+            true
+        }.getOrDefault(false)
+    }
+
     /**
      * Cam yüzeyler için önceden bulanıklaştırılmış küçük kopya (bir kez üretilir, çizimde ölçeklenir).
      * Küçük boyuta indirip kutu bulanıklığı uygulamak, her karede bulanıklık hesaplamaktan çok daha ucuzdur.

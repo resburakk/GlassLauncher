@@ -45,7 +45,11 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     private val wallpaperManager by lazy { getSystemService(WallpaperManager::class.java) }
     private val colorsListener = WallpaperManager.OnColorsChangedListener { colors, which ->
-        if (which and WallpaperManager.FLAG_SYSTEM != 0) applyBarTone(colors)
+        if (which and WallpaperManager.FLAG_SYSTEM != 0) {
+            applyBarTone(colors)
+            // Sistem duvar kâğıdı değişti: cam efekti için launcher kopyasını güncelle.
+            vm.syncSystemWallpaper()
+        }
     }
 
     private val widgetHost get() = (application as LauncherApp).widgetHost
@@ -111,6 +115,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         coveredByApp = false
         hideFromRecents()
         updateDefault()
+        vm.syncSystemWallpaper()
         applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
     }
 

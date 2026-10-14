@@ -204,6 +204,20 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Cam yüzeylerin arkasında gösterilen bulanık duvar kâğıdı (yalnızca launcher duvar kâğıdı seçiliyse). */
     val blurredWallpaper: StateFlow<Blurred?> = _blurred
 
+    /**
+     * Sistem duvar kâğıdını (izin varsa ve ayar açıksa) launcher kopyası yapar; değişmediyse bir şey yapmaz.
+     * Açılışta, öne gelişte ve sistem duvar kâğıdı değişince çağrılır.
+     */
+    fun syncSystemWallpaper(force: Boolean = false) {
+        viewModelScope.launch {
+            val s = la.settingsStore.settings.first()
+            if (!s.syncSystemWallpaper) return@launch
+            if (la.wallpaperRepository.syncFromSystem(force) && !s.launcherWallpaper) {
+                la.settingsStore.update { it.copy(launcherWallpaper = true) }
+            }
+        }
+    }
+
     fun reloadWallpaper() {
         viewModelScope.launch {
             _wallpaper.value = la.wallpaperRepository.load()
