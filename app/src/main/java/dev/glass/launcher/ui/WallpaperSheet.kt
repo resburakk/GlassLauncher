@@ -80,7 +80,7 @@ fun WallpaperSheet(
                     Modifier
                         .fillMaxWidth()
                         .liquidGlass(shape, strength, 18.dp, panel = true)
-                        .background(Color.Black.copy(alpha = 0.28f), shape)
+                        .background(Color(0xE01C1C1E), shape)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
                         .padding(horizontal = 18.dp, vertical = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,

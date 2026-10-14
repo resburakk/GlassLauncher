@@ -18,11 +18,12 @@ ix=$((W*15/100)); iy=$((H*14/100))
 
 # Ekrandaki bir yazının merkezine dokun (uiautomator dökümünden)
 tap_text() {
+  want="$1"
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
   b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
   set -- $b
   if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
-  echo "::warning::Ekranda bulunamadı: $1"; return 1
+  echo "::warning::Ekranda bulunamadı: $want"; return 1
 }
 
 shot 01-ana-ekran
