@@ -7,6 +7,7 @@ import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Path
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffColorFilter
 import android.graphics.Rect
@@ -15,7 +16,9 @@ import android.graphics.Shader
 import android.graphics.drawable.AdaptiveIconDrawable
 import android.graphics.drawable.Drawable
 import androidx.core.graphics.createBitmap
+import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.sin
 
 /**
  * Uygulama simgesini iOS gibi "tam dolu" kare olarak çizer ve seçilen görünümü uygular.
@@ -40,6 +43,59 @@ object IconRenderer {
             renderAdaptive(c, d.mutate() as AdaptiveIconDrawable, size, style, tint)
         } else {
             renderLegacy(c, d, size, style, tint)
+        }
+        // Köşeleri boş kalan (yuvarlak/şekilli) simgeler iOS gibi dolu kareye tamamlanır.
+        return if (style == IconStyle.Original) fillShape(out, size).also { if (it !== out) out.recycle() } else out
+    }
+
+    /**
+     * Köşeleri saydam kalan simgeyi kareye tamamlar:
+     * - Yuvarlak simge: kendi kenar halkası/gölgesi kırpılır (iç daire), boş köşeler simgenin zemin rengiyle dolar.
+     * - Başka şekiller: simgenin zemin renginde bir plaka üzerine hafifçe küçültülerek ortalanır.
+     */
+    private fun fillShape(src: Bitmap, size: Int): Bitmap {
+        if (size < 8) return src
+        val m = (size * 0.04f).toInt().coerceAtLeast(1)
+        val corners = listOf(m to m, size - 1 - m to m, m to size - 1 - m, size - 1 - m to size - 1 - m)
+        if (corners.none { (x, y) -> (src.getPixel(x, y) ushr 24) < 128 }) return src
+        val box = opaqueBounds(src) ?: return src
+        val cx = box.exactCenterX()
+        val cy = box.exactCenterY()
+        val r = minOf(box.width(), box.height()) / 2f
+        fun alphaAt(rad: Double, f: Float): Int {
+            val x = (cx + cos(rad) * r * f).toInt().coerceIn(0, size - 1)
+            val y = (cy + sin(rad) * r * f).toInt().coerceIn(0, size - 1)
+            return src.getPixel(x, y) ushr 24
+        }
+        val dirs = (0 until 8).map { Math.toRadians(it * 45.0) }
+        val ratio = box.width().toFloat() / box.height().coerceAtLeast(1)
+        val round = ratio in 0.9f..1.1f && dirs.all { alphaAt(it, 0.9f) > 200 }
+
+        // Zemin rengi: kenar halkasının hemen içinden örneklenen en yaygın renk (bulunamazsa beyaz).
+        val samples = (0 until 16).mapNotNull { i ->
+            val rad = Math.toRadians(i * 22.5)
+            val x = (cx + cos(rad) * r * 0.8f).toInt().coerceIn(0, size - 1)
+            val y = (cy + sin(rad) * r * 0.8f).toInt().coerceIn(0, size - 1)
+            src.getPixel(x, y).takeIf { (it ushr 24) > 220 }
+        }
+        val plate = samples.groupBy { (Color.red(it) shr 4 shl 8) or (Color.green(it) shr 4 shl 4) or (Color.blue(it) shr 4) }
+            .maxByOrNull { it.value.size }?.value?.let { group ->
+                Color.rgb(group.sumOf { Color.red(it) } / group.size, group.sumOf { Color.green(it) } / group.size, group.sumOf { Color.blue(it) } / group.size)
+            } ?: Color.WHITE
+
+        val out = createBitmap(size, size)
+        val c = Canvas(out)
+        c.drawColor(plate)
+        val paint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        if (round) {
+            c.save()
+            c.clipPath(Path().apply { addCircle(cx, cy, r * 0.9f, Path.Direction.CW) })
+            c.drawBitmap(src, 0f, 0f, paint)
+            c.restore()
+        } else {
+            val k = 0.86f
+            val off = size * (1f - k) / 2f
+            c.drawBitmap(src, null, RectF(off, off, off + size * k, off + size * k), paint)
         }
         return out
     }
