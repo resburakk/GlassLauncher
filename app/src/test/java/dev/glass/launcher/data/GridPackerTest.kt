@@ -65,4 +65,22 @@ class GridPackerTest {
         val p = GridPacker.pack(items, 4, 4)
         assertTrue(GridPacker.isPageFull(p, 0, 4, 4))
     }
+
+    @Test fun pageBreak_startsNextPage_andDropAfterLastAppStaysOnPage() {
+        val items = listOf(a("1"), a("2"), a("3"), PageBreak("b"), a("4"), a("5"))
+        val p = GridPacker.pack(items, 4, 6)
+        assertEquals(0 to (0 to 3), p[3].page to (p[3].row to p[3].col))
+        assertEquals(1, p[4].page); assertEquals(0 to 0, p[4].row to p[4].col)
+        assertEquals(2, GridPacker.pageCount(p))
+        assertTrue(GridPacker.isPageFull(p, 0, 4, 6))
+        // 1. sayfanın boş bölgesine bırakılan öğe sayfa sonunun ÖNÜNE girer (1. sayfada kalır)
+        assertEquals(3, GridPacker.insertionIndex(p, 0, 3, 2, 4))
+    }
+
+    @Test fun pageBreak_onEmptyOrFullPage_isNoOp() {
+        val lead = GridPacker.pack(listOf(PageBreak("b"), a("1")), 4, 6)
+        assertEquals(0, lead[1].page); assertEquals(1, GridPacker.pageCount(lead))
+        val full = GridPacker.pack((1..4).map { a("$it") } + PageBreak("b") + a("5"), 2, 2)
+        assertEquals(1, full[5].page); assertEquals(2, GridPacker.pageCount(full))
+    }
 }

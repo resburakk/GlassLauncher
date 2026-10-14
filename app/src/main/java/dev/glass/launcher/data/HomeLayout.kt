@@ -8,6 +8,12 @@ sealed interface HomeItem { val id: String }
 data class AppItem(val key: String) : HomeItem { override val id: String get() = key }
 data class FolderItem(override val id: String, val name: String, val keys: List<String>) : HomeItem
 
+/**
+ * Görünmez sayfa sonu: kendisinden sonraki öğeler yeni sayfadan başlar (iOS'ta 1. sayfanın altı boş
+ * kalırken klasörlerin 2. sayfada durması gibi). Ekranda çizilmez, sürüklenemez.
+ */
+data class PageBreak(override val id: String) : HomeItem
+
 /** Widget türleri: sistem (AppWidgetHost) veya launcher'ın kendi widget'ları. */
 enum class WidgetKind(val code: String, val title: String) {
     System("sys", "Widget"),
@@ -56,7 +62,7 @@ data class HomeLayout(
                 when (item) {
                     is AppItem -> add(item.key)
                     is FolderItem -> addAll(item.keys)
-                    is WidgetItem -> Unit
+                    is WidgetItem, is PageBreak -> Unit
                 }
             }
         }
@@ -72,6 +78,7 @@ data class HomeLayout(
                     else -> out += item
                 }
                 is WidgetItem -> out += item
+                is PageBreak -> if (out.lastOrNull() !is PageBreak) out += item // art arda sayfa sonu tek olur
             }
         }
         return copy(items = out)
@@ -82,7 +89,7 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> if (item.key == key) null else item
                 is FolderItem -> item.copy(keys = item.keys - key)
-                is WidgetItem -> item
+                is WidgetItem, is PageBreak -> item
             }
         },
         dock = dock - key,
@@ -125,7 +132,7 @@ data class HomeLayout(
 
     /** [draggedKey] uygulamasını [targetId] öğesinin üzerine bırakır: yeni klasör oluşur veya klasöre eklenir. */
     fun mergeInto(targetId: String, draggedKey: String, newFolderName: String = "Klasör"): HomeLayout {
-        if (targetId == draggedKey || items.none { it.id == targetId && it !is WidgetItem }) return this
+        if (targetId == draggedKey || items.none { it.id == targetId && (it is AppItem || it is FolderItem) }) return this
         // Uygulama zaten bu klasördeyse (klasörden çıkarıp kendi klasörüne bırakma) değişiklik yok.
         if (items.any { it is FolderItem && it.id == targetId && draggedKey in it.keys }) return this
         val base = withoutKey(draggedKey)
@@ -134,7 +141,7 @@ data class HomeLayout(
             else when (item) {
                 is AppItem -> FolderItem(UUID.randomUUID().toString(), newFolderName, listOf(item.key, draggedKey))
                 is FolderItem -> item.copy(keys = item.keys + draggedKey)
-                is WidgetItem -> item
+                is WidgetItem, is PageBreak -> item
             }
         }
         return base.copy(items = newItems)
@@ -212,6 +219,7 @@ data class HomeLayout(
                     is WidgetItem -> JSONObject().put("t", "w").put("id", item.id)
                         .put("k", item.kind.code).put("sx", item.spanX).put("sy", item.spanY)
                         .put("aw", item.appWidgetId).put("d", item.data)
+                    is PageBreak -> JSONObject().put("t", "b").put("id", item.id)
                 }
             )
         }
@@ -237,6 +245,8 @@ data class HomeLayout(
                 val t = j.getString("t")
                 if (t == "a") {
                     items += AppItem(j.getString("k"))
+                } else if (t == "b") {
+                    items += PageBreak(j.optString("id").ifEmpty { UUID.randomUUID().toString() })
                 } else if (t == "w") {
                     items += WidgetItem(
                         id = j.optString("id").ifEmpty { UUID.randomUUID().toString() },
@@ -298,7 +308,7 @@ data class HomeLayout(
                         val ks = item.keys.filter { it in valid && seen.add(it) }
                         if (ks.isNotEmpty()) items += item.copy(keys = ks)
                     }
-                    is WidgetItem -> items += item
+                    is WidgetItem, is PageBreak -> items += item
                 }
             }
             val lib = ArrayList<String>()

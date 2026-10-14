@@ -114,6 +114,10 @@ data class LauncherSettings(
     val showLibrary: Boolean = false,
     /** Yuvarlak (köşeleri boş) simgeleri dolu kareye tamamla. */
     val iconFillRound: Boolean = true,
+    /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
+    val liveIcons: Boolean = true,
+    /** Canlı saat simgesinde saniye ibresi. */
+    val liveClockSeconds: Boolean = true,
     /** Arama ekranı: öneri adları, nötr cam, cihaz içi arama türleri ve izin kartı. */
     val searchShowLabels: Boolean = true,
     val searchNeutral: Boolean = false,
@@ -226,6 +230,7 @@ data class LauncherSettings(
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
+        put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
@@ -315,6 +320,8 @@ data class LauncherSettings(
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
                 showLibrary = o.optBoolean("showLibrary", d.showLibrary),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
+                liveIcons = o.optBoolean("liveIcons", d.liveIcons),
+                liveClockSeconds = o.optBoolean("liveClockSeconds", d.liveClockSeconds),
                 searchShowLabels = o.optBoolean("searchShowLabels", d.searchShowLabels),
                 searchNeutral = o.optBoolean("searchNeutral2", d.searchNeutral),
                 searchContacts = o.optBoolean("searchContacts", d.searchContacts),
@@ -355,6 +362,7 @@ class SettingsStore(private val context: Context) {
     private object Keys {
         val settings = stringPreferencesKey("settings_v2")
         val layout = stringPreferencesKey("home_layout")
+        val layoutBackup = stringPreferencesKey("home_layout_backup")
         // Eski sürüm (0.5) anahtarları — yalnızca ilk geçişte okunur.
         val columns = intPreferencesKey("columns")
         val rows = intPreferencesKey("rows")
@@ -390,6 +398,13 @@ class SettingsStore(private val context: Context) {
 
     suspend fun saveLayout(json: String) {
         context.dataStore.edit { it[Keys.layout] = json }
+    }
+
+    /** "iOS 26 dizilimini uygula" öncesindeki düzen (geri almak için). Yoksa null. */
+    val layoutBackupJson: Flow<String?> = context.dataStore.data.map { it[Keys.layoutBackup] }
+
+    suspend fun saveLayoutBackup(json: String?) {
+        context.dataStore.edit { if (json == null) it.remove(Keys.layoutBackup) else it[Keys.layoutBackup] = json }
     }
 
     suspend fun update(block: (LauncherSettings) -> LauncherSettings) {

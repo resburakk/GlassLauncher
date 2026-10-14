@@ -57,6 +57,7 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # 4) Sayfalar, arama
 adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
+shot 04d-ikinci-sayfa
 adb shell input swipe $((W*2/10)) $cy $((W*8/10)) $cy 250; step "önceki sayfa"
 adb shell input swipe $((W*80/100)) $((H*40/100)) $((W*80/100)) $((H*70/100)) 300; step "sağdan kaydırma: kontrol merkezi" 2
 shot 05k-sag-kaydirma

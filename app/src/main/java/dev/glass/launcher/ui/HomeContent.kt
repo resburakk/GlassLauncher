@@ -81,6 +81,7 @@ import dev.glass.launcher.data.AppItem
 import dev.glass.launcher.data.FolderItem
 import dev.glass.launcher.data.GridPacker
 import dev.glass.launcher.data.WidgetItem
+import dev.glass.launcher.data.PageBreak
 import dev.glass.launcher.data.HomeLayout
 import dev.glass.launcher.data.LauncherSettings
 import kotlinx.coroutines.delay
@@ -385,6 +386,7 @@ internal fun HomeContent(
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
                             }
+                            is PageBreak -> Unit // görünmez sayfa sonu
                         }
                     }
                   }
@@ -522,6 +524,13 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     val st = LocalLauncherSettings.current
     val px = with(LocalDensity.current) { icon.roundToPx() }
     val look = vm.iconLook(app, st)
+    val live = vm.liveKind(app, st)
+    if (live != null) {
+        Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow)) {
+            LiveIcon(live, icon, st.liveClockSeconds)
+        }
+        return
+    }
     val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
     Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow)) {
         bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }

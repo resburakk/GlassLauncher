@@ -87,6 +87,22 @@ class AppRepository(private val context: Context) {
         }.filter { it != "android" }.distinct()
     }
 
+    private fun resolvePkg(i: Intent): String? = runCatching {
+        context.packageManager.resolveActivity(i, PackageManager.MATCH_DEFAULT_ONLY)?.activityInfo?.packageName
+    }.getOrNull()?.takeIf { it != "android" }
+
+    /** Canlı saat simgesi çizilecek saat uygulamaları (Honor, Huawei, Google, AOSP + varsayılan). */
+    val clockPackages: Set<String> by lazy {
+        setOf("com.hihonor.deskclock", "com.android.deskclock", "com.google.android.deskclock", "com.huawei.deskclock") +
+            listOfNotNull(resolvePkg(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)))
+    }
+
+    /** Canlı takvim simgesi çizilecek takvim uygulamaları. */
+    val calendarPackages: Set<String> by lazy {
+        setOf("com.hihonor.calendar", "com.android.calendar", "com.google.android.calendar", "com.huawei.calendar") +
+            listOfNotNull(resolvePkg(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_CALENDAR)))
+    }
+
     /** [options]: simgeden büyüyen açılış animasyonu (ActivityOptions). Animasyonu sistem çizer. */
     fun launch(app: AppInfo, sourceBounds: Rect? = null, options: Bundle? = null) {
         runCatching {

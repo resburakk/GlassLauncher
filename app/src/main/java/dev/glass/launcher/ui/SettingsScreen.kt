@@ -48,6 +48,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -207,7 +208,7 @@ fun SettingsScreen(
                             RootPage(isDefaultHome, onRequestDefault) { page = it.name }
                             SettingsThemeGroup(s, onChange)
                         }
-                        SettingsPage.Home -> HomePage(s, onChange)
+                        SettingsPage.Home -> HomePage(vm, s, onChange)
                         SettingsPage.Icons -> IconsPage(s, onChange)
                         SettingsPage.Dock -> DockPage(s, onChange)
                         SettingsPage.Folders -> FoldersPage(s, onChange)
@@ -275,7 +276,37 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
 }
 
 @Composable
-private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+private fun HomePage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf<String?>(null) }
+    val hasBackup by vm.hasLayoutBackup.collectAsState()
+    Group("Dizilim") {
+        ActionRow("iOS 26 dizilimini uygula") { confirm = true }
+        if (hasBackup) {
+            RowDivider()
+            ActionRow("Önceki düzene geri dön") { vm.restorePreviousLayout(); done = "Önceki düzen geri yüklendi." }
+        }
+    }
+    Footer(
+        done ?: ("Uygulamalar iOS 26'nın fabrika sırasına dizilir (karşılıklarıyla: Meet/MeeTime, Takvim, Galeri, Kamera · " +
+            "Gmail, Notlar, Görevler, Saat · TV, Oyun Merkezi, Play Store, Haritalar · Sağlık, Cüzdan, Ayarlar; dock: " +
+            "Telefon, tarayıcı, Mesajlar, Müzik). Diğer uygulamalar 2. sayfada türlerine göre klasörlenir. Widget'lar korunur.")
+    )
+    if (confirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { androidx.compose.material3.Text("iOS 26 dizilimi uygulansın mı?") },
+            text = { androidx.compose.material3.Text("Şu anki ana ekran düzenin yedeklenir; istersen buradan \"Önceki düzene geri dön\" ile geri alabilirsin.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirm = false; vm.applyIosLayout(); done = "iOS 26 dizilimi uygulandı."
+                }) { androidx.compose.material3.Text("Uygula") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirm = false }) { androidx.compose.material3.Text("Vazgeç") }
+            },
+        )
+    }
     Group("Düzen") {
         ChoiceRow("Sütun sayısı", listOf(3, 4, 5), s.columns) { v -> onChange { it.copy(columns = v) } }
         RowDivider()
@@ -510,6 +541,14 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         RowDivider()
         ToggleRow("Cam kenar ışığı", s.iconGlass, default = Def.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
     }
+    Group("Canlı simgeler") {
+        ToggleRow("Canlı saat ve takvim simgeleri", s.liveIcons, default = Def.liveIcons) { v -> onChange { it.copy(liveIcons = v) } }
+        if (s.liveIcons) {
+            RowDivider()
+            ToggleRow("Saatte saniye ibresi", s.liveClockSeconds, default = Def.liveClockSeconds) { v -> onChange { it.copy(liveClockSeconds = v) } }
+        }
+    }
+    Footer("Saat simgesinin ibreleri gerçek saati gösterir, Takvim simgesi her gün bugünün tarihini gösterir. Simgesi elle değiştirilmiş uygulamalarda kullanılmaz.")
     Footer("Tek bir uygulamanın simgesini değiştirmek için simgesine basılı tutup \"Simgeyi Değiştir\"i seçin.")
 }
 

@@ -17,6 +17,7 @@ import dev.glass.launcher.LauncherApp
 import dev.glass.launcher.data.AppCategory
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.HomeLayout
+import dev.glass.launcher.data.IosDefaultLayout
 import dev.glass.launcher.data.LauncherSettings
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -61,6 +62,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             val addNew = la.settingsStore.settings.map { it.addNewToHome }.distinctUntilChanged()
             combine(repo.apps, addNew) { list, add -> list to add }.collect { (list, add) ->
                 if (list.isEmpty()) return@collect // liste henüz yüklenmedi: kayıtlı düzeni budama
+                // İlk kurulum: iOS 26 fabrika dizilimi (karşılıklar + türe göre klasörler).
+                if (base == null) base = IosDefaultLayout.build(la, list)
                 val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages, add)
                 val changed = next != base
                 base = next
@@ -110,6 +113,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun startShortcut(info: ShortcutInfo) = repo.startShortcut(info)
 
     // --- Simgeler ---
+
+    /** Bu uygulama için canlı simge türü (ayar kapalıysa veya özel simge seçilmişse null). */
+    fun liveKind(app: AppInfo, s: LauncherSettings): LiveIconKind? = when {
+        !s.liveIcons || s.customIcons.containsKey(app.key) -> null
+        app.packageName in repo.clockPackages -> LiveIconKind.Clock
+        app.packageName in repo.calendarPackages -> LiveIconKind.Calendar
+        else -> null
+    }
 
     fun iconLook(app: AppInfo, s: LauncherSettings): IconLook =
         IconLook(s.iconStyle, s.tintColor, s.customIcons[app.key], s.iconFillRound)
@@ -230,6 +241,34 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         _layout.value = next
         la.settingsStore.saveLayout(next.toJson())
         return true
+    }
+
+    /** Önceki düzene dönülebilir mi (iOS dizilimi uygulandıktan sonra). */
+    val hasLayoutBackup: StateFlow<Boolean> = la.settingsStore.layoutBackupJson
+        .map { it != null }
+        .stateIn(viewModelScope, eager, false)
+
+    /** Mevcut düzeni yedekleyip iOS 26 fabrika dizilimini uygular. Widget'lar korunur (en sona eklenir). */
+    fun applyIosLayout() {
+        val list = repo.apps.value
+        if (list.isEmpty()) return
+        val cur = _layout.value
+        viewModelScope.launch {
+            la.settingsStore.saveLayoutBackup(cur.toJson())
+            val fresh = IosDefaultLayout.build(la, list)
+            val withWidgets = fresh.copy(items = fresh.items + cur.widgets)
+            editLayout { HomeLayout.reconcile(withWidgets, list, repo.defaultDockPackages, true) }
+        }
+    }
+
+    /** iOS dizilimi uygulanmadan önceki düzene döner. */
+    fun restorePreviousLayout() {
+        viewModelScope.launch {
+            val json = la.settingsStore.layoutBackupJson.first() ?: return@launch
+            val prev = HomeLayout.fromJson(json) ?: return@launch
+            la.settingsStore.saveLayoutBackup(null)
+            editLayout { HomeLayout.reconcile(prev, repo.apps.value, repo.defaultDockPackages, settings.value.addNewToHome) }
+        }
     }
 
     fun updateSettings(block: (LauncherSettings) -> LauncherSettings) {

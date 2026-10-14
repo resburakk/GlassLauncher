@@ -14,6 +14,7 @@ object GridPacker {
 
     fun spanOf(item: HomeItem, columns: Int, rows: Int): Pair<Int, Int> = when (item) {
         is WidgetItem -> item.spanX.coerceIn(1, columns) to item.spanY.coerceIn(1, rows)
+        is PageBreak -> 0 to 0
         else -> 1 to 1
     }
 
@@ -22,6 +23,20 @@ object GridPacker {
         var page = 0
         var occupied = Array(rows) { BooleanArray(columns) }
         for (item in items) {
+            if (item is PageBreak) {
+                // İlk boş hücreye görünmez olarak konur ve sayfanın kalanını doldurur; sonraki öğe yeni
+                // sayfaya geçer. Sayfa boşsa ya da tamamen doluysa etkisizdir (boş sayfa oluşturmaz).
+                val free = (0 until rows * columns).firstOrNull { !occupied[it / columns][it % columns] }
+                val used = occupied.any { row -> row.any { it } }
+                if (free != null && used) {
+                    out += Placement(item, page, free / columns, free % columns, 1, 1)
+                    for (row in occupied) row.fill(true)
+                } else {
+                    if (free == null) { page++; occupied = Array(rows) { BooleanArray(columns) } }
+                    out += Placement(item, page, 0, 0, 0, 0)
+                }
+                continue
+            }
             val (sx, sy) = spanOf(item, columns, rows)
             var placed = false
             while (!placed) {
@@ -52,11 +67,13 @@ object GridPacker {
         return true
     }
 
-    fun pageCount(placements: List<Placement>): Int = (placements.maxOfOrNull { it.page } ?: 0) + 1
+    fun pageCount(placements: List<Placement>): Int =
+        (placements.filter { it.item !is PageBreak }.maxOfOrNull { it.page } ?: 0) + 1
 
     /** Bir sayfanın tamamen dolu olup olmadığı (sürüklerken yeni boş sayfa açmak için). */
     fun isPageFull(placements: List<Placement>, page: Int, columns: Int, rows: Int): Boolean =
-        placements.filter { it.page == page }.sumOf { it.spanX * it.spanY } >= columns * rows
+        placements.any { it.page == page && it.item is PageBreak && it.spanX > 0 } ||
+            placements.filter { it.page == page }.sumOf { it.spanX * it.spanY } >= columns * rows
 
     /**
      * Sürüklenen öğenin bırakıldığı hücreye göre listedeki yeni sırasını bulur.
@@ -66,8 +83,11 @@ object GridPacker {
     fun insertionIndex(placements: List<Placement>, page: Int, row: Int, col: Int, columns: Int): Int {
         val target = page.toLong() * 10_000 + row * columns + col
         placements.forEachIndexed { i, p ->
+            if (p.item is PageBreak && p.spanX == 0) return@forEachIndexed // etkisiz sayfa sonu
             if (p.page == page && p.covers(row, col)) return i
             val start = p.page.toLong() * 10_000 + p.row * columns + p.col
+            // Sayfa sonundan sonraki boş hücreler: öğe sayfa sonunun önüne (aynı sayfaya) girer.
+            if (p.item is PageBreak && p.page == page && start <= target) return i
             if (start >= target) return i
         }
         return placements.size
