@@ -99,7 +99,10 @@ fun SearchOverlay(
     val keyboard = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) {
+        // Kutu ekranın altında; yerleşim tamamlanınca odaklanıp klavyeyi aç (aynı karede istenirse klavye gecikebiliyor).
+        delay(80)
         focus.requestFocus()
+        delay(40)
         keyboard?.show()
     }
 
