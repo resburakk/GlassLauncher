@@ -375,10 +375,15 @@ fun HomeScreen(
                 )
             }
             .onSizeChanged { rootSize = it }
-            // Boş alana çift dokunma: ekranı kilitle (ayarlardan kapatılabilir).
+            // Boş alana dokunma: düzenleme modundaysa moddan çıkar (iOS gibi; titreme durur, düğmeler kapanır).
+            // Düzenleme modu dışında çift dokunma ekranı kilitler (ayarlardan kapatılabilir).
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = {
+                detectTapGestures(onTap = {
+                    // Seçim sürerken tek dokunuş seçimi kaybettirmesin; çift dokunuş her durumda çıkar.
+                    if (editNow && overlayNow == Overlay.None && !selection.active) editMode = false
+                }, onDoubleTap = {
                     val st = settingsNow
+                    if (editNow && overlayNow == Overlay.None) { editMode = false; return@detectTapGestures }
                     if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && st.doubleTapLock) {
                         if (!LockService.lock()) {
                             lockReason = LockReason.Lock
