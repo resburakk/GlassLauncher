@@ -99,6 +99,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.glass.launcher.data.FolderItem
+import dev.glass.launcher.data.AppItem
 import kotlin.math.roundToInt
 
 enum class Overlay { None, Search, Settings, Folder, Menu, Group, Widgets, LockPrompt }
@@ -119,6 +120,10 @@ class DropBridge {
     var goToLastHomePage: (() -> Unit)? = null
     /** Şu an Uygulama Arşivi sayfasında mıyız (arama hareketi orada kapalı). */
     var onLibrary: Boolean = false
+    /** Görünen ana ekran sayfasındaki öğelerin kimlikleri ("Bu Sayfayı Sil" için). */
+    var currentPageIds by mutableStateOf<List<String>>(emptyList())
+    /** Ana ekran sayfa sayısı. */
+    var homePageCount by mutableStateOf(1)
 }
 
 /**
@@ -654,6 +659,40 @@ fun HomeScreen(
         val btnH = 30.dp
         val btnY = homeMetrics?.let { (statusTopDp + it.firstTop) / 2f - btnH / 2f } ?: (statusTopDp + 8.dp)
         val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet
+        // "Bu Sayfayı Sil": birden çok sayfa varken, arama hapının hemen üstünde.
+        var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }
+        val canDeletePage = showEditBar && !bridge.onLibrary && bridge.homePageCount > 1 && drag.key == null
+        homeMetrics?.let { hm ->
+            AnimatedVisibility(
+                canDeletePage,
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = hm.pillCenterY - hm.pillH / 2f - 14.dp - btnH),
+                enter = scaleIn(motion.bouncy(), initialScale = 0.5f) + fadeIn(motion.tween(160)),
+                exit = scaleOut(motion.tween(140), targetScale = 0.6f) + fadeOut(motion.tween(120)),
+            ) {
+                GlassButton("Bu Sayfayı Sil", settings.glassStrength, btnH) { confirmDeletePage = bridge.currentPageIds }
+            }
+        }
+        confirmDeletePage?.let { ids ->
+            val apps = ids.count { id -> layout.items.any { it.id == id && (it is AppItem || it is FolderItem) } }
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { confirmDeletePage = null },
+                title = { Text("Bu sayfa silinsin mi?") },
+                text = {
+                    Text(
+                        if (apps == 0) "Sayfada görünen bir şey yok; sayfa kaldırılacak."
+                        else "Sayfadaki uygulamalar ve klasörler silinmez, Uygulama Arşivi'nde kalır. Widget'lar kaldırılır."
+                    )
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = {
+                        vm.deletePage(ids); confirmDeletePage = null
+                    }) { Text("Sil", color = Color(0xFFFF453A)) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(onClick = { confirmDeletePage = null }) { Text("Vazgeç") }
+                },
+            )
+        }
         AnimatedVisibility(
             showEditBar,
             modifier = Modifier.align(Alignment.TopStart).offset(x = 16.dp, y = btnY),

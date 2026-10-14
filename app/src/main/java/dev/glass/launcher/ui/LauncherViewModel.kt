@@ -196,6 +196,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addWidget(w: WidgetItem) = editLayout { it.addWidget(w, currentPageStart) }
 
+    /** Ana ekranın bir sayfasını siler ([ids]: o sayfadaki öğeler). Uygulamalar arşivde kalır. */
+    fun deletePage(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val set = ids.toSet()
+        _layout.value.widgets.filter { it.id in set }.forEach { w ->
+            if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
+            if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
+        }
+        editLayout { it.removeItems(set) }
+    }
+
     fun removeWidget(w: WidgetItem) {
         if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
         if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)

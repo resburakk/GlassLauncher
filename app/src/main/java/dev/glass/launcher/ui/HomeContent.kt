@@ -318,6 +318,8 @@ internal fun HomeContent(
             bridge.goToPage = { p -> scope.launch { pagerState.animateScrollToPage(p.coerceIn(0, pagerState.pageCount - 1)) } }
             bridge.goToLastHomePage = { scope.launch { pagerState.animateScrollToPage(maxOf(pageTotal - 1, 0)) } }
             bridge.onLibrary = pagerState.currentPage == libIndex
+            bridge.homePageCount = pageTotal
+            bridge.currentPageIds = placements.filter { it.page == pagerState.currentPage }.map { it.item.id }
             vm.currentPageStart = placements.indexOfFirst { it.page == pagerState.currentPage }
                 .let { if (it < 0) items.size else it }
         }

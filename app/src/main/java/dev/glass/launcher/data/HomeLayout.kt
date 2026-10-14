@@ -174,6 +174,24 @@ data class HomeLayout(
         }
     )
 
+    /**
+     * Bir sayfayı siler: o sayfadaki öğeler ana ekrandan kalkar. Uygulamalar (klasördekiler dahil)
+     * silinmez, Uygulama Arşivi'nde kalır; widget'lar ve sayfa sonları kaldırılır.
+     */
+    fun removeItems(ids: Set<String>): HomeLayout {
+        val lib = ArrayList(libraryOnly)
+        val kept = items.filter { item ->
+            if (item.id !in ids) return@filter true
+            when (item) {
+                is AppItem -> lib += item.key
+                is FolderItem -> lib += item.keys
+                is WidgetItem, is PageBreak -> Unit
+            }
+            false
+        }
+        return HomeLayout(kept, dock, lib.distinct()).normalized()
+    }
+
     /** Uygulama Arşivi'ndeki bir uygulamayı ana ekranın sonuna ekler. */
     fun addToHome(key: String): HomeLayout {
         if (key in homeKeys) return this
