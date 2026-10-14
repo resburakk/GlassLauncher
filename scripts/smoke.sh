@@ -60,6 +60,7 @@ adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
 adb shell input swipe $((W*2/10)) $cy $((W*8/10)) $cy 250; step "önceki sayfa"
 adb shell input swipe $cx $((H*40/100)) $cx $((H*70/100)) 300; step "arama" 2
 shot 05-arama
+adb shell dumpsys input_method | grep -iE "mInputShown|mShowRequested|mServedView|mIsInputViewShown|hardKeyboard|mShowExplicitlyRequested|mShowForced" | head -8 | while IFS= read -r l; do echo "::notice::IME $l"; done
 adb shell input text "c"; step "arama yaz" 2
 shot 05b-arama-sonuc
 adb shell input text "c"; step "arama yaz" 2
