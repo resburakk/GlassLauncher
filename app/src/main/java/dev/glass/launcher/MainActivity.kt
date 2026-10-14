@@ -100,10 +100,15 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         wallpaperManager.removeOnColorsChangedListener(colorsListener)
         widgetHost.stopListening()
         super.onStop()
+        coveredByApp = true
     }
+
+    /** Launcher başka bir uygulamanın arkasında kaldı mı (onStop)? Home ile dönüşte sayfa korunur. */
+    private var coveredByApp = false
 
     override fun onResume() {
         super.onResume()
+        coveredByApp = false
         hideFromRecents()
         updateDefault()
         applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
@@ -128,7 +133,9 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         }
         // Launcher zaten öndeyken Home tuşu: iOS gibi ilk sayfaya dön, açık katmanları kapat.
         // Bir uygulamadan dönülürken (launcher henüz önde değil) sayfa korunur; dönüş efekti simgeye oturur.
-        val alreadyInFront = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        // Android, öndeki launcher'a Home iletirken onu yalnızca kısa süre duraklatır (onStop çağrılmaz);
+        // bir uygulamanın arkasında kalmışsa onStop çağrılmıştır.
+        val alreadyInFront = !coveredByApp
         if (alreadyInFront && intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) vm.onHomePressed()
     }
 
