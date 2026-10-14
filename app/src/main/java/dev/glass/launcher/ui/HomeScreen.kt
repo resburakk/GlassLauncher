@@ -11,6 +11,7 @@ import androidx.compose.material3.LocalTextStyle
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.BlurEffect
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -788,12 +789,15 @@ fun HomeScreen(
         val dk = drag.key
         if (dk != null && drag.moved) {
             val gs = drag.ghostSize
-            val gw = with(density) { (gs?.width ?: drag.iconDp).toPx() }
-            val gh = with(density) { (gs?.height ?: drag.iconDp).toPx() }
+            val group = selection.isGroupDrag(dk)
+            // Toplu sürüklemede deste ve rozet katmanın İÇİNDE kalsın diye kenar payı (saydam katman sınırda kırpar).
+            val pad = if (group) 14.dp else 0.dp
+            val gw = with(density) { ((gs?.width ?: drag.iconDp) + pad * 2f).toPx() }
+            val gh = with(density) { ((gs?.height ?: drag.iconDp) + pad * 2f).toPx() }
             Box(
                 Modifier
                     .offset { IntOffset((drag.pos.x - gw / 2f).roundToInt(), (drag.pos.y - gh / 2f).roundToInt()) }
-                    .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f; alpha = 0.94f }
+                    .graphicsLayer { scaleX = 1.08f; scaleY = 1.08f; alpha = 0.96f }
             ) {
                 val app = byKey[dk]
                 if (gs != null) {
@@ -802,25 +806,39 @@ fun HomeScreen(
                         Modifier.size(gs.width, gs.height)
                             .liquidGlass(RoundedCornerShape(widgetCorner(gs.width)), settings.glassStrength, 16.dp)
                     )
-                } else if (app != null || selection.isGroupDrag(dk)) {
-                    val n = if (selection.isGroupDrag(dk)) selection.ids.size else 1
-                    Box {
-                        // Toplu sürükleme: arkada üst üste yığılmış simgeler + sayı rozeti (iOS gibi).
-                        for (i in (minOf(n, 3) - 1) downTo 1) {
+                } else if (group) {
+                    val icon = drag.iconDp
+                    val others = selection.ids.filter { it != dk }
+                    val n = selection.ids.size
+                    val shape = appShape(icon * settings.iconCorner)
+                    Box(Modifier.size(icon + pad * 2f)) {
+                        // iOS gibi: arkada düzgün, hafif kaydırılmış ve gölgeli bir deste (en çok 2 kopya).
+                        val back = others.take(2)
+                        for (i in back.indices.reversed()) {
+                            val step = 5.dp * (i + 1)
                             Box(
-                                Modifier.offset(x = 5.dp * i, y = (-5).dp * i)
-                                    .graphicsLayer { alpha = 0.55f; rotationZ = 4f * i }
-                            ) { GhostIcon(selection.ids.getOrNull(i) ?: dk, byKey, layout, vm, drag.iconDp, settings, folderPages) }
+                                Modifier
+                                    .offset(x = pad + step, y = pad - step)
+                                    .size(icon)
+                                    .graphicsLayer { scaleX = 1f - 0.04f * (i + 1); scaleY = 1f - 0.04f * (i + 1) }
+                                    .shadow(6.dp, shape)
+                            ) { GhostIcon(back[i], byKey, layout, vm, icon, settings, folderPages) }
                         }
-                        GhostIcon(dk, byKey, layout, vm, drag.iconDp, settings, folderPages)
-                        if (n > 1) {
-                            Box(
-                                Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).size(24.dp)
-                                    .background(Color(0xFFFF3B30), CircleShape),
-                                contentAlignment = Alignment.Center,
-                            ) { Text("$n", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                        Box(Modifier.offset(x = pad, y = pad).size(icon).shadow(10.dp, shape)) {
+                            GhostIcon(dk, byKey, layout, vm, icon, settings, folderPages)
                         }
+                        // Sayı rozeti: ön simgenin sağ üst köşesinde, tamamı görünür.
+                        Box(
+                            Modifier
+                                .offset(x = pad + icon - 15.dp, y = pad - 9.dp)
+                                .size(24.dp)
+                                .shadow(3.dp, CircleShape)
+                                .background(Color(0xFFFF3B30), CircleShape),
+                            contentAlignment = Alignment.Center,
+                        ) { Text("$n", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
                     }
+                } else if (app != null) {
+                    AppIconImage(app, vm, drag.iconDp, settings.iconGlass, settings.glassStrength)
                 } else {
                     (layout.items.firstOrNull { it.id == dk } as? FolderItem)?.let {
                         FolderIcon(it, byKey, vm, drag.iconDp, settings.glassStrength, folderPages[it.id] ?: 0)

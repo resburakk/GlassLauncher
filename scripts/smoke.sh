@@ -116,6 +116,12 @@ tap_text "Seç"; step "seçim modu" 2
 adb shell input tap $ix $iy; sleep 0.6
 adb shell input tap $((W*38/100)) $iy; step "iki simge seçildi" 2
 shot 12-coklu-secim
+# Toplu sürükleme: seçili simgeyi tut, ortaya taşı, havadayken görüntü al
+adb shell input motionevent DOWN $ix $iy; sleep 0.8
+for f in 1 2 3 4 5 6; do adb shell input motionevent MOVE $((ix + (cx-ix)*f/6)) $((iy + (H*55/100-iy)*f/6)); sleep 0.08; done
+sleep 0.6
+shot 12d-toplu-surukleme
+adb shell input motionevent UP $cx $((H*55/100)); step "bırak" 2
 tap_text "Klasör Oluştur"; step "klasör oluştur" 2
 shot 12b-secimden-klasor
 adb shell input tap $ix $iy; step "seçim modunda klasörü aç" 2
