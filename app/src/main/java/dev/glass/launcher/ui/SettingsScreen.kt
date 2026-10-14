@@ -287,7 +287,9 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
     var tick by remember { mutableStateOf(0) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { tick++ }
     val la = ctx.applicationContext as dev.glass.launcher.LauncherApp
-    val granted = remember(tick) { la.wallpaperRepository.canReadSystemWallpaper() }
+    val photos = remember(tick) { la.wallpaperRepository.hasPhotosPermission() }
+    val allFiles = remember(tick) { la.wallpaperRepository.hasAllFilesAccess() }
+    val granted = photos && allFiles
     var asked by remember { mutableStateOf(false) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         tick++
@@ -298,7 +300,18 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
         ToggleRow("Sistem duvar kâğıdını cam için kullan", s.syncSystemWallpaper, default = Def.syncSystemWallpaper) { v ->
             onChange { it.copy(syncSystemWallpaper = v) }
         }
-        if (s.syncSystemWallpaper && !granted) {
+        if (s.syncSystemWallpaper && !allFiles) {
+            RowDivider()
+            NavRow("İzin ver: Tüm dosyalara erişim", Glyph.Check, Color(0xFF30D158)) {
+                runCatching {
+                    ctx.startActivity(
+                        Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+        }
+        if (s.syncSystemWallpaper && !photos) {
             RowDivider()
             NavRow("İzin ver: Fotoğraflar", Glyph.Check, Color(0xFF30D158)) {
                 if (!asked) perm.launch(android.Manifest.permission.READ_MEDIA_IMAGES)
@@ -316,7 +329,7 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
         when {
             !s.syncSystemWallpaper -> "Kapalı: cam yalnızca launcher'dan seçilen duvar kâğıdında bulanık ve kırılmalı görünür."
             granted -> "Açık: telefonun duvar kâğıdı launcher'a kopyalanır, değişince kendiliğinden güncellenir. Dock ve klasörler gerçek bulanıklık ve kırılmayla çizilir. Görüntü telefonda kalır, hiçbir yere gönderilmez."
-            else -> "Android, launcher'ın sistem duvar kâğıdını görebilmesi için Fotoğraflar iznini ister (\"Tümüne izin ver\" seçilmeli; \"Seçilenler\" yetmez). İzin vermezsen duvar kâğıdını launcher'dan (boşluğa basılı tut > Duvar Kâğıdı) seçebilirsin."
+            else -> "Android, launcher'ın sistem duvar kâğıdını görebilmesi için iki izin ister: Tüm dosyalara erişim ve Fotoğraflar (\"Tümüne izin ver\" seçilmeli). İzin vermezsen duvar kâğıdını launcher'dan (boşluğa basılı tut > Duvar Kâğıdı) seçebilirsin."
         }
     )
 }
