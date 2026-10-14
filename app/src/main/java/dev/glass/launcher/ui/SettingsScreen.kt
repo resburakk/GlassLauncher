@@ -300,6 +300,8 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             onChange { it.copy(iconCorner = v) }
         }
         RowDivider()
+        ToggleRow("Yuvarlak simgeleri kareye tamamla", s.iconFillRound) { v -> onChange { it.copy(iconFillRound = v) } }
+        RowDivider()
         ToggleRow("Cam kenar ışığı", s.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
     }
     Footer("Tek bir uygulamanın simgesini değiştirmek için simgesine basılı tutup \"Simgeyi Değiştir\"i seçin.")

@@ -35,7 +35,7 @@ import kotlin.math.sin
  */
 object IconRenderer {
 
-    fun render(d: Drawable, size: Int, style: IconStyle, tint: Int): Bitmap {
+    fun render(d: Drawable, size: Int, style: IconStyle, tint: Int, fillRound: Boolean = true): Bitmap {
         val out = createBitmap(size, size)
         val c = Canvas(out)
         if (d is AdaptiveIconDrawable) {
@@ -45,7 +45,7 @@ object IconRenderer {
             renderLegacy(c, d, size, style, tint)
         }
         // Köşeleri boş kalan (yuvarlak/şekilli) simgeler iOS gibi dolu kareye tamamlanır.
-        return if (style == IconStyle.Original) fillShape(out, size).also { if (it !== out) out.recycle() } else out
+        return if (style == IconStyle.Original && fillRound) fillShape(out, size).also { if (it !== out) out.recycle() } else out
     }
 
     /**
@@ -68,8 +68,16 @@ object IconRenderer {
             return src.getPixel(x, y) ushr 24
         }
         val dirs = (0 until 8).map { Math.toRadians(it * 45.0) }
+        val diagonals = listOf(45.0, 135.0, 225.0, 315.0).map { Math.toRadians(it) }
         val ratio = box.width().toFloat() / box.height().coerceAtLeast(1)
-        val round = ratio in 0.9f..1.1f && dirs.all { alphaAt(it, 0.9f) > 200 }
+        // Gerçek daire: kenara yakın her yön dolu, AMA köşegende dairenin dışı (1.2r) boş.
+        // Yuvarlak köşeli karelerde köşegen dışı da doludur; onlar daire sayılmaz.
+        val round = ratio in 0.9f..1.1f &&
+            dirs.all { alphaAt(it, 0.9f) > 200 } &&
+            diagonals.all { alphaAt(it, 1.2f) < 60 }
+        // Yuvarlak köşeli kare (kareyi neredeyse dolduruyor): hiç dokunulmaz, eskisi gibi gösterilir.
+        val nearlyFull = box.width() >= size * 0.9f && box.height() >= size * 0.9f
+        if (!round && nearlyFull && diagonals.all { alphaAt(it, 1.2f) > 200 }) return src
 
         // Zemin rengi: kenar halkasının hemen içinden örneklenen en yaygın renk (bulunamazsa beyaz).
         val samples = (0 until 16).mapNotNull { i ->

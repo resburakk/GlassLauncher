@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Simge görünümünü belirleyen ayarlar (önbellek anahtarının parçası). */
-data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?)
+data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?, val fillRound: Boolean = true)
 
 /**
  * Sınırlı boyutlu simge önbelleği. Bitmap'ler ekrandaki gerçek boyutta üretilir (büyük bitmap yok);
@@ -26,7 +26,7 @@ class IconCache(private val context: Context) {
     private val iconDir: File get() = File(context.filesDir, "icons").apply { mkdirs() }
 
     suspend fun get(app: AppInfo, sizePx: Int, look: IconLook): ImageBitmap {
-        val k = "${app.key}@$sizePx/${look.style}/${look.tint}/${look.customFile}"
+        val k = "${app.key}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}"
         cache.get(k)?.let { return it }
         val bmp = withContext(Dispatchers.Default) {
             val custom = look.customFile?.let { f ->
@@ -35,7 +35,10 @@ class IconCache(private val context: Context) {
             if (custom != null) {
                 IconRenderer.renderCustom(custom, sizePx).also { custom.recycle() }
             } else {
-                IconRenderer.render(app.activityInfo.getIcon(0), sizePx, look.style, look.tint)
+                // En yüksek çözünürlüklü simge kaynağı istenir; ekrandaki boyuta yüksek kaliteyle küçültülür (daha net).
+                val d = runCatching { app.activityInfo.getIcon(android.util.DisplayMetrics.DENSITY_XXXHIGH) }.getOrNull()
+                    ?: app.activityInfo.getIcon(0)
+                IconRenderer.render(d, sizePx, look.style, look.tint, look.fillRound)
             }.asImageBitmap()
         }
         cache.put(k, bmp)

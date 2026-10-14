@@ -112,7 +112,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     // --- Simgeler ---
 
     fun iconLook(app: AppInfo, s: LauncherSettings): IconLook =
-        IconLook(s.iconStyle, s.tintColor, s.customIcons[app.key])
+        IconLook(s.iconStyle, s.tintColor, s.customIcons[app.key], s.iconFillRound)
 
     fun setCustomIcon(app: AppInfo, uri: Uri) {
         viewModelScope.launch {

@@ -1,5 +1,6 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
@@ -523,7 +524,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     val look = vm.iconLook(app, st)
     val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
     Box(Modifier.size(icon).glassIcon(RoundedCornerShape(icon * st.iconCorner), glass, strength)) {
-        bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize()) }
+        bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
     }
 }
 
