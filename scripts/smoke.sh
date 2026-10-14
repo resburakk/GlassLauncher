@@ -110,6 +110,15 @@ tap_text "Uygula"; step "sıralamayı uygula" 2
 shot 09c-siralama-uygulandi
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 10-siralama-sonrasi
+# Çoklu seçim: düzenleme modu > Seç > iki simge > Klasör Oluştur
+adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
+tap_text "Seç"; step "seçim modu" 2
+adb shell input tap $ix $iy; sleep 0.6
+adb shell input tap $((W*38/100)) $iy; step "iki simge seçildi" 2
+shot 12-coklu-secim
+tap_text "Klasör Oluştur"; step "klasör oluştur" 2
+shot 12b-secimden-klasor
+adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # Galeriden "Farklı ayarla" penceresi (ATTACH_DATA)
 adb shell am start -a android.intent.action.ATTACH_DATA -t image/png -d content://media/external/images/media/1 -n dev.glass.launcher/.WallpaperImportActivity; step "farklı ayarla" 3

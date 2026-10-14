@@ -192,6 +192,64 @@ data class HomeLayout(
         return HomeLayout(kept, dock, lib.distinct()).normalized()
     }
 
+    // --- Çoklu seçim (toplu işlemler). [ids]: ana ekrandaki öğe kimlikleri (uygulama anahtarı / klasör kimliği). ---
+
+    /** Seçili öğelerin içerdiği uygulama anahtarları (klasörler açılır), ızgaradaki sırayla. */
+    fun appKeysOf(ids: Collection<String>): List<String> {
+        val set = ids.toSet()
+        return items.filter { it.id in set }.flatMap { item ->
+            when (item) {
+                is AppItem -> listOf(item.key)
+                is FolderItem -> item.keys
+                is WidgetItem, is PageBreak -> emptyList()
+            }
+        }
+    }
+
+    /** Seçili öğeleri sıralarını koruyarak birlikte [toIndex] konumuna taşır ([toIndex], seçilenler çıkarılmış listede). */
+    fun moveGroup(ids: Collection<String>, toIndex: Int): HomeLayout {
+        val set = ids.toSet()
+        val moving = items.filter { it.id in set }
+        if (moving.isEmpty()) return this
+        val rest = items.filter { it.id !in set }.toMutableList()
+        rest.addAll(toIndex.coerceIn(0, rest.size), moving)
+        return copy(items = rest)
+    }
+
+    /**
+     * Seçili öğelerden yeni klasör oluşturur (klasörlerin içindekiler de girer). Klasör [anchorId] öğesinin
+     * yerine (yoksa seçilenlerin ilkinin yerine) konur.
+     */
+    fun createFolderFrom(ids: Collection<String>, name: String, anchorId: String? = null): HomeLayout {
+        val keys = appKeysOf(ids).distinct()
+        if (keys.isEmpty()) return this
+        val set = ids.toSet()
+        val anchor = anchorId?.takeIf { a -> items.any { it.id == a } } ?: items.firstOrNull { it.id in set }?.id
+        val folder = FolderItem(UUID.randomUUID().toString(), name, keys)
+        val out = ArrayList<HomeItem>()
+        var placed = false
+        for (item in items) {
+            if (item.id == anchor) { out += folder; placed = true; continue }
+            if (item.id in set) continue
+            out += item
+        }
+        if (!placed) out += folder
+        val keySet = keys.toSet()
+        return HomeLayout(out, dock - keySet, libraryOnly - keySet).normalized()
+    }
+
+    /** Seçili uygulamaları (klasörlerin içindekiler dahil) mevcut [folderId] klasörünün sonuna taşır. */
+    fun moveIntoFolder(folderId: String, ids: Collection<String>): HomeLayout {
+        val target = items.firstOrNull { it.id == folderId } as? FolderItem ?: return this
+        val set = ids.toSet() - folderId
+        val keys = appKeysOf(set).filter { it !in target.keys }.distinct()
+        if (keys.isEmpty()) return this
+        val out = items.filter { it.id !in set }.map {
+            if (it.id == folderId) target.copy(keys = target.keys + keys) else it
+        }
+        return copy(items = out).normalized()
+    }
+
     /** Uygulama Arşivi'ndeki bir uygulamayı ana ekranın sonuna ekler. */
     fun addToHome(key: String): HomeLayout {
         if (key in homeKeys) return this

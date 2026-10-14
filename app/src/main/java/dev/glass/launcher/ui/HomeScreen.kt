@@ -100,6 +100,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.glass.launcher.data.FolderItem
 import dev.glass.launcher.data.AppItem
+import dev.glass.launcher.data.AppInfo
+import dev.glass.launcher.data.HomeLayout
+import dev.glass.launcher.data.LauncherSettings
 import kotlin.math.roundToInt
 
 enum class Overlay { None, Search, Settings, Folder, Menu, Group, Widgets, LockPrompt }
@@ -158,6 +161,9 @@ fun HomeScreen(
 
     var overlay by remember { mutableStateOf(Overlay.None) }
     var editMode by remember { mutableStateOf(false) }
+    val selection = remember { SelectionState() }
+    // Düzenleme modundan çıkınca seçim de biter.
+    LaunchedEffect(editMode) { if (!editMode) selection.end() }
     var openFolderId by remember { mutableStateOf<String?>(null) }
     var folderOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     var menu by remember { mutableStateOf<MenuRequest?>(null) }
@@ -221,7 +227,9 @@ fun HomeScreen(
     BackHandler(enabled = true) {
         if (wallpaperSheet) wallpaperSheet = false
         else if (folderMenu != null) folderMenu = null
-        else if (overlay != Overlay.None) closeOverlay() else if (editMode) editMode = false
+        else if (overlay != Overlay.None) closeOverlay()
+        else if (selection.active) selection.end()
+        else if (editMode) editMode = false
     }
 
     LaunchedEffect(openSettingsRequest) {
@@ -454,6 +462,7 @@ fun HomeScreen(
                 onOpenFolder = { f, c -> openFolderAt(f, c) },
                 onOpenGroup = { g -> group = g; overlay = Overlay.Group },
                 libProgress = libProgress,
+                selection = selection,
             )
         }
         }
@@ -661,17 +670,47 @@ fun HomeScreen(
         val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet
         // "Bu Sayfayı Sil": birden çok sayfa varken, arama hapının hemen üstünde.
         var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }
-        val canDeletePage = showEditBar && !bridge.onLibrary && bridge.homePageCount > 1 && drag.key == null
+        val bottomBar = showEditBar && !bridge.onLibrary && drag.key == null && !selection.active
+        val canDeletePage = bridge.homePageCount > 1
         homeMetrics?.let { hm ->
             AnimatedVisibility(
-                canDeletePage,
+                bottomBar,
                 modifier = Modifier.align(Alignment.TopCenter).offset(y = hm.pillCenterY - hm.pillH / 2f - 14.dp - btnH),
                 enter = scaleIn(motion.bouncy(), initialScale = 0.5f) + fadeIn(motion.tween(160)),
                 exit = scaleOut(motion.tween(140), targetScale = 0.6f) + fadeOut(motion.tween(120)),
             ) {
-                GlassButton("Bu Sayfayı Sil", settings.glassStrength, btnH) { confirmDeletePage = bridge.currentPageIds }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GlassButton("Seç", settings.glassStrength, btnH) { selection.start() }
+                    if (canDeletePage) {
+                        GlassButton("Bu Sayfayı Sil", settings.glassStrength, btnH) { confirmDeletePage = bridge.currentPageIds }
+                    }
+                }
             }
         }
+        // Çoklu seçim işlem çubuğu
+        val selIds = selection.ids.toList()
+        SelectionBar(
+            visible = editMode && selection.active && overlay == Overlay.None && drag.key == null,
+            count = selIds.size,
+            appCount = layout.appKeysOf(selIds).distinct().size,
+            folders = layout.items.filterIsInstance<FolderItem>().filter { it.id !in selIds }.map { it.id to it.name },
+            onCreateFolder = {
+                val ids = selection.ids.toList()
+                vm.editLayout { l -> l.createFolderFrom(ids, vm.folderNameFor(l.appKeysOf(ids))) }
+                selection.ids.clear()
+            },
+            onMoveInto = { fid ->
+                val ids = selection.ids.toList()
+                vm.editLayout { it.moveIntoFolder(fid, ids) }
+                selection.ids.clear()
+            },
+            onRemove = {
+                val ids = selection.ids.toList()
+                vm.deletePage(ids)
+                selection.ids.clear()
+            },
+            onDone = { selection.end() },
+        )
         confirmDeletePage?.let { ids ->
             val apps = ids.count { id -> layout.items.any { it.id == id && (it is AppItem || it is FolderItem) } }
             androidx.compose.material3.AlertDialog(
@@ -757,8 +796,25 @@ fun HomeScreen(
                         Modifier.size(gs.width, gs.height)
                             .liquidGlass(RoundedCornerShape(widgetCorner(gs.width)), settings.glassStrength, 16.dp)
                     )
-                } else if (app != null) {
-                    AppIconImage(app, vm, drag.iconDp, settings.iconGlass, settings.glassStrength)
+                } else if (app != null || selection.isGroupDrag(dk)) {
+                    val n = if (selection.isGroupDrag(dk)) selection.ids.size else 1
+                    Box {
+                        // Toplu sürükleme: arkada üst üste yığılmış simgeler + sayı rozeti (iOS gibi).
+                        for (i in (minOf(n, 3) - 1) downTo 1) {
+                            Box(
+                                Modifier.offset(x = 5.dp * i, y = (-5).dp * i)
+                                    .graphicsLayer { alpha = 0.55f; rotationZ = 4f * i }
+                            ) { GhostIcon(selection.ids.getOrNull(i) ?: dk, byKey, layout, vm, drag.iconDp, settings, folderPages) }
+                        }
+                        GhostIcon(dk, byKey, layout, vm, drag.iconDp, settings, folderPages)
+                        if (n > 1) {
+                            Box(
+                                Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-8).dp).size(24.dp)
+                                    .background(Color(0xFFFF3B30), CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) { Text("$n", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+                        }
+                    }
                 } else {
                     (layout.items.firstOrNull { it.id == dk } as? FolderItem)?.let {
                         FolderIcon(it, byKey, vm, drag.iconDp, settings.glassStrength, folderPages[it.id] ?: 0)
@@ -857,6 +913,22 @@ private fun LockPrompt(
                 Text("Vazgeç", color = Color.White, fontSize = 15.sp,
                     modifier = Modifier.clickable(onClick = onClose).padding(8.dp))
             }
+        }
+    }
+}
+
+/** Sürükleme hayaletinde bir öğenin simgesi (uygulama veya klasör). */
+@Composable
+private fun GhostIcon(
+    id: String, byKey: Map<String, AppInfo>, layout: HomeLayout, vm: LauncherViewModel, size: Dp,
+    settings: LauncherSettings, folderPages: Map<String, Int>,
+) {
+    val app = byKey[id]
+    if (app != null) {
+        AppIconImage(app, vm, size, settings.iconGlass, settings.glassStrength)
+    } else {
+        (layout.items.firstOrNull { it.id == id } as? FolderItem)?.let {
+            FolderIcon(it, byKey, vm, size, settings.glassStrength, folderPages[it.id] ?: 0)
         }
     }
 }

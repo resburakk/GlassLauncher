@@ -113,6 +113,8 @@ internal fun HomeContent(
     onOpenSearch: () -> Unit,
     onOpenFolder: (FolderItem, Offset) -> Unit,
     onOpenGroup: (LibraryGroup) -> Unit,
+    /** Çoklu seçim durumu (düzenleme modunda "Seç"). */
+    selection: SelectionState,
     /** Arşive geçiş oranı (0 = ana ekran, 1 = arşiv); arka plan bulanıklığı için üst bileşen okur. */
     libProgress: MutableFloatState,
 ) {
@@ -182,6 +184,16 @@ internal fun HomeContent(
             // Kısa bekleme: simge merkezine (klasör hedefine) yönelen parmak düzeni hemen bozmasın.
             delay((260 / motion.speed).toLong())
             val cur = vm.layout.value
+            if (selection.isGroupDrag(dragKey)) {
+                // Toplu sürükleme: seçilenler birlikte yer açar (dock'a konmaz).
+                val ids = selection.ids.toSet()
+                val rest = cur.items.filter { it.id !in ids }
+                if (cell.page < 0) { preview = rest; dockPreview = null; return@LaunchedEffect }
+                dockPreview = null
+                val gi = GridPacker.insertionIndex(GridPacker.pack(rest, m.columns, m.rows, visible), cell.page, cell.row, cell.col, m.columns)
+                preview = rest.toMutableList().apply { addAll(gi.coerceIn(0, size), cur.items.filter { it.id in ids }) }
+                return@LaunchedEffect
+            }
             val without = cur.items.filter { it.id != dragKey }
             if (cell.page < 0) {
                 // Dock üzerinde: ızgaradaki boşluk kapanır; dock'ta yer varsa simgeler kayar.
@@ -275,6 +287,32 @@ internal fun HomeContent(
         fun handleDrop(id: String, pos: Offset, hover: String?) {
             if (pagerState.currentPage >= libIndex) return // arşiv sayfasına bırakma: değişiklik yok
             val cur = vm.layout.value
+            if (selection.isGroupDrag(id)) {
+                val ids = selection.ids.toList()
+                // Dock'a toplu bırakma yok.
+                if (dockRect.height > 0f && pos.y >= dockRect.top - with(density) { 12.dp.toPx() }) return
+                // Seçili olmayan bir simge/klasörün üzerine: hepsi o klasöre ya da yeni klasöre.
+                if (hover != null && hover !in ids) {
+                    val target = cur.items.firstOrNull { it.id == hover }
+                    when (target) {
+                        is FolderItem -> vm.editLayout { it.moveIntoFolder(hover, ids) }
+                        is AppItem -> vm.editLayout { l -> l.createFolderFrom(ids + hover, vm.folderNameFor(l.appKeysOf(ids + hover)), hover) }
+                        else -> return
+                    }
+                    selection.ids.clear()
+                    return
+                }
+                val iconPxG = with(density) { m.icon.toPx() }
+                val pxG = with(density) { m.pitchX.toPx() }
+                val pyG = with(density) { m.pitchY.toPx() }
+                val mxG = with(density) { m.marginX.toPx() }
+                val colG = floor((pos.x - gridOrigin.x - mxG + (pxG - iconPxG) / 2f) / pxG).toInt().coerceIn(0, m.columns - 1)
+                val rowG = floor((pos.y - gridOrigin.y - firstTopPx) / pyG).toInt().coerceIn(0, m.rows - 1)
+                val rest = cur.items.filter { it.id !in ids.toSet() }
+                val gi = GridPacker.insertionIndex(GridPacker.pack(rest, m.columns, m.rows, visible), pagerState.currentPage, rowG, colG, m.columns)
+                vm.editLayout { it.moveGroup(ids, gi) }
+                return
+            }
             val isApp = byKey.containsKey(id)
             val topLevel = cur.items.any { it.id == id }
 
@@ -363,8 +401,12 @@ internal fun HomeContent(
                                         icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                         drag = drag, layer = DragLayer.Home, isApp = true,
                                         acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                        onClick = { r -> if (!edit) launchFrom(app, r) },
+                                        onClick = { r ->
+                                            if (selection.active) selection.toggle(item.id) else if (!edit) launchFrom(app, r)
+                                        },
                                         onDrop = { p, h -> handleDrop(item.id, p, h) },
+                                        selected = if (selection.active) item.id in selection.ids else null,
+                                        hidden = selection.isGroupDrag(drag.key) && item.id in selection.ids,
                                     ) { AppIconImage(app, vm, m.icon, settings.iconGlass, settings.glassStrength) }
                                 }
                             }
@@ -374,8 +416,10 @@ internal fun HomeContent(
                                 icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                 drag = drag, layer = DragLayer.Home, isApp = false,
                                 acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                onClick = { r -> onOpenFolder(item, r.center) },
+                                onClick = { r -> if (selection.active) selection.toggle(item.id) else onOpenFolder(item, r.center) },
                                 onDrop = { p, h -> handleDrop(item.id, p, h) },
+                                selected = if (selection.active) item.id in selection.ids else null,
+                                hidden = selection.isGroupDrag(drag.key) && item.id in selection.ids,
                             ) {
                                 FolderIcon(
                                     item, byKey, vm, m.icon, settings.glassStrength * settings.folderOpacity,

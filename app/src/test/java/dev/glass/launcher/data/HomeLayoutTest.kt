@@ -120,4 +120,22 @@ class HomeLayoutTest {
         assertEquals(setOf("a", "d"), l.homeKeys)
         assertFalse("w" in l.homeKeys)
     }
+
+    @Test fun multiSelect_groupMove_folderCreate_moveInto() {
+        val base = HomeLayout(
+            items = listOf(AppItem("a"), AppItem("b"), FolderItem("f", "F", listOf("x", "y")), AppItem("c"), AppItem("d")),
+        )
+        // b ve d birlikte en başa
+        val moved = base.moveGroup(listOf("d", "b"), 0)
+        assertEquals(listOf("b", "d", "a", "f", "c"), moved.items.map { it.id })
+        // a + klasör f → yeni klasör a'nın yerinde, f'nin içindekiler de girer
+        val made = base.createFolderFrom(listOf("a", "f"), "Yeni")
+        val nf = made.items[0] as FolderItem
+        assertEquals(listOf("a", "x", "y"), nf.keys)
+        assertEquals(listOf(nf.id, "b", "c", "d"), made.items.map { it.id })
+        // c ve d klasör f'ye
+        val into = base.moveIntoFolder("f", listOf("c", "d"))
+        assertEquals(listOf("x", "y", "c", "d"), (into.items.first { it.id == "f" } as FolderItem).keys)
+        assertEquals(listOf("a", "b", "f"), into.items.map { it.id })
+    }
 }

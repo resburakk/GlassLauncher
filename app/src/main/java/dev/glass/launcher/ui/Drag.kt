@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -289,6 +290,10 @@ internal fun DraggableCell(
     jiggle: State<Float>,
     onClick: (Rect) -> Unit,
     onDrop: (Offset, String?) -> Unit,
+    /** Çoklu seçim: null = seçim modu kapalı; true/false = işaret dolu/boş. */
+    selected: Boolean? = null,
+    /** Toplu sürüklemede seçili diğer simgeler yerinde gizlenir (hayalette birlikte taşınır). */
+    hidden: Boolean = false,
     iconContent: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -338,7 +343,7 @@ internal fun DraggableCell(
                     target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
                 }
                 .graphicsLayer {
-                    alpha = if (drag.key == itemId) 0f else dim
+                    alpha = if (drag.key == itemId || hidden) 0f else dim
                     scaleX = scale
                     scaleY = scale
                     rotationZ = if (edit) jiggle.value * sign else 0f
@@ -348,7 +353,15 @@ internal fun DraggableCell(
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            iconContent()
+            Box {
+                iconContent()
+                if (selected != null) {
+                    SelectBadge(
+                        selected, icon * 0.36f,
+                        Modifier.align(Alignment.BottomEnd).offset(x = icon * 0.08f, y = icon * 0.08f),
+                    )
+                }
+            }
             if (showLabel) {
                 val st = LocalLauncherSettings.current
                 val pt = LocalPt.current

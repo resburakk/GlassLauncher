@@ -196,6 +196,12 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun addWidget(w: WidgetItem) = editLayout { it.addWidget(w, currentPageStart) }
 
+    /** Yeni klasör adı: uygulamaların hepsi aynı türdeyse o türün adı (ör. "Sosyal"), değilse "Klasör". */
+    fun folderNameFor(keys: List<String>): String {
+        val cats = keys.mapNotNull { k -> repo.apps.value.firstOrNull { it.key == k }?.category }.distinct()
+        return cats.singleOrNull()?.takeIf { it != AppCategory.Other }?.title ?: "Klasör"
+    }
+
     /** Ana ekranın bir sayfasını siler ([ids]: o sayfadaki öğeler). Uygulamalar arşivde kalır. */
     fun deletePage(ids: List<String>) {
         if (ids.isEmpty()) return
