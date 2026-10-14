@@ -18,6 +18,9 @@ import dev.glass.launcher.data.AppCategory
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.HomeLayout
 import dev.glass.launcher.data.IosDefaultLayout
+import dev.glass.launcher.data.WallpaperApplier
+import dev.glass.launcher.data.WallpaperTarget
+import kotlinx.coroutines.flow.drop
 import dev.glass.launcher.data.LauncherSettings
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -167,14 +170,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     val degraded: StateFlow<Boolean> = _degraded
     fun reportSlowFrames() { _degraded.value = true }
 
-    fun setWallpaper(uri: Uri, alsoSystem: Boolean) {
+    /** Görseli seçilen yere (ana ekran / kilit / ikisi) uygular; launcher ve sistem duvar kâğıdı birlikte değişir. */
+    fun setWallpaper(uri: Uri, target: WallpaperTarget) {
         viewModelScope.launch {
-            if (la.wallpaperRepository.save(uri)) {
-                _wallpaper.value = la.wallpaperRepository.load()
-                _blurred.value = la.wallpaperRepository.loadBlurred()
-                la.settingsStore.update { it.copy(launcherWallpaper = true) }
-                if (alsoSystem) la.wallpaperRepository.applyToSystem()
-            }
+            val msg = WallpaperApplier.apply(la, uri, target)
+            android.widget.Toast.makeText(la, msg, android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -287,5 +287,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     // (Daha önce başta çağrılıyordu; coroutine ilklendirilmemiş alanı yakalayıp açılışta çöküyordu.)
     init {
         reloadWallpaper()
+        // Duvar kâğıdı başka yerden (galeri "Farklı ayarla", ayarlar) değişince yeniden yükle.
+        viewModelScope.launch { la.wallpaperRepository.version.drop(1).collect { reloadWallpaper() } }
     }
 }

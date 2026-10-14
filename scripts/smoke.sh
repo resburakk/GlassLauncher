@@ -16,6 +16,15 @@ W=${size%x*}; H=${size#*x}
 cx=$((W/2)); cy=$((H/2))
 ix=$((W*15/100)); iy=$((H*14/100))
 
+# Ekrandaki bir yazının merkezine dokun (uiautomator dökümünden)
+tap_text() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  set -- $b
+  if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
+  echo "::warning::Ekranda bulunamadı: $1"; return 1
+}
+
 shot 01-ana-ekran
 
 # 1) Uzun basma: menü parmak ekrandayken açılmalı
@@ -32,6 +41,9 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 # 2) Boş alana uzun bas: düzenleme modu ve düğmeler
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
 shot 04-duzenleme
+tap_text "Duvar Kâğıdı"; step "duvar kâğıdı paneli" 2
+shot 04w-duvar-kagidi-paneli
+adb shell input keyevent KEYCODE_BACK; step "paneli kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # 3) Uzun bas + sürükle
@@ -91,20 +103,17 @@ adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_HOME; st
 # 8) Ayarlar
 adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 4
 shot 09-ayarlar
-# Ekrandaki bir yazının merkezine dokun (uiautomator dökümünden)
-tap_text() {
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
-  set -- $b
-  if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
-  echo "::warning::Ekranda bulunamadı: $1"; return 1
-}
 tap_text "Varsayılan uygulama sıralaması"; step "sıralama düğmesi" 2
 shot 09b-siralama-onay
 tap_text "Uygula"; step "sıralamayı uygula" 2
 shot 09c-siralama-uygulandi
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 10-siralama-sonrasi
+
+# Galeriden "Farklı ayarla" penceresi (ATTACH_DATA)
+adb shell am start -a android.intent.action.ATTACH_DATA -t image/png -d content://media/external/images/media/1 -n dev.glass.launcher/.WallpaperImportActivity; step "farklı ayarla" 3
+shot 11-farkli-ayarla
+adb shell input keyevent KEYCODE_BACK; step "geri"
 
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -12 | while IFS= read -r line; do echo "::notice::DIAG $line"; done

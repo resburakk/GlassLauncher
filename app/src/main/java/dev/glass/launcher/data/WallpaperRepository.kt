@@ -8,6 +8,8 @@ import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -20,6 +22,10 @@ class Blurred(val image: ImageBitmap, val srcW: Int, val srcH: Int)
  */
 class WallpaperRepository(private val context: Context) {
     private val file get() = File(context.filesDir, "wallpaper.img")
+
+    private val _version = MutableStateFlow(0)
+    /** Launcher duvar kâğıdı her değiştiğinde artar (ör. galeriden "Farklı ayarla" ile); ana ekran yeniden yükler. */
+    val version: StateFlow<Int> = _version
 
     suspend fun load(): ImageBitmap? = withContext(Dispatchers.IO) {
         val f = file
@@ -44,10 +50,10 @@ class WallpaperRepository(private val context: Context) {
                 tmp.outputStream().use { input.copyTo(it) }
             }
             tmp.renameTo(file)
-        }.getOrDefault(false)
+        }.getOrDefault(false).also { if (it) _version.value++ }
     }
 
-    suspend fun clear() = withContext(Dispatchers.IO) { file.delete() }
+    suspend fun clear() = withContext(Dispatchers.IO) { file.delete().also { _version.value++ } }
 
     /**
      * Cam yüzeyler için önceden bulanıklaştırılmış küçük kopya (bir kez üretilir, çizimde ölçeklenir).
@@ -73,10 +79,14 @@ class WallpaperRepository(private val context: Context) {
     }
 
     /** Kopyalanan görseli sistem duvar kâğıdı (ana ekran) olarak da ayarlar. SET_WALLPAPER izni gerekir. */
-    suspend fun applyToSystem(): Boolean = withContext(Dispatchers.IO) {
+    suspend fun applyToSystem(
+        flags: Int = WallpaperManager.FLAG_SYSTEM,
+        source: Uri? = null,
+    ): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val wm = context.getSystemService(WallpaperManager::class.java)
-            file.inputStream().use { wm.setStream(it, null, true, WallpaperManager.FLAG_SYSTEM) }
+            val input = if (source != null) context.contentResolver.openInputStream(source)!! else file.inputStream()
+            input.use { wm.setStream(it, null, true, flags) }
             true
         }.getOrDefault(false)
     }

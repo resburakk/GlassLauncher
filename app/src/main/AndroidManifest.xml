@@ -98,6 +98,23 @@
                 android:resource="@xml/lock_service" />
         </service>
 
+        <!-- Galeride bir görseli açıp ⋮ > "Farklı ayarla" (ATTACH_DATA) ile launcher duvar kâğıdı yapmak. -->
+        <activity
+            android:name=".WallpaperImportActivity"
+            android:exported="true"
+            android:label="@string/wallpaper_import_label"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@style/Theme.GlassLauncher.Import"
+            android:excludeFromRecents="true"
+            android:taskAffinity="dev.glass.launcher.import"
+            android:launchMode="standard">
+            <intent-filter android:label="@string/wallpaper_import_label">
+                <action android:name="android.intent.action.ATTACH_DATA" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
         <!-- Uygulama listesinde "Glass Ayarları" olarak görünür: ayarları açar (launcher varsayılan değilken de). -->
         <activity-alias
             android:name=".SettingsEntry"

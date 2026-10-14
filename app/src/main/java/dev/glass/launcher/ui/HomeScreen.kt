@@ -208,8 +208,14 @@ fun HomeScreen(
         folderMenu = null
     }
 
+    var wallpaperSheet by remember { mutableStateOf(false) }
+    val wallpaperPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) vm.setWallpaper(uri, dev.glass.launcher.data.WallpaperTarget.of(settings.wallpaperTarget))
+    }
+
     BackHandler(enabled = true) {
-        if (folderMenu != null) folderMenu = null
+        if (wallpaperSheet) wallpaperSheet = false
+        else if (folderMenu != null) folderMenu = null
         else if (overlay != Overlay.None) closeOverlay() else if (editMode) editMode = false
     }
 
@@ -647,7 +653,7 @@ fun HomeScreen(
         // yayla açılır; arkaları yalnızca kendileri bulanık cam.
         val btnH = 30.dp
         val btnY = homeMetrics?.let { (statusTopDp + it.firstTop) / 2f - btnH / 2f } ?: (statusTopDp + 8.dp)
-        val showEditBar = editMode && overlay == Overlay.None
+        val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet
         AnimatedVisibility(
             showEditBar,
             modifier = Modifier.align(Alignment.TopStart).offset(x = 16.dp, y = btnY),
@@ -656,6 +662,7 @@ fun HomeScreen(
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GlassButton("+", settings.glassStrength, btnH) { overlay = Overlay.Widgets }
+                GlassButton("Duvar Kâğıdı", settings.glassStrength, btnH) { wallpaperSheet = true }
                 GlassButton("Ayarlar", settings.glassStrength, btnH) { overlay = Overlay.Settings }
             }
         }
@@ -668,6 +675,30 @@ fun HomeScreen(
             GlassButton("Bitti", settings.glassStrength, btnH) { editMode = false }
         }
         }
+
+        // Duvar kâğıdı paneli (düzenleme modunda "Duvar Kâğıdı" ile alttan açılır)
+        WallpaperSheet(
+            visible = wallpaperSheet,
+            target = dev.glass.launcher.data.WallpaperTarget.of(settings.wallpaperTarget),
+            strength = settings.glassStrength,
+            hasLauncherWallpaper = settings.launcherWallpaper,
+            onTarget = { t -> vm.updateSettings { it.copy(wallpaperTarget = t.code) } },
+            onPick = {
+                wallpaperSheet = false
+                wallpaperPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onSystem = {
+                wallpaperSheet = false
+                runCatching {
+                    context.startActivity(
+                        Intent.createChooser(Intent(Intent.ACTION_SET_WALLPAPER), "Duvar kâğıdı")
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            },
+            onRemove = { wallpaperSheet = false; vm.clearWallpaper() },
+            onClose = { wallpaperSheet = false },
+        )
 
         // Sürüklenen öğenin hayalet simgesi (tüm katmanların üstünde)
         val dk = drag.key

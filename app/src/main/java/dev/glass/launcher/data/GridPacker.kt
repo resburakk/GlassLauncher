@@ -18,7 +18,24 @@ object GridPacker {
         else -> 1 to 1
     }
 
-    fun pack(items: List<HomeItem>, columns: Int, rows: Int): List<Placement> {
+    /**
+     * [visible]: ekranda gerçekten görünen öğeler. İçinde görünen hiçbir öğe kalmayan sayfalar
+     * otomatik silinir (sonraki sayfalar kayar), böylece boş sayfa oluşmaz.
+     */
+    fun pack(items: List<HomeItem>, columns: Int, rows: Int, visible: (HomeItem) -> Boolean = { true }): List<Placement> =
+        compact(packRaw(items, columns, rows), visible)
+
+    private fun compact(pl: List<Placement>, visible: (HomeItem) -> Boolean): List<Placement> {
+        val kept = pl.filter { it.item !is PageBreak && visible(it.item) }.map { it.page }.toSortedSet()
+        if (kept.isEmpty()) return pl.map { it.copy(page = 0) }
+        val maxPage = pl.maxOf { it.page }
+        if (kept.size == maxPage + 1) return pl
+        // Eski sayfa → yeni sayfa: boş sayfalar bir sonraki dolu sayfayla birleşir.
+        val map = IntArray(maxPage + 1) { p -> kept.headSet(p).size.coerceAtMost(kept.size - 1) }
+        return pl.map { it.copy(page = map[it.page]) }
+    }
+
+    private fun packRaw(items: List<HomeItem>, columns: Int, rows: Int): List<Placement> {
         val out = ArrayList<Placement>(items.size)
         var page = 0
         var occupied = Array(rows) { BooleanArray(columns) }

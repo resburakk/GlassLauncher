@@ -83,4 +83,14 @@ class GridPackerTest {
         val full = GridPacker.pack((1..4).map { a("$it") } + PageBreak("b") + a("5"), 2, 2)
         assertEquals(1, full[5].page); assertEquals(2, GridPacker.pageCount(full))
     }
+
+    @Test fun pagesWithOnlyInvisibleItems_areRemoved() {
+        val items = (1..4).map { a("$it") } + a("gone") + (5..6).map { a("$it") }
+        // 2×2: sayfa 0 = 1-4, sayfa 1 = gone,5,6 → "gone" görünmez ama sayfa 1 dolu kalır
+        val p = GridPacker.pack(items, 2, 2) { it !is AppItem || it.key != "gone" }
+        assertEquals(2, GridPacker.pageCount(p))
+        // Yalnızca görünmez öğe olan sayfa silinir
+        val q = GridPacker.pack((1..4).map { a("$it") } + a("gone"), 2, 2) { it !is AppItem || it.key != "gone" }
+        assertEquals(1, GridPacker.pageCount(q))
+    }
 }

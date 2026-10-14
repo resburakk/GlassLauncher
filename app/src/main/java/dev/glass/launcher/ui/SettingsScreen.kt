@@ -542,6 +542,12 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             onChange { it.copy(iconRimGlow = v) }
         }
         RowDivider()
+        SliderRow(
+            "Simge kenar çizgisi kalınlığı",
+            if (s.iconRimWidth < 0.05f) "Yok" else String.format(java.util.Locale("tr"), "%.1f pt", s.iconRimWidth),
+            s.iconRimWidth, 0f..3f, default = Def.iconRimWidth,
+        ) { v -> onChange { it.copy(iconRimWidth = v) } }
+        RowDivider()
         ToggleRow("Yuvarlak simgeleri kareye tamamla", s.iconFillRound, default = Def.iconFillRound) { v -> onChange { it.copy(iconFillRound = v) } }
         RowDivider()
         ToggleRow("Cam kenar ışığı", s.iconGlass, default = Def.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
@@ -652,18 +658,27 @@ private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
 @Composable
 private fun WallpaperPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     val ctx = LocalContext.current
-    var alsoSystem by rememberSaveable { mutableStateOf(true) }
+    val target = dev.glass.launcher.data.WallpaperTarget.of(s.wallpaperTarget)
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) vm.setWallpaper(uri, alsoSystem)
+        if (uri != null) vm.setWallpaper(uri, target)
+    }
+    Group("Uygulanacak yer") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            dev.glass.launcher.data.WallpaperTarget.entries.forEach { t ->
+                Chip(t.title, target == t, Modifier.weight(1f)) { onChange { it.copy(wallpaperTarget = t.code) } }
+            }
+        }
     }
     Group(null) {
         NavRow("Görsel seç", Glyph.Wallpaper, Color(0xFF34C759)) {
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
-        RowDivider(inset = 56.dp)
-        ToggleRow("Sistem duvar kâğıdı olarak da ayarla", alsoSystem) { alsoSystem = it }
     }
-    Footer("Görsel seçici izin gerektirmez. Seçilen görsel launcher'da gösterilir ve gerçek cam bulanıklığı için kullanılır.")
+    Footer(
+        "Seçilen görsel hem launcher'da hem telefonun sistem duvar kâğıdında uygulanır. Ana ekranda boş bir yere " +
+            "basılı tutup \"Duvar Kâğıdı\" ile de değiştirebilirsin; galeride bir fotoğrafı açıp ⋮ > \"Farklı ayarla\" > " +
+            "\"Glass Launcher\" ile de olur."
+    )
     if (s.launcherWallpaper) {
         Group(null) {
             SliderRow("Karartma", pct(s.wallpaperDim / 0.6f), s.wallpaperDim, 0f..0.6f, default = Def.wallpaperDim) { v -> onChange { it.copy(wallpaperDim = v) } }

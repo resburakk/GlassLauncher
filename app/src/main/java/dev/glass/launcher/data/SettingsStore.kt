@@ -116,6 +116,10 @@ data class LauncherSettings(
     val iconFillRound: Boolean = true,
     /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
     val liveIcons: Boolean = true,
+    /** Simge kenarındaki ince beyaz çizginin (iOS kenar ışığı) kalınlığı, dp. */
+    val iconRimWidth: Float = 1.2f,
+    /** Duvar kâğıdı seçilince sistemde nereye uygulanır: "home", "lock", "both". */
+    val wallpaperTarget: String = "both",
     /** Canlı saat simgesinde saniye ibresi. */
     val liveClockSeconds: Boolean = true,
     /** Arama ekranı: öneri adları, nötr cam, cihaz içi arama türleri ve izin kartı. */
@@ -169,6 +173,8 @@ data class LauncherSettings(
         iconCorner = iconCorner.coerceIn(0.05f, 0.5f),
         cornerSmoothing = cornerSmoothing.coerceIn(0f, 1f),
         iconRimGlow = iconRimGlow.coerceIn(0f, 2f),
+        iconRimWidth = iconRimWidth.coerceIn(0f, 3f),
+        wallpaperTarget = wallpaperTarget.takeIf { it in setOf("home", "lock", "both") } ?: "both",
         dockHeight = dockHeight.coerceIn(0.8f, 1.3f),
         dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
         dockOpacity = dockOpacity.coerceIn(0f, 2f),
@@ -231,6 +237,7 @@ data class LauncherSettings(
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
+        put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
@@ -321,6 +328,8 @@ data class LauncherSettings(
                 showLibrary = o.optBoolean("showLibrary", d.showLibrary),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
                 liveIcons = o.optBoolean("liveIcons", d.liveIcons),
+                iconRimWidth = o.optDouble("iconRimWidth", d.iconRimWidth.toDouble()).toFloat(),
+                wallpaperTarget = o.optString("wallpaperTarget", d.wallpaperTarget),
                 liveClockSeconds = o.optBoolean("liveClockSeconds", d.liveClockSeconds),
                 searchShowLabels = o.optBoolean("searchShowLabels", d.searchShowLabels),
                 searchNeutral = o.optBoolean("searchNeutral2", d.searchNeutral),

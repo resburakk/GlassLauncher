@@ -128,7 +128,9 @@ internal fun HomeContent(
         val view = LocalView.current
         val items = layout.items
         // Uygulamalar 1×1, widget'lar N×M hücre: sayfalara yerleştir.
-        val placements = remember(items, m.columns, m.rows) { GridPacker.pack(items, m.columns, m.rows) }
+        // Görünmeyen öğeler (kaldırılmış/erişilemeyen uygulama) sayfa tutmaz: boş sayfalar otomatik silinir.
+        val visible: (HomeItem) -> Boolean = { it !is AppItem || byKey.containsKey(it.key) }
+        val placements = remember(items, m.columns, m.rows, byKey) { GridPacker.pack(items, m.columns, m.rows, visible) }
         val pageTotal = if (items.isEmpty()) 1 else GridPacker.pageCount(placements)
         val dragging = drag.key != null
         val lastFull = GridPacker.isPageFull(placements, pageTotal - 1, m.columns, m.rows)
@@ -191,13 +193,13 @@ internal fun HomeContent(
                 return@LaunchedEffect
             }
             dockPreview = cur.dock - dragKey
-            val idx = GridPacker.insertionIndex(GridPacker.pack(without, m.columns, m.rows), cell.page, cell.row, cell.col, m.columns)
+            val idx = GridPacker.insertionIndex(GridPacker.pack(without, m.columns, m.rows, visible), cell.page, cell.row, cell.col, m.columns)
             val dragged = cur.items.firstOrNull { it.id == dragKey }
                 ?: if (byKey.containsKey(dragKey)) AppItem(dragKey) else return@LaunchedEffect
             preview = without.toMutableList().apply { add(idx.coerceIn(0, size), dragged) }
         }
         val shownItems = preview ?: items
-        val shownPlacements = remember(shownItems, m.columns, m.rows) { GridPacker.pack(shownItems, m.columns, m.rows) }
+        val shownPlacements = remember(shownItems, m.columns, m.rows, byKey) { GridPacker.pack(shownItems, m.columns, m.rows, visible) }
         val byPage = remember(shownPlacements) { shownPlacements.groupBy { it.page } }
         val shownDock = dockPreview ?: layout.dock
 
@@ -305,7 +307,7 @@ internal fun HomeContent(
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
             val without = cur.items.filter { it.id != id }
             val idx = GridPacker.insertionIndex(
-                GridPacker.pack(without, m.columns, m.rows), pagerState.currentPage, row, col, m.columns,
+                GridPacker.pack(without, m.columns, m.rows, visible), pagerState.currentPage, row, col, m.columns,
             )
             if (topLevel) vm.editLayout { it.moveItem(id, idx) }
             else vm.editLayout { it.moveAppToGrid(id, idx) } // dock, klasör veya arşivden
@@ -525,14 +527,16 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     val px = with(LocalDensity.current) { icon.roundToPx() }
     val look = vm.iconLook(app, st)
     val live = vm.liveKind(app, st)
+    // Kenar çizgisi kalınlığı: ana ekran boyutunda ayardaki değer, küçük simgelerde orantılı incelir.
+    val rimW = st.iconRimWidth.dp * (icon / 60.dp).coerceAtMost(1f)
     if (live != null) {
-        Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow)) {
+        Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
             LiveIcon(live, icon, st.liveClockSeconds)
         }
         return
     }
     val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
-    Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow)) {
+    Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
         bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
     }
 }

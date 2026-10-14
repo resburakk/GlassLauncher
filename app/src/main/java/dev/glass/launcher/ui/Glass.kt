@@ -202,8 +202,8 @@ private fun DrawScope.drawBackdrop(bd: Blurred, rootW: Float, rootH: Float, orig
 }
 
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
-fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f): Modifier =
-    if (!enabled) this.clip(shape).iosRim(shape, rimGlow)
+fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f, rimWidth: Dp = 1.2.dp): Modifier =
+    if (!enabled) this.clip(shape).iosRim(shape, rimGlow, rimWidth)
     else this.clip(shape)
         .drawWithContent {
             drawContent()
@@ -214,9 +214,9 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
                 )
             )
         }
-        .iosRim(shape, rimGlow)
+        .iosRim(shape, rimGlow, rimWidth)
         .border(
-            1.dp,
+            rimWidth / 1.2f,
             Brush.linearGradient(listOf(white(0.65f * strength), white(0.04f * strength), white(0.35f * strength))),
             shape,
         )
@@ -373,10 +373,10 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier
  * iOS 26 simge kenar ışığı: üst ve sol kenarda ince, parlak bir şerit; alt-sağ kenarda çok hafif.
  * Simgeye cam gibi hafif kabarıklık verir. [glow] 0 ise hiçbir şey çizilmez (eski görünüm).
  */
-private fun Modifier.iosRim(shape: Shape, glow: Float): Modifier =
-    if (glow <= 0.01f) this
+private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
+    if (glow <= 0.01f || width < 0.05.dp) this
     else this.border(
-        1.2.dp,
+        width,
         Brush.linearGradient(
             0f to white(0.55f * glow),
             0.35f to white(0.12f * glow),
