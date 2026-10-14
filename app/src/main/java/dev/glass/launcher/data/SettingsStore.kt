@@ -113,6 +113,11 @@ data class LauncherSettings(
     val searchMessages: Boolean = true,
     val searchFiles: Boolean = true,
     val searchDeviceCard: Boolean = true,
+    /** Arama yazı ayarları (pt) ve sonuçların cam panel içinde gösterilmesi. */
+    val searchFieldTextSize: Float = 16f,
+    val searchResultTextSize: Float = 15f,
+    val searchResultWeight: Float = 400f,
+    val searchResultsPanel: Boolean = false,
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
     val theme: ThemeMode = ThemeMode.Auto,
@@ -164,6 +169,9 @@ data class LauncherSettings(
         menuTextSize = menuTextSize.coerceIn(13f, 22f),
         menuRowHeight = menuRowHeight.coerceIn(36f, 64f),
         menuOpacity = menuOpacity.coerceIn(0.1f, 0.95f),
+        searchFieldTextSize = searchFieldTextSize.coerceIn(12f, 22f),
+        searchResultTextSize = searchResultTextSize.coerceIn(12f, 22f),
+        searchResultWeight = searchResultWeight.coerceIn(300f, 700f),
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -193,6 +201,8 @@ data class LauncherSettings(
         put("searchShowLabels", searchShowLabels); put("searchNeutral", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
+        put("searchFieldTextSize", searchFieldTextSize.toDouble()); put("searchResultTextSize", searchResultTextSize.toDouble())
+        put("searchResultWeight", searchResultWeight.toDouble()); put("searchResultsPanel", searchResultsPanel)
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
@@ -278,6 +288,10 @@ data class LauncherSettings(
                 searchMessages = o.optBoolean("searchMessages", d.searchMessages),
                 searchFiles = o.optBoolean("searchFiles", d.searchFiles),
                 searchDeviceCard = o.optBoolean("searchDeviceCard", d.searchDeviceCard),
+                searchFieldTextSize = f("searchFieldTextSize", d.searchFieldTextSize),
+                searchResultTextSize = f("searchResultTextSize", d.searchResultTextSize),
+                searchResultWeight = f("searchResultWeight", d.searchResultWeight),
+                searchResultsPanel = o.optBoolean("searchResultsPanel", d.searchResultsPanel),
             ).let { loaded ->
                 if (o.optInt("metricsVersion", 1) >= METRICS_VERSION) loaded
                 else loaded.copy(

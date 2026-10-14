@@ -62,6 +62,8 @@ adb shell input swipe $cx $((H*40/100)) $cx $((H*70/100)) 300; step "arama" 2
 shot 05-arama
 adb shell input text "c"; step "arama yaz" 2
 shot 05b-arama-sonuc
+adb shell input text "c"; step "arama yaz" 2
+shot 05b-arama-sonuc
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # 5) Çift dokunma (izin penceresi)

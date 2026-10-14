@@ -144,97 +144,103 @@ fun SearchOverlay(
     // Nötr cam: duvar kâğıdının rengini yumuşatan hafif gri-beyaz katman (iOS'taki gibi daha nötr).
     val neutral = if (st.searchNeutral) Modifier.background(Color(0x38E5E5EA)) else Modifier
 
-    Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { close() }) }) {
+    val fieldSize = st.searchFieldTextSize.sp
+    // iOS 26 düzeni: arka plan hafif kararır; öneriler hep üstte, sonuçlar ortada, arama kutusu altta
+    // klavyenin hemen üstünde (safeDrawing klavye yüksekliğini de kapsar).
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.18f))
+            .pointerInput(Unit) { detectTapGestures(onTap = { close() }) }
+    ) {
         Column(
-            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp)
+            Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .height(46.dp)
-                        .liquidGlass(CircleShape, strength, 4.dp)
-                        .then(neutral)
-                        .padding(start = 14.dp, end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    SearchGlyph(Color(0xCCFFFFFF), 18.dp)
-                    Spacer(Modifier.width(8.dp))
-                    BasicTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 17.sp, fontFamily = AppFont),
-                        cursorBrush = SolidColor(Color.White),
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            results.firstOrNull()?.let { open(it) } ?: if (query.isNotBlank()) webSearch(query.trim()) else Unit
-                        }),
-                        modifier = Modifier.weight(1f).focusRequester(focus),
-                        decorationBox = { inner ->
-                            Box(contentAlignment = Alignment.CenterStart) {
-                                if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont)
-                                inner()
-                            }
-                        },
-                    )
-                    if (query.isNotEmpty()) {
-                        // Temizle (×)
-                        Box(
-                            Modifier.size(30.dp).clip(CircleShape).clickable { query = "" },
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Box(Modifier.size(18.dp).clip(CircleShape).background(Color(0x66FFFFFF)), contentAlignment = Alignment.Center) {
-                                GlyphIcon(Glyph.Close, Color(0xFF3A3A3C), 14.dp)
-                            }
-                        }
-                    } else {
-                        // Mikrofon: sesle yazma
-                        Box(
-                            Modifier.size(34.dp).clip(CircleShape).clickable {
-                                val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
-                                    .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ara")
-                                runCatching { mic.launch(i) }
-                            },
-                            contentAlignment = Alignment.Center,
-                        ) { GlyphIcon(Glyph.Mic, Color(0xCCFFFFFF), 20.dp) }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp),
+            )
+            SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, ::open)
+            Spacer(Modifier.height(10.dp))
+
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (query.isNotBlank()) {
+                    Box(
+                        if (st.searchResultsPanel) {
+                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp).then(neutral)
+                        } else Modifier
+                    ) {
+                        ResultsList(
+                            vm = vm, query = query.trim(), apps = results, device = device,
+                            iconGlass = iconGlass, strength = strength,
+                            showPermissionCard = missing.isNotEmpty() && st.searchDeviceCard,
+                            onAskPermission = { permLauncher.launch(missing.toTypedArray()) },
+                            onDismissCard = { vm.updateSettings { it.copy(searchDeviceCard = false) } },
+                            onOpenApp = ::open,
+                            onOpenHit = { launch(it.intent) },
+                            onWeb = { webSearch(query.trim()) },
+                            onStore = { storeSearch(query.trim()) },
+                        )
                     }
                 }
-                Spacer(Modifier.width(12.dp))
-                Text(
-                    "İptal", color = Color.White, fontSize = 16.sp, fontFamily = AppFont,
-                    modifier = Modifier.clickable { close() }.padding(vertical = 8.dp),
-                )
             }
 
-            Spacer(Modifier.height(18.dp))
-
-            if (query.isBlank()) {
-                Text(
-                    "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp),
+            // Arama kutusu: klavyenin üstünde, arada küçük bir boşlukla. "İptal" yok (iOS 26); × temizler,
+            // boşluğa dokunmak veya geri hareketi kapatır.
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 10.dp)
+                    .height(48.dp)
+                    .liquidGlass(CircleShape, strength, 4.dp)
+                    .then(neutral)
+                    .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
+                    .padding(start = 14.dp, end = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SearchGlyph(Color(0xCCFFFFFF), 18.dp)
+                Spacer(Modifier.width(8.dp))
+                BasicTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    textStyle = TextStyle(color = Color.White, fontSize = fieldSize, fontFamily = AppFont),
+                    cursorBrush = SolidColor(Color.White),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = {
+                        results.firstOrNull()?.let { open(it) } ?: if (query.isNotBlank()) webSearch(query.trim()) else Unit
+                    }),
+                    modifier = Modifier.weight(1f).focusRequester(focus),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = fieldSize, fontFamily = AppFont)
+                            inner()
+                        }
+                    },
                 )
-                SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, ::open)
-            } else {
-                Box(
-                    Modifier
-                        .weight(1f, fill = false)
-                        .liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp)
-                        .then(neutral)
-                ) {
-                    ResultsList(
-                        vm = vm, query = query.trim(), apps = results, device = device,
-                        iconGlass = iconGlass, strength = strength,
-                        showPermissionCard = missing.isNotEmpty() && st.searchDeviceCard,
-                        onAskPermission = { permLauncher.launch(missing.toTypedArray()) },
-                        onDismissCard = { vm.updateSettings { it.copy(searchDeviceCard = false) } },
-                        onOpenApp = ::open,
-                        onOpenHit = { launch(it.intent) },
-                        onWeb = { webSearch(query.trim()) },
-                        onStore = { storeSearch(query.trim()) },
-                    )
+                if (query.isNotEmpty()) {
+                    // Temizle (×)
+                    Box(
+                        Modifier.size(30.dp).clip(CircleShape).clickable { query = "" },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(20.dp).clip(CircleShape).background(Color(0xCCFFFFFF)), contentAlignment = Alignment.Center) {
+                            GlyphIcon(Glyph.Close, Color(0xFF3A3A3C), 14.dp)
+                        }
+                    }
+                } else {
+                    // Mikrofon: sesle yazma
+                    Box(
+                        Modifier.size(34.dp).clip(CircleShape).clickable {
+                            val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+                                .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ara")
+                            runCatching { mic.launch(i) }
+                        },
+                        contentAlignment = Alignment.Center,
+                    ) { GlyphIcon(Glyph.Mic, Color(0xCCFFFFFF), 20.dp) }
                 }
             }
         }
@@ -291,6 +297,10 @@ private fun ResultsList(
     onWeb: () -> Unit,
     onStore: () -> Unit,
 ) {
+    val st = LocalLauncherSettings.current
+    val rowSize = st.searchResultTextSize.sp
+    val topSize = (st.searchResultTextSize + 1f).sp
+    val rowWeight = fontWeightOf(st.searchResultWeight)
     val contacts = device.filter { it.kind == DeviceHitKind.Contact }
     val messages = device.filter { it.kind == DeviceHitKind.Message }
     val files = device.filter { it.kind == DeviceHitKind.File }
@@ -315,9 +325,9 @@ private fun ResultsList(
                     Modifier.fillMaxWidth().clickable { onOpenApp(top) }.padding(horizontal = 14.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppIconImage(top, vm, 54.dp, iconGlass, strength)
+                    AppIconImage(top, vm, 48.dp, iconGlass, strength)
                     Spacer(Modifier.width(14.dp))
-                    Text(highlight(top.label, query), color = Color.White, fontSize = 18.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(highlight(top.label, query), color = Color.White, fontSize = topSize, fontWeight = rowWeight, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -330,9 +340,9 @@ private fun ResultsList(
                         Modifier.fillMaxWidth().clickable { onOpenApp(app) }.padding(horizontal = 14.dp, vertical = 7.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AppIconImage(app, vm, 38.dp, iconGlass, strength)
+                        AppIconImage(app, vm, 34.dp, iconGlass, strength)
                         Spacer(Modifier.width(12.dp))
-                        Text(highlight(app.label, query), color = Color.White, fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(highlight(app.label, query), color = Color.White, fontSize = rowSize, fontWeight = rowWeight, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -395,7 +405,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.deviceSection(
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(highlight(hit.title, query), color = Color.White, fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(highlight(hit.title, query), color = Color.White, fontSize = LocalLauncherSettings.current.searchResultTextSize.sp, fontWeight = fontWeightOf(LocalLauncherSettings.current.searchResultWeight), fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(highlight(hit.subtitle, query), color = Color(0xB3FFFFFF), fontSize = 13.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -424,7 +434,7 @@ private fun ActionRow(glyph: Glyph, title: String, onClick: () -> Unit) {
     ) {
         Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) { GlyphIcon(glyph, Color.White, 22.dp) }
         Spacer(Modifier.width(12.dp))
-        Text(title, color = Color.White, fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, color = Color.White, fontSize = LocalLauncherSettings.current.searchResultTextSize.sp, fontWeight = fontWeightOf(LocalLauncherSettings.current.searchResultWeight), fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -437,7 +447,7 @@ private fun highlight(text: String, query: String): AnnotatedString {
     if (i < 0) return AnnotatedString(text)
     return buildAnnotatedString {
         append(text.substring(0, i))
-        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text.substring(i, i + q.length)) }
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = Color.White)) { append(text.substring(i, i + q.length)) }
         append(text.substring(i + q.length))
     }
 }

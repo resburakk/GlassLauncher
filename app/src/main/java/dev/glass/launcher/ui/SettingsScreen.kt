@@ -233,6 +233,8 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
         ToggleRow("Önerilerde uygulama adları", s.searchShowLabels) { v -> onChange { it.copy(searchShowLabels = v) } }
         RowDivider()
         ToggleRow("Nötr cam rengi", s.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
+        RowDivider()
+        ToggleRow("Sonuçlar cam panel içinde", s.searchResultsPanel) { v -> onChange { it.copy(searchResultsPanel = v) } }
     }
     Group("Telefonda ara") {
         ToggleRow("Kişiler (${status(contactsOk)})", s.searchContacts) { v ->
@@ -312,6 +314,19 @@ private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         RowDivider()
         SliderRow("Yazı kalınlığı", fontWeightName(s.pillTextWeight), s.pillTextWeight, 300f..700f) { v ->
             onChange { it.copy(pillTextWeight = v) }
+        }
+    }
+    Group("Arama") {
+        SliderRow("Arama kutusu yazı boyutu", "${s.searchFieldTextSize.roundToInt()} pt", s.searchFieldTextSize, 12f..22f) { v ->
+            onChange { it.copy(searchFieldTextSize = v) }
+        }
+        RowDivider()
+        SliderRow("Sonuç yazı boyutu", "${s.searchResultTextSize.roundToInt()} pt", s.searchResultTextSize, 12f..22f) { v ->
+            onChange { it.copy(searchResultTextSize = v) }
+        }
+        RowDivider()
+        SliderRow("Sonuç yazı kalınlığı", fontWeightName(s.searchResultWeight), s.searchResultWeight, 300f..700f) { v ->
+            onChange { it.copy(searchResultWeight = v) }
         }
     }
     Group("Klasörler") {
