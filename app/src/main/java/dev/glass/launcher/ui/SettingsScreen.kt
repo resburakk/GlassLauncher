@@ -286,23 +286,28 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
     val ctx = LocalContext.current
     var tick by remember { mutableStateOf(0) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { tick++ }
-    val granted = remember(tick) { runCatching { android.os.Environment.isExternalStorageManager() }.getOrDefault(false) }
+    val la = ctx.applicationContext as dev.glass.launcher.LauncherApp
+    val granted = remember(tick) { la.wallpaperRepository.canReadSystemWallpaper() }
+    var asked by remember { mutableStateOf(false) }
+    val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
+        tick++
+        asked = true
+        // İzin verilince launcher öne geldiğinde (onResume) kopyalama kendiliğinden yapılır.
+    }
     Group("Duvar kâğıdı ile cam") {
         ToggleRow("Sistem duvar kâğıdını cam için kullan", s.syncSystemWallpaper, default = Def.syncSystemWallpaper) { v ->
             onChange { it.copy(syncSystemWallpaper = v) }
         }
         if (s.syncSystemWallpaper && !granted) {
             RowDivider()
-            NavRow("İzin ver: Tüm dosyalara erişim", Glyph.Check, Color(0xFF30D158)) {
-                runCatching {
+            NavRow("İzin ver: Fotoğraflar", Glyph.Check, Color(0xFF30D158)) {
+                if (!asked) perm.launch(android.Manifest.permission.READ_MEDIA_IMAGES)
+                else runCatching {
+                    // Daha önce reddedildiyse uygulama izinleri ekranı açılır.
                     ctx.startActivity(
-                        Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:${ctx.packageName}"))
+                        Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
                             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
-                }.onFailure {
-                    runCatching {
-                        ctx.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }
                 }
             }
         }
@@ -311,7 +316,7 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
         when {
             !s.syncSystemWallpaper -> "Kapalı: cam yalnızca launcher'dan seçilen duvar kâğıdında bulanık ve kırılmalı görünür."
             granted -> "Açık: telefonun duvar kâğıdı launcher'a kopyalanır, değişince kendiliğinden güncellenir. Dock ve klasörler gerçek bulanıklık ve kırılmayla çizilir. Görüntü telefonda kalır, hiçbir yere gönderilmez."
-            else -> "Android, launcher'ın sistem duvar kâğıdını görmesi için \"Tüm dosyalara erişim\" izni ister. İzin vermezsen duvar kâğıdını launcher'dan (boşluğa basılı tut > Duvar Kâğıdı) seçebilirsin."
+            else -> "Android, launcher'ın sistem duvar kâğıdını görebilmesi için Fotoğraflar iznini ister (\"Tümüne izin ver\" seçilmeli; \"Seçilenler\" yetmez). İzin vermezsen duvar kâğıdını launcher'dan (boşluğa basılı tut > Duvar Kâğıdı) seçebilirsin."
         }
     )
 }

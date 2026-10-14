@@ -63,8 +63,14 @@ class WallpaperRepository(private val context: Context) {
 
     suspend fun clear() = withContext(Dispatchers.IO) { file.delete().also { _version.value++ } }
 
-    /** Sistem duvar kâğıdını okuma izni var mı? (Android 13+: "Tüm dosyalara erişim".) */
-    fun canReadSystemWallpaper(): Boolean = runCatching { android.os.Environment.isExternalStorageManager() }.getOrDefault(false)
+    /**
+     * Sistem duvar kâğıdını okuma izni var mı? Android bunun için "Fotoğraflar ve videolar" (görseller) iznini
+     * ister; bazı sürümlerde "Tüm dosyalara erişim" de yeterlidir.
+     */
+    fun canReadSystemWallpaper(): Boolean =
+        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.READ_MEDIA_IMAGES) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            runCatching { android.os.Environment.isExternalStorageManager() }.getOrDefault(false)
 
     private val prefs get() = context.getSharedPreferences("wallpaper_sync", Context.MODE_PRIVATE)
 

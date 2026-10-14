@@ -6,7 +6,7 @@ adb install -r "$APK" || { echo "::error::Kurulum başarısız"; exit 1; }
 adb logcat -c
 adb shell cmd role add-role-holder --user 0 android.app.role.HOME dev.glass.launcher || true
 # Cam efekti: sistem duvar kâğıdını okuma izni (telefonda kullanıcı verir)
-adb shell appops set --uid dev.glass.launcher MANAGE_EXTERNAL_STORAGE allow || true
+adb shell pm grant dev.glass.launcher android.permission.READ_MEDIA_IMAGES || true
 adb shell am start -W -n dev.glass.launcher/.MainActivity
 sleep 20
 adb shell input keyevent KEYCODE_HOME; sleep 4
@@ -35,7 +35,6 @@ tap_text() {
 }
 
 shot 01-ana-ekran
-echo "::notice::DUVAR izin=$(adb shell appops get --uid dev.glass.launcher MANAGE_EXTERNAL_STORAGE | tr -d '\r' | head -1)"
 
 # 1) Uzun basma: menü parmak ekrandayken açılmalı
 adb shell input motionevent DOWN $ix $iy
