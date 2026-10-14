@@ -516,6 +516,7 @@ fun HomeScreen(
                     onPageChanged = { folderPages[f.id] = it },
                     onRename = { name -> vm.editLayout { it.renameFolder(f.id, name) } },
                     onReorder = { key, idx -> vm.editLayout { it.reorderInFolder(f.id, key, idx) } },
+                    selection = selection,
                     onDropOutside = { key, pos, hover ->
                         // Klasör dışına bırakılan uygulama ana ekrana taşınır (bırakıldığı yere).
                         closeOverlay()
@@ -690,23 +691,28 @@ fun HomeScreen(
         // Çoklu seçim işlem çubuğu
         val selIds = selection.ids.toList()
         SelectionBar(
-            visible = editMode && selection.active && overlay == Overlay.None && drag.key == null,
+            visible = editMode && selection.active && (overlay == Overlay.None || overlay == Overlay.Folder) && drag.key == null,
             count = selIds.size,
             appCount = layout.appKeysOf(selIds).distinct().size,
-            folders = layout.items.filterIsInstance<FolderItem>().filter { it.id !in selIds }.map { it.id to it.name },
+            // Açık klasörün kendisi hedef listesinde gösterilmez.
+            folders = layout.items.filterIsInstance<FolderItem>()
+                .filter { overlay != Overlay.Folder || it.id != openFolderId }.map { it.id to it.name },
             onCreateFolder = {
                 val ids = selection.ids.toList()
+                if (overlay == Overlay.Folder) closeOverlay()
                 vm.editLayout { l -> l.createFolderFrom(ids, vm.folderNameFor(l.appKeysOf(ids))) }
                 selection.ids.clear()
             },
             onMoveInto = { fid ->
                 val ids = selection.ids.toList()
+                if (overlay == Overlay.Folder) closeOverlay()
                 vm.editLayout { it.moveIntoFolder(fid, ids) }
                 selection.ids.clear()
             },
             onRemove = {
                 val ids = selection.ids.toList()
-                vm.deletePage(ids)
+                if (overlay == Overlay.Folder) closeOverlay()
+                vm.editLayout { it.removeAppsFromHome(ids) }
                 selection.ids.clear()
             },
             onDone = { selection.end() },

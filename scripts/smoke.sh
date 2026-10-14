@@ -118,6 +118,9 @@ adb shell input tap $((W*38/100)) $iy; step "iki simge seçildi" 2
 shot 12-coklu-secim
 tap_text "Klasör Oluştur"; step "klasör oluştur" 2
 shot 12b-secimden-klasor
+adb shell input tap $ix $iy; step "seçim modunda klasörü aç" 2
+adb shell input tap $((W*28/100)) $((H*38/100)); step "klasör içinden seç" 2
+shot 12c-klasor-icinde-secim
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # Galeriden "Farklı ayarla" penceresi (ATTACH_DATA)

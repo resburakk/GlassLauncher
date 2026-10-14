@@ -138,4 +138,27 @@ class HomeLayoutTest {
         assertEquals(listOf("x", "y", "c", "d"), (into.items.first { it.id == "f" } as FolderItem).keys)
         assertEquals(listOf("a", "b", "f"), into.items.map { it.id })
     }
+
+    @Test fun multiSelect_appsInsideFolders() {
+        val base = HomeLayout(
+            items = listOf(AppItem("a"), FolderItem("f", "F", listOf("x", "y", "z")), FolderItem("g", "G", listOf("p", "q"))),
+        )
+        // klasör f'den x ile ana ekrandan a → yeni klasör a'nın yerinde; f'de y,z kalır
+        val made = base.createFolderFrom(listOf("x", "a"), "Yeni")
+        val nf = made.items[0] as FolderItem
+        assertEquals(listOf("a", "x"), nf.keys)
+        assertEquals(listOf("y", "z"), (made.items.first { it.id == "f" } as FolderItem).keys)
+        // f'den y ve z → g klasörüne; f'de tek x kalır ve klasör çözülür
+        val into = base.moveIntoFolder("g", listOf("y", "z"))
+        assertEquals(listOf("p", "q", "y", "z"), (into.items.first { it.id == "g" } as FolderItem).keys)
+        assertTrue(into.items.any { it is AppItem && it.key == "x" })
+        // klasörden x ve z en başa
+        val moved = base.moveGroup(listOf("z", "x"), 0)
+        // f'de tek y kalınca klasör çözülür
+        assertEquals(listOf("x", "z", "a", "y", "g"), moved.items.map { it.id })
+        // kaldır: arşive gider
+        val rem = base.removeAppsFromHome(listOf("p"))
+        assertTrue("p" in rem.libraryOnly)
+        assertTrue(rem.items.any { it is AppItem && it.key == "q" })
+    }
 }

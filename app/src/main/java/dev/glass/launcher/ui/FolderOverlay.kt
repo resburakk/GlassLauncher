@@ -79,6 +79,8 @@ fun FolderOverlay(
     onClose: () -> Unit,
     /** Klasör kapanıyor: iOS 26 gibi küçülürken ilk sayfaya kayar. */
     closing: Boolean = false,
+    /** Ana ekrandaki çoklu seçim: açıkken uygulamalara dokunmak seçer. */
+    selection: SelectionState? = null,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -191,11 +193,17 @@ fun FolderOverlay(
                                         icon = icon, pitchX = pitch, cellHeight = rowH,
                                         drag = drag, layer = DragLayer.Folder, isApp = true,
                                         acceptsMerge = false, edit = edit, jiggle = jiggle,
-                                        onClick = { if (!edit) { vm.launch(app); onClose() } },
-                                        onDrop = { pos, hover ->
-                                            if (panelRect.contains(pos)) reorderAt(k, pos)
-                                            else onDropOutside(k, pos, hover)
+                                        onClick = {
+                                            if (selection?.active == true) selection.toggle(k)
+                                            else if (!edit) { vm.launch(app); onClose() }
                                         },
+                                        onDrop = { pos, hover ->
+                                            val group = selection?.isGroupDrag(k) == true
+                                            if (panelRect.contains(pos) && !group) reorderAt(k, pos)
+                                            else if (!panelRect.contains(pos)) onDropOutside(k, pos, hover)
+                                        },
+                                        selected = if (selection?.active == true) k in selection.ids else null,
+                                        hidden = selection?.isGroupDrag(drag.key) == true && k in selection.ids,
                                     ) { AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength) }
                                 }
                             }

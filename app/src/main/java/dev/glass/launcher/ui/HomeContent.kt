@@ -416,10 +416,9 @@ internal fun HomeContent(
                                 icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                 drag = drag, layer = DragLayer.Home, isApp = false,
                                 acceptsMerge = true, edit = edit, jiggle = jiggle,
-                                onClick = { r -> if (selection.active) selection.toggle(item.id) else onOpenFolder(item, r.center) },
+                                // Seçim modunda da klasör açılır; seçim içindeki uygulamalarda yapılır.
+                                onClick = { r -> onOpenFolder(item, r.center) },
                                 onDrop = { p, h -> handleDrop(item.id, p, h) },
-                                selected = if (selection.active) item.id in selection.ids else null,
-                                hidden = selection.isGroupDrag(drag.key) && item.id in selection.ids,
                             ) {
                                 FolderIcon(
                                     item, byKey, vm, m.icon, settings.glassStrength * settings.folderOpacity,

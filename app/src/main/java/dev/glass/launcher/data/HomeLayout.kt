@@ -192,62 +192,100 @@ data class HomeLayout(
         return HomeLayout(kept, dock, lib.distinct()).normalized()
     }
 
-    // --- Çoklu seçim (toplu işlemler). [ids]: ana ekrandaki öğe kimlikleri (uygulama anahtarı / klasör kimliği). ---
+    // --- Çoklu seçim (toplu işlemler). [ids]: seçilen uygulama anahtarları; ana ekranda veya bir klasörün
+    // içinde olabilirler (klasör kimliği verilirse içindekilerin hepsi sayılır). ---
 
-    /** Seçili öğelerin içerdiği uygulama anahtarları (klasörler açılır), ızgaradaki sırayla. */
+    /** Seçili uygulama anahtarları, ana ekrandaki sırayla (klasör içindekiler klasörün yerinde). */
     fun appKeysOf(ids: Collection<String>): List<String> {
         val set = ids.toSet()
-        return items.filter { it.id in set }.flatMap { item ->
+        return items.flatMap { item ->
             when (item) {
-                is AppItem -> listOf(item.key)
-                is FolderItem -> item.keys
+                is AppItem -> if (item.key in set) listOf(item.key) else emptyList()
+                is FolderItem -> if (item.id in set) item.keys else item.keys.filter { it in set }
                 is WidgetItem, is PageBreak -> emptyList()
             }
-        }
+        }.distinct()
     }
 
-    /** Seçili öğeleri sıralarını koruyarak birlikte [toIndex] konumuna taşır ([toIndex], seçilenler çıkarılmış listede). */
+    /** Anahtarları ana ekrandan ve klasörlerden çıkarır (tek uygulama kalan klasör çözülür). */
+    private fun extract(keys: Set<String>): HomeLayout = copy(
+        items = items.mapNotNull { item ->
+            when (item) {
+                is AppItem -> if (item.key in keys) null else item
+                is FolderItem -> item.copy(keys = item.keys - keys)
+                is WidgetItem, is PageBreak -> item
+            }
+        },
+    ).normalized()
+
+    /**
+     * Seçili uygulamaları sıralarını koruyarak birlikte [toIndex] konumuna taşır (klasördekiler klasörden
+     * çıkar). [toIndex], seçilenler çıkarılmış listeye göredir.
+     */
     fun moveGroup(ids: Collection<String>, toIndex: Int): HomeLayout {
-        val set = ids.toSet()
-        val moving = items.filter { it.id in set }
-        if (moving.isEmpty()) return this
-        val rest = items.filter { it.id !in set }.toMutableList()
-        rest.addAll(toIndex.coerceIn(0, rest.size), moving)
-        return copy(items = rest)
+        val keys = appKeysOf(ids)
+        if (keys.isEmpty()) return this
+        val base = extract(keys.toSet())
+        val list = base.items.toMutableList()
+        list.addAll(toIndex.coerceIn(0, list.size), keys.map { AppItem(it) })
+        return base.copy(items = list, dock = base.dock - keys.toSet(), libraryOnly = base.libraryOnly - keys.toSet())
     }
 
     /**
-     * Seçili öğelerden yeni klasör oluşturur (klasörlerin içindekiler de girer). Klasör [anchorId] öğesinin
-     * yerine (yoksa seçilenlerin ilkinin yerine) konur.
+     * Seçili uygulamalardan yeni klasör oluşturur. Klasör [anchorId] öğesinin yerine (yoksa seçilenlerin
+     * ilkinin bulunduğu yere) konur; klasörlerden alınanlar o klasörlerden çıkar.
      */
     fun createFolderFrom(ids: Collection<String>, name: String, anchorId: String? = null): HomeLayout {
-        val keys = appKeysOf(ids).distinct()
+        val keys = appKeysOf(ids)
         if (keys.isEmpty()) return this
-        val set = ids.toSet()
-        val anchor = anchorId?.takeIf { a -> items.any { it.id == a } } ?: items.firstOrNull { it.id in set }?.id
+        val set = keys.toSet()
+        val anchor = anchorId?.takeIf { a -> items.any { it.id == a } }
+            ?: items.firstOrNull { item ->
+                (item is AppItem && item.key in set) || (item is FolderItem && item.keys.any { it in set })
+            }?.id
         val folder = FolderItem(UUID.randomUUID().toString(), name, keys)
         val out = ArrayList<HomeItem>()
         var placed = false
         for (item in items) {
-            if (item.id == anchor) { out += folder; placed = true; continue }
-            if (item.id in set) continue
-            out += item
+            if (item.id == anchor) {
+                out += folder; placed = true
+                // Kaynak bir klasörse kalanlarıyla yerinde durur (yeni klasör önüne gelir).
+                if (item is FolderItem) out += item.copy(keys = item.keys - set)
+                continue
+            }
+            when (item) {
+                is AppItem -> if (item.key !in set) out += item
+                is FolderItem -> out += item.copy(keys = item.keys - set)
+                is WidgetItem, is PageBreak -> out += item
+            }
         }
         if (!placed) out += folder
-        val keySet = keys.toSet()
-        return HomeLayout(out, dock - keySet, libraryOnly - keySet).normalized()
+        return HomeLayout(out, dock - set, libraryOnly - set).normalized()
     }
 
-    /** Seçili uygulamaları (klasörlerin içindekiler dahil) mevcut [folderId] klasörünün sonuna taşır. */
+    /** Seçili uygulamaları mevcut [folderId] klasörünün sonuna taşır (başka klasörlerden de çıkarak). */
     fun moveIntoFolder(folderId: String, ids: Collection<String>): HomeLayout {
         val target = items.firstOrNull { it.id == folderId } as? FolderItem ?: return this
-        val set = ids.toSet() - folderId
-        val keys = appKeysOf(set).filter { it !in target.keys }.distinct()
+        val keys = appKeysOf(ids - folderId).filter { it !in target.keys }
         if (keys.isEmpty()) return this
-        val out = items.filter { it.id !in set }.map {
-            if (it.id == folderId) target.copy(keys = target.keys + keys) else it
+        val set = keys.toSet()
+        val out = items.mapNotNull { item ->
+            when {
+                item.id == folderId -> target.copy(keys = target.keys + keys)
+                item is AppItem -> if (item.key in set) null else item
+                item is FolderItem -> item.copy(keys = item.keys - set)
+                else -> item
+            }
         }
-        return copy(items = out).normalized()
+        return HomeLayout(out, dock - set, libraryOnly - set).normalized()
+    }
+
+    /** Seçili uygulamaları ana ekrandan (ve klasörlerden) kaldırır; Uygulama Arşivi'nde kalırlar. */
+    fun removeAppsFromHome(ids: Collection<String>): HomeLayout {
+        val keys = appKeysOf(ids)
+        if (keys.isEmpty()) return this
+        val base = extract(keys.toSet())
+        return base.copy(libraryOnly = (base.libraryOnly + keys).distinct())
     }
 
     /** Uygulama Arşivi'ndeki bir uygulamayı ana ekranın sonuna ekler. */
