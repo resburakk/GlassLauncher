@@ -77,6 +77,8 @@ fun FolderOverlay(
     onDropOutside: (String, Offset, String?) -> Unit,
     onDragLeftPanel: () -> Unit,
     onClose: () -> Unit,
+    /** Klasör kapanıyor: iOS 26 gibi küçülürken ilk sayfaya kayar. */
+    closing: Boolean = false,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -118,6 +120,9 @@ fun FolderOverlay(
         val pageChanged by rememberUpdatedState(onPageChanged)
         LaunchedEffect(pagerState) {
             snapshotFlow { pagerState.currentPage }.collect { pageChanged(it) }
+        }
+        LaunchedEffect(closing) {
+            if (closing && pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
         }
 
         // Sürüklenen uygulama panelden çıkıp kısa süre dışarıda kalırsa klasör kapanır (iOS davranışı).

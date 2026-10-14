@@ -200,6 +200,8 @@ fun HomeScreen(
     } else remember { mutableStateOf(0f) }
 
     fun closeOverlay() {
+        // Klasör kapanınca bir sonraki açılışta ve küçük simgede ilk sayfa görünür (iOS 26).
+        openFolderId?.let { folderPages[it] = 0 }
         overlay = Overlay.None
         openFolderId = null
         menu = null
@@ -496,6 +498,7 @@ fun HomeScreen(
                         closeOverlay()
                     },
                     onClose = { closeOverlay() },
+                    closing = !(overlay == Overlay.Folder && openFolder != null),
                 )
                 }
             }
