@@ -206,6 +206,7 @@ fun SettingsScreen(
                     when (p) {
                         null -> {
                             LayoutOrderGroup(vm)
+                            GlassMasterGroup(s, onChange)
                             RootPage(isDefaultHome, onRequestDefault) { page = it.name }
                             SettingsThemeGroup(s, onChange)
                         }
@@ -272,6 +273,21 @@ private fun LayoutOrderGroup(vm: LauncherViewModel) {
             },
         )
     }
+}
+
+@Composable
+private fun GlassMasterGroup(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    val label = when {
+        s.glassTint < 0.2f -> "Çok şeffaf"
+        s.glassTint < 0.42f -> "Şeffaf"
+        s.glassTint <= 0.58f -> "Dengeli"
+        s.glassTint < 0.8f -> "Renkli"
+        else -> "Tam renkli"
+    }
+    Group("Liquid Glass") {
+        SliderRow("Şeffaflık", label, s.glassTint, 0f..1f, default = Def.glassTint) { v -> onChange { it.copy(glassTint = v) } }
+    }
+    Footer("iOS 27 ve MagicOS 11'deki gibi tüm cam yüzeylerin (dock, klasör, menü, arama, paneller) şeffaflığını birlikte ayarlar. Ayrıntılı ayarlar: Cam Efekti.")
 }
 
 @Composable
@@ -658,6 +674,20 @@ private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         RowDivider()
         SliderRow("Dolgu yoğunluğu (saydamlık)", pct(s.glassOpacity), s.glassOpacity, 0f..2f, default = Def.glassOpacity) { v -> onChange { it.copy(glassOpacity = v) } }
     }
+    Group("iOS 26 / 27 efektleri") {
+        SliderRow("Kenar kırılması (mercek)", if (s.glassRefraction < 0.01f) "Kapalı" else pct(s.glassRefraction), s.glassRefraction, 0f..1f, default = Def.glassRefraction) { v ->
+            onChange { it.copy(glassRefraction = v) }
+        }
+        RowDivider()
+        SliderRow("Koyu derinlik kenarı", if (s.glassEdgeDark < 0.01f) "Kapalı" else pct(s.glassEdgeDark), s.glassEdgeDark, 0f..1f, default = Def.glassEdgeDark) { v ->
+            onChange { it.copy(glassEdgeDark = v) }
+        }
+    }
+    Footer(
+        "Kenar kırılması: camın kenarlarında arkadaki görüntü mercekteki gibi bükülür. Dock ve klasörlerde launcher " +
+            "duvar kâğıdı seçiliyken, menü, arama ve açık klasörde her zaman çalışır. Koyu kenar: iOS 27'deki gibi " +
+            "cam yüzeyleri zeminden ayıran ince koyu bant."
+    )
     Group("Tema") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ThemeMode.entries.forEach { t -> Chip(t.title, s.theme == t, Modifier.weight(1f)) { onChange { it.copy(theme = t) } } }

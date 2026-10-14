@@ -7,6 +7,7 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +15,14 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Bulanık duvar kâğıdı kopyası ve orijinal görselin boyutu (ekrana yerleşim hesabı için). */
-class Blurred(val image: ImageBitmap, val srcW: Int, val srcH: Int)
+class Blurred(val image: ImageBitmap, val srcW: Int, val srcH: Int) {
+    /** Kırılma (mercek) gölgelendiricisine girdi olarak verilen doku; kenarlarda kenar pikseli uzatılır. */
+    val shader: android.graphics.BitmapShader by lazy {
+        android.graphics.BitmapShader(
+            image.asAndroidBitmap(), android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
+        )
+    }
+}
 
 /**
  * Launcher'ın kendi duvar kâğıdı (Photo Picker ile seçilir, izin gerekmez).

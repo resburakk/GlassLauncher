@@ -58,6 +58,17 @@ import dev.glass.launcher.data.Blurred
 import dev.glass.launcher.data.LauncherSettings
 
 private fun al(x: Float) = x.coerceIn(0f, 1f)
+
+/**
+ * Genel şeffaflık kaydırıcısının cam dolgusuna çarpanı: 0 → 0.35 (çok şeffaf), 0.5 → 1 (bugünkü görünüm),
+ * 1 → 1.8 (renkli/opak).
+ */
+fun glassTintFactor(t: Float): Float =
+    if (t < 0.5f) 0.35f + (t / 0.5f) * 0.65f else 1f + ((t - 0.5f) / 0.5f) * 0.8f
+
+/** iOS 27 tarzı koyu derinlik kenarı: parlak kenar çizgisinin hemen içinde ince, yarı saydam koyu bant. */
+private fun Modifier.darkEdge(shape: Shape, amount: Float, width: Dp): Modifier =
+    if (amount <= 0.01f) this else this.border(width, black(0.22f * amount), shape)
 private fun white(a: Float) = Color.White.copy(alpha = al(a))
 private fun black(a: Float) = Color.Black.copy(alpha = al(a))
 
@@ -107,9 +118,10 @@ fun Modifier.liquidGlass(
     val look = LocalGlass.current
     val st = LocalLauncherSettings.current
     val rimW = st.glassRimWidth
-    val op = st.glassOpacity
+    val op = st.glassOpacity * glassTintFactor(st.glassTint)
     val glow = st.glassRimGlow
     val s = strength
+    val lens = remember { GlassLens.newShader() }
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalGlassRegions.current else null
     val bd = if (look.reduced || content != null) null else look.backdrop
@@ -137,7 +149,7 @@ fun Modifier.liquidGlass(
         )
         .clip(shape)
         .then(
-            if (bd != null) Modifier.drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin) }
+            if (bd != null) Modifier.drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin, lens, st.glassRefraction) }
             else Modifier
         )
 
@@ -147,9 +159,10 @@ fun Modifier.liquidGlass(
             if (look.reduced) Modifier
             else Modifier.drawWithContent {
                 drawContent()
+                // Speküler parlama (iOS 27: daha parlak).
                 drawRect(
                     Brush.radialGradient(
-                        listOf(white((if (look.dark) 0.12f else 0.24f) * s * glow), Color.Transparent),
+                        listOf(white((if (look.dark) 0.18f else 0.32f) * s * glow), Color.Transparent),
                         center = Offset(size.width * 0.2f, 0f),
                         radius = size.width * 0.7f,
                     )
@@ -163,6 +176,7 @@ fun Modifier.liquidGlass(
                 )
             }
         )
+        .then(if (look.reduced) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
         .then(if (rimW > 0f) Modifier.border(rimW.dp, rim, shape) else Modifier)
 }
 
@@ -170,9 +184,26 @@ fun Modifier.liquidGlass(
  * Bulanık duvar kâğıdının bu yüzeyin arkasına düşen bölümünü çizer. Kaynak bölge %4 küçültülür: içerik
  * hafifçe büyümüş görünür ve kenarlarda kayar — camdaki ışık kırılmasına benzer bir "mercek" hissi verir.
  */
-private fun DrawScope.drawBackdrop(bd: Blurred, rootW: Float, rootH: Float, origin: Offset) {
+private fun DrawScope.drawBackdrop(
+    bd: Blurred, rootW: Float, rootH: Float, origin: Offset,
+    lens: android.graphics.RuntimeShader? = null, refraction: Float = 0f,
+) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
+    if (lens != null && refraction > 0.01f) {
+        // Kırılmalı yol: bulanık kopya, kök koordinatlarına eşlenmiş bir doku olarak merceğe verilir.
+        val scaleR = maxOf(rootW / bd.srcW, rootH / bd.srcH)
+        val kR = img.width.toFloat() / bd.srcW
+        val bs = bd.shader
+        val m = android.graphics.Matrix()
+        m.setScale(scaleR / kR, scaleR / kR)
+        m.postTranslate((rootW - bd.srcW * scaleR) / 2f, (rootH - bd.srcH * scaleR) / 2f)
+        bs.setLocalMatrix(m)
+        lens.setInputShader("content", bs)
+        GlassLens.configure(lens, size.width, size.height, minOf(size.width, size.height) * 0.3f, refraction, origin.x, origin.y)
+        drawRect(androidx.compose.ui.graphics.ShaderBrush(lens))
+        return
+    }
     // Duvar kâğıdı kökte ContentScale.Crop ile çizilir: aynı eşlemeyi bulanık kopyaya uygula.
     val scale = maxOf(rootW / bd.srcW, rootH / bd.srcH)
     val offX = (rootW - bd.srcW * scale) / 2f
@@ -302,6 +333,10 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
     val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
     val r = with(LocalDensity.current) { radius.toPx() }.coerceAtLeast(0.5f)
     val reduced = LocalGlass.current.reduced
+    val refr = LocalLauncherSettings.current.glassRefraction
+    // Her cam alanı için ayrı mercek düğümü ve gölgelendirici (uniform'lar alana özeldir).
+    val lensNodes = remember { ArrayList<android.graphics.RenderNode>() }
+    val lensShaders = remember { ArrayList<android.graphics.RuntimeShader>() }
     val effect = remember(r) {
         android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     }
@@ -328,13 +363,32 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
         blurNode.endRecording()
         drawIntoCanvas { c ->
             val nc = c.nativeCanvas
-            list.forEach { rr ->
+            list.forEachIndexed { i, rr ->
                 nc.save()
                 nc.clipPath(Path().apply { addRoundRect(rr) }.asAndroidPath())
                 // Alanın net içeriği silinir (sistem duvar kâğıdı görünür), yerine bulanık kopyası çizilir.
                 // İçerik saydam olduğu için silmeden çizilirse net simgeler bulanık kopyanın altından görünür.
                 nc.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR)
-                nc.drawRenderNode(blurNode)
+                val rw = rr.width.toInt(); val rh = rr.height.toInt()
+                if (refr > 0.01f && rw > 4 && rh > 4) {
+                    // Kırılma: alanın bulanık kopyası kendi düğümüne alınır, kenarında mercek gibi bükülür.
+                    while (lensNodes.size <= i) {
+                        lensNodes += android.graphics.RenderNode("glassLens")
+                        lensShaders += GlassLens.newShader()
+                    }
+                    val ln = lensNodes[i]; val sh = lensShaders[i]
+                    val l = rr.left.toInt(); val t = rr.top.toInt()
+                    ln.setPosition(l, t, l + rw, t + rh)
+                    GlassLens.configure(sh, rw.toFloat(), rh.toFloat(), rr.topLeftCornerRadius.x, refr)
+                    ln.setRenderEffect(android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content"))
+                    val lc = ln.beginRecording(rw, rh)
+                    lc.translate(-l.toFloat(), -t.toFloat())
+                    lc.drawRenderNode(blurNode)
+                    ln.endRecording()
+                    nc.drawRenderNode(ln)
+                } else {
+                    nc.drawRenderNode(blurNode)
+                }
                 nc.restore()
             }
         }
@@ -354,12 +408,13 @@ fun Modifier.glassBrightness(b: Float): Modifier = when {
  */
 fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier = composed {
     val st = LocalLauncherSettings.current
-    val op = st.glassOpacity
+    val op = st.glassOpacity * glassTintFactor(st.glassTint)
     val glow = st.glassRimGlow
     this
         .clip(shape)
         .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
         .glassBrightness(st.glassBrightness)
+        .darkEdge(shape, st.glassEdgeDark, (st.glassRimWidth + 1.6f).dp)
         .then(
             if (st.glassRimWidth > 0f && glow > 0f) Modifier.border(
                 st.glassRimWidth.dp,

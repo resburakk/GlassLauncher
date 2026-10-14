@@ -417,8 +417,10 @@ private fun ConfirmButton(title: String, color: Color, weight: FontWeight, onCli
 }
 
 /** Menü camı: açık (süt beyazı) ya da koyu buzlu cam; kenar çizgisi ve parlaklık genel cam ayarlarını izler. */
-private fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opacity: Float, dark: Boolean): Modifier = composed {
+private fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opacity0: Float, dark: Boolean): Modifier = composed {
     val st = LocalLauncherSettings.current
+    // Genel şeffaflık kaydırıcısı menüye de uygulanır (okunabilirlik için üst sınır var).
+    val opacity = (opacity0 * glassTintFactor(st.glassTint)).coerceIn(0.05f, 0.97f)
     val fill = if (dark) {
         Brush.verticalGradient(listOf(Color.Black.copy(alpha = opacity * 0.75f), Color.Black.copy(alpha = opacity * 0.85f)))
     } else {
