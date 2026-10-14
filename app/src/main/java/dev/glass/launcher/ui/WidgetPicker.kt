@@ -63,6 +63,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.core.graphics.drawable.toBitmap
 import dev.glass.launcher.data.AppCategorizer
 import dev.glass.launcher.data.WidgetItem
@@ -85,7 +88,7 @@ enum class WidgetSize(val title: String, val spanX: Int, val spanY: Int) {
 }
 
 /** Galeride bir widget ve seçilebilecek boyutları. */
-private class GalleryWidget(
+internal class GalleryWidget(
     val key: String,
     val title: String,
     val info: AppWidgetProviderInfo?,
@@ -94,7 +97,7 @@ private class GalleryWidget(
 )
 
 /** Galeride bir uygulama (widget'larıyla). */
-private class GalleryApp(
+internal class GalleryApp(
     val key: String,
     val name: String,
     val icon: ImageBitmap?,
@@ -125,8 +128,10 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var openApp by remember { mutableStateOf<String?>(null) }
 
-    val apps by produceState<List<GalleryApp>?>(null, hm) {
+    val cacheKey = hm?.let { "${it.columns}x${it.rows}" }
+    val apps by produceState(vm.widgetGalleryCache?.takeIf { it.first == cacheKey }?.second, hm) {
         val m = hm ?: return@produceState
+        if (value != null) return@produceState // önceden yüklendi: anında açılır
         val pm = ctx.packageManager
         val iconPx = (48 * density).toInt()
         value = withContext(Dispatchers.Default) {
@@ -162,7 +167,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                 },
             )
             system + glass
-        }
+        }.also { vm.widgetGalleryCache = cacheKey!! to it }
     }
 
     fun add(w: GalleryWidget, s: Span) {
@@ -383,6 +388,8 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
             }
         }
     }
+    val info = w.info
+    val density = LocalDensity.current.density
     Box(
         Modifier.size(cw, ch).clip(RoundedCornerShape(corner)).background(Color.White.copy(alpha = 0.10f))
             .border(0.8.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(corner)),
@@ -390,6 +397,28 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
     ) {
         val b = img
         when {
+            // Android 12+ widget'ları (Honor dahil) ön izlemeyi canlı yerleşim olarak verir: gerçek widget
+            // görünümü ana ekrandaki boyutunda çizilip karta orantılı küçültülür.
+            info != null && info.previewLayout != 0 -> {
+                val (lw, lh, sc) = WidgetSizing.layoutSize(info, realW, realH, density)
+                AndroidView(
+                    factory = { c ->
+                        // Ön izleme dokunulmaz: dokunuşlar kaydırmaya (sayfa değiştirmeye) gider.
+                        object : android.widget.FrameLayout(c) {
+                            override fun onInterceptTouchEvent(ev: android.view.MotionEvent?) = true
+                            override fun onTouchEvent(event: android.view.MotionEvent?) = false
+                        }.apply {
+                            val hv = android.appwidget.AppWidgetHostView(c)
+                            runCatching {
+                                hv.setAppWidget(-1, info)
+                                hv.updateAppWidget(android.widget.RemoteViews(info.provider.packageName, info.previewLayout))
+                            }
+                            addView(hv, android.widget.FrameLayout.LayoutParams(-1, -1))
+                        }
+                    },
+                    modifier = Modifier.requiredSize(lw, lh).graphicsLayer { scaleX = sc * k; scaleY = sc * k },
+                )
+            }
             // Ön izleme görseli kendi oranında, kesilmeden sığdırılır.
             b != null -> Image(b, w.title, Modifier.fillMaxSize().padding(4.dp), contentScale = ContentScale.Fit)
             w.builtin != null -> BuiltinPreview(w.builtin, cw)

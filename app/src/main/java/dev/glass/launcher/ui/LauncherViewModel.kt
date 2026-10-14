@@ -239,6 +239,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     val widgetHost get() = la.widgetHost
 
+    /** Widget galerisi bir kez yüklenir (sayfa ölçüsü anahtarıyla); sonraki açılışlar anında olur. */
+    internal var widgetGalleryCache: Pair<String, List<GalleryApp>>? = null
+
     /** Ana ekranda görünen sayfanın ilk öğesinin listedeki sırası (yeni widget'lar buraya eklenir). */
     var currentPageStart: Int = 0
 

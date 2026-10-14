@@ -19,7 +19,13 @@ ix=$((W*15/100)); iy=$((H*14/100))
 # Ekrandaki bir yazının merkezine dokun (uiautomator dökümünden)
 tap_text() {
   want="$1"
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  # Ekran dökümü bazen zaman aşımına uğrar (sürekli çizilen saniye ibresi vb.): birkaç kez dene.
+  for t in 1 2 3 4 5; do
+    adb shell rm -f /sdcard/ui.xml
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    adb shell ls /sdcard/ui.xml >/dev/null 2>&1 && break
+    sleep 1
+  done
   b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
   set -- $b
   if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
@@ -145,9 +151,9 @@ shot 13c-donus-sonrasi
 adb shell appwidget grantbind --package dev.glass.launcher --user 0 || true
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
-tap_text "+"; step "widget galerisi" 3
+tap_text "+"; step "widget galerisi" 7
 shot 14a-widget-galerisi
-tap_text "Clock"; step "saat widgetları" 3
+tap_text "Clock"; step "saat widgetları" 4
 shot 14b-widget-detay
 adb shell input swipe $((W*80/100)) $((H*50/100)) $((W*20/100)) $((H*50/100)) 300; step "sonraki boyut" 2
 shot 14c-widget-detay-2
