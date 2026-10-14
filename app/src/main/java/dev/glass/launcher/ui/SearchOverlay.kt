@@ -1,5 +1,8 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.platform.LocalView
 import android.app.SearchManager
 import android.content.Intent
 import android.net.Uri
@@ -83,6 +86,7 @@ import kotlinx.coroutines.delay
  * kenarı eşit boşluklu), "En İyi Sonuç" + "Uygulamalar", izin verildiyse kişiler / mesajlar / dosyalar,
  * en altta internette ve Play Store'da arama. Eşleşen harfler kalın gösterilir.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SearchOverlay(
     vm: LauncherViewModel,
@@ -98,12 +102,22 @@ fun SearchOverlay(
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
 
+    val view = LocalView.current
+    val imeVisible by rememberUpdatedState(WindowInsets.isImeVisible)
     LaunchedEffect(Unit) {
-        // Kutu ekranın altında; yerleşim tamamlanınca odaklanıp klavyeyi aç (aynı karede istenirse klavye gecikebiliyor).
+        // Kutu ekranın altında; yerleşim tamamlanınca odaklanıp klavyeyi aç. Klavye gelmezse birkaç kez
+        // yeniden istenir (bazı cihaz/klavyelerde ilk istek yok sayılabiliyor).
         delay(80)
         focus.requestFocus()
-        delay(40)
-        keyboard?.show()
+        repeat(5) {
+            delay(120)
+            if (imeVisible) return@LaunchedEffect
+            keyboard?.show()
+            runCatching {
+                val imm = view.context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                imm?.showSoftInput(view, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+            }
+        }
     }
 
     // Türkçe karakter duyarsız, sıralı çevrimdışı arama ("cevi" → "Çeviri", "gm" → "Google Maps").
