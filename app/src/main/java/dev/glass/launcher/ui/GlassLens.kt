@@ -61,8 +61,8 @@ object GlassLens {
         s.setFloatUniform("size", w, h)
         s.setFloatUniform("origin", ox, oy)
         s.setFloatUniform("radius", radius)
-        s.setFloatUniform("edge", m * 0.26f)
-        s.setFloatUniform("strength", m * 0.16f * amount)
+        s.setFloatUniform("edge", m * 0.30f)
+        s.setFloatUniform("strength", m * 0.30f * amount)
         s.setFloatUniform("glow", 0.07f * amount)
     }
 }
