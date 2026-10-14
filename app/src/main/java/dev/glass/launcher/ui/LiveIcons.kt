@@ -106,7 +106,7 @@ private fun LiveClock(seconds: Boolean) {
     val now = rememberNow(seconds)
     Spacer(Modifier.fillMaxSize().drawWithCache {
         val s = size.minDimension
-        val c = center
+        val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
         val faceR = s * 0.445f
         // Rakamlar boyut değişince bir kez ölçülür (her karede değil).
         val numStyle = TextStyle(
