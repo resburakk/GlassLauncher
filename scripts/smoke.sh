@@ -133,7 +133,7 @@ adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; st
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input keyevent KEYCODE_HOME; step "öndeyken Home: ilk sayfa" 2
 shot 13-ilk-sayfa
-adb shell input tap $((W*62/100)) $((H*25/100)); sleep 0.25
+adb shell input tap $ix $((H*25/100)); sleep 0.25
 shot 13a-acilis
 step "uygulama açık" 3
 adb shell input keyevent KEYCODE_HOME; sleep 0.12
