@@ -60,7 +60,7 @@ adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
 adb shell input swipe $((W*2/10)) $cy $((W*8/10)) $cy 250; step "önceki sayfa"
 adb shell input swipe $((W*80/100)) $((H*40/100)) $((W*80/100)) $((H*70/100)) 300; step "sağdan kaydırma: kontrol merkezi" 2
 shot 05k-sag-kaydirma
-adb shell input keyevent KEYCODE_BACK; step "geri" 2
+adb shell cmd statusbar collapse; step "paneli kapat" 2
 adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 2
 shot 05-arama
 adb shell dumpsys input_method | grep -iE "mInputShown|mShowRequested|mServedView|mIsInputViewShown|hardKeyboard|mShowExplicitlyRequested|mShowForced" | head -8 | while IFS= read -r l; do echo "::notice::IME $l"; done

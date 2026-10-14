@@ -312,7 +312,7 @@ fun ContextMenuOverlay(
                         Modifier
                             .width(menuW)
                             .heightIn(max = maxH)
-                            .menuGlass(RoundedCornerShape(corner), glassOpacity, st.menuDark)
+                            .menuGlass(appShape(corner), glassOpacity, st.menuDark)
                             .pointerInput(Unit) { detectTapGestures { } }
                             .verticalScroll(scroll)
                             .padding(vertical = u * 6f)
@@ -366,7 +366,7 @@ private fun RemoveConfirm(
             Column(
                 Modifier
                     .width(u * 280f)
-                    .menuGlass(RoundedCornerShape(corner), (opacity + 0.15f).coerceAtMost(0.95f), dark)
+                    .menuGlass(appShape(corner), (opacity + 0.15f).coerceAtMost(0.95f), dark)
                     .pointerInput(Unit) { detectTapGestures { } }
                     .padding(top = u * 18f, bottom = u * 6f),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -406,7 +406,7 @@ private fun ConfirmButton(title: String, color: Color, weight: FontWeight, onCli
 }
 
 /** Menü camı: açık (süt beyazı) ya da koyu buzlu cam; kenar çizgisi ve parlaklık genel cam ayarlarını izler. */
-private fun Modifier.menuGlass(shape: RoundedCornerShape, opacity: Float, dark: Boolean): Modifier = composed {
+private fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opacity: Float, dark: Boolean): Modifier = composed {
     val st = LocalLauncherSettings.current
     val fill = if (dark) {
         Brush.verticalGradient(listOf(Color.Black.copy(alpha = opacity * 0.75f), Color.Black.copy(alpha = opacity * 0.85f)))

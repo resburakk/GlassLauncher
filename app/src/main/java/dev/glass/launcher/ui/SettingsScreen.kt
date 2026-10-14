@@ -498,6 +498,14 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             onChange { it.copy(iconCorner = v) }
         }
         RowDivider()
+        SliderRow("Köşe yumuşaklığı (iOS)", pct(s.cornerSmoothing), s.cornerSmoothing, 0f..1f, default = Def.cornerSmoothing) { v ->
+            onChange { it.copy(cornerSmoothing = v) }
+        }
+        RowDivider()
+        SliderRow("Simge kenar parlaklığı", pct(s.iconRimGlow), s.iconRimGlow, 0f..2f, default = Def.iconRimGlow) { v ->
+            onChange { it.copy(iconRimGlow = v) }
+        }
+        RowDivider()
         ToggleRow("Yuvarlak simgeleri kareye tamamla", s.iconFillRound, default = Def.iconFillRound) { v -> onChange { it.copy(iconFillRound = v) } }
         RowDivider()
         ToggleRow("Cam kenar ışığı", s.iconGlass, default = Def.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }

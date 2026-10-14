@@ -51,6 +51,10 @@ data class LauncherSettings(
     val iconStyle: IconStyle = IconStyle.Original,
     val tintColor: Int = 0xFF64D2FF.toInt(),
     val iconCorner: Float = 0.225f,
+    /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
+    val cornerSmoothing: Float = 0.6f,
+    /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
+    val iconRimGlow: Float = 1f,
     val iconGlass: Boolean = true,
     /** Uygulama anahtarı → özel simge dosya adı (filesDir/icons altında). */
     val customIcons: Map<String, String> = emptyMap(),
@@ -159,6 +163,8 @@ data class LauncherSettings(
         labelSize = labelSize.coerceIn(9f, 16f),
         iconScale = iconScale.coerceIn(0.7f, 1.4f),
         iconCorner = iconCorner.coerceIn(0.05f, 0.5f),
+        cornerSmoothing = cornerSmoothing.coerceIn(0f, 1f),
+        iconRimGlow = iconRimGlow.coerceIn(0f, 2f),
         dockHeight = dockHeight.coerceIn(0.8f, 1.3f),
         dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
         dockOpacity = dockOpacity.coerceIn(0f, 2f),
@@ -228,6 +234,7 @@ data class LauncherSettings(
         put("searchGlassBrightness2", searchGlassBrightness.toDouble())
         put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
         put("settingsTheme", settingsTheme); put("labelWeight", labelWeight.toDouble())
+        put("cornerSmoothing", cornerSmoothing.toDouble()); put("iconRimGlow", iconRimGlow.toDouble())
         put("editButtonTextSize", editButtonTextSize.toDouble()); put("editButtonWeight", editButtonWeight.toDouble())
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
@@ -324,6 +331,8 @@ data class LauncherSettings(
                 textShadowSpread = f("textShadowSpread", d.textShadowSpread),
                 settingsTheme = o.optString("settingsTheme", d.settingsTheme),
                 labelWeight = f("labelWeight", d.labelWeight),
+                cornerSmoothing = f("cornerSmoothing", d.cornerSmoothing),
+                iconRimGlow = f("iconRimGlow", d.iconRimGlow),
                 editButtonTextSize = f("editButtonTextSize", d.editButtonTextSize),
                 editButtonWeight = f("editButtonWeight", d.editButtonWeight),
             ).let { loaded ->

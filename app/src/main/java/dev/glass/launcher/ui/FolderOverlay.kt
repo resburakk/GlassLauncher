@@ -112,7 +112,7 @@ fun FolderOverlay(
         val topPad = u * 29f
         val bottomPad = u * 15f
         val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
-        val panelShape = RoundedCornerShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
+        val panelShape = appShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
         val pages = folder.keys.chunked(9)
         val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, maxOf(pages.size - 1, 0))) {
             maxOf(pages.size, 1)

@@ -384,7 +384,7 @@ internal fun FolderIcon(
     Box(
         // Gölgesiz: yarı saydam camın altındaki gölge içeriden kare gibi görünüyordu.
         // Köşe, uygulama simgeleriyle aynı "Köşe yuvarlaklığı" ayarını izler.
-        Modifier.size(icon).liquidGlass(RoundedCornerShape(icon * LocalLauncherSettings.current.iconCorner), strength * 0.8f, 0.dp),
+        Modifier.size(icon).liquidGlass(appShape(icon * LocalLauncherSettings.current.iconCorner), strength * 0.8f, 0.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.size(block), verticalArrangement = Arrangement.spacedBy(gap)) {

@@ -202,8 +202,8 @@ private fun DrawScope.drawBackdrop(bd: Blurred, rootW: Float, rootH: Float, orig
 }
 
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
-fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float): Modifier =
-    if (!enabled) this.clip(shape)
+fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f): Modifier =
+    if (!enabled) this.clip(shape).iosRim(shape, rimGlow)
     else this.clip(shape)
         .drawWithContent {
             drawContent()
@@ -214,6 +214,7 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float): Modifie
                 )
             )
         }
+        .iosRim(shape, rimGlow)
         .border(
             1.dp,
             Brush.linearGradient(listOf(white(0.65f * strength), white(0.04f * strength), white(0.35f * strength))),
@@ -367,3 +368,20 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier
             ) else Modifier
         )
 }
+
+/**
+ * iOS 26 simge kenar ışığı: üst ve sol kenarda ince, parlak bir şerit; alt-sağ kenarda çok hafif.
+ * Simgeye cam gibi hafif kabarıklık verir. [glow] 0 ise hiçbir şey çizilmez (eski görünüm).
+ */
+private fun Modifier.iosRim(shape: Shape, glow: Float): Modifier =
+    if (glow <= 0.01f) this
+    else this.border(
+        1.2.dp,
+        Brush.linearGradient(
+            0f to white(0.55f * glow),
+            0.35f to white(0.12f * glow),
+            0.7f to Color.Transparent,
+            1f to white(0.10f * glow),
+        ),
+        shape,
+    )

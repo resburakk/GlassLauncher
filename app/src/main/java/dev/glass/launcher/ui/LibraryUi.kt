@@ -222,7 +222,7 @@ private fun CategoryTile(
         Box(
             Modifier
                 .size(tile)
-                .lightGlass(RoundedCornerShape(u * settings.libraryTileCorner), 0.6f, 0.25f)
+                .lightGlass(appShape(u * settings.libraryTileCorner), 0.6f, 0.25f)
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -362,7 +362,7 @@ fun LibraryGroupOverlay(
         Column(
             Modifier
                 .width(panelW)
-                .lightGlass(RoundedCornerShape(u * settings.libraryGroupCorner), 0.75f, 0.35f)
+                .lightGlass(appShape(u * settings.libraryGroupCorner), 0.75f, 0.35f)
                 .pointerInput(Unit) { detectTapGestures { } }
                 .padding(top = u * 29f, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
             horizontalAlignment = Alignment.CenterHorizontally,

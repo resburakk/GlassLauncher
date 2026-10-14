@@ -448,7 +448,7 @@ internal fun HomeContent(
                         .width(dockW)
                         .height(m.dockH)
                         .onGloballyPositioned { dockRect = it.boundsInRoot() }
-                        .liquidGlass(RoundedCornerShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp)
+                        .liquidGlass(appShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp)
                 ) {
                     shownDock.forEachIndexed { i, dk ->
                       key(dk) {
@@ -523,7 +523,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     val px = with(LocalDensity.current) { icon.roundToPx() }
     val look = vm.iconLook(app, st)
     val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
-    Box(Modifier.size(icon).glassIcon(RoundedCornerShape(icon * st.iconCorner), glass, strength)) {
+    Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow)) {
         bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
     }
 }
