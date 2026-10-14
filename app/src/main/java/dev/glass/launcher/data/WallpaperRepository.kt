@@ -74,7 +74,10 @@ class WallpaperRepository(private val context: Context) {
      * Görüntü cihazda kalır; hiçbir yere gönderilmez.
      */
     suspend fun syncFromSystem(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
-        if (!canReadSystemWallpaper()) return@withContext false
+        if (!canReadSystemWallpaper()) {
+            android.util.Log.i("GlassDiag", "wallpaperSync izin yok")
+            return@withContext false
+        }
         runCatching {
             val wm = context.getSystemService(WallpaperManager::class.java)
             val id = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
@@ -85,7 +88,10 @@ class WallpaperRepository(private val context: Context) {
             if (pfd != null) {
                 pfd.use { p -> android.os.ParcelFileDescriptor.AutoCloseInputStream(p).use { input -> tmp.outputStream().use { input.copyTo(it) } } }
             } else {
-                val d = wm.drawable ?: return@runCatching false
+                val d = wm.drawable ?: run {
+                    android.util.Log.i("GlassDiag", "wallpaperSync cizilebilir yok (canli duvar kagidi?)")
+                    return@runCatching false
+                }
                 val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     ?: android.graphics.Bitmap.createBitmap(
                         d.intrinsicWidth.coerceAtLeast(1), d.intrinsicHeight.coerceAtLeast(1), android.graphics.Bitmap.Config.ARGB_8888,
@@ -95,8 +101,10 @@ class WallpaperRepository(private val context: Context) {
             if (!tmp.renameTo(file)) return@runCatching false
             prefs.edit().putInt("lastId", id).apply()
             _version.value++
+            android.util.Log.i("GlassDiag", "wallpaperSync kopyalandi id=$id dosya=${pfd != null} boyut=${file.length()}")
             true
-        }.getOrDefault(false)
+        }.onFailure { android.util.Log.w("GlassDiag", "wallpaperSync hata: ${it.javaClass.simpleName} ${it.message}") }
+            .getOrDefault(false)
     }
 
     /**

@@ -36,7 +36,7 @@ tap_text() {
 
 shot 01-ana-ekran
 echo "::notice::DUVAR izin=$(adb shell appops get --uid dev.glass.launcher MANAGE_EXTERNAL_STORAGE | tr -d '\r' | head -1)"
-echo "::notice::DUVAR kopya=$(adb shell run-as dev.glass.launcher ls -la files/ 2>&1 | grep -i wallpaper | tr -s ' ' | tr -d '\r' | head -2 | tr '\n' ' ')"
+echo "::notice::DUVAR kopya=$(adb shell run-as dev.glass.launcher ls -la files/ 2>&1 | tr -s ' ' | tr -d '\r' | head -8 | tr '\n' ' ')"
 
 # 1) Uzun basma: menü parmak ekrandayken açılmalı
 adb shell input motionevent DOWN $ix $iy
@@ -191,7 +191,7 @@ if [ -n "$mid" ]; then
 fi
 
 adb logcat -d > logcat.txt
-grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -12 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
+grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
   grep -A45 "FATAL EXCEPTION" logcat.txt | head -60 | sed 's/^.*AndroidRuntime: //' | while IFS= read -r line; do
     echo "::error::CRASH ${line//$'%'/%25}"
