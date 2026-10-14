@@ -91,7 +91,20 @@ adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_HOME; st
 # 8) Ayarlar
 adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 4
 shot 09-ayarlar
-adb shell input keyevent KEYCODE_BACK; step "geri"
+# Ekrandaki bir yazının merkezine dokun (uiautomator dökümünden)
+tap_text() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  set -- $b
+  if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
+  echo "::warning::Ekranda bulunamadı: $1"; return 1
+}
+tap_text "Varsayılan uygulama sıralaması"; step "sıralama düğmesi" 2
+shot 09b-siralama-onay
+tap_text "Uygula"; step "sıralamayı uygula" 2
+shot 09c-siralama-uygulandi
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+shot 10-siralama-sonrasi
 
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -12 | while IFS= read -r line; do echo "::notice::DIAG $line"; done

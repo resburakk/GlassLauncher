@@ -205,10 +205,11 @@ fun SettingsScreen(
                     CompositionLocalProvider(LocalResetRegistry provides resetReg) {
                     when (p) {
                         null -> {
+                            LayoutOrderGroup(vm)
                             RootPage(isDefaultHome, onRequestDefault) { page = it.name }
                             SettingsThemeGroup(s, onChange)
                         }
-                        SettingsPage.Home -> HomePage(vm, s, onChange)
+                        SettingsPage.Home -> HomePage(s, onChange)
                         SettingsPage.Icons -> IconsPage(s, onChange)
                         SettingsPage.Dock -> DockPage(s, onChange)
                         SettingsPage.Folders -> FoldersPage(s, onChange)
@@ -236,6 +237,40 @@ fun SettingsScreen(
             }
         }
     }
+    }
+}
+
+@Composable
+private fun LayoutOrderGroup(vm: LauncherViewModel) {
+    var confirm by remember { mutableStateOf(false) }
+    var done by remember { mutableStateOf<String?>(null) }
+    val hasBackup by vm.hasLayoutBackup.collectAsState()
+    Group(null) {
+        NavRow("Varsayılan uygulama sıralaması", Glyph.Grid, Color(0xFFFF9F0A)) { confirm = true }
+        if (hasBackup) {
+            RowDivider()
+            ActionRow("Önceki düzene geri dön") { vm.restorePreviousLayout(); done = "Önceki düzen geri yüklendi." }
+        }
+    }
+    Footer(
+        done ?: ("Uygulamalar iOS 26'nın fabrika sırasına dizilir (karşılıklarıyla: Meet/MeeTime, Takvim, Galeri, Kamera · " +
+            "Gmail, Notlar, Görevler, Saat · TV, Oyun Merkezi, Play Store, Haritalar · Sağlık, Cüzdan, Ayarlar; dock: " +
+            "Telefon, tarayıcı, Mesajlar, Müzik). Diğer uygulamalar 2. sayfada türlerine göre klasörlenir. Widget'lar korunur.")
+    )
+    if (confirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { confirm = false },
+            title = { androidx.compose.material3.Text("Varsayılan sıralama uygulansın mı?") },
+            text = { androidx.compose.material3.Text("Şu anki ana ekran düzenin yedeklenir; istersen buradan \"Önceki düzene geri dön\" ile geri alabilirsin.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    confirm = false; vm.applyIosLayout(); done = "Varsayılan sıralama uygulandı. Ana ekrana dönüp bakabilirsin."
+                }) { androidx.compose.material3.Text("Uygula") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { confirm = false }) { androidx.compose.material3.Text("Vazgeç") }
+            },
+        )
     }
 }
 
@@ -276,37 +311,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
 }
 
 @Composable
-private fun HomePage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
-    var confirm by remember { mutableStateOf(false) }
-    var done by remember { mutableStateOf<String?>(null) }
-    val hasBackup by vm.hasLayoutBackup.collectAsState()
-    Group("Dizilim") {
-        ActionRow("iOS 26 dizilimini uygula") { confirm = true }
-        if (hasBackup) {
-            RowDivider()
-            ActionRow("Önceki düzene geri dön") { vm.restorePreviousLayout(); done = "Önceki düzen geri yüklendi." }
-        }
-    }
-    Footer(
-        done ?: ("Uygulamalar iOS 26'nın fabrika sırasına dizilir (karşılıklarıyla: Meet/MeeTime, Takvim, Galeri, Kamera · " +
-            "Gmail, Notlar, Görevler, Saat · TV, Oyun Merkezi, Play Store, Haritalar · Sağlık, Cüzdan, Ayarlar; dock: " +
-            "Telefon, tarayıcı, Mesajlar, Müzik). Diğer uygulamalar 2. sayfada türlerine göre klasörlenir. Widget'lar korunur.")
-    )
-    if (confirm) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { confirm = false },
-            title = { androidx.compose.material3.Text("iOS 26 dizilimi uygulansın mı?") },
-            text = { androidx.compose.material3.Text("Şu anki ana ekran düzenin yedeklenir; istersen buradan \"Önceki düzene geri dön\" ile geri alabilirsin.") },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    confirm = false; vm.applyIosLayout(); done = "iOS 26 dizilimi uygulandı."
-                }) { androidx.compose.material3.Text("Uygula") }
-            },
-            dismissButton = {
-                androidx.compose.material3.TextButton(onClick = { confirm = false }) { androidx.compose.material3.Text("Vazgeç") }
-            },
-        )
-    }
+private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group("Düzen") {
         ChoiceRow("Sütun sayısı", listOf(3, 4, 5), s.columns) { v -> onChange { it.copy(columns = v) } }
         RowDivider()
