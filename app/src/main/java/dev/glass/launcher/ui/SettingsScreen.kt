@@ -358,8 +358,12 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
             when { s.searchGlassBrightness > 0.01f -> "+${(s.searchGlassBrightness * 100).roundToInt()}"; s.searchGlassBrightness < -0.01f -> "${(s.searchGlassBrightness * 100).roundToInt()}"; else -> "0" },
             s.searchGlassBrightness, -1f..1f, default = Def.searchGlassBrightness,
         ) { v -> onChange { it.copy(searchGlassBrightness = v) } }
+        RowDivider()
+        SliderRow("Öneri paneli köşesi", pct(s.searchSuggestCorner / 0.5f), s.searchSuggestCorner, 0.05f..0.5f, default = Def.searchSuggestCorner) { v ->
+            onChange { it.copy(searchSuggestCorner = v) }
+        }
     }
-    Footer("Öneri paneli ve arama çubuğu dock ile aynı camı kullanır; parlaklık, arama açıkken kararan arka planla uyum içindir.")
+    Footer("Öneri paneli ve arama çubuğu dock ile aynı camı kullanır; parlaklık, arama açıkken kararan arka planla uyum içindir. Öneri paneli köşesi dock'tan bağımsızdır. Yazı ayarları: Yazı Tipi > Arama.")
     Group("Telefonda ara") {
         ToggleRow("Kişiler (${status(contactsOk)})", s.searchContacts, default = Def.searchContacts) { v ->
             onChange { it.copy(searchContacts = v) }
@@ -478,6 +482,14 @@ private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         RowDivider()
         SliderRow("Sonuç yazı kalınlığı", fontWeightName(s.searchResultWeight), s.searchResultWeight, 300f..700f, default = Def.searchResultWeight) { v ->
             onChange { it.copy(searchResultWeight = v) }
+        }
+        RowDivider()
+        SliderRow("Öneri adları yazı boyutu", "${s.searchSuggestLabelSize.roundToInt()} pt", s.searchSuggestLabelSize, 8f..18f, default = Def.searchSuggestLabelSize) { v ->
+            onChange { it.copy(searchSuggestLabelSize = v) }
+        }
+        RowDivider()
+        SliderRow("Öneri adları yazı kalınlığı", fontWeightName(s.searchSuggestLabelWeight), s.searchSuggestLabelWeight, 300f..700f, default = Def.searchSuggestLabelWeight) { v ->
+            onChange { it.copy(searchSuggestLabelWeight = v) }
         }
     }
     Group("Klasörler") {

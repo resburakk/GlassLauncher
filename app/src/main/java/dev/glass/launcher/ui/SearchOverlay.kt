@@ -289,14 +289,17 @@ private fun SuggestionsPanel(
         Modifier
             .requiredWidth(panelW)
             .height(pad * 2f + cellH)
-            .liquidGlass(appShape(hm.dockCorner), strength * st.dockOpacity, 14.dp)
+            .liquidGlass(appShape(hm.dockH * st.searchSuggestCorner), strength * st.dockOpacity, 14.dp)
             .background(Color.Black.copy(alpha = SEARCH_DIM))
             .glassBrightness(st.searchGlassBrightness)
             .then(neutral)
     ) {
         suggestions.take(4).forEachIndexed { i, app ->
             Box(Modifier.offset(x = pad + hm.dockPitch * i.toFloat(), y = pad)) {
-                AppCell(app, vm, hm.dockIcon, hm.dockPitch, cellH, showLabels, iconGlass, strength) { onOpen(app) }
+                AppCell(
+                    app, vm, hm.dockIcon, hm.dockPitch, cellH, showLabels, iconGlass, strength,
+                    labelSize = st.searchSuggestLabelSize, labelWeight = st.searchSuggestLabelWeight,
+                ) { onOpen(app) }
             }
         }
     }

@@ -593,7 +593,10 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
 internal fun AppCell(
     app: AppInfo, vm: LauncherViewModel,
     icon: Dp, pitchX: Dp, cellHeight: Dp, showLabel: Boolean,
-    glass: Boolean, strength: Float, onClick: () -> Unit,
+    glass: Boolean, strength: Float,
+    /** Etiket yazı boyutu (pt) ve kalınlığı; null: varsayılan (ana ekran etiket ayarları). */
+    labelSize: Float? = null, labelWeight: Float? = null,
+    onClick: () -> Unit,
 ) {
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
         Column(
@@ -604,7 +607,10 @@ internal fun AppCell(
             if (showLabel) {
                 Text(
                     app.label,
-                    style = LabelStyle.copy(fontWeight = fontWeightOf(LocalLauncherSettings.current.labelWeight)),
+                    style = LabelStyle.copy(
+                        fontWeight = fontWeightOf(labelWeight ?: LocalLauncherSettings.current.labelWeight),
+                        fontSize = labelSize?.sp ?: LabelStyle.fontSize,
+                    ),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,

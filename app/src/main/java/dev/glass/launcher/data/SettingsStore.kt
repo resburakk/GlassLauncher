@@ -126,6 +126,11 @@ data class LauncherSettings(
     val liveIconTheme: String = "auto",
     /** Uygulama simgeden büyüyerek açılır, dönüşte simgeye küçülerek oturur. */
     val appTransitions: Boolean = false,
+    /** Arama öneri panelinin köşesi (dock yüksekliğine oranla; dock köşesinden bağımsız). */
+    val searchSuggestCorner: Float = 0.34f,
+    /** Arama önerilerindeki uygulama adlarının yazı boyutu (pt) ve kalınlığı. */
+    val searchSuggestLabelSize: Float = 11f,
+    val searchSuggestLabelWeight: Float = 400f,
     /** Arama ekranı: öneri adları, nötr cam, cihaz içi arama türleri ve izin kartı. */
     val searchShowLabels: Boolean = true,
     val searchNeutral: Boolean = false,
@@ -178,6 +183,9 @@ data class LauncherSettings(
         cornerSmoothing = cornerSmoothing.coerceIn(0f, 1f),
         iconRimGlow = iconRimGlow.coerceIn(0f, 2f),
         iconRimWidth = iconRimWidth.coerceIn(0f, 3f),
+        searchSuggestCorner = searchSuggestCorner.coerceIn(0.05f, 0.5f),
+        searchSuggestLabelSize = searchSuggestLabelSize.coerceIn(8f, 18f),
+        searchSuggestLabelWeight = searchSuggestLabelWeight.coerceIn(300f, 700f),
         wallpaperTarget = wallpaperTarget.takeIf { it in setOf("home", "lock", "both") } ?: "both",
         dockHeight = dockHeight.coerceIn(0.8f, 1.3f),
         dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
@@ -243,6 +251,8 @@ data class LauncherSettings(
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
         put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions)
+        put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
+        put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
@@ -336,6 +346,9 @@ data class LauncherSettings(
                 iconRimWidth = o.optDouble("iconRimWidth", d.iconRimWidth.toDouble()).toFloat(),
                 liveIconTheme = o.optString("liveIconTheme", d.liveIconTheme),
                 appTransitions = o.optBoolean("appTransitions2", d.appTransitions),
+                searchSuggestCorner = o.optDouble("searchSuggestCorner", d.searchSuggestCorner.toDouble()).toFloat(),
+                searchSuggestLabelSize = o.optDouble("searchSuggestLabelSize", d.searchSuggestLabelSize.toDouble()).toFloat(),
+                searchSuggestLabelWeight = o.optDouble("searchSuggestLabelWeight", d.searchSuggestLabelWeight.toDouble()).toFloat(),
                 wallpaperTarget = o.optString("wallpaperTarget", d.wallpaperTarget),
                 liveClockSeconds = o.optBoolean("liveClockSeconds", d.liveClockSeconds),
                 searchShowLabels = o.optBoolean("searchShowLabels", d.searchShowLabels),
