@@ -35,6 +35,8 @@ tap_text() {
 }
 
 shot 01-ana-ekran
+echo "::notice::DUVAR izin=$(adb shell appops get --uid dev.glass.launcher MANAGE_EXTERNAL_STORAGE | tr -d '\r' | head -1)"
+echo "::notice::DUVAR kopya=$(adb shell run-as dev.glass.launcher ls -la files/ 2>&1 | grep -i wallpaper | tr -s ' ' | tr -d '\r' | head -2 | tr '\n' ' ')"
 
 # 1) Uzun basma: menü parmak ekrandayken açılmalı
 adb shell input motionevent DOWN $ix $iy
