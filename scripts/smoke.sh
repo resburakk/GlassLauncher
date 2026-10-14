@@ -168,6 +168,24 @@ adb shell am start -a android.intent.action.ATTACH_DATA -t image/png -d content:
 shot 11-farkli-ayarla
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
+# Cam kırılması testi: çizgili test duvar kâğıdı launcher duvar kâğıdı olarak ayarlanır (galeriden
+# "Farklı ayarla" yoluyla), sonra dock ve bağlam menüsü görüntülenir. Çizgiler cam kenarında bükülmeli.
+adb push "$(dirname "$0")/test-wallpaper.png" /sdcard/Pictures/glass-test.png >/dev/null
+adb shell content call --uri content://media --method scan_volume --arg external_primary >/dev/null 2>&1 || true
+sleep 2
+mid=$(adb shell content query --uri content://media/external/images/media --projection _id:_display_name | grep glass-test | grep -oE '_id=[0-9]+' | head -1 | cut -d= -f2)
+echo "::notice::Test duvar kâğıdı medya kimliği: ${mid:-yok}"
+if [ -n "$mid" ]; then
+  adb shell am start -a android.intent.action.ATTACH_DATA -t image/png -d content://media/external/images/media/$mid --grant-read-uri-permission -n dev.glass.launcher/.WallpaperImportActivity; step "farklı ayarla" 3
+  tap_text "Ana ekran"; step "launcher duvar kâğıdı" 5
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+  shot 15a-cam-dock
+  adb shell input motionevent DOWN $ix $iy; sleep 1.2
+  adb shell input motionevent UP $ix $iy; step "menü" 2
+  shot 15b-cam-menu
+  adb shell input keyevent KEYCODE_BACK; step "geri"
+fi
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -12 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
