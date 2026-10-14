@@ -25,6 +25,8 @@ enum class SwipeAction(val title: String) {
     /** Telefonun kendi bildirim gölgesi. */
     Notifications("Bildirimler"),
     Search("Arama"),
+    /** Ekranın sol yarısından: bildirimler; sağ yarısından: Kontrol Merkezi. */
+    Split("Sol: Bildirimler · Sağ: Kontrol Merkezi"),
     None("Hiçbiri"),
 }
 
@@ -99,7 +101,7 @@ data class LauncherSettings(
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
     /** Ekranın ortasından (boş alandan) aşağı kaydırma. */
-    val midSwipe: SwipeAction = SwipeAction.Search,
+    val midSwipe: SwipeAction = SwipeAction.Split,
     /** Boş alana çift dokununca ekranı kilitle (Erişilebilirlik hizmeti gerekir). */
     val doubleTapLock: Boolean = true,
     /** Uygulama arşivi sayfası (ana ekranın sağı). Varsayılan kapalı: sayfa hiç görünmez. */
@@ -126,6 +128,9 @@ data class LauncherSettings(
     val textShadowSpread: Float = 1f,
     /** Ayarlar ekranının teması: "auto" (telefona uyar), "light", "dark". */
     val settingsTheme: String = "auto",
+    /** Düzenleme modundaki üst düğmelerin (+, Ayarlar, Bitti) yazı boyutu (pt) ve kalınlığı. */
+    val editButtonTextSize: Float = 14f,
+    val editButtonWeight: Float = 400f,
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
     val theme: ThemeMode = ThemeMode.Auto,
@@ -183,6 +188,8 @@ data class LauncherSettings(
         searchGlassBrightness = searchGlassBrightness.coerceIn(-1f, 1f),
         textShadowStrength = textShadowStrength.coerceIn(0.05f, 0.9f),
         textShadowSpread = textShadowSpread.coerceIn(0.3f, 3f),
+        editButtonTextSize = editButtonTextSize.coerceIn(10f, 20f),
+        editButtonWeight = editButtonWeight.coerceIn(300f, 700f),
         settingsTheme = settingsTheme.takeIf { it in setOf("auto", "light", "dark") } ?: "auto",
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
@@ -209,7 +216,7 @@ data class LauncherSettings(
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
-        put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
+        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
@@ -218,6 +225,7 @@ data class LauncherSettings(
         put("searchGlassBrightness", searchGlassBrightness.toDouble())
         put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
         put("settingsTheme", settingsTheme)
+        put("editButtonTextSize", editButtonTextSize.toDouble()); put("editButtonWeight", editButtonWeight.toDouble())
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
@@ -293,7 +301,7 @@ data class LauncherSettings(
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),
                 topSwipe = runCatching { SwipeAction.valueOf(o.optString("topSwipe")) }.getOrDefault(d.topSwipe),
-                midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe")) }.getOrDefault(d.midSwipe),
+                midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe2")) }.getOrDefault(d.midSwipe),
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
                 showLibrary = o.optBoolean("showLibrary", d.showLibrary),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
@@ -312,6 +320,8 @@ data class LauncherSettings(
                 textShadowStrength = f("textShadowStrength", d.textShadowStrength),
                 textShadowSpread = f("textShadowSpread", d.textShadowSpread),
                 settingsTheme = o.optString("settingsTheme", d.settingsTheme),
+                editButtonTextSize = f("editButtonTextSize", d.editButtonTextSize),
+                editButtonWeight = f("editButtonWeight", d.editButtonWeight),
             ).let { loaded ->
                 if (o.optInt("metricsVersion", 1) >= METRICS_VERSION) loaded
                 else loaded.copy(

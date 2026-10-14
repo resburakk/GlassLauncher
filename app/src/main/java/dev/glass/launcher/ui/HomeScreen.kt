@@ -369,13 +369,18 @@ fun HomeScreen(
             }
             .pointerInput(topZonePx) {
                 var startY = 0f
+                var startX = 0f
                 var total = 0f
                 detectVerticalDragGestures(
-                    onDragStart = { startY = it.y; total = 0f },
+                    onDragStart = { startY = it.y; startX = it.x; total = 0f },
                     onDragEnd = {
                         if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && total > 80.dp.toPx()) {
                             // Hangi hareketin ne açacağı Ayarlar > Hareketler'den seçilir.
-                            val action = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
+                            val chosen = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
+                            // Bölünmüş: sağ yarı Kontrol Merkezi, sol yarı bildirimler.
+                            val action = if (chosen == SwipeAction.Split) {
+                                if (startX >= size.width / 2f) SwipeAction.ControlCenter else SwipeAction.Notifications
+                            } else chosen
                             when (action) {
                                 // Telefonun KENDİ Kontrol Merkezi / bildirimleri.
                                 SwipeAction.ControlCenter -> if (!SystemPanels.openControlCenter(context)) {
@@ -387,7 +392,7 @@ fun HomeScreen(
                                     overlay = Overlay.LockPrompt
                                 }
                                 SwipeAction.Search -> overlay = Overlay.Search
-                                SwipeAction.None -> Unit
+                                SwipeAction.Split, SwipeAction.None -> Unit
                             }
                         }
                         total = 0f
@@ -707,8 +712,9 @@ internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onCl
             .padding(horizontal = 15.dp),
         contentAlignment = Alignment.Center,
     ) {
+        val st = LocalLauncherSettings.current
         Text(
-            text, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+            text, color = Color.White, fontSize = st.editButtonTextSize.sp, fontWeight = fontWeightOf(st.editButtonWeight),
             style = LocalTextStyle.current.copy(shadow = IosTextShadow),
         )
     }

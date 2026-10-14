@@ -404,6 +404,15 @@ private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             onChange { it.copy(pillTextWeight = v) }
         }
     }
+    Group("Düzenleme düğmeleri (+, Ayarlar, Bitti)") {
+        SliderRow("Yazı boyutu", "${s.editButtonTextSize.roundToInt()} pt", s.editButtonTextSize, 10f..20f, default = Def.editButtonTextSize) { v ->
+            onChange { it.copy(editButtonTextSize = v) }
+        }
+        RowDivider()
+        SliderRow("Yazı kalınlığı", fontWeightName(s.editButtonWeight), s.editButtonWeight, 300f..700f, default = Def.editButtonWeight) { v ->
+            onChange { it.copy(editButtonWeight = v) }
+        }
+    }
     Group("Yazı gölgesi") {
         ToggleRow("Gölge", s.textShadow, default = Def.textShadow) { v -> onChange { it.copy(textShadow = v) } }
         if (s.textShadow) {
@@ -417,7 +426,7 @@ private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             }
         }
     }
-    Footer("Kapalıyken yazıların etrafında çerçeve/gölge olmaz. Yayılma arttıkça gölge daha geniş ve yumuşak olur.")
+    Footer("Düzenleme düğmeleri: ana ekranda boş alana basılı tutunca üstte çıkan düğmeler. Kapalıyken yazıların etrafında çerçeve/gölge olmaz. Yayılma arttıkça gölge daha geniş ve yumuşak olur.")
     Group("Arama") {
         SliderRow("Arama kutusu yazı boyutu", "${s.searchFieldTextSize.roundToInt()} pt", s.searchFieldTextSize, 12f..22f, default = Def.searchFieldTextSize) { v ->
             onChange { it.copy(searchFieldTextSize = v) }

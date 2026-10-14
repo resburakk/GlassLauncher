@@ -29,17 +29,23 @@ class IconCache(private val context: Context) {
         val k = "${app.key}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}"
         cache.get(k)?.let { return it }
         val bmp = withContext(Dispatchers.Default) {
+            // Küçük simgeler (klasör önizlemesi vb.) de en az 192 px'te çizilip sonra küçültülür: yuvarlak simge
+            // algılaması her boyutta aynı sonucu verir ve küçük simgeler daha net olur.
+            val renderPx = maxOf(sizePx, MIN_RENDER_PX)
             val custom = look.customFile?.let { f ->
                 runCatching { BitmapFactory.decodeFile(File(iconDir, f).path) }.getOrNull()
             }
-            if (custom != null) {
-                IconRenderer.renderCustom(custom, sizePx).also { custom.recycle() }
+            val big = if (custom != null) {
+                IconRenderer.renderCustom(custom, renderPx).also { custom.recycle() }
             } else {
                 // En yüksek çözünürlüklü simge kaynağı istenir; ekrandaki boyuta yüksek kaliteyle küçültülür (daha net).
                 val d = runCatching { app.activityInfo.getIcon(android.util.DisplayMetrics.DENSITY_XXXHIGH) }.getOrNull()
                     ?: app.activityInfo.getIcon(0)
-                IconRenderer.render(d, sizePx, look.style, look.tint, look.fillRound)
-            }.asImageBitmap()
+                IconRenderer.render(d, renderPx, look.style, look.tint, look.fillRound)
+            }
+            val out = if (renderPx == sizePx) big
+            else android.graphics.Bitmap.createScaledBitmap(big, sizePx, sizePx, true).also { if (it !== big) big.recycle() }
+            out.asImageBitmap()
         }
         cache.put(k, bmp)
         return bmp
@@ -63,4 +69,8 @@ class IconCache(private val context: Context) {
     }
 
     fun clear() = cache.evictAll()
+
+    private companion object {
+        const val MIN_RENDER_PX = 192
+    }
 }
