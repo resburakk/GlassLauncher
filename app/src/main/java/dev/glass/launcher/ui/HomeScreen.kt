@@ -791,7 +791,7 @@ fun HomeScreen(
             val gs = drag.ghostSize
             val group = selection.isGroupDrag(dk)
             // Toplu sürüklemede deste ve rozet katmanın İÇİNDE kalsın diye kenar payı (saydam katman sınırda kırpar).
-            val pad = if (group) 14.dp else 0.dp
+            val pad = if (group) 26.dp else 0.dp
             val gw = with(density) { ((gs?.width ?: drag.iconDp) + pad * 2f).toPx() }
             val gh = with(density) { ((gs?.height ?: drag.iconDp) + pad * 2f).toPx() }
             Box(
@@ -812,16 +812,17 @@ fun HomeScreen(
                     val n = selection.ids.size
                     val shape = appShape(icon * settings.iconCorner)
                     Box(Modifier.size(icon + pad * 2f)) {
-                        // iOS gibi: arkada düzgün, hafif kaydırılmış ve gölgeli bir deste (en çok 2 kopya).
-                        val back = others.take(2)
+                        // Belirgin deste: arkada en çok 3 simge, her biri kaydırılmış ve yelpaze gibi açılmış.
+                        val back = others.take(3)
+                        val fan = listOf(Triple(10f, -8f, 8f), Triple(-10f, -12f, -7f), Triple(16f, -18f, 13f))
                         for (i in back.indices.reversed()) {
-                            val step = 5.dp * (i + 1)
+                            val (dx, dy, rot) = fan[i]
                             Box(
                                 Modifier
-                                    .offset(x = pad + step, y = pad - step)
+                                    .offset(x = pad + dx.dp, y = pad + dy.dp)
                                     .size(icon)
-                                    .graphicsLayer { scaleX = 1f - 0.04f * (i + 1); scaleY = 1f - 0.04f * (i + 1) }
-                                    .shadow(6.dp, shape)
+                                    .graphicsLayer { rotationZ = rot }
+                                    .shadow(8.dp, shape)
                             ) { GhostIcon(back[i], byKey, layout, vm, icon, settings, folderPages) }
                         }
                         Box(Modifier.offset(x = pad, y = pad).size(icon).shadow(10.dp, shape)) {
