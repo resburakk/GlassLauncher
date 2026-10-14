@@ -83,6 +83,7 @@ fun FolderOverlay(
     selection: SelectionState? = null,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
+    val view = androidx.compose.ui.platform.LocalView.current
 
     var name by remember(folder.id) { mutableStateOf(folder.name) }
     val nameNow by rememberUpdatedState(name)
@@ -193,9 +194,9 @@ fun FolderOverlay(
                                         icon = icon, pitchX = pitch, cellHeight = rowH,
                                         drag = drag, layer = DragLayer.Folder, isApp = true,
                                         acceptsMerge = false, edit = edit, jiggle = jiggle,
-                                        onClick = {
+                                        onClick = { r ->
                                             if (selection?.active == true) selection.toggle(k)
-                                            else if (!edit) { vm.launch(app); onClose() }
+                                            else if (!edit) { vm.launchFrom(app, view, r); onClose() }
                                         },
                                         onDrop = { pos, hover ->
                                             val group = selection?.isGroupDrag(k) == true

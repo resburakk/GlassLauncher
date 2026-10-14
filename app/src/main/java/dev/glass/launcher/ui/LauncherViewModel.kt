@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import dev.glass.launcher.data.Blurred
 import dev.glass.launcher.data.IconLook
 import dev.glass.launcher.data.WidgetItem
@@ -103,6 +104,53 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Launcher öndeyken Home tuşuna basıldı: katmanları kapat, ilk sayfaya dön. */
     val homePressed: SharedFlow<Unit> = _homePressed
     fun onHomePressed() { _homePressed.tryEmit(Unit) }
+
+    /** Son açılan uygulama ve simgesinin ekrandaki yeri (dönüşte simgeye küçülme efekti için). */
+    class LaunchRecord(val key: String, val rect: androidx.compose.ui.geometry.Rect?, val at: Long)
+
+    @Volatile var lastLaunch: LaunchRecord? = null
+        private set
+
+    /** Simgenin ortalama rengi (dönüş efektinde kartın rengi). Saydam pikseller sayılmaz. */
+    suspend fun iconColor(app: AppInfo, s: LauncherSettings): androidx.compose.ui.graphics.Color =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching {
+                val bmp = la.iconCache.get(app, 64, iconLook(app, s))?.asAndroidBitmap()
+                    ?: return@runCatching androidx.compose.ui.graphics.Color.White
+                var r = 0L; var g = 0L; var b = 0L; var n = 0L
+                val step = maxOf(1, bmp.width / 16)
+                for (y in 0 until bmp.height step step) for (x in 0 until bmp.width step step) {
+                    val c = bmp.getPixel(x, y)
+                    if ((c ushr 24) < 200) continue
+                    r += (c shr 16) and 0xFF; g += (c shr 8) and 0xFF; b += c and 0xFF; n++
+                }
+                if (n == 0L) androidx.compose.ui.graphics.Color.White
+                else androidx.compose.ui.graphics.Color((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
+            }.getOrDefault(androidx.compose.ui.graphics.Color.White)
+        }
+
+    /** Dönüş efekti bir kez oynatılır: kaydı alır ve siler (çok eskiyse yok sayar). */
+    fun consumeLastLaunch(): LaunchRecord? {
+        val r = lastLaunch ?: return null
+        lastLaunch = null
+        return r.takeIf { android.os.SystemClock.elapsedRealtime() - it.at < 30 * 60_000L }
+    }
+
+    /**
+     * Uygulamayı, dokunulan simgenin ekrandaki yerinden ([rect], kök koordinatlarında) büyüyerek açar.
+     * Ayar kapalıysa veya konum yoksa sistemin varsayılan animasyonu kullanılır.
+     */
+    fun launchFrom(app: AppInfo, view: android.view.View, rect: androidx.compose.ui.geometry.Rect?) {
+        val on = settings.value.appTransitions
+        val r = rect?.takeIf { !it.isEmpty && it.width > 1f }
+        val opts = if (on && r != null) runCatching {
+            android.app.ActivityOptions.makeScaleUpAnimation(
+                view, r.left.toInt(), r.top.toInt(), r.width.toInt(), r.height.toInt(),
+            ).toBundle()
+        }.getOrNull() else null
+        lastLaunch = if (on) LaunchRecord(app.key, r, android.os.SystemClock.elapsedRealtime()) else null
+        launch(app, r?.let { Rect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt()) }, opts)
+    }
 
     fun launch(app: AppInfo, bounds: Rect? = null, options: Bundle? = null) {
         repo.launch(app, bounds, options)

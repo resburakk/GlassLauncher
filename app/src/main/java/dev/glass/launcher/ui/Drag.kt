@@ -119,6 +119,11 @@ class DragState {
 
     fun target(id: String): DragTarget? = targets[id]
 
+    /** Ana ekranda veya dock'ta görünen bir öğenin simge alanı (kök koordinatı); yoksa null. */
+    fun homeIconRect(itemId: String): Rect? = targets.values
+        .firstOrNull { it.itemId == itemId && (it.place == CellPlace.Grid || it.place == CellPlace.Dock) && !it.iconRect.isEmpty }
+        ?.iconRect
+
     fun hitTest(p: Offset): DragTarget? =
         targets.values.firstOrNull { it.layer == activeLayer && it.cellRect.contains(p) }
 

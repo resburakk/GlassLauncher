@@ -127,7 +127,9 @@ class MainActivity : ComponentActivity(), WidgetRequester {
             return
         }
         // Launcher zaten öndeyken Home tuşu: iOS gibi ilk sayfaya dön, açık katmanları kapat.
-        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) vm.onHomePressed()
+        // Bir uygulamadan dönülürken (launcher henüz önde değil) sayfa korunur; dönüş efekti simgeye oturur.
+        val alreadyInFront = lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+        if (alreadyInFront && intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) vm.onHomePressed()
     }
 
     /**

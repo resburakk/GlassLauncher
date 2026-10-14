@@ -122,6 +122,10 @@ data class LauncherSettings(
     val wallpaperTarget: String = "both",
     /** Canlı saat simgesinde saniye ibresi. */
     val liveClockSeconds: Boolean = true,
+    /** Canlı saat/takvim görünümü: "auto" (telefonun açık/koyu modu), "light", "dark". */
+    val liveIconTheme: String = "auto",
+    /** Uygulama simgeden büyüyerek açılır, dönüşte simgeye küçülerek oturur. */
+    val appTransitions: Boolean = true,
     /** Arama ekranı: öneri adları, nötr cam, cihaz içi arama türleri ve izin kartı. */
     val searchShowLabels: Boolean = true,
     val searchNeutral: Boolean = false,
@@ -238,6 +242,7 @@ data class LauncherSettings(
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
+        put("liveIconTheme", liveIconTheme); put("appTransitions", appTransitions)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
@@ -329,6 +334,8 @@ data class LauncherSettings(
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
                 liveIcons = o.optBoolean("liveIcons", d.liveIcons),
                 iconRimWidth = o.optDouble("iconRimWidth", d.iconRimWidth.toDouble()).toFloat(),
+                liveIconTheme = o.optString("liveIconTheme", d.liveIconTheme),
+                appTransitions = o.optBoolean("appTransitions", d.appTransitions),
                 wallpaperTarget = o.optString("wallpaperTarget", d.wallpaperTarget),
                 liveClockSeconds = o.optBoolean("liveClockSeconds", d.liveClockSeconds),
                 searchShowLabels = o.optBoolean("searchShowLabels", d.searchShowLabels),

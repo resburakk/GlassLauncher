@@ -254,6 +254,42 @@ fun HomeScreen(
         photoTarget = null
     }
 
+    // --- Dönüş efekti: uygulamadan ana ekrana dönünce kart simgenin yerine küçülür ---
+    var returnInfo by remember { mutableStateOf<ReturnInfo?>(null) }
+    val returnAnim = remember { androidx.compose.animation.core.Animatable(1f) }
+    var resumeTick by remember { mutableStateOf(0) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumeTick++
+        }
+        lifecycleOwner.lifecycle.addObserver(obs)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(obs) }
+    }
+    LaunchedEffect(resumeTick) {
+        if (resumeTick == 0) return@LaunchedEffect
+        val rec = vm.consumeLastLaunch() ?: return@LaunchedEffect
+        if (!settingsNow.appTransitions || rootSize.width == 0) return@LaunchedEffect
+        val app = vm.appsByKey.value[rec.key] ?: return@LaunchedEffect
+        val color = vm.iconColor(app, settingsNow)
+        androidx.compose.runtime.withFrameNanos { } // konumlar güncellensin
+        // Hedef: simge ana ekranda/dock'ta ise orası; bir klasördeyse klasörün simgesi; yoksa açıldığı yer.
+        val folder = vm.layout.value.items.filterIsInstance<FolderItem>().firstOrNull { rec.key in it.keys }
+        val r = drag.homeIconRect(rec.key) ?: folder?.let { drag.homeIconRect(it.id) } ?: rec.rect
+        val w = rootSize.width.toFloat(); val h = rootSize.height.toFloat()
+        val onScreen = r != null && r.left >= -2f && r.right <= w + 2f && r.top >= -2f && r.bottom <= h + 2f
+        val iconPx = r?.width?.takeIf { it > 1f } ?: (w * 0.16f)
+        val target = if (onScreen) r!! else androidx.compose.ui.geometry.Rect(
+            w / 2f - iconPx / 2f, h / 2f - iconPx / 2f, w / 2f + iconPx / 2f, h / 2f + iconPx / 2f,
+        )
+        returnInfo = ReturnInfo(app, target, color, onScreen)
+        returnAnim.snapTo(0f)
+        returnAnim.animateTo(
+            1f, androidx.compose.animation.core.spring(dampingRatio = 0.9f, stiffness = 260f * motion.speed),
+        )
+        returnInfo = null
+    }
+
     LaunchedEffect(vm) {
         vm.homePressed.collect {
             closeOverlay()
@@ -449,7 +485,17 @@ fun HomeScreen(
             )
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
-        Box(Modifier.fillMaxSize().then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)) {
+        Box(
+            Modifier.fillMaxSize()
+                .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
+                // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
+                .graphicsLayer {
+                    if (returnInfo != null) {
+                        val k = 1f + 0.05f * (1f - returnAnim.value)
+                        scaleX = k; scaleY = k
+                    }
+                }
+        ) {
             HomeContent(
                 vm = vm,
                 layout = layout,
@@ -789,6 +835,9 @@ fun HomeScreen(
             onRemove = { wallpaperSheet = false; vm.clearWallpaper() },
             onClose = { wallpaperSheet = false },
         )
+
+        // Dönüş efekti kartı
+        returnInfo?.let { AppReturnOverlay(it, rootSize, returnAnim.value, vm) }
 
         // Sürüklenen öğenin hayalet simgesi (tüm katmanların üstünde)
         val dk = drag.key

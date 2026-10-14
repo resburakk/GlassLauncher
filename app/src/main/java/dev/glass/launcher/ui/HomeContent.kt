@@ -237,10 +237,7 @@ internal fun HomeContent(
 
         /** Uygulamayı, simgesinden büyüyen sistem animasyonuyla açar. */
         fun launchFrom(app: AppInfo, r: Rect) {
-            val opts = runCatching {
-                ActivityOptions.makeScaleUpAnimation(view, r.left.toInt(), r.top.toInt(), r.width.toInt(), r.height.toInt()).toBundle()
-            }.getOrNull()
-            vm.launch(app, android.graphics.Rect(r.left.toInt(), r.top.toInt(), r.right.toInt(), r.bottom.toInt()), opts)
+            vm.launchFrom(app, view, r)
         }
 
         // 0 = ana ekran, 1 = tamamen Uygulama Arşivi
@@ -576,7 +573,12 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     val rimW = st.iconRimWidth.dp * (icon / 60.dp).coerceAtMost(1f)
     if (live != null) {
         Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
-            LiveIcon(live, icon, st.liveClockSeconds)
+            val dark = when (st.liveIconTheme) {
+                "light" -> false
+                "dark" -> true
+                else -> androidx.compose.foundation.isSystemInDarkTheme()
+            }
+            LiveIcon(live, icon, st.liveClockSeconds, dark)
         }
         return
     }

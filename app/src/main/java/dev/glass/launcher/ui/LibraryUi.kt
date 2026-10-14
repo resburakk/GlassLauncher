@@ -211,6 +211,7 @@ private fun CategoryTile(
     onDrop: (String, androidx.compose.ui.geometry.Offset, String?) -> Unit,
     onOpen: () -> Unit,
 ) {
+    val view = androidx.compose.ui.platform.LocalView.current
     val u = LocalPt.current
     val pad = u * 12.6f
     val gap = u * 12.8f
@@ -237,7 +238,7 @@ private fun CategoryTile(
                                     label = app.label, showLabel = false, icon = big, pitchX = big, cellHeight = big,
                                     drag = drag, layer = DragLayer.Home, isApp = true, acceptsMerge = false,
                                     edit = false, jiggle = jiggle,
-                                    onClick = { vm.launch(app) },
+                                    onClick = { r -> vm.launchFrom(app, view, r) },
                                     onDrop = { p, h -> onDrop(app.key, p, h) },
                                 ) { AppIconImage(app, vm, big, settings.iconGlass, settings.glassStrength) }
                                 i == 3 && rest.isNotEmpty() -> MiniCluster(vm, rest, big, onOpen)
@@ -340,6 +341,7 @@ fun LibraryGroupOverlay(
     onDrop: (String, androidx.compose.ui.geometry.Offset, String?) -> Unit,
     onClose: () -> Unit,
 ) {
+    val view = androidx.compose.ui.platform.LocalView.current
     BoxWithConstraints(
         Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
         contentAlignment = Alignment.Center,
@@ -378,7 +380,7 @@ fun LibraryGroupOverlay(
                             label = app.label, showLabel = true, icon = icon, pitchX = pitch, cellHeight = rowH,
                             drag = drag, layer = DragLayer.Folder, isApp = true, acceptsMerge = false,
                             edit = false, jiggle = jiggle,
-                            onClick = { vm.launch(app); onClose() },
+                            onClick = { r -> vm.launchFrom(app, view, r); onClose() },
                             onDrop = { p, h -> onDrop(app.key, p, h) },
                         ) { AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength) }
                     }

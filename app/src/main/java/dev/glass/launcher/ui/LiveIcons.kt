@@ -33,8 +33,6 @@ import kotlin.math.sin
 /** Canlı çizilen sistem simgeleri (iOS'taki gibi). */
 enum class LiveIconKind { Clock, Calendar }
 
-private val IosRed = Color(0xFFFF3B30)
-private val IosOrange = Color(0xFFFF9500)
 private val TR_DAYS = arrayOf("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt")
 
 /**
@@ -62,32 +60,49 @@ private fun rememberNow(smooth: Boolean): () -> Long {
     return { now.longValue }
 }
 
+/** Canlı simgelerin renkleri (açık / koyu mod). */
+private class LivePalette(
+    val calBg: Color, val calRed: Color, val calInk: Color,
+    val clockBg: Color, val clockInk: Color, val clockRed: Color,
+)
+
+private val LightPalette = LivePalette(
+    calBg = Color.White, calRed = Color(0xFFFF3B30), calInk = Color.Black,
+    clockBg = Color(0xFFF4EFE4), clockInk = Color(0xFF1E1E1E), clockRed = Color(0xFFE63946),
+)
+private val DarkPalette = LivePalette(
+    calBg = Color(0xFF1C1C1E), calRed = Color(0xFFFF453A), calInk = Color.White,
+    clockBg = Color(0xFF262320), clockInk = Color(0xFFF0E8D6), clockRed = Color(0xFFFF5C5C),
+)
+
+/** [dark]: koyu mod renkleri (telefonun teması ya da ayardaki sabit seçim). */
 @Composable
-fun LiveIcon(kind: LiveIconKind, size: Dp, seconds: Boolean) {
+fun LiveIcon(kind: LiveIconKind, size: Dp, seconds: Boolean, dark: Boolean = false) {
+    val p = if (dark) DarkPalette else LightPalette
     when (kind) {
-        LiveIconKind.Clock -> LiveClock(seconds && size >= 30.dp)
-        LiveIconKind.Calendar -> LiveCalendar()
+        LiveIconKind.Clock -> LiveClock(seconds && size >= 30.dp, p)
+        LiveIconKind.Calendar -> LiveCalendar(p)
     }
 }
 
-/** iOS Takvim simgesi: beyaz zemin, üstte kırmızı kısa gün adı, altta büyük tarih. */
+/** Takvim simgesi: üstte kırmızı kısa gün adı, altta büyük tarih; açık modda beyaz, koyuda koyu gri zemin. */
 @Composable
-private fun LiveCalendar() {
+private fun LiveCalendar(p: LivePalette) {
     val measurer = rememberTextMeasurer()
     val now = rememberNow(false)
     Spacer(Modifier.fillMaxSize().drawWithCache {
         val s = size.minDimension
         onDrawBehind {
-        drawRect(Color.White)
+        drawRect(p.calBg)
         val cal = Calendar.getInstance().apply { timeInMillis = now() }
         val day = TR_DAYS[cal.get(Calendar.DAY_OF_WEEK) - 1]
         val date = cal.get(Calendar.DAY_OF_MONTH).toString()
         val dayStyle = TextStyle(
-            color = IosRed, fontFamily = AppFont, fontWeight = FontWeight.Medium,
+            color = p.calRed, fontFamily = AppFont, fontWeight = FontWeight.Medium,
             fontSize = (s * 0.165f).toSp(), letterSpacing = 0.sp,
         )
         val dateStyle = TextStyle(
-            color = Color.Black, fontFamily = AppFont, fontWeight = FontWeight.Light,
+            color = p.calInk, fontFamily = AppFont, fontWeight = FontWeight.Light,
             fontSize = (s * 0.50f).toSp(), letterSpacing = (-0.02f * s).toSp(),
         )
         val d = measurer.measure(day, dayStyle)
@@ -99,59 +114,54 @@ private fun LiveCalendar() {
     })
 }
 
-/** iOS Saat simgesi: siyah zemin, beyaz kadran, rakamlar, siyah ibreler, turuncu saniye ibresi. */
+/**
+ * Bauhaus saat simgesi: krem (koyu modda koyu kahve) zemin, iri 12-3-6-9 rakamları, diğer saatlerde
+ * noktalar, kalın yuvarlak uçlu ibreler, kırmızı saniye ibresi.
+ */
 @Composable
-private fun LiveClock(seconds: Boolean) {
+private fun LiveClock(seconds: Boolean, p: LivePalette) {
     val measurer = rememberTextMeasurer()
     val now = rememberNow(seconds)
     Spacer(Modifier.fillMaxSize().drawWithCache {
         val s = size.minDimension
-        val c = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
-        val faceR = s * 0.445f
-        // Rakamlar boyut değişince bir kez ölçülür (her karede değil).
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val r = s * 0.42f
+        // Rakamlar boyut/renk değişince bir kez ölçülür (her karede değil).
         val numStyle = TextStyle(
-            color = Color.Black, fontFamily = AppFont, fontWeight = FontWeight.Medium,
-            fontSize = (s * 0.108f).toSp(), letterSpacing = 0.sp,
+            color = p.clockInk, fontFamily = AppFont, fontWeight = FontWeight.Bold,
+            fontSize = (s * 0.17f).toSp(), letterSpacing = 0.sp,
         )
-        val numR = faceR * 0.76f
-        val nums = (1..12).map { h ->
+        val nums = listOf(12, 3, 6, 9).map { h ->
             val a = Math.toRadians(h * 30.0 - 90.0)
             val m = measurer.measure(h.toString(), numStyle)
             m to Offset(
-                c.x + numR * cos(a).toFloat() - m.size.width / 2f,
-                c.y + numR * sin(a).toFloat() - m.size.height / 2f,
+                c.x + r * 0.80f * cos(a).toFloat() - m.size.width / 2f,
+                c.y + r * 0.80f * sin(a).toFloat() - m.size.height / 2f,
             )
         }
+        val dots = listOf(1, 2, 4, 5, 7, 8, 10, 11).map { h ->
+            val a = Math.toRadians(h * 30.0 - 90.0)
+            Offset(c.x + r * 0.82f * cos(a).toFloat(), c.y + r * 0.82f * sin(a).toFloat())
+        }
         onDrawBehind {
-        drawRect(Color.Black)
-        drawCircle(Color.White, faceR, c)
-        drawTicks(c, faceR, s)
+        drawRect(p.clockBg)
         nums.forEach { (m, o) -> drawText(m, topLeft = o) }
+        dots.forEach { drawCircle(p.clockInk, s * 0.016f, it) }
         val cal = Calendar.getInstance().apply { timeInMillis = now() }
         val ms = cal.get(Calendar.MILLISECOND)
         val sec = cal.get(Calendar.SECOND) + ms / 1000f
         val min = cal.get(Calendar.MINUTE) + sec / 60f
         val hr = (cal.get(Calendar.HOUR) + min / 60f)
-        hand(c, hr * 30f, faceR * 0.50f, s * 0.052f, Color.Black, tail = 0f)
-        hand(c, min * 6f, faceR * 0.78f, s * 0.040f, Color.Black, tail = 0f)
-        drawCircle(Color.Black, s * 0.042f, c)
+        hand(c, hr * 30f, r * 0.45f, s * 0.07f, p.clockInk, tail = 0f)
+        hand(c, min * 6f, r * 0.68f, s * 0.05f, p.clockInk, tail = 0f)
         if (seconds) {
-            hand(c, sec * 6f, faceR * 0.86f, s * 0.016f, IosOrange, tail = faceR * 0.20f)
-            drawCircle(IosOrange, s * 0.028f, c)
-            drawCircle(Color.White, s * 0.010f, c)
+            hand(c, sec * 6f, r * 0.70f, s * 0.018f, p.clockRed, tail = r * 0.18f)
+            drawCircle(p.clockRed, s * 0.04f, c)
+        } else {
+            drawCircle(p.clockInk, s * 0.045f, c)
         }
         }
     })
-}
-
-private fun DrawScope.drawTicks(c: Offset, r: Float, s: Float) {
-    for (i in 0 until 60) {
-        if (i % 5 == 0) continue
-        val a = Math.toRadians(i * 6.0)
-        val o = Offset(c.x + r * 0.95f * sin(a).toFloat(), c.y - r * 0.95f * cos(a).toFloat())
-        val n = Offset(c.x + r * 0.90f * sin(a).toFloat(), c.y - r * 0.90f * cos(a).toFloat())
-        drawLine(Color(0xFFB0B0B5), n, o, strokeWidth = s * 0.008f)
-    }
 }
 
 private fun DrawScope.hand(c: Offset, deg: Float, len: Float, width: Float, color: Color, tail: Float) {

@@ -557,9 +557,15 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         if (s.liveIcons) {
             RowDivider()
             ToggleRow("Saatte saniye ibresi", s.liveClockSeconds, default = Def.liveClockSeconds) { v -> onChange { it.copy(liveClockSeconds = v) } }
+            RowDivider()
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("auto" to "Otomatik", "light" to "Açık", "dark" to "Koyu").forEach { (k, t) ->
+                    Chip(t, s.liveIconTheme == k, Modifier.weight(1f)) { onChange { it.copy(liveIconTheme = k) } }
+                }
+            }
         }
     }
-    Footer("Saat simgesinin ibreleri gerçek saati gösterir, Takvim simgesi her gün bugünün tarihini gösterir. Simgesi elle değiştirilmiş uygulamalarda kullanılmaz.")
+    Footer("Saat simgesinin ibreleri gerçek saati gösterir, Takvim simgesi her gün bugünün tarihini gösterir. Görünüm \"Otomatik\"te telefonun açık/koyu moduna uyar. Simgesi elle değiştirilmiş uygulamalarda kullanılmaz.")
     Footer("Tek bir uygulamanın simgesini değiştirmek için simgesine basılı tutup \"Simgeyi Değiştir\"i seçin.")
 }
 

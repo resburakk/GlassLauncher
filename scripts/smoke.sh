@@ -129,6 +129,16 @@ adb shell input tap $((W*28/100)) $((H*38/100)); step "klasör içinden seç" 2
 shot 12c-klasor-icinde-secim
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 
+# Uygulama aç (simgeden büyüyerek) ve ana ekrana dön (simgeye küçülme efekti)
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input tap $((W*62/100)) $((H*25/100)); sleep 0.25
+shot 13a-acilis
+step "uygulama açık" 3
+adb shell input keyevent KEYCODE_HOME; sleep 0.12
+shot 13b-donus
+step "dönüş bitti" 2
+shot 13c-donus-sonrasi
+
 # Galeriden "Farklı ayarla" penceresi (ATTACH_DATA)
 adb shell am start -a android.intent.action.ATTACH_DATA -t image/png -d content://media/external/images/media/1 -n dev.glass.launcher/.WallpaperImportActivity; step "farklı ayarla" 3
 shot 11-farkli-ayarla
