@@ -21,6 +21,21 @@
 
     <!-- Paket görünürlüğü: QUERY_ALL_PACKAGES yerine yalnızca başlatılabilir uygulamalar sorgulanır -->
     <queries>
+        <!-- Arama: "internette ara", "Play Store'da ara" ve sesle yazma için açılacak uygulamayı bulmak -->
+        <intent>
+            <action android:name="android.intent.action.WEB_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
