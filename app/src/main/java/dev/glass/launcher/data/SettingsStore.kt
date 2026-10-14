@@ -44,6 +44,8 @@ data class LauncherSettings(
     val labelGap: Float = 5f,
     /** Etiket yazı boyutu (pt; iOS'ta 12). */
     val labelSize: Float = 12f,
+    /** Ana ekran simge adlarının kalınlığı (300–700). */
+    val labelWeight: Float = 400f,
     // Simgeler
     val iconScale: Float = 1f,
     val iconStyle: IconStyle = IconStyle.Original,
@@ -121,7 +123,7 @@ data class LauncherSettings(
     val searchResultWeight: Float = 400f,
     val searchResultsPanel: Boolean = false,
     /** Arama paneli ve çubuğunun cam parlaklığı (karartılmış arka planla uyum için varsayılan biraz koyu). */
-    val searchGlassBrightness: Float = -0.3f,
+    val searchGlassBrightness: Float = 0f,
     /** Yazı gölgesi (iOS tarzı dağınık gölge): açık/kapalı, yoğunluk ve yayılma. */
     val textShadow: Boolean = false,
     val textShadowStrength: Float = 0.35f,
@@ -190,6 +192,7 @@ data class LauncherSettings(
         textShadowSpread = textShadowSpread.coerceIn(0.3f, 3f),
         editButtonTextSize = editButtonTextSize.coerceIn(10f, 20f),
         editButtonWeight = editButtonWeight.coerceIn(300f, 700f),
+        labelWeight = labelWeight.coerceIn(300f, 700f),
         settingsTheme = settingsTheme.takeIf { it in setOf("auto", "light", "dark") } ?: "auto",
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
@@ -222,9 +225,9 @@ data class LauncherSettings(
         put("searchDeviceCard", searchDeviceCard)
         put("searchFieldTextSize", searchFieldTextSize.toDouble()); put("searchResultTextSize", searchResultTextSize.toDouble())
         put("searchResultWeight", searchResultWeight.toDouble()); put("searchResultsPanel", searchResultsPanel)
-        put("searchGlassBrightness", searchGlassBrightness.toDouble())
+        put("searchGlassBrightness2", searchGlassBrightness.toDouble())
         put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
-        put("settingsTheme", settingsTheme)
+        put("settingsTheme", settingsTheme); put("labelWeight", labelWeight.toDouble())
         put("editButtonTextSize", editButtonTextSize.toDouble()); put("editButtonWeight", editButtonWeight.toDouble())
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
@@ -315,11 +318,12 @@ data class LauncherSettings(
                 searchResultTextSize = f("searchResultTextSize", d.searchResultTextSize),
                 searchResultWeight = f("searchResultWeight", d.searchResultWeight),
                 searchResultsPanel = o.optBoolean("searchResultsPanel", d.searchResultsPanel),
-                searchGlassBrightness = f("searchGlassBrightness", d.searchGlassBrightness),
+                searchGlassBrightness = f("searchGlassBrightness2", d.searchGlassBrightness),
                 textShadow = o.optBoolean("textShadow", d.textShadow),
                 textShadowStrength = f("textShadowStrength", d.textShadowStrength),
                 textShadowSpread = f("textShadowSpread", d.textShadowSpread),
                 settingsTheme = o.optString("settingsTheme", d.settingsTheme),
+                labelWeight = f("labelWeight", d.labelWeight),
                 editButtonTextSize = f("editButtonTextSize", d.editButtonTextSize),
                 editButtonWeight = f("editButtonWeight", d.editButtonWeight),
             ).let { loaded ->

@@ -394,6 +394,10 @@ private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         SliderRow("Yazı boyutu", "${"%.1f".format(Locale.US, s.labelSize)} pt", s.labelSize, 9f..16f, default = Def.labelSize) { v ->
             onChange { it.copy(labelSize = v) }
         }
+        RowDivider()
+        SliderRow("Yazı kalınlığı", fontWeightName(s.labelWeight), s.labelWeight, 300f..700f, default = Def.labelWeight) { v ->
+            onChange { it.copy(labelWeight = v) }
+        }
     }
     Group("Arama düğmesi (dock üstü)") {
         SliderRow("Yazı boyutu", "${s.pillTextSize.roundToInt()} pt", s.pillTextSize, 9f..24f, default = Def.pillTextSize) { v ->

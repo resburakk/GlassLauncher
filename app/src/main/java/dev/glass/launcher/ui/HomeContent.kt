@@ -544,7 +544,7 @@ internal fun AppCell(
             if (showLabel) {
                 Text(
                     app.label,
-                    style = LabelStyle,
+                    style = LabelStyle.copy(fontWeight = fontWeightOf(LocalLauncherSettings.current.labelWeight)),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,

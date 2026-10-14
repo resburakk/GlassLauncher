@@ -354,7 +354,7 @@ internal fun DraggableCell(
                 val pt = LocalPt.current
                 Text(
                     label,
-                    style = CellLabelStyle.copy(fontSize = (st.labelSize * pt.value).sp),
+                    style = CellLabelStyle.copy(fontSize = (st.labelSize * pt.value).sp, fontWeight = fontWeightOf(st.labelWeight)),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,

@@ -211,7 +211,8 @@ fun SearchOverlay(
                     .padding(top = 8.dp, bottom = 10.dp)
                     .height(48.dp)
                     .liquidGlass(CircleShape, strength * st.dockOpacity, 4.dp)
-                    .glassBrightness(st.searchGlassBrightness)
+                    .background(Color.Black.copy(alpha = SEARCH_DIM))
+            .glassBrightness(st.searchGlassBrightness)
                     .then(neutral)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
                     .padding(start = 14.dp, end = 8.dp),
@@ -289,6 +290,7 @@ private fun SuggestionsPanel(
             .requiredWidth(panelW)
             .height(pad * 2f + cellH)
             .liquidGlass(RoundedCornerShape(hm.dockCorner), strength * st.dockOpacity, 14.dp)
+            .background(Color.Black.copy(alpha = SEARCH_DIM))
             .glassBrightness(st.searchGlassBrightness)
             .then(neutral)
     ) {
@@ -470,3 +472,10 @@ private fun highlight(text: String, query: String): AnnotatedString {
         append(text.substring(i + q.length))
     }
 }
+
+/**
+ * Arama açıkken arka plana uygulanan toplam karartma: ana ekran perdesi (%28) + arama katmanı (%18) ≈ %41.
+ * Öneri paneli ve arama çubuğu, camlarında duvar kâğıdını karartılmadan gösterdiği için aynı oranda
+ * koyulaştırılır; böylece çevreleriyle uyumlu, dock ile aynı ayarda görünürler.
+ */
+private const val SEARCH_DIM = 0.41f
