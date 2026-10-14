@@ -65,7 +65,9 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         requestHighestRefreshRate()
         updateDefault()
         applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
-        if (isSettingsEntry(intent)) openSettingsRequest++
+        // Kurulum/güncellemeden sonra "Aç" ile gelinirse (ilk açılış) ayarlar değil ana ekran gösterilir.
+        val firstRun = consumeFirstRunAfterUpdate()
+        if (isSettingsEntry(intent) && !firstRun) openSettingsRequest++
         val lastCrash = (application as LauncherApp).takeLastCrash()
         setContent {
             var crash by remember { mutableStateOf(lastCrash) }
@@ -172,6 +174,15 @@ class MainActivity : ComponentActivity(), WidgetRequester {
             d.postDelayed(blurRelayout, 120)
         }
     }
+
+    /** Uygulama kurulduktan veya güncellendikten sonraki ilk açılış mı? (Bir kez true döner.) */
+    private fun consumeFirstRunAfterUpdate(): Boolean = runCatching {
+        val stamp = packageManager.getPackageInfo(packageName, 0).lastUpdateTime
+        val prefs = getSharedPreferences("launch", MODE_PRIVATE)
+        val seen = prefs.getLong("seenUpdate", 0L)
+        prefs.edit().putLong("seenUpdate", stamp).apply()
+        seen != stamp
+    }.getOrDefault(false)
 
     private fun isSettingsEntry(i: Intent?): Boolean =
         i?.component?.className?.endsWith(".SettingsEntry") == true

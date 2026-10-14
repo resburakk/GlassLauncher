@@ -1,5 +1,14 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.material3.LocalTextStyle
+import androidx.core.view.WindowCompat
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.isSystemInDarkTheme
 import kotlin.math.roundToInt
 import android.content.Intent
 import androidx.activity.compose.BackHandler
@@ -65,10 +74,36 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 
 private val Blue = Color(0xFF0A84FF)
-private val RowBg = Color(0xFF1C1C1E)
-private val Divider = Color(0xFF38383A)
-private val Muted = Color(0xFF8E8E93)
-private val PageBg = Color(0xFF000000)
+
+/** Ayarlar ekranı renkleri: telefonun açık/koyu temasına (veya seçilen temaya) göre. */
+private class SettingsPalette(
+    val pageBg: Color, val rowBg: Color, val divider: Color, val muted: Color, val fg: Color,
+    val secondary: Color, val chip: Color, val switchOff: Color, val sliderOff: Color,
+)
+private val DarkPalette = SettingsPalette(
+    pageBg = Color(0xFF000000), rowBg = Color(0xFF1C1C1E), divider = Color(0xFF38383A), muted = Color(0xFF8E8E93),
+    fg = Color.White, secondary = Color(0xFFD1D1D6), chip = Color(0xFF3A3A3C), switchOff = Color(0xFF39393D),
+    sliderOff = Color(0xFF48484A),
+)
+private val LightPalette = SettingsPalette(
+    pageBg = Color(0xFFF2F2F7), rowBg = Color.White, divider = Color(0xFFC6C6C8), muted = Color(0xFF6D6D72),
+    fg = Color.Black, secondary = Color(0xFF3C3C43), chip = Color(0xFFE5E5EA), switchOff = Color(0xFFE9E9EA),
+    sliderOff = Color(0xFFD1D1D6),
+)
+private val LocalSettingsPalette = staticCompositionLocalOf { DarkPalette }
+private val RowBg: Color @Composable get() = LocalSettingsPalette.current.rowBg
+private val Divider: Color @Composable get() = LocalSettingsPalette.current.divider
+private val Muted: Color @Composable get() = LocalSettingsPalette.current.muted
+private val PageBg: Color @Composable get() = LocalSettingsPalette.current.pageBg
+private val Fg: Color @Composable get() = LocalSettingsPalette.current.fg
+private val Secondary: Color @Composable get() = LocalSettingsPalette.current.secondary
+private val ChipBg: Color @Composable get() = LocalSettingsPalette.current.chip
+
+/** Varsayılan değerler ("↺" düğmesi ve sayfa sıfırlama için). */
+private val Def = LauncherSettings()
+
+/** Açık sayfadaki ayarların "varsayılana dön" işlemleri (sayfa sıfırlama düğmesi için). */
+private val LocalResetRegistry = staticCompositionLocalOf<MutableList<() -> Unit>?> { null }
 
 /** Ayarlar alt sayfaları (iOS Ayarlar düzeni). */
 private enum class SettingsPage(val title: String, val glyph: Glyph, val color: Color) {
@@ -108,6 +143,28 @@ fun SettingsScreen(
 
     BackHandler { if (page != null) page = null else onClose() }
 
+    val dark = when (s.settingsTheme) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
+    // Açık temada durum/gezinme çubuğu simgeleri koyu olmalı; ayarlar kapanınca eski hâline döner.
+    val view = LocalView.current
+    DisposableEffect(dark) {
+        val win = (view.context as? android.app.Activity)?.window
+        val ctrl = win?.let { WindowCompat.getInsetsController(it, view) }
+        val prevS = ctrl?.isAppearanceLightStatusBars
+        val prevN = ctrl?.isAppearanceLightNavigationBars
+        ctrl?.isAppearanceLightStatusBars = !dark
+        ctrl?.isAppearanceLightNavigationBars = !dark
+        onDispose {
+            if (ctrl != null) {
+                prevS?.let { ctrl.isAppearanceLightStatusBars = it }
+                prevN?.let { ctrl.isAppearanceLightNavigationBars = it }
+            }
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalSettingsPalette provides if (dark) DarkPalette else LightPalette,
+        LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = AppFont),
+    ) {
     Box(Modifier.fillMaxSize().background(PageBg)) {
         AnimatedContent(
             targetState = page,
@@ -140,11 +197,16 @@ fun SettingsScreen(
                     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
                 ) {
                     Text(
-                        p?.title ?: "Ayarlar", color = Color.White, fontSize = 32.sp, fontWeight = FontWeight.Bold,
+                        p?.title ?: "Ayarlar", color = Fg, fontSize = 32.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
                     )
+                    val resetReg = remember(p) { mutableStateListOf<() -> Unit>() }
+                    CompositionLocalProvider(LocalResetRegistry provides resetReg) {
                     when (p) {
-                        null -> RootPage(isDefaultHome, onRequestDefault) { page = it.name }
+                        null -> {
+                            RootPage(isDefaultHome, onRequestDefault) { page = it.name }
+                            SettingsThemeGroup(s, onChange)
+                        }
                         SettingsPage.Home -> HomePage(s, onChange)
                         SettingsPage.Icons -> IconsPage(s, onChange)
                         SettingsPage.Dock -> DockPage(s, onChange)
@@ -162,11 +224,30 @@ fun SettingsScreen(
                         SettingsPage.Performance -> PerformancePage(s, onChange)
                         SettingsPage.About -> AboutPage()
                     }
+                    }
+                    if (p != null && resetReg.isNotEmpty()) {
+                        Group(null) {
+                            ActionRow("Bu sayfayı varsayılana döndür", destructive = true) { resetReg.toList().forEach { it() } }
+                        }
+                    }
                     Spacer(Modifier.height(32.dp))
                 }
             }
         }
     }
+    }
+}
+
+@Composable
+private fun SettingsThemeGroup(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group("Ayarlar görünümü") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("auto" to "Otomatik", "light" to "Açık", "dark" to "Koyu").forEach { (k, t) ->
+                Chip(t, s.settingsTheme == k, Modifier.weight(1f)) { onChange { it.copy(settingsTheme = k) } }
+            }
+        }
+    }
+    Footer("Otomatik: telefonun açık/koyu tema ayarını izler.")
 }
 
 @Composable
@@ -202,9 +283,9 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
     }
     Footer("Satır sayısı ekran yüksekliğine göre gerekirse azaltılır.")
     Group("Aralıklar") {
-        SliderRow("Yatay aralık", pct(s.hSpacing), s.hSpacing, 0.8f..1.3f) { v -> onChange { it.copy(hSpacing = v) } }
+        SliderRow("Yatay aralık", pct(s.hSpacing), s.hSpacing, 0.8f..1.3f, default = Def.hSpacing) { v -> onChange { it.copy(hSpacing = v) } }
         RowDivider()
-        SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f) { v -> onChange { it.copy(vSpacing = v) } }
+        SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f, default = Def.vSpacing) { v -> onChange { it.copy(vSpacing = v) } }
     }
     Footer("Uygulama adlarının yazı ayarları \"Yazı Tipi\" sayfasında.")
 }
@@ -230,24 +311,31 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
     fun status(ok: Boolean) = if (ok) "İzin verildi" else "İzin yok"
 
     Group("Görünüm") {
-        ToggleRow("Önerilerde uygulama adları", s.searchShowLabels) { v -> onChange { it.copy(searchShowLabels = v) } }
+        ToggleRow("Önerilerde uygulama adları", s.searchShowLabels, default = Def.searchShowLabels) { v -> onChange { it.copy(searchShowLabels = v) } }
         RowDivider()
-        ToggleRow("Nötr cam rengi", s.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
+        ToggleRow("Nötr cam rengi", s.searchNeutral, default = Def.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
         RowDivider()
-        ToggleRow("Sonuçlar cam panel içinde", s.searchResultsPanel) { v -> onChange { it.copy(searchResultsPanel = v) } }
+        ToggleRow("Sonuçlar cam panel içinde", s.searchResultsPanel, default = Def.searchResultsPanel) { v -> onChange { it.copy(searchResultsPanel = v) } }
+        RowDivider()
+        SliderRow(
+            "Cam parlaklığı",
+            when { s.searchGlassBrightness > 0.01f -> "+${(s.searchGlassBrightness * 100).roundToInt()}"; s.searchGlassBrightness < -0.01f -> "${(s.searchGlassBrightness * 100).roundToInt()}"; else -> "0" },
+            s.searchGlassBrightness, -1f..1f, default = Def.searchGlassBrightness,
+        ) { v -> onChange { it.copy(searchGlassBrightness = v) } }
     }
+    Footer("Öneri paneli ve arama çubuğu dock ile aynı camı kullanır; parlaklık, arama açıkken kararan arka planla uyum içindir.")
     Group("Telefonda ara") {
-        ToggleRow("Kişiler (${status(contactsOk)})", s.searchContacts) { v ->
+        ToggleRow("Kişiler (${status(contactsOk)})", s.searchContacts, default = Def.searchContacts) { v ->
             onChange { it.copy(searchContacts = v) }
             if (v && !contactsOk) perm.launch(arrayOf(android.Manifest.permission.READ_CONTACTS))
         }
         RowDivider()
-        ToggleRow("Mesajlar (${status(smsOk)})", s.searchMessages) { v ->
+        ToggleRow("Mesajlar (${status(smsOk)})", s.searchMessages, default = Def.searchMessages) { v ->
             onChange { it.copy(searchMessages = v) }
             if (v && !smsOk) perm.launch(arrayOf(android.Manifest.permission.READ_SMS))
         }
         RowDivider()
-        ToggleRow("Dosyalar (${status(filesOk)})", s.searchFiles) { v ->
+        ToggleRow("Dosyalar (${status(filesOk)})", s.searchFiles, default = Def.searchFiles) { v ->
             onChange { it.copy(searchFiles = v) }
             if (v && !filesOk) perm.launch(dev.glass.launcher.data.DeviceSearch.mediaPermissions)
         }
@@ -280,18 +368,18 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
 @Composable
 private fun MenuPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group("Görünüm") {
-        ToggleRow("Koyu menü", s.menuDark) { v -> onChange { it.copy(menuDark = v) } }
+        ToggleRow("Koyu menü", s.menuDark, default = Def.menuDark) { v -> onChange { it.copy(menuDark = v) } }
         RowDivider()
-        SliderRow("Cam açıklığı", pct(s.menuOpacity), s.menuOpacity, 0.1f..0.95f) { v -> onChange { it.copy(menuOpacity = v) } }
+        SliderRow("Cam açıklığı", pct(s.menuOpacity), s.menuOpacity, 0.1f..0.95f, default = Def.menuOpacity) { v -> onChange { it.copy(menuOpacity = v) } }
         RowDivider()
-        SliderRow("Köşe yuvarlaklığı", "${s.menuCorner.roundToInt()} pt", s.menuCorner, 10f..44f) { v -> onChange { it.copy(menuCorner = v) } }
+        SliderRow("Köşe yuvarlaklığı", "${s.menuCorner.roundToInt()} pt", s.menuCorner, 10f..44f, default = Def.menuCorner) { v -> onChange { it.copy(menuCorner = v) } }
     }
     Group("Boyutlar") {
-        SliderRow("Genişlik", "${s.menuWidth.roundToInt()} pt", s.menuWidth, 200f..330f) { v -> onChange { it.copy(menuWidth = v) } }
+        SliderRow("Genişlik", "${s.menuWidth.roundToInt()} pt", s.menuWidth, 200f..330f, default = Def.menuWidth) { v -> onChange { it.copy(menuWidth = v) } }
         RowDivider()
-        SliderRow("Satır yüksekliği", "${s.menuRowHeight.roundToInt()} pt", s.menuRowHeight, 36f..64f) { v -> onChange { it.copy(menuRowHeight = v) } }
+        SliderRow("Satır yüksekliği", "${s.menuRowHeight.roundToInt()} pt", s.menuRowHeight, 36f..64f, default = Def.menuRowHeight) { v -> onChange { it.copy(menuRowHeight = v) } }
         RowDivider()
-        SliderRow("Yazı boyutu", "${s.menuTextSize.roundToInt()} pt", s.menuTextSize, 13f..22f) { v -> onChange { it.copy(menuTextSize = v) } }
+        SliderRow("Yazı boyutu", "${s.menuTextSize.roundToInt()} pt", s.menuTextSize, 13f..22f, default = Def.menuTextSize) { v -> onChange { it.copy(menuTextSize = v) } }
     }
     Footer("Bir simgeye basılı tutunca açılan menü. Bulanıklık, kenar çizgisi ve parlaklık Liquid Glass sayfasındaki genel ayarları izler.")
 }
@@ -299,38 +387,52 @@ private fun MenuPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
 @Composable
 private fun FontsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group("Uygulama adları") {
-        ToggleRow("Adları göster", s.showLabels) { v -> onChange { it.copy(showLabels = v) } }
+        ToggleRow("Adları göster", s.showLabels, default = Def.showLabels) { v -> onChange { it.copy(showLabels = v) } }
         RowDivider()
-        SliderRow("Simgeye uzaklık", "${s.labelGap.toInt()} pt", s.labelGap, 0f..14f) { v -> onChange { it.copy(labelGap = v) } }
+        SliderRow("Simgeye uzaklık", "${s.labelGap.toInt()} pt", s.labelGap, 0f..14f, default = Def.labelGap) { v -> onChange { it.copy(labelGap = v) } }
         RowDivider()
-        SliderRow("Yazı boyutu", "${"%.1f".format(Locale.US, s.labelSize)} pt", s.labelSize, 9f..16f) { v ->
+        SliderRow("Yazı boyutu", "${"%.1f".format(Locale.US, s.labelSize)} pt", s.labelSize, 9f..16f, default = Def.labelSize) { v ->
             onChange { it.copy(labelSize = v) }
         }
     }
     Group("Arama düğmesi (dock üstü)") {
-        SliderRow("Yazı boyutu", "${s.pillTextSize.roundToInt()} pt", s.pillTextSize, 9f..24f) { v ->
+        SliderRow("Yazı boyutu", "${s.pillTextSize.roundToInt()} pt", s.pillTextSize, 9f..24f, default = Def.pillTextSize) { v ->
             onChange { it.copy(pillTextSize = v) }
         }
         RowDivider()
-        SliderRow("Yazı kalınlığı", fontWeightName(s.pillTextWeight), s.pillTextWeight, 300f..700f) { v ->
+        SliderRow("Yazı kalınlığı", fontWeightName(s.pillTextWeight), s.pillTextWeight, 300f..700f, default = Def.pillTextWeight) { v ->
             onChange { it.copy(pillTextWeight = v) }
         }
     }
+    Group("Yazı gölgesi") {
+        ToggleRow("Gölge", s.textShadow, default = Def.textShadow) { v -> onChange { it.copy(textShadow = v) } }
+        if (s.textShadow) {
+            RowDivider()
+            SliderRow("Yoğunluk", pct(s.textShadowStrength / 0.35f), s.textShadowStrength, 0.05f..0.9f, default = Def.textShadowStrength) { v ->
+                onChange { it.copy(textShadowStrength = v) }
+            }
+            RowDivider()
+            SliderRow("Etrafa yayılma", pct(s.textShadowSpread), s.textShadowSpread, 0.3f..3f, default = Def.textShadowSpread) { v ->
+                onChange { it.copy(textShadowSpread = v) }
+            }
+        }
+    }
+    Footer("Kapalıyken yazıların etrafında çerçeve/gölge olmaz. Yayılma arttıkça gölge daha geniş ve yumuşak olur.")
     Group("Arama") {
-        SliderRow("Arama kutusu yazı boyutu", "${s.searchFieldTextSize.roundToInt()} pt", s.searchFieldTextSize, 12f..22f) { v ->
+        SliderRow("Arama kutusu yazı boyutu", "${s.searchFieldTextSize.roundToInt()} pt", s.searchFieldTextSize, 12f..22f, default = Def.searchFieldTextSize) { v ->
             onChange { it.copy(searchFieldTextSize = v) }
         }
         RowDivider()
-        SliderRow("Sonuç yazı boyutu", "${s.searchResultTextSize.roundToInt()} pt", s.searchResultTextSize, 12f..22f) { v ->
+        SliderRow("Sonuç yazı boyutu", "${s.searchResultTextSize.roundToInt()} pt", s.searchResultTextSize, 12f..22f, default = Def.searchResultTextSize) { v ->
             onChange { it.copy(searchResultTextSize = v) }
         }
         RowDivider()
-        SliderRow("Sonuç yazı kalınlığı", fontWeightName(s.searchResultWeight), s.searchResultWeight, 300f..700f) { v ->
+        SliderRow("Sonuç yazı kalınlığı", fontWeightName(s.searchResultWeight), s.searchResultWeight, 300f..700f, default = Def.searchResultWeight) { v ->
             onChange { it.copy(searchResultWeight = v) }
         }
     }
     Group("Klasörler") {
-        SliderRow("Açık klasör adı boyutu", "${s.openFolderTitleSize.roundToInt()} pt", s.openFolderTitleSize, 10f..40f) { v ->
+        SliderRow("Açık klasör adı boyutu", "${s.openFolderTitleSize.roundToInt()} pt", s.openFolderTitleSize, 10f..40f, default = Def.openFolderTitleSize) { v ->
             onChange { it.copy(openFolderTitleSize = v) }
         }
     }
@@ -350,7 +452,7 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             }
         }
         RowDivider()
-        SliderRow("Simge boyutu", pct(s.iconScale), s.iconScale, 0.7f..1.4f) { v -> onChange { it.copy(iconScale = v) } }
+        SliderRow("Simge boyutu", pct(s.iconScale), s.iconScale, 0.7f..1.4f, default = Def.iconScale) { v -> onChange { it.copy(iconScale = v) } }
     }
     Group("Görünüm") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -379,13 +481,13 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             "(uygulama monokrom katman sunuyorsa o kullanılır; sunmuyorsa parlaklıktan üretilir)."
     )
     Group("Şekil") {
-        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.225f), s.iconCorner, 0.05f..0.5f) { v ->
+        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.225f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
             onChange { it.copy(iconCorner = v) }
         }
         RowDivider()
-        ToggleRow("Yuvarlak simgeleri kareye tamamla", s.iconFillRound) { v -> onChange { it.copy(iconFillRound = v) } }
+        ToggleRow("Yuvarlak simgeleri kareye tamamla", s.iconFillRound, default = Def.iconFillRound) { v -> onChange { it.copy(iconFillRound = v) } }
         RowDivider()
-        ToggleRow("Cam kenar ışığı", s.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
+        ToggleRow("Cam kenar ışığı", s.iconGlass, default = Def.iconGlass) { v -> onChange { it.copy(iconGlass = v) } }
     }
     Footer("Tek bir uygulamanın simgesini değiştirmek için simgesine basılı tutup \"Simgeyi Değiştir\"i seçin.")
 }
@@ -393,25 +495,25 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
 @Composable
 private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group(null) {
-        SliderRow("Yükseklik", pct(s.dockHeight), s.dockHeight, 0.8f..1.3f) { v -> onChange { it.copy(dockHeight = v) } }
+        SliderRow("Yükseklik", pct(s.dockHeight), s.dockHeight, 0.8f..1.3f, default = Def.dockHeight) { v -> onChange { it.copy(dockHeight = v) } }
         RowDivider()
-        SliderRow("Genişlik", pct(s.dockWidth), s.dockWidth, 0.85f..1.05f) { v -> onChange { it.copy(dockWidth = v) } }
+        SliderRow("Genişlik", pct(s.dockWidth), s.dockWidth, 0.85f..1.05f, default = Def.dockWidth) { v -> onChange { it.copy(dockWidth = v) } }
         RowDivider()
-        SliderRow("Cam yoğunluğu", pct(s.dockOpacity), s.dockOpacity, 0f..2f) { v -> onChange { it.copy(dockOpacity = v) } }
+        SliderRow("Cam yoğunluğu", pct(s.dockOpacity), s.dockOpacity, 0f..2f, default = Def.dockOpacity) { v -> onChange { it.copy(dockOpacity = v) } }
         RowDivider()
-        SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f) { v -> onChange { it.copy(dockBottom = v) } }
+        SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f, default = Def.dockBottom) { v -> onChange { it.copy(dockBottom = v) } }
         RowDivider()
-        SliderRow("Köşe yuvarlaklığı", pct(s.dockCorner / 0.5f), s.dockCorner, 0.08f..0.5f) { v -> onChange { it.copy(dockCorner = v) } }
+        SliderRow("Köşe yuvarlaklığı", pct(s.dockCorner / 0.5f), s.dockCorner, 0.08f..0.5f, default = Def.dockCorner) { v -> onChange { it.copy(dockCorner = v) } }
     }
     Group("Arama düğmesi") {
-        SliderRow("Boyut", pct(s.pillScale), s.pillScale, 0.7f..1.5f) { v -> onChange { it.copy(pillScale = v) } }
+        SliderRow("Boyut", pct(s.pillScale), s.pillScale, 0.7f..1.5f, default = Def.pillScale) { v -> onChange { it.copy(pillScale = v) } }
         RowDivider()
         val pos = when {
             s.pillOffset > 0.5f -> "${s.pillOffset.toInt()} pt yukarı"
             s.pillOffset < -0.5f -> "${(-s.pillOffset).toInt()} pt aşağı"
             else -> "Ortada"
         }
-        SliderRow("Konum", pos, s.pillOffset, -60f..60f) { v -> onChange { it.copy(pillOffset = v) } }
+        SliderRow("Konum", pos, s.pillOffset, -60f..60f, default = Def.pillOffset) { v -> onChange { it.copy(pillOffset = v) } }
     }
     Footer("Konum \"Ortada\" iken arama düğmesi, simge dizisi ile dock arasında tam ortada durur.")
     Footer("Dock simgelerini değiştirmek için düzenleme modunda simgeleri dock'a sürükleyin.")
@@ -420,26 +522,26 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
 @Composable
 private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group("Uygulama arşivi") {
-        ToggleRow("Uygulama arşivi sayfası", s.showLibrary) { v -> onChange { it.copy(showLibrary = v) } }
+        ToggleRow("Uygulama arşivi sayfası", s.showLibrary, default = Def.showLibrary) { v -> onChange { it.copy(showLibrary = v) } }
     }
     Group(null) {
-        SliderRow("Klasör cam yoğunluğu", pct(s.folderOpacity), s.folderOpacity, 0f..2f) { v ->
+        SliderRow("Klasör cam yoğunluğu", pct(s.folderOpacity), s.folderOpacity, 0f..2f, default = Def.folderOpacity) { v ->
             onChange { it.copy(folderOpacity = v) }
         }
         RowDivider()
-        SliderRow("Açık klasör boyutu", pct(s.folderSize), s.folderSize, 0.55f..0.95f) { v ->
+        SliderRow("Açık klasör boyutu", pct(s.folderSize), s.folderSize, 0.55f..0.95f, default = Def.folderSize) { v ->
             onChange { it.copy(folderSize = v) }
         }
         RowDivider()
-        SliderRow("Açık klasör köşe yuvarlaklığı", "${s.folderCorner.roundToInt()} pt", s.folderCorner, 8f..80f) { v ->
+        SliderRow("Açık klasör köşe yuvarlaklığı", "${s.folderCorner.roundToInt()} pt", s.folderCorner, 8f..80f, default = Def.folderCorner) { v ->
             onChange { it.copy(folderCorner = v) }
         }
         RowDivider()
-        SliderRow("Arşiv kapalı klasör köşesi", "${s.libraryTileCorner.roundToInt()} pt", s.libraryTileCorner, 8f..40f) { v ->
+        SliderRow("Arşiv kapalı klasör köşesi", "${s.libraryTileCorner.roundToInt()} pt", s.libraryTileCorner, 8f..40f, default = Def.libraryTileCorner) { v ->
             onChange { it.copy(libraryTileCorner = v) }
         }
         RowDivider()
-        SliderRow("Arşiv açık klasör köşesi", "${s.libraryGroupCorner.roundToInt()} pt", s.libraryGroupCorner, 8f..80f) { v ->
+        SliderRow("Arşiv açık klasör köşesi", "${s.libraryGroupCorner.roundToInt()} pt", s.libraryGroupCorner, 8f..80f, default = Def.libraryGroupCorner) { v ->
             onChange { it.copy(libraryGroupCorner = v) }
         }
     }
@@ -449,23 +551,23 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
 @Composable
 private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group(null) {
-        SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f) { v -> onChange { it.copy(glassStrength = v) } }
+        SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f, default = Def.glassStrength) { v -> onChange { it.copy(glassStrength = v) } }
         RowDivider()
-        SliderRow("Beyaz çizgi kalınlığı", "${"%.1f".format(s.glassRimWidth)} pt", s.glassRimWidth, 0f..4f) { v ->
+        SliderRow("Beyaz çizgi kalınlığı", "${"%.1f".format(s.glassRimWidth)} pt", s.glassRimWidth, 0f..4f, default = Def.glassRimWidth) { v ->
             onChange { it.copy(glassRimWidth = v) }
         }
         RowDivider()
-        SliderRow("Bulanıklık şiddeti", pct(s.glassBlur), s.glassBlur, 0f..2f) { v -> onChange { it.copy(glassBlur = v) } }
+        SliderRow("Bulanıklık şiddeti", pct(s.glassBlur), s.glassBlur, 0f..2f, default = Def.glassBlur) { v -> onChange { it.copy(glassBlur = v) } }
         RowDivider()
         SliderRow(
             "Parlaklık",
             when { s.glassBrightness > 0.01f -> "+${(s.glassBrightness * 100).roundToInt()}"; s.glassBrightness < -0.01f -> "${(s.glassBrightness * 100).roundToInt()}"; else -> "0" },
-            s.glassBrightness, -1f..1f,
+            s.glassBrightness, -1f..1f, default = Def.glassBrightness,
         ) { v -> onChange { it.copy(glassBrightness = v) } }
         RowDivider()
-        SliderRow("Kenar ışığı", pct(s.glassRimGlow), s.glassRimGlow, 0f..2f) { v -> onChange { it.copy(glassRimGlow = v) } }
+        SliderRow("Kenar ışığı", pct(s.glassRimGlow), s.glassRimGlow, 0f..2f, default = Def.glassRimGlow) { v -> onChange { it.copy(glassRimGlow = v) } }
         RowDivider()
-        SliderRow("Dolgu yoğunluğu (saydamlık)", pct(s.glassOpacity), s.glassOpacity, 0f..2f) { v -> onChange { it.copy(glassOpacity = v) } }
+        SliderRow("Dolgu yoğunluğu (saydamlık)", pct(s.glassOpacity), s.glassOpacity, 0f..2f, default = Def.glassOpacity) { v -> onChange { it.copy(glassOpacity = v) } }
     }
     Group("Tema") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -474,7 +576,7 @@ private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
     }
     Footer("Otomatik: telefonun açık/koyu moduna uyar. Koyu temada cam yüzeyler koyu tonlanır.")
     Group("Bulanıklık") {
-        ToggleRow("Gerçek arka plan bulanıklığı", s.realBlur) { v -> onChange { it.copy(realBlur = v) } }
+        ToggleRow("Gerçek arka plan bulanıklığı", s.realBlur, default = Def.realBlur) { v -> onChange { it.copy(realBlur = v) } }
     }
     Footer(
         "Android, başka uygulamaların (sistem duvar kâğıdı dahil) arkasını bulanıklaştırmaya izin vermez. " +
@@ -499,7 +601,7 @@ private fun WallpaperPage(vm: LauncherViewModel, s: LauncherSettings, onChange: 
     Footer("Görsel seçici izin gerektirmez. Seçilen görsel launcher'da gösterilir ve gerçek cam bulanıklığı için kullanılır.")
     if (s.launcherWallpaper) {
         Group(null) {
-            SliderRow("Karartma", pct(s.wallpaperDim / 0.6f), s.wallpaperDim, 0f..0.6f) { v -> onChange { it.copy(wallpaperDim = v) } }
+            SliderRow("Karartma", pct(s.wallpaperDim / 0.6f), s.wallpaperDim, 0f..0.6f, default = Def.wallpaperDim) { v -> onChange { it.copy(wallpaperDim = v) } }
             RowDivider()
             ActionRow("Launcher duvar kâğıdını kaldır", destructive = true) { vm.clearWallpaper() }
         }
@@ -524,7 +626,7 @@ private fun AnimationsPage(s: LauncherSettings, onChange: ((LauncherSettings) ->
         else -> "Normal"
     }
     Group(null) {
-        SliderRow("Animasyon hızı", label, s.animSpeed, 0.5f..2f) { v -> onChange { it.copy(animSpeed = v) } }
+        SliderRow("Animasyon hızı", label, s.animSpeed, 0.5f..2f, default = Def.animSpeed) { v -> onChange { it.copy(animSpeed = v) } }
     }
     Footer("Klasör, menü, arama ve sayfa geçişlerini etkiler. Uygulama açılış animasyonunu sistem çizer; launcher tamamen kontrol edemez.")
 }
@@ -539,7 +641,7 @@ private fun GesturesPage(s: LauncherSettings, onChange: ((LauncherSettings) -> L
             "Erişilebilirlik izni önerilir; izin kapalıyken de denenir ama bazı telefonlarda engellenebilir."
     )
     Group("Çift dokunma ve izin") {
-        ToggleRow("Boş alana çift dokununca kilitle", s.doubleTapLock) { v -> onChange { it.copy(doubleTapLock = v) } }
+        ToggleRow("Boş alana çift dokununca kilitle", s.doubleTapLock, default = Def.doubleTapLock) { v -> onChange { it.copy(doubleTapLock = v) } }
         RowDivider()
         val enabled = LockService.isEnabled(ctx)
         InfoRow("Erişilebilirlik izni", if (enabled) "Açık" else "Kapalı")
@@ -574,7 +676,7 @@ private fun WidgetsPage(onAddWidget: () -> Unit) {
 @Composable
 private fun LibraryPageSettings(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group(null) {
-        ToggleRow("Yeni uygulamaları ana ekrana ekle", s.addNewToHome) { v -> onChange { it.copy(addNewToHome = v) } }
+        ToggleRow("Yeni uygulamaları ana ekrana ekle", s.addNewToHome, default = Def.addNewToHome) { v -> onChange { it.copy(addNewToHome = v) } }
     }
     Footer("Kapalıyken yeni kurulan uygulamalar yalnızca Uygulama Arşivi'nde görünür. Kategoriler, uygulamanın bildirdiği türe ve adına göre tahmin edilir.")
 }
@@ -621,9 +723,9 @@ private fun BackupPage(vm: LauncherViewModel) {
 @Composable
 private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group(null) {
-        ToggleRow("Otomatik kalite", s.autoQuality) { v -> onChange { it.copy(autoQuality = v) } }
+        ToggleRow("Otomatik kalite", s.autoQuality, default = Def.autoQuality) { v -> onChange { it.copy(autoQuality = v) } }
         RowDivider()
-        ToggleRow("Düşük güç modu", s.lowPower) { v -> onChange { it.copy(lowPower = v) } }
+        ToggleRow("Düşük güç modu", s.lowPower, default = Def.lowPower) { v -> onChange { it.copy(lowPower = v) } }
     }
     Footer(
         "Otomatik kalite: kare süresi uzarsa veya telefon Pil Tasarrufu modundaysa cam efektleri (bulanıklık, " +
@@ -705,7 +807,7 @@ private fun NavRow(title: String, glyph: Glyph, color: Color, onClick: () -> Uni
             GlyphIcon(glyph, Color.White, 18.dp)
         }
         Spacer(Modifier.width(12.dp))
-        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
         Text("›", color = Muted, fontSize = 22.sp)
     }
 }
@@ -721,23 +823,25 @@ private fun ActionRow(title: String, destructive: Boolean = false, onClick: () -
 @Composable
 private fun InfoRow(title: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 13.dp)) {
-        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
         Text(value, color = Muted, fontSize = 17.sp)
     }
 }
 
 @Composable
 private fun TextBlock(text: String) {
-    Text(text, color = Color(0xFFD1D1D6), fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(16.dp))
+    Text(text, color = Secondary, fontSize = 14.sp, lineHeight = 20.sp, modifier = Modifier.padding(16.dp))
 }
 
 @Composable
-private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> Unit) {
+private fun ToggleRow(title: String, checked: Boolean, default: Boolean? = null, onChecked: (Boolean) -> Unit) {
+    RegisterReset(default) { onChecked(it) }
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        if (default != null && checked != default) ResetButton { onChecked(default) }
         Switch(
             checked = checked,
             onCheckedChange = onChecked,
@@ -745,7 +849,7 @@ private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> U
                 checkedTrackColor = Color(0xFF34C759),
                 checkedThumbColor = Color.White,
                 checkedBorderColor = Color.Transparent,
-                uncheckedTrackColor = Color(0xFF39393D),
+                uncheckedTrackColor = LocalSettingsPalette.current.switchOff,
                 uncheckedThumbColor = Color.White,
                 uncheckedBorderColor = Color.Transparent,
             ),
@@ -756,11 +860,14 @@ private fun ToggleRow(title: String, checked: Boolean, onChecked: (Boolean) -> U
 @Composable
 private fun SliderRow(
     title: String, valueText: String, value: Float, range: ClosedFloatingPointRange<Float>,
+    default: Float? = null,
     onValue: (Float) -> Unit,
 ) {
+    RegisterReset(default) { onValue(it) }
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth()) {
-            Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            if (default != null && kotlin.math.abs(value - default) > 0.0005f) ResetButton { onValue(default) }
             Text(valueText, color = Muted, fontSize = 17.sp)
         }
         Slider(
@@ -768,9 +875,31 @@ private fun SliderRow(
             colors = SliderDefaults.colors(
                 thumbColor = Color.White,
                 activeTrackColor = Blue,
-                inactiveTrackColor = Color(0xFF48484A),
+                inactiveTrackColor = LocalSettingsPalette.current.sliderOff,
             ),
         )
+    }
+}
+
+/** "↺": ayarı varsayılan değerine döndürür. */
+@Composable
+private fun ResetButton(onClick: () -> Unit) {
+    Text(
+        "↺ Varsayılan", color = Blue, fontSize = 13.sp,
+        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 4.dp),
+    )
+}
+
+/** Satırın sıfırlama işlemini açık sayfanın listesine kaydeder (sayfa sıfırlama düğmesi için). */
+@Composable
+private fun <T> RegisterReset(default: T?, apply: (T) -> Unit) {
+    val reg = LocalResetRegistry.current ?: return
+    if (default == null) return
+    val latest by rememberUpdatedState(apply)
+    DisposableEffect(reg, default) {
+        val f: () -> Unit = { latest(default) }
+        reg.add(f)
+        onDispose { reg.remove(f) }
     }
 }
 
@@ -780,7 +909,7 @@ private fun ChoiceRow(title: String, options: List<Int>, selected: Int, onSelect
         Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, color = Color.White, fontSize = 17.sp, modifier = Modifier.weight(1f))
+        Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             options.forEach { o ->
                 Box(
@@ -788,10 +917,10 @@ private fun ChoiceRow(title: String, options: List<Int>, selected: Int, onSelect
                         .width(42.dp)
                         .height(32.dp)
                         .clip(RoundedCornerShape(9.dp))
-                        .background(if (o == selected) Blue else Color(0xFF3A3A3C))
+                        .background(if (o == selected) Blue else ChipBg)
                         .clickable { onSelect(o) },
                     contentAlignment = Alignment.Center,
-                ) { Text("$o", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Medium) }
+                ) { Text("$o", color = if (o == selected) Color.White else Fg, fontSize = 15.sp, fontWeight = FontWeight.Medium) }
             }
         }
     }
@@ -803,10 +932,10 @@ private fun Chip(text: String, selected: Boolean, modifier: Modifier, onClick: (
         modifier
             .height(36.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) Blue else Color(0xFF3A3A3C))
+            .background(if (selected) Blue else ChipBg)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = Color.White, fontSize = 14.sp, maxLines = 1) }
+    ) { Text(text, color = if (selected) Color.White else Fg, fontSize = 14.sp, maxLines = 1) }
 }
 
 @Composable

@@ -210,7 +210,8 @@ fun SearchOverlay(
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 10.dp)
                     .height(48.dp)
-                    .liquidGlass(CircleShape, strength, 4.dp)
+                    .liquidGlass(CircleShape, strength * st.dockOpacity, 4.dp)
+                    .glassBrightness(st.searchGlassBrightness)
                     .then(neutral)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
                     .padding(start = 14.dp, end = 8.dp),
@@ -287,7 +288,8 @@ private fun SuggestionsPanel(
         Modifier
             .requiredWidth(panelW)
             .height(pad * 2f + cellH)
-            .liquidGlass(RoundedCornerShape(hm.dockCorner), strength * st.dockOpacity, 6.dp)
+            .liquidGlass(RoundedCornerShape(hm.dockCorner), strength * st.dockOpacity, 14.dp)
+            .glassBrightness(st.searchGlassBrightness)
             .then(neutral)
     ) {
         suggestions.take(4).forEachIndexed { i, app ->

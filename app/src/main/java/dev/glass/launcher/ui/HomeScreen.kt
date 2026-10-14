@@ -292,6 +292,11 @@ fun HomeScreen(
                 "crossWindowBlur=${context.getSystemService(android.view.WindowManager::class.java).isCrossWindowBlurEnabled}",
         )
     }
+    LaunchedEffect(settings.textShadow, settings.textShadowStrength, settings.textShadowSpread) {
+        TextShadowConfig.enabled = settings.textShadow
+        TextShadowConfig.strength = settings.textShadowStrength
+        TextShadowConfig.spread = settings.textShadowSpread
+    }
     CompositionLocalProvider(
         LocalLauncherSettings provides settings,
         LocalMotion provides motion,

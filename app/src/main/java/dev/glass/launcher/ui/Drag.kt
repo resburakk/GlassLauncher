@@ -257,7 +257,7 @@ suspend fun PointerInputScope.detectHomeDrag(
 }
 
 /** iOS ana ekran etiketi: beyaz, normal kalınlık, yumuşak ve hafif koyu gölge. */
-internal val CellLabelStyle = TextStyle(
+internal val CellLabelStyle: TextStyle get() = TextStyle(
     color = Color.White,
     fontSize = 12.sp,
     fontWeight = FontWeight.Normal,

@@ -504,7 +504,7 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: Float, onClick: (
     }
 }
 
-private val LabelStyle = TextStyle(
+private val LabelStyle: TextStyle get() = TextStyle(
     color = Color.White,
     fontSize = 11.sp,
     fontWeight = FontWeight.Medium,

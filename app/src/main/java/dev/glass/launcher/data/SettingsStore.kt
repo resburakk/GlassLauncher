@@ -108,7 +108,7 @@ data class LauncherSettings(
     val iconFillRound: Boolean = true,
     /** Arama ekranı: öneri adları, nötr cam, cihaz içi arama türleri ve izin kartı. */
     val searchShowLabels: Boolean = true,
-    val searchNeutral: Boolean = true,
+    val searchNeutral: Boolean = false,
     val searchContacts: Boolean = true,
     val searchMessages: Boolean = true,
     val searchFiles: Boolean = true,
@@ -118,6 +118,14 @@ data class LauncherSettings(
     val searchResultTextSize: Float = 15f,
     val searchResultWeight: Float = 400f,
     val searchResultsPanel: Boolean = false,
+    /** Arama paneli ve çubuğunun cam parlaklığı (karartılmış arka planla uyum için varsayılan biraz koyu). */
+    val searchGlassBrightness: Float = -0.3f,
+    /** Yazı gölgesi (iOS tarzı dağınık gölge): açık/kapalı, yoğunluk ve yayılma. */
+    val textShadow: Boolean = false,
+    val textShadowStrength: Float = 0.35f,
+    val textShadowSpread: Float = 1f,
+    /** Ayarlar ekranının teması: "auto" (telefona uyar), "light", "dark". */
+    val settingsTheme: String = "auto",
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
     val theme: ThemeMode = ThemeMode.Auto,
@@ -172,6 +180,10 @@ data class LauncherSettings(
         searchFieldTextSize = searchFieldTextSize.coerceIn(12f, 22f),
         searchResultTextSize = searchResultTextSize.coerceIn(12f, 22f),
         searchResultWeight = searchResultWeight.coerceIn(300f, 700f),
+        searchGlassBrightness = searchGlassBrightness.coerceIn(-1f, 1f),
+        textShadowStrength = textShadowStrength.coerceIn(0.05f, 0.9f),
+        textShadowSpread = textShadowSpread.coerceIn(0.3f, 3f),
+        settingsTheme = settingsTheme.takeIf { it in setOf("auto", "light", "dark") } ?: "auto",
         glassStrength = glassStrength.coerceIn(0.5f, 1.5f),
         wallpaperDim = wallpaperDim.coerceIn(0f, 0.6f),
         animSpeed = animSpeed.coerceIn(0.5f, 2f),
@@ -198,11 +210,14 @@ data class LauncherSettings(
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
-        put("searchShowLabels", searchShowLabels); put("searchNeutral", searchNeutral)
+        put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
         put("searchFieldTextSize", searchFieldTextSize.toDouble()); put("searchResultTextSize", searchResultTextSize.toDouble())
         put("searchResultWeight", searchResultWeight.toDouble()); put("searchResultsPanel", searchResultsPanel)
+        put("searchGlassBrightness", searchGlassBrightness.toDouble())
+        put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
+        put("settingsTheme", settingsTheme)
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
@@ -283,7 +298,7 @@ data class LauncherSettings(
                 showLibrary = o.optBoolean("showLibrary", d.showLibrary),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
                 searchShowLabels = o.optBoolean("searchShowLabels", d.searchShowLabels),
-                searchNeutral = o.optBoolean("searchNeutral", d.searchNeutral),
+                searchNeutral = o.optBoolean("searchNeutral2", d.searchNeutral),
                 searchContacts = o.optBoolean("searchContacts", d.searchContacts),
                 searchMessages = o.optBoolean("searchMessages", d.searchMessages),
                 searchFiles = o.optBoolean("searchFiles", d.searchFiles),
@@ -292,6 +307,11 @@ data class LauncherSettings(
                 searchResultTextSize = f("searchResultTextSize", d.searchResultTextSize),
                 searchResultWeight = f("searchResultWeight", d.searchResultWeight),
                 searchResultsPanel = o.optBoolean("searchResultsPanel", d.searchResultsPanel),
+                searchGlassBrightness = f("searchGlassBrightness", d.searchGlassBrightness),
+                textShadow = o.optBoolean("textShadow", d.textShadow),
+                textShadowStrength = f("textShadowStrength", d.textShadowStrength),
+                textShadowSpread = f("textShadowSpread", d.textShadowSpread),
+                settingsTheme = o.optString("settingsTheme", d.settingsTheme),
             ).let { loaded ->
                 if (o.optInt("metricsVersion", 1) >= METRICS_VERSION) loaded
                 else loaded.copy(

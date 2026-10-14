@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -31,7 +35,19 @@ val AppFont: FontFamily = FontFamily(
  * iOS 26 ana ekran yazılarının altındaki gölge: koyu ama dağınık ve belirsiz
  * (keskin bir kenar oluşturmaz; açık duvar kâğıtlarında okunurluğu korur).
  */
-val IosTextShadow = Shadow(color = Color(0x59000000), offset = Offset(0f, 2f), blurRadius = 12f)
+val IosTextShadow: Shadow
+    get() = if (!TextShadowConfig.enabled) Shadow.None else Shadow(
+        color = Color.Black.copy(alpha = TextShadowConfig.strength),
+        offset = Offset(0f, 2f * TextShadowConfig.spread.coerceAtMost(1.5f)),
+        blurRadius = 12f * TextShadowConfig.spread,
+    )
+
+/** Yazı gölgesi ayarları (ayarlardan güncellenir; okuyan yazılar otomatik yenilenir). */
+object TextShadowConfig {
+    var enabled by mutableStateOf(false)
+    var strength by mutableFloatStateOf(0.35f)
+    var spread by mutableFloatStateOf(1f)
+}
 
 /** Ayardaki kalınlık değerini (300–700) en yakın font kalınlığına yuvarlar. */
 fun fontWeightOf(w: Float): FontWeight = FontWeight(((w / 100f).roundToInt() * 100).coerceIn(100, 900))
