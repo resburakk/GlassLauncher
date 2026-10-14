@@ -104,8 +104,20 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onResume() {
         super.onResume()
+        hideFromRecents()
         updateDefault()
         applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
+    }
+
+    /**
+     * Launcher "Son uygulamalar" ekranında kart olarak görünmesin. Manifestteki excludeFromRecents, uygulama
+     * listesindeki "Glass Ayarları" kısayolundan (takma ad) açılan görevde uygulanmıyor; bu yüzden uygulamanın
+     * tüm görevleri burada ayrıca gizlenir. Yalnızca kendi görevlerimize dokunur.
+     */
+    private fun hideFromRecents() {
+        runCatching {
+            getSystemService(android.app.ActivityManager::class.java).appTasks.forEach { it.setExcludeFromRecents(true) }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
