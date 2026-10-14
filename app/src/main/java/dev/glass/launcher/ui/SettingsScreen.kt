@@ -714,7 +714,16 @@ private fun AnimationsPage(s: LauncherSettings, onChange: ((LauncherSettings) ->
     Group(null) {
         SliderRow("Animasyon hızı", label, s.animSpeed, 0.5f..2f, default = Def.animSpeed) { v -> onChange { it.copy(animSpeed = v) } }
     }
-    Footer("Klasör, menü, arama ve sayfa geçişlerini etkiler. Uygulama açılış animasyonunu sistem çizer; launcher tamamen kontrol edemez.")
+    Footer("Klasör, menü, arama ve sayfa geçişlerini etkiler.")
+    Group(null) {
+        ToggleRow("Simgeden açılış ve simgeye kapanış", s.appTransitions, default = Def.appTransitions) { v ->
+            onChange { it.copy(appTransitions = v) }
+        }
+    }
+    Footer(
+        "Açıkken uygulama dokunduğun simgenin yerinden büyüyerek açılır, ana ekrana dönünce simgesinin yerine " +
+            "küçülerek oturur. Kapalıyken telefonun standart açılış/kapanış animasyonu kullanılır."
+    )
 }
 
 @Composable
