@@ -149,6 +149,7 @@ shot 13c-donus-sonrasi
 
 # Widget galerisi: düzenleme modu > + > Clock > Widget Ekle (bağlama izni teste özel komutla verilir)
 adb shell appwidget grantbind --package dev.glass.launcher --user 0 || true
+adb shell appwidget grantbind --package dev.glass.launcher --user current || true
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
 tap_text "+"; step "widget galerisi" 7
@@ -158,7 +159,9 @@ shot 14b-widget-detay
 adb shell input swipe $((W*80/100)) $((H*50/100)) $((W*20/100)) $((H*50/100)) 300; step "sonraki boyut" 2
 shot 14c-widget-detay-2
 tap_text "Widget Ekle"; step "widget eklendi" 4
-adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
+shot 14e-widget-ekle-sonrasi
+adb shell dumpsys appwidget | grep -A3 "dev.glass.launcher" | head -12 | while IFS= read -r l; do echo "::notice::WIDGET $l"; done
+adb shell input tap $cx $((H*90/100)); step "boşluğa dokun: düzenlemeden çık" 2
 shot 14d-widget-ana-ekran
 
 # Galeriden "Farklı ayarla" penceresi (ATTACH_DATA)
