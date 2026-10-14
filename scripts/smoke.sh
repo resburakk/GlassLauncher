@@ -36,7 +36,6 @@ tap_text() {
 
 shot 01-ana-ekran
 echo "::notice::DUVAR izin=$(adb shell appops get --uid dev.glass.launcher MANAGE_EXTERNAL_STORAGE | tr -d '\r' | head -1)"
-echo "::notice::DUVAR kopya=$(adb shell run-as dev.glass.launcher ls -la files/ 2>&1 | tr -s ' ' | tr -d '\r' | head -8 | tr '\n' ' ')"
 
 # 1) Uzun basma: menü parmak ekrandayken açılmalı
 adb shell input motionevent DOWN $ix $iy
@@ -87,7 +86,6 @@ shot 05k-sag-kaydirma
 adb shell cmd statusbar collapse; step "paneli kapat" 2
 adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 2
 shot 05-arama
-adb shell dumpsys input_method | grep -iE "mInputShown|mShowRequested|mServedView|mIsInputViewShown|hardKeyboard|mShowExplicitlyRequested|mShowForced" | head -8 | while IFS= read -r l; do echo "::notice::IME $l"; done
 adb shell input text "c"; step "arama yaz" 2
 shot 05b-arama-sonuc
 adb shell input text "c"; step "arama yaz" 2
@@ -163,7 +161,6 @@ adb shell input swipe $((W*80/100)) $((H*50/100)) $((W*20/100)) $((H*50/100)) 30
 shot 14c-widget-detay-2
 tap_text "Widget Ekle"; step "widget eklendi" 4
 shot 14e-widget-ekle-sonrasi
-adb shell dumpsys appwidget | grep -A3 "dev.glass.launcher" | head -12 | while IFS= read -r l; do echo "::notice::WIDGET $l"; done
 adb shell input tap $cx $((H*90/100)); step "boşluğa dokun: düzenlemeden çık" 2
 shot 14d-widget-ana-ekran
 
