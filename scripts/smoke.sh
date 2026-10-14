@@ -149,7 +149,6 @@ shot 13c-donus-sonrasi
 
 # Widget galerisi: düzenleme modu > + > Clock > Widget Ekle (bağlama izni teste özel komutla verilir)
 adb shell appwidget grantbind --package dev.glass.launcher --user 0 || true
-adb shell appwidget grantbind --package dev.glass.launcher --user current || true
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
 tap_text "+"; step "widget galerisi" 7
