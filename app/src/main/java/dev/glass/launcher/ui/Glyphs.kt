@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Özgün, basit çizgi simgeler (Apple simgeleri kullanılmaz). */
-enum class Glyph { Edit, Info, Minus, Trash, Plus, Folder, Pencil, Grid, Search, Close, Check, Widget, Wallpaper }
+enum class Glyph { Edit, Info, Minus, Trash, Plus, Folder, Pencil, Grid, Search, Close, Check, Widget, Wallpaper, Mic, Person, Message, Doc, Globe, Bag }
 
 @Composable
 fun GlyphIcon(glyph: Glyph, color: Color, size: Dp = 18.dp) {
@@ -102,6 +102,37 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
             }
             drawPath(p, color, style = stroke)
             drawCircle(color, s * 0.06f, Offset(s * 0.66f, s * 0.34f))
+        }
+        Glyph.Mic -> {
+            drawRoundRect(color, Offset(s * 0.37f, s * 0.1f), Size(s * 0.26f, s * 0.46f), CornerRadius(s * 0.13f), style = stroke)
+            drawArc(color, 0f, 180f, false, Offset(s * 0.24f, s * 0.26f), Size(s * 0.52f, s * 0.44f), style = stroke)
+            drawLine(color, Offset(c.x, s * 0.7f), Offset(c.x, s * 0.88f), w, StrokeCap.Round)
+        }
+        Glyph.Person -> {
+            drawCircle(color, s * 0.17f, Offset(c.x, s * 0.33f), style = stroke)
+            drawArc(color, 180f, 180f, false, Offset(s * 0.18f, s * 0.58f), Size(s * 0.64f, s * 0.5f), style = stroke)
+        }
+        Glyph.Message -> {
+            drawRoundRect(color, Offset(s * 0.12f, s * 0.18f), Size(s * 0.76f, s * 0.52f), CornerRadius(s * 0.2f), style = stroke)
+            drawLine(color, Offset(s * 0.3f, s * 0.7f), Offset(s * 0.22f, s * 0.86f), w, StrokeCap.Round)
+        }
+        Glyph.Doc -> {
+            val p = Path().apply {
+                moveTo(s * 0.24f, s * 0.1f); lineTo(s * 0.58f, s * 0.1f); lineTo(s * 0.76f, s * 0.28f)
+                lineTo(s * 0.76f, s * 0.9f); lineTo(s * 0.24f, s * 0.9f); close()
+            }
+            drawPath(p, color, style = stroke)
+            drawLine(color, Offset(s * 0.36f, s * 0.52f), Offset(s * 0.64f, s * 0.52f), w, StrokeCap.Round)
+            drawLine(color, Offset(s * 0.36f, s * 0.68f), Offset(s * 0.64f, s * 0.68f), w, StrokeCap.Round)
+        }
+        Glyph.Globe -> {
+            drawCircle(color, s * 0.4f, c, style = stroke)
+            drawOval(color, Offset(s * 0.32f, s * 0.1f), Size(s * 0.36f, s * 0.8f), style = stroke)
+            drawLine(color, Offset(s * 0.1f, c.y), Offset(s * 0.9f, c.y), w, StrokeCap.Round)
+        }
+        Glyph.Bag -> {
+            drawRoundRect(color, Offset(s * 0.16f, s * 0.32f), Size(s * 0.68f, s * 0.56f), CornerRadius(s * 0.1f), style = stroke)
+            drawArc(color, 180f, 180f, false, Offset(s * 0.34f, s * 0.12f), Size(s * 0.32f, s * 0.4f), style = stroke)
         }
     }
 }

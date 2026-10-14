@@ -106,6 +106,13 @@ data class LauncherSettings(
     val showLibrary: Boolean = false,
     /** Yuvarlak (köşeleri boş) simgeleri dolu kareye tamamla. */
     val iconFillRound: Boolean = true,
+    /** Arama ekranı: öneri adları, nötr cam, cihaz içi arama türleri ve izin kartı. */
+    val searchShowLabels: Boolean = true,
+    val searchNeutral: Boolean = true,
+    val searchContacts: Boolean = true,
+    val searchMessages: Boolean = true,
+    val searchFiles: Boolean = true,
+    val searchDeviceCard: Boolean = true,
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,
     val theme: ThemeMode = ThemeMode.Auto,
@@ -183,6 +190,9 @@ data class LauncherSettings(
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
+        put("searchShowLabels", searchShowLabels); put("searchNeutral", searchNeutral)
+        put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
+        put("searchDeviceCard", searchDeviceCard)
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
@@ -262,6 +272,12 @@ data class LauncherSettings(
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
                 showLibrary = o.optBoolean("showLibrary", d.showLibrary),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
+                searchShowLabels = o.optBoolean("searchShowLabels", d.searchShowLabels),
+                searchNeutral = o.optBoolean("searchNeutral", d.searchNeutral),
+                searchContacts = o.optBoolean("searchContacts", d.searchContacts),
+                searchMessages = o.optBoolean("searchMessages", d.searchMessages),
+                searchFiles = o.optBoolean("searchFiles", d.searchFiles),
+                searchDeviceCard = o.optBoolean("searchDeviceCard", d.searchDeviceCard),
             ).let { loaded ->
                 if (o.optInt("metricsVersion", 1) >= METRICS_VERSION) loaded
                 else loaded.copy(

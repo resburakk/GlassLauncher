@@ -78,6 +78,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Folders("Klasörler", Glyph.Folder, Color(0xFF64D2FF)),
     Fonts("Yazı Tipi", Glyph.Pencil, Color(0xFFFF9F0A)),
     Menu("Açılır Menü", Glyph.Edit, Color(0xFFAF52DE)),
+    Search("Arama", Glyph.Search, Color(0xFF8E8E93)),
     Glass("Liquid Glass", Glyph.Search, Color(0xFF30B0C7)),
     Wallpaper("Duvar Kâğıdı", Glyph.Wallpaper, Color(0xFF34C759)),
     Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
@@ -150,6 +151,7 @@ fun SettingsScreen(
                         SettingsPage.Folders -> FoldersPage(s, onChange)
                         SettingsPage.Fonts -> FontsPage(s, onChange)
                         SettingsPage.Menu -> MenuPage(s, onChange)
+                        SettingsPage.Search -> SearchPage(s, onChange)
                         SettingsPage.Glass -> GlassPage(s, onChange)
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
@@ -177,7 +179,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
     }
     val groups = listOf(
         listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders, SettingsPage.Fonts),
-        listOf(SettingsPage.Glass, SettingsPage.Menu, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
+        listOf(SettingsPage.Glass, SettingsPage.Menu, SettingsPage.Search, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
         listOf(SettingsPage.Widgets, SettingsPage.Library),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
     )
@@ -205,6 +207,72 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f) { v -> onChange { it.copy(vSpacing = v) } }
     }
     Footer("Uygulama adlarının yazı ayarları \"Yazı Tipi\" sayfasında.")
+}
+
+@Composable
+private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var tick by remember { mutableStateOf(0) }
+    val perm = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
+    ) { tick++ }
+    // Ekrana geri dönüldüğünde (ör. tüm dosyalara erişim ayarından) izin durumunu yenile.
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) tick++ }
+        lifecycle.lifecycle.addObserver(obs)
+        onDispose { lifecycle.lifecycle.removeObserver(obs) }
+    }
+    val contactsOk = remember(tick) { dev.glass.launcher.data.DeviceSearch.canContacts(ctx) }
+    val smsOk = remember(tick) { dev.glass.launcher.data.DeviceSearch.canMessages(ctx) }
+    val filesOk = remember(tick) { dev.glass.launcher.data.DeviceSearch.canFiles(ctx) }
+    val allFiles = remember(tick) { dev.glass.launcher.data.DeviceSearch.allFiles() }
+    fun status(ok: Boolean) = if (ok) "İzin verildi" else "İzin yok"
+
+    Group("Görünüm") {
+        ToggleRow("Önerilerde uygulama adları", s.searchShowLabels) { v -> onChange { it.copy(searchShowLabels = v) } }
+        RowDivider()
+        ToggleRow("Nötr cam rengi", s.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
+    }
+    Group("Telefonda ara") {
+        ToggleRow("Kişiler (${status(contactsOk)})", s.searchContacts) { v ->
+            onChange { it.copy(searchContacts = v) }
+            if (v && !contactsOk) perm.launch(arrayOf(android.Manifest.permission.READ_CONTACTS))
+        }
+        RowDivider()
+        ToggleRow("Mesajlar (${status(smsOk)})", s.searchMessages) { v ->
+            onChange { it.copy(searchMessages = v) }
+            if (v && !smsOk) perm.launch(arrayOf(android.Manifest.permission.READ_SMS))
+        }
+        RowDivider()
+        ToggleRow("Dosyalar (${status(filesOk)})", s.searchFiles) { v ->
+            onChange { it.copy(searchFiles = v) }
+            if (v && !filesOk) perm.launch(dev.glass.launcher.data.DeviceSearch.mediaPermissions)
+        }
+        RowDivider()
+        ActionRow(if (allFiles) "Belgeler de aranıyor (tüm dosyalar)" else "Belgeleri de ara: tüm dosyalara erişim ver") {
+            runCatching {
+                ctx.startActivity(
+                    android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        android.net.Uri.parse("package:" + ctx.packageName),
+                    ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
+        RowDivider()
+        ActionRow("Eksik izinleri iste") {
+            val missing = dev.glass.launcher.data.DeviceSearch.missingPermissions(ctx, s.searchContacts, s.searchMessages, s.searchFiles)
+            if (missing.isNotEmpty()) perm.launch(missing.toTypedArray())
+            onChange { it.copy(searchDeviceCard = true) }
+        }
+    }
+    Footer(
+        "Kişiler, mesajlar ve dosyalar yalnızca telefonunda, çevrimdışı aranır; hiçbir veri dışarı gönderilmez. " +
+            "Telefona dışarıdan kurulan uygulamalarda Android, SMS iznini \"kısıtlı ayar\" olarak engelleyebilir: " +
+            "Uygulama bilgisi → ⋮ → \"Kısıtlı ayarlara izin ver\" seçip tekrar dene. Fotoğraf, video ve müzikler medya izniyle; " +
+            "PDF gibi belgeler ise \"tüm dosyalara erişim\" izniyle aranır."
+    )
 }
 
 @Composable

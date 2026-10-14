@@ -1,26 +1,32 @@
 package dev.glass.launcher.ui
 
+import android.app.SearchManager
+import android.content.Intent
+import android.net.Uri
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -30,26 +36,53 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.glass.launcher.data.AppCategorizer
 import dev.glass.launcher.data.AppInfo
+import dev.glass.launcher.data.DeviceHit
+import dev.glass.launcher.data.DeviceHitKind
+import dev.glass.launcher.data.DeviceSearch
 import dev.glass.launcher.data.SearchRanker
+import kotlinx.coroutines.delay
 
-/** Spotlight benzeri arama: cam arama kutusu, 4 simgelik öneri satırı, anlık sonuçlar, otomatik klavye. */
+/**
+ * iOS tarzı arama: cam arama kutusu (temizle / mikrofon), adlı 4'lü öneri paneli (dock ölçüsünde, dört
+ * kenarı eşit boşluklu), "En İyi Sonuç" + "Uygulamalar", izin verildiyse kişiler / mesajlar / dosyalar,
+ * en altta internette ve Play Store'da arama. Eşleşen harfler kalın gösterilir.
+ */
 @Composable
 fun SearchOverlay(
     vm: LauncherViewModel,
@@ -59,6 +92,8 @@ fun SearchOverlay(
     iconGlass: Boolean,
     onClose: () -> Unit,
 ) {
+    val ctx = LocalContext.current
+    val st = LocalLauncherSettings.current
     var query by remember { mutableStateOf("") }
     val focus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
@@ -71,8 +106,43 @@ fun SearchOverlay(
     // Türkçe karakter duyarsız, sıralı çevrimdışı arama ("cevi" → "Çeviri", "gm" → "Google Maps").
     val results = remember(query, allApps) { SearchRanker.rank(query, allApps) { it.label } }
 
+    // Cihaz içi arama izinleri
+    var permTick by remember { mutableIntStateOf(0) }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permTick++ }
+    val missing = remember(permTick, st.searchContacts, st.searchMessages, st.searchFiles) {
+        DeviceSearch.missingPermissions(ctx, st.searchContacts, st.searchMessages, st.searchFiles)
+    }
+    val device by produceState(emptyList<DeviceHit>(), query, permTick, st.searchContacts, st.searchMessages, st.searchFiles) {
+        if (query.isBlank()) { value = emptyList(); return@produceState }
+        delay(150) // yazarken her harfte sorgu yapma
+        value = DeviceSearch.search(ctx, query.trim(), st.searchContacts, st.searchMessages, st.searchFiles)
+    }
+
+    // Sesle arama: telefonun kendi konuşma tanıma ekranı açılır (launcher ek izin istemez).
+    val mic = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { query = it }
+    }
+
     fun close() { keyboard?.hide(); onClose() }
     fun open(app: AppInfo) { keyboard?.hide(); vm.launch(app); onClose() }
+    fun launch(i: Intent) {
+        keyboard?.hide()
+        runCatching { ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        onClose()
+    }
+    fun webSearch(q: String) {
+        val i = Intent(Intent.ACTION_WEB_SEARCH).putExtra(SearchManager.QUERY, q)
+        if (i.resolveActivity(ctx.packageManager) != null) launch(i)
+        else launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(q))))
+    }
+    fun storeSearch(q: String) {
+        val i = Intent(Intent.ACTION_VIEW, Uri.parse("market://search?q=" + Uri.encode(q) + "&c=apps"))
+        if (i.resolveActivity(ctx.packageManager) != null) launch(i)
+        else launch(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/search?q=" + Uri.encode(q) + "&c=apps")))
+    }
+
+    // Nötr cam: duvar kâğıdının rengini yumuşatan hafif gri-beyaz katman (iOS'taki gibi daha nötr).
+    val neutral = if (st.searchNeutral) Modifier.background(Color(0x38E5E5EA)) else Modifier
 
     Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { close() }) }) {
         Column(
@@ -84,7 +154,8 @@ fun SearchOverlay(
                         .weight(1f)
                         .height(46.dp)
                         .liquidGlass(CircleShape, strength, 4.dp)
-                        .padding(horizontal = 14.dp),
+                        .then(neutral)
+                        .padding(start = 14.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     SearchGlyph(Color(0xCCFFFFFF), 18.dp)
@@ -96,20 +167,45 @@ fun SearchOverlay(
                         textStyle = TextStyle(color = Color.White, fontSize = 17.sp, fontFamily = AppFont),
                         cursorBrush = SolidColor(Color.White),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                        keyboardActions = KeyboardActions(onSearch = { results.firstOrNull()?.let { open(it) } }),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            results.firstOrNull()?.let { open(it) } ?: if (query.isNotBlank()) webSearch(query.trim()) else Unit
+                        }),
                         modifier = Modifier.weight(1f).focusRequester(focus),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = 17.sp)
+                                if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont)
                                 inner()
                             }
                         },
                     )
+                    if (query.isNotEmpty()) {
+                        // Temizle (×)
+                        Box(
+                            Modifier.size(30.dp).clip(CircleShape).clickable { query = "" },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Box(Modifier.size(18.dp).clip(CircleShape).background(Color(0x66FFFFFF)), contentAlignment = Alignment.Center) {
+                                GlyphIcon(Glyph.Close, Color(0xFF3A3A3C), 14.dp)
+                            }
+                        }
+                    } else {
+                        // Mikrofon: sesle yazma
+                        Box(
+                            Modifier.size(34.dp).clip(CircleShape).clickable {
+                                val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+                                    .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ara")
+                                runCatching { mic.launch(i) }
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { GlyphIcon(Glyph.Mic, Color(0xCCFFFFFF), 20.dp) }
+                    }
                 }
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "İptal", color = Color.White, fontSize = 16.sp,
-                    modifier = Modifier.clickable { close() }.padding(vertical = 8.dp)
+                    "İptal", color = Color.White, fontSize = 16.sp, fontFamily = AppFont,
+                    modifier = Modifier.clickable { close() }.padding(vertical = 8.dp),
                 )
             }
 
@@ -118,52 +214,230 @@ fun SearchOverlay(
             if (query.isBlank()) {
                 Text(
                     "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
+                    fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp),
                 )
-                // Öneri kutusu ana ekrandaki dock ile birebir aynı ölçüde (genişlik, yükseklik, köşe,
-                // simge boyutu ve aralığı); simgeler ana ekranla aynı boyutta.
-                val hm = LocalHomeMetrics.current
-                if (hm != null) {
-                    val st = LocalLauncherSettings.current
-                    val screenW = LocalConfiguration.current.screenWidthDp.dp
-                    Box(
-                        Modifier
-                            .align(Alignment.CenterHorizontally)
-                            .requiredWidth(screenW - hm.dockMarginX * 2f)
-                            .height(hm.dockH)
-                            .liquidGlass(RoundedCornerShape(hm.dockCorner), strength * st.dockOpacity, 6.dp)
-                    ) {
-                        suggestions.take(4).forEachIndexed { i, app ->
-                            Box(
-                                Modifier
-                                    .align(Alignment.CenterStart)
-                                    .offset(x = hm.dockInnerStart + hm.dockPitch * i.toFloat())
-                            ) {
-                                AppCell(app, vm, hm.dockIcon, hm.dockPitch, hm.dockIcon, false, iconGlass, strength) { open(app) }
-                            }
-                        }
-                    }
-                }
-            } else if (results.isEmpty()) {
-                Text("Sonuç bulunamadı", color = Color(0xCCFFFFFF), fontSize = 15.sp, modifier = Modifier.padding(6.dp))
+                SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, ::open)
             } else {
-                LazyColumn(
+                Box(
                     Modifier
                         .weight(1f, fill = false)
                         .liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp)
+                        .then(neutral)
                 ) {
-                    items(results, key = { it.key }) { app ->
-                        Row(
-                            Modifier.fillMaxWidth().clickable { open(app) }.padding(horizontal = 14.dp, vertical = 9.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            AppIconImage(app, vm, 40.dp, iconGlass, strength)
-                            Spacer(Modifier.width(12.dp))
-                            Text(app.label, color = Color.White, fontSize = 16.sp, maxLines = 1)
-                        }
+                    ResultsList(
+                        vm = vm, query = query.trim(), apps = results, device = device,
+                        iconGlass = iconGlass, strength = strength,
+                        showPermissionCard = missing.isNotEmpty() && st.searchDeviceCard,
+                        onAskPermission = { permLauncher.launch(missing.toTypedArray()) },
+                        onDismissCard = { vm.updateSettings { it.copy(searchDeviceCard = false) } },
+                        onOpenApp = ::open,
+                        onOpenHit = { launch(it.intent) },
+                        onWeb = { webSearch(query.trim()) },
+                        onStore = { storeSearch(query.trim()) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Öneri paneli: ana ekrandaki dock ile aynı genişlik/köşe; simgelerin dört yanındaki boşluk eşit. */
+@Composable
+private fun SuggestionsPanel(
+    vm: LauncherViewModel,
+    suggestions: List<AppInfo>,
+    strength: Float,
+    iconGlass: Boolean,
+    showLabels: Boolean,
+    neutral: Modifier,
+    onOpen: (AppInfo) -> Unit,
+) {
+    val hm = LocalHomeMetrics.current ?: return
+    val st = LocalLauncherSettings.current
+    val screenW = LocalConfiguration.current.screenWidthDp.dp
+    val panelW = screenW - hm.dockMarginX * 2f
+    // Yanlardaki boşluk = simgelerin dış kenarından panel kenarına; aynı boşluk üstte ve altta da kullanılır.
+    val pad = hm.dockInnerStart
+    val labelBlock: Dp = if (showLabels) 22.dp else 0.dp
+    val cellH = hm.dockIcon + labelBlock
+    Box(
+        Modifier
+            .requiredWidth(panelW)
+            .height(pad * 2f + cellH)
+            .liquidGlass(RoundedCornerShape(hm.dockCorner), strength * st.dockOpacity, 6.dp)
+            .then(neutral)
+    ) {
+        suggestions.take(4).forEachIndexed { i, app ->
+            Box(Modifier.offset(x = pad + hm.dockPitch * i.toFloat(), y = pad)) {
+                AppCell(app, vm, hm.dockIcon, hm.dockPitch, cellH, showLabels, iconGlass, strength) { onOpen(app) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResultsList(
+    vm: LauncherViewModel,
+    query: String,
+    apps: List<AppInfo>,
+    device: List<DeviceHit>,
+    iconGlass: Boolean,
+    strength: Float,
+    showPermissionCard: Boolean,
+    onAskPermission: () -> Unit,
+    onDismissCard: () -> Unit,
+    onOpenApp: (AppInfo) -> Unit,
+    onOpenHit: (DeviceHit) -> Unit,
+    onWeb: () -> Unit,
+    onStore: () -> Unit,
+) {
+    val contacts = device.filter { it.kind == DeviceHitKind.Contact }
+    val messages = device.filter { it.kind == DeviceHitKind.Message }
+    val files = device.filter { it.kind == DeviceHitKind.File }
+    LazyColumn(
+        // Alt kenarda yumuşak solma: liste klavyenin üstünde kesik görünmez.
+        Modifier
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                val h = 28.dp.toPx()
+                drawRect(
+                    Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - h, endY = size.height),
+                    topLeft = Offset(0f, size.height - h), size = Size(size.width, h), blendMode = BlendMode.DstIn,
+                )
+            },
+        contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
+    ) {
+        apps.firstOrNull()?.let { top ->
+            item { SectionHeader("En İyi Sonuç") }
+            item {
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpenApp(top) }.padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppIconImage(top, vm, 54.dp, iconGlass, strength)
+                    Spacer(Modifier.width(14.dp))
+                    Text(highlight(top.label, query), color = Color.White, fontSize = 18.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+        if (apps.size > 1) {
+            item { SectionHeader("Uygulamalar") }
+            itemsIndexed(apps.drop(1).take(40), key = { _, a -> a.key }) { i, app ->
+                Column {
+                    if (i > 0) Hairline()
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onOpenApp(app) }.padding(horizontal = 14.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AppIconImage(app, vm, 38.dp, iconGlass, strength)
+                        Spacer(Modifier.width(12.dp))
+                        Text(highlight(app.label, query), color = Color.White, fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
         }
+        deviceSection("Kişiler", Glyph.Person, contacts, query, onOpenHit)
+        deviceSection("Mesajlar", Glyph.Message, messages, query, onOpenHit)
+        deviceSection("Dosyalar", Glyph.Doc, files, query, onOpenHit)
+        if (showPermissionCard) {
+            item {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0x1FFFFFFF))
+                        .padding(14.dp)
+                ) {
+                    Text("Kişiler, mesajlar ve dosyalar da aransın mı?", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "İzin verirsen bunlar yalnızca telefonunda, çevrimdışı aranır; hiçbir şey dışarı gönderilmez.",
+                        color = Color(0xCCFFFFFF), fontSize = 13.sp, fontFamily = AppFont,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Row {
+                        Text(
+                            "İzin ver", color = Color(0xFF64B5FF), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                            modifier = Modifier.clickable(onClick = onAskPermission).padding(vertical = 4.dp, horizontal = 2.dp),
+                        )
+                        Spacer(Modifier.width(22.dp))
+                        Text(
+                            "Şimdi değil", color = Color(0xCCFFFFFF), fontSize = 15.sp, fontFamily = AppFont,
+                            modifier = Modifier.clickable(onClick = onDismissCard).padding(vertical = 4.dp, horizontal = 2.dp),
+                        )
+                    }
+                }
+            }
+        }
+        item { SectionHeader("Daha Fazla") }
+        item { ActionRow(Glyph.Globe, "“$query” için internette ara", onWeb) }
+        item { Hairline() }
+        item { ActionRow(Glyph.Bag, "“$query” için Play Store'da ara", onStore) }
+    }
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.deviceSection(
+    title: String, glyph: Glyph, hits: List<DeviceHit>, query: String, onOpen: (DeviceHit) -> Unit,
+) {
+    if (hits.isEmpty()) return
+    item { SectionHeader(title) }
+    itemsIndexed(hits) { i, hit ->
+        Column {
+        if (i > 0) Hairline()
+        Row(
+            Modifier.fillMaxWidth().clickable { onOpen(hit) }.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x33FFFFFF)), contentAlignment = Alignment.Center) {
+                GlyphIcon(glyph, Color.White, 20.dp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(highlight(hit.title, query), color = Color.White, fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(highlight(hit.subtitle, query), color = Color(0xB3FFFFFF), fontSize = 13.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        title, color = Color(0xB3FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+        modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun Hairline() {
+    Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(0.5.dp).background(Color(0x2EFFFFFF)))
+}
+
+@Composable
+private fun ActionRow(glyph: Glyph, title: String, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) { GlyphIcon(glyph, Color.White, 22.dp) }
+        Spacer(Modifier.width(12.dp))
+        Text(title, color = Color.White, fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Aranan metne uyan kısmı kalın gösterir (Türkçe karakter duyarsız). */
+private fun highlight(text: String, query: String): AnnotatedString {
+    val n = AppCategorizer.normalize(text)
+    val q = AppCategorizer.normalize(query)
+    if (q.isEmpty() || n.length != text.length) return AnnotatedString(text)
+    val i = n.indexOf(q)
+    if (i < 0) return AnnotatedString(text)
+    return buildAnnotatedString {
+        append(text.substring(0, i))
+        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(text.substring(i, i + q.length)) }
+        append(text.substring(i + q.length))
     }
 }
