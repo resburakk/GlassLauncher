@@ -49,6 +49,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.requiredSize
 import dev.glass.launcher.data.WidgetItem
 import dev.glass.launcher.data.WidgetKind
 import kotlinx.coroutines.delay
@@ -87,7 +89,7 @@ private fun rememberNow(everySecond: Boolean): LocalDateTime {
 fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, strength: Float) {
     val shape = RoundedCornerShape(widgetCorner(width))
     when (w.kind) {
-        WidgetKind.System -> SystemWidget(w, vm, width, height, shape)
+        WidgetKind.System -> SystemWidget(w, vm, width, height)
         WidgetKind.Photo -> Box(Modifier.size(width, height).clip(shape).background(Color(0x33000000))) {
             PhotoWidget(w, vm, width, height)
         }
@@ -105,13 +107,21 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
     }
 }
 
+/**
+ * Sistem widget'ı (Honor vb.) olduğu gibi gösterilir: kırpma, cam veya arka plan eklenmez. Widget'a
+ * kapladığı alanın gerçek boyutu bildirilir; alan widget'ın en küçük boyutundan darsa widget o boyutta
+ * çizilip orantılı küçültülür (en-boy oranı korunur, sıkışma ve kesilme olmaz).
+ */
 @Composable
-private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, shape: RoundedCornerShape) {
+private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp) {
     val host = vm.widgetHost
-    LaunchedEffect(w.appWidgetId, width, height) {
-        host.updateSize(w.appWidgetId, width.value, height.value)
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+    val info = remember(w.appWidgetId) { host.info(w.appWidgetId) }
+    val (lw, lh, scale) = WidgetSizing.layoutSize(info, width, height, density)
+    LaunchedEffect(w.appWidgetId, lw, lh) {
+        host.updateSize(w.appWidgetId, lw.value, lh.value)
     }
-    Box(Modifier.size(width, height).clip(shape)) {
+    Box(Modifier.size(width, height), contentAlignment = Alignment.Center) {
         AndroidView(
             factory = { ctx ->
                 host.view(w.appWidgetId) ?: TextView(ctx).apply {
@@ -120,7 +130,9 @@ private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height
                     textAlignment = android.view.View.TEXT_ALIGNMENT_CENTER
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .requiredSize(lw, lh)
+                .graphicsLayer { scaleX = scale; scaleY = scale },
         )
     }
 }

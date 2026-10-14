@@ -141,6 +141,20 @@ shot 13b-donus
 step "dönüş bitti" 2
 shot 13c-donus-sonrasi
 
+# Widget galerisi: düzenleme modu > + > Clock > Widget Ekle (bağlama izni teste özel komutla verilir)
+adb shell appwidget grantbind --package dev.glass.launcher --user 0 || true
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
+tap_text "+"; step "widget galerisi" 3
+shot 14a-widget-galerisi
+tap_text "Clock"; step "saat widgetları" 3
+shot 14b-widget-detay
+adb shell input swipe $((W*80/100)) $((H*50/100)) $((W*20/100)) $((H*50/100)) 300; step "sonraki boyut" 2
+shot 14c-widget-detay-2
+tap_text "Widget Ekle"; step "widget eklendi" 4
+adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
+shot 14d-widget-ana-ekran
+
 # Galeriden "Farklı ayarla" penceresi (ATTACH_DATA)
 adb shell am start -a android.intent.action.ATTACH_DATA -t image/png -d content://media/external/images/media/1 -n dev.glass.launcher/.WallpaperImportActivity; step "farklı ayarla" 3
 shot 11-farkli-ayarla

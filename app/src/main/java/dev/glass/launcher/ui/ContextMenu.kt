@@ -138,7 +138,7 @@ fun ContextMenuOverlay(
     onDissolveFolder: () -> Unit,
     onChangeIcon: () -> Unit,
     onResetIcon: () -> Unit,
-    onResizeWidget: (WidgetSize) -> Unit,
+    onResizeWidget: (Span) -> Unit,
     onEditWidget: (() -> Unit)?,
     onRemoveWidget: () -> Unit,
     onClose: () -> Unit,
@@ -160,6 +160,16 @@ fun ContextMenuOverlay(
         }
     }
 
+    // Widget boyutları: sistem widget'larında widget'ın izin verdikleri, kendi widget'larımızda iOS boyutları.
+    val hm = LocalHomeMetrics.current
+    val dens = androidx.compose.ui.platform.LocalDensity.current.density
+    val widgetSizes: List<Span> = remember(widget?.id, hm) {
+        val w = widget ?: return@remember emptyList()
+        val info = if (w.kind == WidgetKind.System) vm.widgetHost.info(w.appWidgetId) else null
+        if (info != null && hm != null) WidgetSizing.sizeOptions(info, hm, dens)
+        else WidgetSize.entries.map { Span(it.spanX, it.spanY) }
+    }
+
     // iOS gibi: "Uygulamayı Kaldır" önce sorar (Sil / Ana Ekrandan Kaldır / Vazgeç).
     var confirmRemove by remember { mutableStateOf(false) }
 
@@ -168,9 +178,10 @@ fun ContextMenuOverlay(
             onEditWidget?.let { edit ->
                 add(MenuAction(if (widget.kind == WidgetKind.Photo) "Fotoğrafı Değiştir" else "Widget'ı Düzenle", Glyph.Pencil) { edit() })
             }
-            WidgetSize.entries.forEach { sz ->
-                if (sz.spanX != widget.spanX || sz.spanY != widget.spanY) {
-                    add(MenuAction("Boyut: ${sz.title}", Glyph.Widget) { onResizeWidget(sz) })
+            widgetSizes.forEach { sz ->
+                if (sz.x != widget.spanX || sz.y != widget.spanY) {
+                    val label = if (sz.title.contains('×')) sz.title else "${sz.title} (${sz.x}×${sz.y})"
+                    add(MenuAction("Boyut: $label", Glyph.Widget) { onResizeWidget(sz) })
                 }
             }
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })

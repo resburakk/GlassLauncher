@@ -672,7 +672,7 @@ fun HomeScreen(
                         iconPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     },
                     onResetIcon = { byKey[req.itemId]?.let { vm.resetCustomIcon(it) } },
-                    onResizeWidget = { sz -> vm.editLayout { it.resizeWidget(req.itemId, sz.spanX, sz.spanY) } },
+                    onResizeWidget = { sz -> vm.editLayout { it.resizeWidget(req.itemId, sz.x, sz.y) } },
                     onEditWidget = when {
                         widget == null -> null
                         widget.kind == WidgetKind.Photo -> {
