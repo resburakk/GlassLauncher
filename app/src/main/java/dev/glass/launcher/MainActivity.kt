@@ -20,6 +20,7 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.graphicsLayer
 import dev.glass.launcher.ui.CrashScreen
 import dev.glass.launcher.ui.AppFont
 import androidx.compose.material3.LocalTextStyle
@@ -37,6 +38,13 @@ import java.util.UUID
 class MainActivity : ComponentActivity(), WidgetRequester {
     private val vm: LauncherViewModel by viewModels()
     private var isDefault by mutableStateOf(false)
+    /**
+     * Sistemin "Son uygulamalar" ekranı açılırken ana ekran görüntüsü yarı saydam bir kart gibi görünüyordu
+     * (ana ekranın kendi zemini yok, arkası duvar kâğıdı). Launcher kendi açmadığı bir şeyle arka plana
+     * geçerken içerik solar; kart yalnızca duvar kâğıdı olarak kalır. Dönüşte iOS gibi büyüyerek gelir.
+     */
+    private var homeHidden by mutableStateOf(false)
+
     /** "Glass Ayarları" kısayoluyla açıldıysa ayarlar doğrudan gösterilir. */
     private var openSettingsRequest by mutableStateOf(0)
 
@@ -84,11 +92,25 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                 LocalWindowBlur provides ::setWallpaperBlur,
                 LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = AppFont),
             ) {
-                HomeScreen(
-                    vm, isDefault,
-                    onRequestDefault = ::requestHomeRole,
-                    openSettingsRequest = openSettingsRequest,
+                val hide by androidx.compose.animation.core.animateFloatAsState(
+                    if (homeHidden) 1f else 0f,
+                    if (homeHidden) androidx.compose.animation.core.tween(110)
+                    else androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 380f),
+                    label = "homeHide",
                 )
+                androidx.compose.foundation.layout.Box(
+                    androidx.compose.ui.Modifier.graphicsLayer {
+                        alpha = 1f - hide
+                        val k = 1f - 0.06f * hide
+                        scaleX = k; scaleY = k
+                    }
+                ) {
+                    HomeScreen(
+                        vm, isDefault,
+                        onRequestDefault = ::requestHomeRole,
+                        openSettingsRequest = openSettingsRequest,
+                    )
+                }
             }
         }
     }
@@ -110,8 +132,26 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     /** Launcher başka bir uygulamanın arkasında kaldı mı (onStop)? Home ile dönüşte sayfa korunur. */
     private var coveredByApp = false
 
+    override fun onPause() {
+        super.onPause()
+        // Launcher bir uygulama/pencere açmadan arka plana geçiyor: büyük olasılıkla son uygulamalar ekranı.
+        if (!LaunchTracker.recent() && !isChangingConfigurations) homeHidden = true
+    }
+
+    override fun startActivity(intent: Intent?, options: Bundle?) {
+        LaunchTracker.mark()
+        super.startActivity(intent, options)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) {
+        LaunchTracker.mark()
+        super.startActivityForResult(intent, requestCode, options)
+    }
+
     override fun onResume() {
         super.onResume()
+        homeHidden = false
         coveredByApp = false
         hideFromRecents()
         updateDefault()

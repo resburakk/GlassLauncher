@@ -105,6 +105,7 @@ class AppRepository(private val context: Context) {
 
     /** [options]: simgeden büyüyen açılış animasyonu (ActivityOptions). Animasyonu sistem çizer. */
     fun launch(app: AppInfo, sourceBounds: Rect? = null, options: Bundle? = null) {
+        dev.glass.launcher.LaunchTracker.mark()
         runCatching {
             launcherApps.startMainActivity(app.componentName, app.user, sourceBounds, options)
         }
@@ -112,6 +113,7 @@ class AppRepository(private val context: Context) {
 
     /** Sistemin "Uygulama bilgisi" ekranı. */
     fun openAppInfo(app: AppInfo) {
+        dev.glass.launcher.LaunchTracker.mark()
         runCatching { launcherApps.startAppDetailsActivity(app.componentName, app.user, null, null) }
     }
 
@@ -152,6 +154,7 @@ class AppRepository(private val context: Context) {
     }
 
     fun startShortcut(info: ShortcutInfo) {
+        dev.glass.launcher.LaunchTracker.mark()
         runCatching { launcherApps.startShortcut(info, null, null) }
     }
 }

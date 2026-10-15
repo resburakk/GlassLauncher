@@ -188,6 +188,15 @@ if [ -n "$mid" ]; then
   adb shell input keyevent KEYCODE_BACK; step "geri"
 fi
 
+# 16) Son uygulamalar: ana ekran içeriği solmalı (yarı saydam kart görünmemeli)
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input keyevent KEYCODE_APP_SWITCH; sleep 0.25
+shot 16a-son-uygulamalar-gecis
+step "son uygulamalar" 2
+shot 16b-son-uygulamalar
+adb shell input keyevent KEYCODE_HOME; step "ana ekrana dönüş" 2
+shot 16c-donus
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
