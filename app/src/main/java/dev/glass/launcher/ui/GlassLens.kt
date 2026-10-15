@@ -48,8 +48,10 @@ half4 main(float2 coord) {
     float t = clamp(1.0 + d / max(edge, 1.0), 0.0, 1.0);
     float k = t * t * t;
     // Köşelerde iki kenarın etkisi üst üste biner: köşe yayında bükülmeyi ve parlamayı yumuşat (leke oluşmasın).
+    // Azaltma KADEMELİDİR: köşe bölgesinin sınırında 1'den başlar, yayın ortasına doğru yumuşakça 0.55'e iner.
+    // (Ani geçiş camın içinde düz çizgiler, kare kare bir ızgara gibi görünüyordu.)
     float2 q = abs(p) - (c - r);
-    float corner = (q.x > 0.0 && q.y > 0.0) ? 0.55 : 1.0;
+    float corner = 1.0 - 0.45 * smoothstep(0.0, max(r * 0.7, 1.0), min(q.x, q.y));
     k *= corner;
     float2 e = float2(1.0, 0.0);
     float2 g = float2(
