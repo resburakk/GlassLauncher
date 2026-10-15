@@ -20,7 +20,10 @@ class Blurred(val image: ImageBitmap, val srcW: Int, val srcH: Int) {
     val shader: android.graphics.BitmapShader by lazy {
         android.graphics.BitmapShader(
             image.asAndroidBitmap(), android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP,
-        )
+        ).apply {
+            // Küçük bulanık kopya büyütülürken yumuşak (doğrusal) örneklenir; aksi halde kare kare pikseller görünür.
+            filterMode = android.graphics.BitmapShader.FILTER_MODE_LINEAR
+        }
     }
 }
 
