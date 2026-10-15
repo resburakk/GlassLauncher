@@ -300,6 +300,7 @@ internal fun HomeContent(
         }
 
         fun handleDrop(id: String, pos: Offset, hover: String?) {
+            android.util.Log.i("GlassDiag", "drop id=${id.take(24)} page=${pagerState.currentPage} lib=$libIndex total=$pageTotal hover=$hover")
             if (pagerState.currentPage >= libIndex) return // arşiv sayfasına bırakma: değişiklik yok
             val cur = vm.layout.value
             if (selection.isGroupDrag(id)) {
@@ -364,6 +365,7 @@ internal fun HomeContent(
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
             val without = cur.items.filter { it.id != id }
             // Sondaki yeni (boş) sayfaya bırakıldı: öğe yeni sayfaya geçer.
+            android.util.Log.i("GlassDiag", "drop step3 page=${pagerState.currentPage} pagesWithout=${GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))}")
             if (pagerState.currentPage >= GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))) {
                 vm.editLayout { it.moveToNewPage(id) }
                 return

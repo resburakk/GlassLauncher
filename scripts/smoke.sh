@@ -244,6 +244,8 @@ adb shell input motionevent MOVE $((W*50/100)) $((H*30/100)); sleep 0.8
 shot 19b-yeni-sayfa-surukle
 adb shell input motionevent UP $((W*50/100)) $((H*30/100)); step "bırak" 2
 shot 19c-yeni-sayfa-birakildi
+adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa" 2
+shot 19d-sonraki-sayfa
 adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 
 adb logcat -d > logcat.txt
