@@ -328,7 +328,7 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
     Footer(
         when {
             !s.syncSystemWallpaper -> "Kapalı: cam yalnızca launcher'dan seçilen duvar kâğıdında bulanık ve kırılmalı görünür."
-            granted -> "Açık: telefonun duvar kâğıdı launcher'a kopyalanır, değişince kendiliğinden güncellenir. Dock ve klasörler gerçek bulanıklık ve kırılmayla çizilir. Görüntü telefonda kalır, hiçbir yere gönderilmez."
+            granted -> "Açık: telefonun duvar kâğıdı launcher'a kopyalanır, değişince kendiliğinden güncellenir. Dock ve klasörler gerçek bulanıklık ve kırılmayla çizilir. Görüntü telefonda kalır, hiçbir yere gönderilmez.\n\nDurum: ${la.wallpaperRepository.syncStatus}"
             else -> "Android, launcher'ın sistem duvar kâğıdını görebilmesi için iki izin ister: Tüm dosyalara erişim ve Fotoğraflar (\"Tümüne izin ver\" seçilmeli). İzin vermezsen duvar kâğıdını launcher'dan (boşluğa basılı tut > Duvar Kâğıdı) seçebilirsin."
         }
     )

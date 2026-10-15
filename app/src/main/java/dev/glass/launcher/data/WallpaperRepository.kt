@@ -61,7 +61,12 @@ class WallpaperRepository(private val context: Context) {
                 tmp.outputStream().use { input.copyTo(it) }
             }
             tmp.renameTo(file)
-        }.getOrDefault(false).also { if (it) _version.value++ }
+        }.getOrDefault(false).also {
+            if (it) {
+                _version.value++
+                prefs.edit().putBoolean("fromSync", false).apply() // elle seçildi
+            }
+        }
     }
 
     suspend fun clear() = withContext(Dispatchers.IO) { file.delete().also { _version.value++ } }
@@ -82,6 +87,14 @@ class WallpaperRepository(private val context: Context) {
 
     private val prefs get() = context.getSharedPreferences("wallpaper_sync", Context.MODE_PRIVATE)
 
+    /** Son kopyalama denemesinin sonucu (Ayarlar'da gösterilir). */
+    val syncStatus: String get() = prefs.getString("status", null) ?: "Henüz denenmedi."
+
+    private fun status(s: String) {
+        prefs.edit().putString("status", s).apply()
+        android.util.Log.i("GlassDiag", "wallpaperSync $s")
+    }
+
     /**
      * Sistem duvar kâğıdını launcher kopyası olarak alır (cam bulanıklığı ve kırılma için). Yalnızca
      * duvar kâğıdı değiştiyse kopyalar ([force] hariç). Canlı duvar kâğıdında veya izin yoksa false döner.
@@ -90,11 +103,21 @@ class WallpaperRepository(private val context: Context) {
     suspend fun syncFromSystem(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         // Android sürümüne göre biri ya da ikisi gerekir; hiçbiri yoksa denemeye gerek yok.
         if (!hasPhotosPermission() && !hasAllFilesAccess()) {
-            android.util.Log.i("GlassDiag", "wallpaperSync izin yok")
+            status("İzin yok.")
             return@withContext false
         }
         runCatching {
             val wm = context.getSystemService(WallpaperManager::class.java)
+            // Canlı (hareketli) duvar kâğıdının görüntüsünü Android başka uygulamalara vermez.
+            val live = wm.wallpaperInfo
+            if (live != null) {
+                val name = runCatching { live.loadLabel(context.packageManager).toString() }.getOrDefault(live.packageName)
+                status("Canlı (hareketli) duvar kâğıdı: \"$name\". Android görüntüsünü vermediği için kopyalanamaz.")
+                // Eski kopya (sistemden alınmışsa) yanlış görüntü göstermesin; elle seçilen launcher duvar kâğıdına dokunma.
+                if (prefs.getBoolean("fromSync", false) && file.exists()) { file.delete(); _version.value++ }
+                prefs.edit().putInt("lastId", -1).apply()
+                return@runCatching false
+            }
             val id = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
             if (!force && id >= 0 && id == prefs.getInt("lastId", -1) && file.exists()) return@runCatching true
             val tmp = File(context.filesDir, "wallpaper.tmp")
@@ -104,7 +127,7 @@ class WallpaperRepository(private val context: Context) {
                 pfd.use { p -> android.os.ParcelFileDescriptor.AutoCloseInputStream(p).use { input -> tmp.outputStream().use { input.copyTo(it) } } }
             } else {
                 val d = wm.drawable ?: run {
-                    android.util.Log.i("GlassDiag", "wallpaperSync cizilebilir yok (canli duvar kagidi?)")
+                    status("Duvar kâğıdı görüntüsü alınamadı.")
                     return@runCatching false
                 }
                 val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
@@ -114,11 +137,12 @@ class WallpaperRepository(private val context: Context) {
                 tmp.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
             }
             if (!tmp.renameTo(file)) return@runCatching false
-            prefs.edit().putInt("lastId", id).apply()
+            prefs.edit().putInt("lastId", id).putBoolean("fromSync", true).apply()
             _version.value++
-            android.util.Log.i("GlassDiag", "wallpaperSync kopyalandi id=$id dosya=${pfd != null} boyut=${file.length()}")
+            val t = java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("tr")).format(java.util.Date())
+            status("Kopyalandı ($t, ${file.length() / 1024} KB${if (pfd != null) ", orijinal dosya" else ""}).")
             true
-        }.onFailure { android.util.Log.w("GlassDiag", "wallpaperSync hata: ${it.javaClass.simpleName} ${it.message}") }
+        }.onFailure { status("Hata: ${it.javaClass.simpleName} ${it.message ?: ""}".trim()) }
             .getOrDefault(false)
     }
 
