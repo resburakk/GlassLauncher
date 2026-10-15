@@ -382,7 +382,14 @@ fun BlurBackdrop(
  * İçerik katmanına uygulanır: içeriği net çizer, ardından [GlassRegions]'daki alanlara içeriğin bulanık
  * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
  */
-fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot: Boolean = false): Modifier = composed {
+fun Modifier.glassRegionBlur(
+    reg: GlassRegions,
+    radius: Dp = 30.dp,
+    includeRoot: Boolean = false,
+    /** Yoğun bulanık alanların (arama paneli/çubuğu) yarıçapı: cam stilinden bağımsız, arkadaki simge
+     *  sıraları kenarı belli olmayan bir ışığa dönüşsün diye büyük. */
+    strongRadius: Dp = 84.dp,
+): Modifier = composed {
     // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
     val node = remember { android.graphics.RenderNode("glassRegionContent") }
     val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
@@ -403,8 +410,9 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
         android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     }
     val strongNode = remember { android.graphics.RenderNode("glassRegionBlurStrong") }
-    val strongEffect = remember(r) {
-        android.graphics.RenderEffect.createBlurEffect(r * 2.2f, r * 2.2f, android.graphics.Shader.TileMode.CLAMP)
+    val sr = with(LocalDensity.current) { strongRadius.toPx() }.coerceAtLeast(r * 2.2f)
+    val strongEffect = remember(sr) {
+        android.graphics.RenderEffect.createBlurEffect(sr, sr, android.graphics.Shader.TileMode.CLAMP)
     }
     this.drawWithContent {
         drawContent()
