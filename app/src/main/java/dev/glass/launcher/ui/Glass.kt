@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -168,7 +169,7 @@ fun Modifier.liquidGlass(
             if (bd != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() }
             else Modifier
         )
-        .clip(shape)
+        .smoothClip(shape)
         .then(
             if (bd != null) Modifier.drawBehind {
                 drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
@@ -180,8 +181,8 @@ fun Modifier.liquidGlass(
         .glassBrightness(st.glassBrightness)
         .then(
             if (look.reduced) Modifier
-            else Modifier.drawWithContent {
-                drawContent()
+            // Parlama camın kendisine aittir: içeriğin (simgeler, yazılar) ALTINDA çizilir, yoksa simgeler soluk görünür.
+            else Modifier.drawBehind {
                 // Speküler parlama (iOS 27: daha parlak).
                 drawRect(
                     Brush.radialGradient(
@@ -301,6 +302,8 @@ class GlassRegions {
     val regions = mutableStateMapOf<Any, RoundRect>()
     /** Yalnızca en alttaki ana ekran içeriğine uygulanan alanlar (ör. açık klasör paneli: kendi katmanı bulanmasın). */
     val rootRegions = mutableStateMapOf<Any, RoundRect>()
+    /** Alanın gerçek şekli (ör. iOS sürekli köşe); yoksa düz yuvarlak köşe kullanılır. */
+    val shapes = HashMap<Any, Shape>()
 }
 
 val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
@@ -310,7 +313,7 @@ val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
  * Panelin arkasına aynı boyutta yerleştirilir; kendi alanını [GlassRegions]'a kaydeder.
  */
 @Composable
-fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = false) {
+fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = false, shape: Shape? = null) {
     val reg = LocalGlassRegions.current ?: return
     val map = if (rootOnly) reg.rootRegions else reg.regions
     if (LocalGlass.current.reduced) return
@@ -326,7 +329,8 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = 
         val rr = RoundRect(b, CornerRadius((cr * k).coerceAtMost(minOf(b.width, b.height) / 2f)))
         if (map[key] != rr) map[key] = rr
     }
-    DisposableEffect(reg, key) { onDispose { map.remove(key) } }
+    if (shape != null) reg.shapes[key] = shape else reg.shapes.remove(key)
+    DisposableEffect(reg, key) { onDispose { map.remove(key); reg.shapes.remove(key) } }
     // Yaylı açılış animasyonu (ölçek katmanda olduğu için yerleşim bildirimi gelmez) boyunca alan
     // HER KAREDE yeniden ölçülür; bulanıklık menüyle birlikte büyür. Sonra seyrek kontrol yeterli.
     LaunchedEffect(key) {
@@ -368,7 +372,7 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
     }
     this.drawWithContent {
         drawContent()
-        val list = if (includeRoot) reg.regions.values.toList() + reg.rootRegions.values else reg.regions.values.toList()
+        val list = if (includeRoot) reg.regions.entries.toList() + reg.rootRegions.entries else reg.regions.entries.toList()
         if (reduced || list.isEmpty()) return@drawWithContent
         val w = size.width.toInt(); val h = size.height.toInt()
         if (w <= 0 || h <= 0) return@drawWithContent
@@ -389,12 +393,16 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
         blurNode.endRecording()
         drawIntoCanvas { c ->
             val nc = c.nativeCanvas
-            list.forEachIndexed { i, rr ->
-                nc.save()
-                nc.clipPath(Path().apply { addRoundRect(rr) }.asAndroidPath())
+            list.forEachIndexed { i, entry ->
+                val rr = entry.value
+                // Alanın gerçek şekli (menü/klasör: iOS sürekli köşe). Kırpma yerine kenar yumuşatmalı silme
+                // kullanılır: Android'de yol ile kırpma köşeleri basamak basamak yapar.
+                val shp = reg.shapes[entry.key] ?: RoundedCornerShape(rr.topLeftCornerRadius.x)
+                val path = shp.androidPath(rr.left, rr.top, rr.width, rr.height, layoutDirection, this)
                 // Alanın net içeriği silinir (sistem duvar kâğıdı görünür), yerine bulanık kopyası çizilir.
                 // İçerik saydam olduğu için silmeden çizilirse net simgeler bulanık kopyanın altından görünür.
-                nc.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR)
+                nc.drawPath(path, AaClearPaint)
+                nc.saveLayer(rr.left, rr.top, rr.right, rr.bottom, null)
                 val rw = rr.width.toInt(); val rh = rr.height.toInt()
                 if (refr > 0.01f && rw > 4 && rh > 4) {
                     // Kırılma: alanın bulanık kopyası kendi düğümüne alınır, kenarında mercek gibi bükülür.
@@ -415,6 +423,9 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
                 } else {
                     nc.drawRenderNode(blurNode)
                 }
+                // Şeklin dışında kalan bulanık kopya yumuşak kenarla silinir.
+                path.fillType = android.graphics.Path.FillType.INVERSE_WINDING
+                nc.drawPath(path, AaClearPaint)
                 nc.restore()
             }
         }
@@ -437,7 +448,7 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier
     val op = st.glassOpacity * glassTintFactor(st.glassTint) * (if (LocalGlass.current.clear) 0.5f else 1f)
     val glow = st.glassRimGlow
     this
-        .clip(shape)
+        .smoothClip(shape)
         .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
         .glassBrightness(st.glassBrightness)
         .darkEdge(shape, st.glassEdgeDark, (st.glassRimWidth + 1.6f).dp)

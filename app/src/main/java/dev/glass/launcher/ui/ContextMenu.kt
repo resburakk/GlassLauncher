@@ -318,7 +318,7 @@ fun ContextMenuOverlay(
             modifier = Modifier.fillMaxSize(),
             content = {
                 Box(Modifier.width(menuW).heightIn(max = maxH)) {
-                    BlurBackdrop(corner, Modifier.matchParentSize())
+                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner))
                     Column(
                         Modifier
                             .width(menuW)
@@ -373,7 +373,7 @@ private fun RemoveConfirm(
     val blue = if (dark) Color(0xFF64B5FF) else Color(0xFF0A84FF)
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
         Box(Modifier.width(u * 280f)) {
-            BlurBackdrop(corner, Modifier.matchParentSize())
+            BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner))
             Column(
                 Modifier
                     .width(u * 280f)
@@ -428,7 +428,7 @@ private fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opacit
     }
     this
         .shadow(24.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
-        .clip(shape)
+        .smoothClip(shape)
         .background(fill)
         .glassBrightness(st.glassBrightness)
         .then(

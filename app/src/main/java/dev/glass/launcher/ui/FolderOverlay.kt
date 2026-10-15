@@ -165,7 +165,7 @@ fun FolderOverlay(
         val panelCorner = (u * settings.folderCorner).coerceAtMost(panelW / 2f)
         Box {
         // Şeffaf cam: panelin arkasındaki ana ekran görüntüsü kenarda mercek gibi bükülür (yalnızca alt katmanda).
-        if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true)
+        if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true, shape = panelShape)
         Column(
             Modifier
                 .width(panelW)

@@ -7,6 +7,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -94,4 +100,58 @@ class SquircleShape(private val radius: Dp, private val smoothing: Float) : Shap
 fun appShape(radius: Dp): Shape {
     val s = LocalLauncherSettings.current.cornerSmoothing
     return if (s < 0.01f) RoundedCornerShape(radius) else SquircleShape(radius, s)
+}
+
+/** Kenar yumuşatmalı silme fırçası (dışarıda kalan pikselleri kısmi örtüyle siler; basamak oluşmaz). */
+internal val AaClearPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+    xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.CLEAR)
+}
+
+/**
+ * [clip] ile aynı, ancak iOS sürekli köşesinde (squircle) kenar yumuşatmalı. Android, özel yol ile kırpmada
+ * kenar yumuşatma yapmaz (köşeler basamak basamak görünür); burada içerik ayrı bir katmanda çizilip şeklin
+ * dışında kalan kısım yumuşak kenarlı olarak silinir. Düz yuvarlak köşe ve daire zaten yumuşak kırpılır.
+ */
+fun androidx.compose.ui.Modifier.smoothClip(shape: Shape): androidx.compose.ui.Modifier =
+    if (shape !is SquircleShape) this.then(androidx.compose.ui.Modifier.clip(shape))
+    else this
+        .graphicsLayer {
+            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+            clip = true
+        }
+        .drawWithCache {
+            val outline = shape.createOutline(size, layoutDirection, this)
+            val inv = android.graphics.Path().apply {
+                when (outline) {
+                    is Outline.Generic -> set(outline.path.asAndroidPath())
+                    is Outline.Rounded -> addRoundRect(
+                        android.graphics.RectF(0f, 0f, size.width, size.height),
+                        outline.roundRect.topLeftCornerRadius.x, outline.roundRect.topLeftCornerRadius.y,
+                        android.graphics.Path.Direction.CW,
+                    )
+                    is Outline.Rectangle -> addRect(0f, 0f, size.width, size.height, android.graphics.Path.Direction.CW)
+                }
+                fillType = android.graphics.Path.FillType.INVERSE_WINDING
+            }
+            onDrawWithContent {
+                drawContent()
+                drawIntoCanvas { it.nativeCanvas.drawPath(inv, AaClearPaint) }
+            }
+        }
+
+/** Şeklin [size] boyutundaki yolu (kök koordinatına [left],[top] kadar kaydırılmış), platform yolu olarak. */
+internal fun Shape.androidPath(
+    left: Float, top: Float, width: Float, height: Float, dir: LayoutDirection, density: Density,
+): android.graphics.Path {
+    val p = android.graphics.Path()
+    when (val o = createOutline(Size(width, height), dir, density)) {
+        is Outline.Generic -> p.set(o.path.asAndroidPath())
+        is Outline.Rounded -> p.addRoundRect(
+            android.graphics.RectF(0f, 0f, width, height),
+            o.roundRect.topLeftCornerRadius.x, o.roundRect.topLeftCornerRadius.y, android.graphics.Path.Direction.CW,
+        )
+        is Outline.Rectangle -> p.addRect(0f, 0f, width, height, android.graphics.Path.Direction.CW)
+    }
+    p.offset(left, top)
+    return p
 }
