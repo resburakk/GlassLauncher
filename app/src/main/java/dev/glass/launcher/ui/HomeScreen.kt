@@ -633,10 +633,14 @@ fun HomeScreen(
             enter = fadeIn(motion.tween(160)),
             exit = fadeOut(motion.tween(140)),
         ) {
+            val menuVis by transition.animateFloat(transitionSpec = { motion.tween(150) }, label = "menuVis") {
+                if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
+            }
             folderMenuHolder[0]?.let { req ->
                 Box(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
                     ContextMenuOverlay(
+                        visibility = { menuVis },
                         req = req,
                         vm = vm,
                         app = byKey[req.itemId],
@@ -672,10 +676,14 @@ fun HomeScreen(
             enter = fadeIn(motion.tween(160)) + scaleIn(motion.bouncy(), initialScale = 0.9f),
             exit = fadeOut(motion.tween(140)),
         ) {
+            val menuVis by transition.animateFloat(transitionSpec = { motion.tween(150) }, label = "menuVis") {
+                if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
+            }
             menuHolder[0]?.let { req ->
                 val folder = layout.items.firstOrNull { it.id == req.itemId } as? FolderItem
                 val widget = layout.items.firstOrNull { it.id == req.itemId } as? WidgetItem
                 ContextMenuOverlay(
+                    visibility = { menuVis },
                     req = req,
                     vm = vm,
                     app = byKey[req.itemId],

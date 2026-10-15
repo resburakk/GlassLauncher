@@ -128,6 +128,8 @@ fun ContextMenuOverlay(
     widget: WidgetItem?,
     hasCustomIcon: Boolean,
     onHome: Boolean,
+    /** Dıştaki açılış/kapanış geçişinin görünürlüğü (0..1); arka plan bulanıklığı buna uyar. */
+    visibility: () -> Float = { 1f },
     strength: Float,
     iconGlass: Boolean,
     byKey: Map<String, AppInfo>,
@@ -318,7 +320,7 @@ fun ContextMenuOverlay(
             modifier = Modifier.fillMaxSize(),
             content = {
                 Box(Modifier.width(menuW).heightIn(max = maxH)) {
-                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner))
+                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() })
                     Column(
                         Modifier
                             .width(menuW)

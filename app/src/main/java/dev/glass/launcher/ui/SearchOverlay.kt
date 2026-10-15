@@ -176,10 +176,24 @@ fun SearchOverlay(
             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp)
         ) {
             Spacer(Modifier.height(12.dp))
-            Text(
-                "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp, bottom = 8.dp),
-            )
+            // Başlık + sağda iOS'taki "Show More" gibi 4 ↔ 8 öneri geçişi (aşağı/yukarı çekmeyle aynı ayar).
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp).weight(1f),
+                )
+                if (suggestions.size > 4) {
+                    val more = st.searchSuggestExpanded
+                    Text(
+                        if (more) "Daha Az" else "Daha Fazla",
+                        color = Color(0xE6FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { vm.updateSettings { it.copy(searchSuggestExpanded = !more) } }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
             SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, ::open)
             Spacer(Modifier.height(10.dp))
 

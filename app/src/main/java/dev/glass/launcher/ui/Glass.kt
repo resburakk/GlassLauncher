@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.snapshotFlow
+
+import androidx.compose.runtime.rememberUpdatedState
+
 import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -304,6 +308,8 @@ class GlassRegions {
     val rootRegions = mutableStateMapOf<Any, RoundRect>()
     /** Alanın gerçek şekli (ör. iOS sürekli köşe); yoksa düz yuvarlak köşe kullanılır. */
     val shapes = HashMap<Any, Shape>()
+    /** Alanın görünürlüğü (0..1): menü açılırken/kapanırken bulanıklık da menüyle birlikte belirir ve söner. */
+    val alphas = mutableStateMapOf<Any, Float>()
 }
 
 val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
@@ -313,7 +319,11 @@ val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
  * Panelin arkasına aynı boyutta yerleştirilir; kendi alanını [GlassRegions]'a kaydeder.
  */
 @Composable
-fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = false, shape: Shape? = null) {
+fun BlurBackdrop(
+    corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = false, shape: Shape? = null,
+    /** Panelin o anki görünürlüğü (açılış/kapanış animasyonu); bulanıklık buna göre belirir/söner. */
+    alpha: (() -> Float)? = null,
+) {
     val reg = LocalGlassRegions.current ?: return
     val map = if (rootOnly) reg.rootRegions else reg.regions
     if (LocalGlass.current.reduced) return
@@ -330,7 +340,17 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = 
         if (map[key] != rr) map[key] = rr
     }
     if (shape != null) reg.shapes[key] = shape else reg.shapes.remove(key)
-    DisposableEffect(reg, key) { onDispose { map.remove(key); reg.shapes.remove(key) } }
+    DisposableEffect(reg, key) { onDispose { map.remove(key); reg.shapes.remove(key); reg.alphas.remove(key) } }
+    if (alpha != null) {
+        val a by rememberUpdatedState(alpha)
+        // Her karede: görünürlük değiştikçe (kapanış dahil) bulanıklık ve alanı birlikte güncellenir.
+        LaunchedEffect(key) {
+            snapshotFlow { a().coerceIn(0f, 1f) }.collect { v ->
+                reg.alphas[key] = v
+                update()
+            }
+        }
+    }
     // Yaylı açılış animasyonu (ölçek katmanda olduğu için yerleşim bildirimi gelmez) boyunca alan
     // HER KAREDE yeniden ölçülür; bulanıklık menüyle birlikte büyür. Sonra seyrek kontrol yeterli.
     LaunchedEffect(key) {
@@ -367,6 +387,13 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
     // Her cam alanı için ayrı mercek düğümü ve gölgelendirici (uniform'lar alana özeldir).
     val lensNodes = remember { ArrayList<android.graphics.RenderNode>() }
     val lensShaders = remember { ArrayList<android.graphics.RuntimeShader>() }
+    // Yarı görünür alanda net içerik kısmen silinir (bulanık kopyayla karışır).
+    val fadePaint = remember {
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.BLACK
+            xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.DST_OUT)
+        }
+    }
     val effect = remember(r) {
         android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
     }
@@ -401,8 +428,11 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
                 val path = shp.androidPath(rr.left, rr.top, rr.width, rr.height, layoutDirection, this)
                 // Alanın net içeriği silinir (sistem duvar kâğıdı görünür), yerine bulanık kopyası çizilir.
                 // İçerik saydam olduğu için silmeden çizilirse net simgeler bulanık kopyanın altından görünür.
-                nc.drawPath(path, AaClearPaint)
-                nc.saveLayer(rr.left, rr.top, rr.right, rr.bottom, null)
+                val vis = reg.alphas[entry.key] ?: 1f
+                if (vis <= 0.01f) return@forEachIndexed
+                if (vis >= 0.99f) nc.drawPath(path, AaClearPaint)
+                else nc.drawPath(path, fadePaint.apply { alpha = (vis * 255).toInt() })
+                nc.saveLayerAlpha(rr.left, rr.top, rr.right, rr.bottom, (vis * 255).toInt())
                 val rw = rr.width.toInt(); val rh = rr.height.toInt()
                 if (refr > 0.01f && rw > 4 && rh > 4) {
                     // Kırılma: alanın bulanık kopyası kendi düğümüne alınır, kenarında mercek gibi bükülür.
