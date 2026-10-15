@@ -1,6 +1,5 @@
 package dev.glass.launcher.ui
 
-import androidx.compose.ui.layout.onSizeChanged
 
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 
@@ -320,12 +319,7 @@ private fun SuggestionsPanel(
     val panelShape = appShape(panelCorner)
     // Panel, arkasındaki GERÇEK görüntünün (bulanık duvar kâğıdı + bulanık simgeler) bir derece daha bulanık
     // kopyasını gösterir; böylece çevresindeki bulanık alanla aynı sahnenin devamı gibi durur.
-    androidx.compose.runtime.SideEffect {
-        android.util.Log.i("GlassDiag", "suggest expanded=$expanded n=${suggestions.size} h=${panelH.value.toInt()}")
-    }
-    Box(Modifier.requiredWidth(panelW).height(panelH).onSizeChanged {
-        android.util.Log.i("GlassDiag", "suggest size=${it.height}")
-    }) {
+    Box(Modifier.requiredWidth(panelW).height(panelH)) {
     BlurBackdrop(panelCorner, Modifier.matchParentSize(), shape = panelShape, alpha = visibility)
     Box(
         Modifier
