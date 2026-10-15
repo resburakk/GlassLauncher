@@ -723,6 +723,17 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
 
 @Composable
 private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    Group("Cam stili") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("clear" to "Şeffaf", "frosted" to "Buzlu").forEach { (k, t) ->
+                Chip(t, s.glassStyle == k, Modifier.weight(1f)) { onChange { it.copy(glassStyle = k) } }
+            }
+        }
+    }
+    Footer(
+        "Şeffaf: iOS 26'daki gibi camın arkası net görünür, kenarlarda mercek gibi bükülür (düzenleme düğmeleri gibi). " +
+            "Buzlu: arkası güçlü bulanık ve beyazımsı. Şeffafta yazılar okunur kalsın diye hafif yazı gölgesi kendiliğinden açılır."
+    )
     Group(null) {
         SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f, default = Def.glassStrength) { v -> onChange { it.copy(glassStrength = v) } }
         RowDivider()

@@ -136,6 +136,8 @@ data class LauncherSettings(
     val glassTint: Float = 0.5f,
     /** Sistem duvar kâğıdı kendiliğinden launcher kopyası olarak alınır ("Tüm dosyalara erişim" izni gerekir). */
     val syncSystemWallpaper: Boolean = true,
+    /** Cam stili: "clear" (iOS 26 Şeffaf: arkası net, kenarda mercek) veya "frosted" (buzlu, bulanık). */
+    val glassStyle: String = "clear",
     /** Arama önerilerindeki uygulama adlarının yazı boyutu (pt) ve kalınlığı. */
     val searchSuggestLabelSize: Float = 11f,
     val searchSuggestLabelWeight: Float = 400f,
@@ -265,7 +267,7 @@ data class LauncherSettings(
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
-        put("syncSystemWallpaper", syncSystemWallpaper)
+        put("syncSystemWallpaper", syncSystemWallpaper); put("glassStyle", glassStyle)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
@@ -364,6 +366,7 @@ data class LauncherSettings(
                 glassEdgeDark = o.optDouble("glassEdgeDark", d.glassEdgeDark.toDouble()).toFloat(),
                 glassTint = o.optDouble("glassTint", d.glassTint.toDouble()).toFloat(),
                 syncSystemWallpaper = o.optBoolean("syncSystemWallpaper", d.syncSystemWallpaper),
+                glassStyle = o.optString("glassStyle", d.glassStyle).takeIf { it == "clear" || it == "frosted" } ?: d.glassStyle,
                 searchSuggestLabelSize = o.optDouble("searchSuggestLabelSize", d.searchSuggestLabelSize.toDouble()).toFloat(),
                 searchSuggestLabelWeight = o.optDouble("searchSuggestLabelWeight", d.searchSuggestLabelWeight.toDouble()).toFloat(),
                 wallpaperTarget = o.optString("wallpaperTarget", d.wallpaperTarget),

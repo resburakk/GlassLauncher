@@ -352,6 +352,9 @@ fun HomeScreen(
         }
     }
     val useBackdrop = settings.launcherWallpaper && settings.realBlur && !reduced
+    val clearGlass = settings.glassStyle == "clear"
+    // Şeffaf cam: duvar kâğıdının net kopyası (doku olarak; kendi boyutuyla eşlenir).
+    val sharpBackdrop = remember(wallpaper) { wallpaper?.let { dev.glass.launcher.data.Blurred(it, it.width, it.height) } }
     // Tanı kaydı (yalnızca durum değişince): kalite düşürme nedenleri ve pencere bulanıklığı desteği.
     LaunchedEffect(reduced, powerSave, degraded) {
         android.util.Log.i(
@@ -361,9 +364,11 @@ fun HomeScreen(
                 "crossWindowBlur=${context.getSystemService(android.view.WindowManager::class.java).isCrossWindowBlurEnabled}",
         )
     }
-    LaunchedEffect(settings.textShadow, settings.textShadowStrength, settings.textShadowSpread) {
-        TextShadowConfig.enabled = settings.textShadow
-        TextShadowConfig.strength = settings.textShadowStrength
+    LaunchedEffect(settings.textShadow, settings.textShadowStrength, settings.textShadowSpread, settings.glassStyle) {
+        // Şeffaf camda yazılar net duvar kâğıdı üstünde okunur kalsın: gölge kapalıysa hafif bir gölge açılır.
+        val autoShadow = settings.glassStyle == "clear" && !settings.textShadow
+        TextShadowConfig.enabled = settings.textShadow || autoShadow
+        TextShadowConfig.strength = if (autoShadow) 0.3f else settings.textShadowStrength
         TextShadowConfig.spread = settings.textShadowSpread
     }
     CompositionLocalProvider(
@@ -375,6 +380,8 @@ fun HomeScreen(
             dark = dark,
             reduced = reduced,
             noLens = noLens,
+            clear = clearGlass,
+            sharp = if (useBackdrop) sharpBackdrop else null,
             backdrop = if (useBackdrop) blurred else null,
             rootW = rootSize.width.toFloat(),
             rootH = rootSize.height.toFloat(),
@@ -484,7 +491,7 @@ fun HomeScreen(
             Modifier
                 .fillMaxSize()
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
-                .glassRegionBlur(glassRegions, 30.dp * settings.glassBlur)
+                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
@@ -569,7 +576,7 @@ fun HomeScreen(
         ) {
             folderHolder[0]?.let { f ->
                 // Klasör katmanı da menünün arkasında bulanıklaşır (ayrı katmanda: alttaki ana ekran silinmez).
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, 30.dp * settings.glassBlur)) {
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)) {
                 FolderOverlay(
                     folder = f,
                     byKey = byKey,
@@ -606,7 +613,7 @@ fun HomeScreen(
             exit = scaleOut(motion.tween(180), targetScale = 0.85f) + fadeOut(motion.tween(160)),
         ) {
             groupHolder[0]?.let { g ->
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, 30.dp * settings.glassBlur)) {
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)) {
                 LibraryGroupOverlay(
                     group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },

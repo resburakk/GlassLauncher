@@ -80,6 +80,10 @@ data class GlassLook(
     val reduced: Boolean = false,
     /** Kaydırmada yavaşlık algılandı: kenar kırılması kapalı (bulanıklık açık kalır). */
     val noLens: Boolean = false,
+    /** iOS 26 "Şeffaf" cam: arkası net (hafif yumuşak), dolgu çok ince, kenarda belirgin mercek. */
+    val clear: Boolean = false,
+    /** Launcher duvar kâğıdının NET kopyası (şeffaf cam için); yoksa null. */
+    val sharp: Blurred? = null,
     /** Launcher duvar kâğıdının bulanık kopyası (gerçek arka plan bulanıklığı için); yoksa null. */
     val backdrop: Blurred? = null,
     /** Duvar kâğıdının çizildiği kök alanın boyutu (px). */
@@ -131,9 +135,19 @@ fun Modifier.liquidGlass(
     val lens = remember { GlassLens.newShader() }
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalGlassRegions.current else null
-    val bd = if (look.reduced || content != null) null else look.backdrop
-    // Gerçek bulanıklık varken dolgu daha ince tutulur; cam arkasındaki renkleri göstersin.
-    val fill = if (bd != null || content != null) 0.55f else 1f
+    val clear = look.clear
+    val bd = if (look.reduced || content != null) null else if (clear) (look.sharp ?: look.backdrop) else look.backdrop
+    // Gerçek arka plan varken dolgu daha ince; şeffaf camda neredeyse yok (arkası görünsün).
+    val fill = when {
+        bd != null || content != null -> if (clear) 0.2f else 0.55f
+        else -> if (clear) 0.6f else 1f
+    }
+    val softPx = if (clear && bd != null && bd === look.sharp) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
+    val refr = when {
+        look.noLens -> 0f
+        clear -> (st.glassRefraction * 1.3f).coerceAtMost(1.2f)
+        else -> st.glassRefraction
+    }
     val base = if (look.dark) {
         Brush.verticalGradient(listOf(black((0.30f * s + 0.08f) * fill * op), black((0.42f * s + 0.08f) * fill * op)))
     } else {
@@ -157,7 +171,7 @@ fun Modifier.liquidGlass(
         .clip(shape)
         .then(
             if (bd != null) Modifier.drawBehind {
-                drawBackdrop(bd, look.rootW, look.rootH, origin, lens, if (look.noLens) 0f else st.glassRefraction)
+                drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
             }
             else Modifier
         )
@@ -195,11 +209,11 @@ fun Modifier.liquidGlass(
  */
 private fun DrawScope.drawBackdrop(
     bd: Blurred, rootW: Float, rootH: Float, origin: Offset,
-    lens: android.graphics.RuntimeShader? = null, refraction: Float = 0f,
+    lens: android.graphics.RuntimeShader? = null, refraction: Float = 0f, soft: Float = 0f, forceLens: Boolean = false,
 ) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
-    if (lens != null && refraction > 0.01f) {
+    if (lens != null && (refraction > 0.01f || forceLens)) {
         // Kırılmalı yol: bulanık kopya, kök koordinatlarına eşlenmiş bir doku olarak merceğe verilir.
         val scaleR = maxOf(rootW / bd.srcW, rootH / bd.srcH)
         val kR = img.width.toFloat() / bd.srcW
@@ -209,7 +223,7 @@ private fun DrawScope.drawBackdrop(
         m.postTranslate((rootW - bd.srcW * scaleR) / 2f, (rootH - bd.srcH * scaleR) / 2f)
         bs.setLocalMatrix(m)
         lens.setInputShader("content", bs)
-        GlassLens.configure(lens, size.width, size.height, minOf(size.width, size.height) * 0.3f, refraction, origin.x, origin.y)
+        GlassLens.configure(lens, size.width, size.height, minOf(size.width, size.height) * 0.3f, refraction, origin.x, origin.y, soft)
         drawRect(androidx.compose.ui.graphics.ShaderBrush(lens))
         return
     }
@@ -417,7 +431,7 @@ fun Modifier.glassBrightness(b: Float): Modifier = when {
  */
 fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier = composed {
     val st = LocalLauncherSettings.current
-    val op = st.glassOpacity * glassTintFactor(st.glassTint)
+    val op = st.glassOpacity * glassTintFactor(st.glassTint) * (if (LocalGlass.current.clear) 0.5f else 1f)
     val glow = st.glassRimGlow
     this
         .clip(shape)
