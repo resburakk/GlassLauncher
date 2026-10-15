@@ -195,6 +195,8 @@ suspend fun PointerInputScope.detectHomeDrag(
     onLongPressEmpty: () -> Unit,
     onMenu: (DragTarget) -> Unit,
     onDragStarted: () -> Unit,
+    /** Düzenleme modunda bu öğe parmağı kaydırınca doğrudan sürüklenebilir mi (seçimde: yalnızca seçililer). */
+    canDirectDrag: (DragTarget) -> Boolean = { true },
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -211,8 +213,13 @@ suspend fun PointerInputScope.detectHomeDrag(
                 val c = ev.changes.firstOrNull { it.id == down.id }
                 r = when {
                     c == null || !c.pressed || ev.changes.size > 1 -> 0
-                    (c.position - down.position).getDistance() > slop ->
-                        if (editing && hit != null) 1 else 0
+                    (c.position - down.position).getDistance() > slop -> {
+                        val d = c.position - down.position
+                        // Hızlı yatay hareket her zaman sayfa çevirir (iOS gibi); yavaş/kontrollü hareket sürükler.
+                        val flick = kotlin.math.abs(d.x) > kotlin.math.abs(d.y) * 1.2f &&
+                            c.uptimeMillis - down.uptimeMillis < 140
+                        if (editing && hit != null && !flick && canDirectDrag(hit)) 1 else 0
+                    }
                     else -> -1
                 }
             }

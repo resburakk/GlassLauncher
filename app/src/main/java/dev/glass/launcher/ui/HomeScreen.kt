@@ -414,6 +414,9 @@ fun HomeScreen(
                         overlayNow == Overlay.None || overlayNow == Overlay.Folder || overlayNow == Overlay.Group
                     },
                     isEditing = { editNow },
+                    // Seçim modunda yalnızca seçili öğeler parmak kaydırılınca sürüklenir; seçilmemiş bir simgenin
+                    // üzerinden kaydırmak sayfayı (klasörde klasör sayfasını) çevirir.
+                    canDirectDrag = { t -> !selection.active || t.itemId in selection.ids },
                     onLongPressEmpty = {
                         if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
