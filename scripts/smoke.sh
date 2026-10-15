@@ -233,6 +233,19 @@ shot 16b-son-uygulamalar
 adb shell input keyevent KEYCODE_HOME; step "ana ekrana dönüş" 2
 shot 16c-donus
 
+# 19) Simgeyi sağ kenara sürükleyip bekle: sonda yeni boş sayfa açılmalı, simge oraya geçmeli
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input motionevent DOWN $ix $iy; sleep 1.3
+adb shell input motionevent MOVE $((W*60/100)) $((H*40/100)); sleep 0.3
+adb shell input motionevent MOVE $((W*97/100)) $((H*40/100)); sleep 1.6
+shot 19a-kenarda-bekle
+adb shell input motionevent MOVE $((W*96/100)) $((H*40/100)); sleep 1.6
+adb shell input motionevent MOVE $((W*50/100)) $((H*30/100)); sleep 0.8
+shot 19b-yeni-sayfa-surukle
+adb shell input motionevent UP $((W*50/100)) $((H*30/100)); step "bırak" 2
+shot 19c-yeni-sayfa-birakildi
+adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

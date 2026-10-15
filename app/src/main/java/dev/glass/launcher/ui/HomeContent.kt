@@ -142,9 +142,8 @@ internal fun HomeContent(
         val placements = remember(items, m.columns, m.rows, byKey) { GridPacker.pack(items, m.columns, m.rows, visible) }
         val pageTotal = if (items.isEmpty()) 1 else GridPacker.pageCount(placements)
         val dragging = drag.key != null
-        val lastFull = GridPacker.isPageFull(placements, pageTotal - 1, m.columns, m.rows)
-        // Sürüklerken son sayfa doluysa yeni boş bir sayfa görünür.
-        val homeCount = pageTotal + if (dragging && lastFull) 1 else 0
+        // Sürüklerken sonda her zaman yeni boş bir sayfa görünür (iOS gibi); oraya bırakılan öğe yeni sayfaya geçer.
+        val homeCount = pageTotal + if (dragging) 1 else 0
         val libIndex = homeCount
         val pagerState = rememberPagerState { homeCount + if (settings.showLibrary) 1 else 0 }
 
@@ -197,6 +196,10 @@ internal fun HomeContent(
                 val rest = cur.items.filter { it.id !in ids }
                 if (cell.page < 0) { preview = rest; dockPreview = null; return@LaunchedEffect }
                 dockPreview = null
+                if (cell.page >= GridPacker.pageCount(GridPacker.pack(rest, m.columns, m.rows, visible))) {
+                    preview = rest + PageBreak("onizleme-yeni-sayfa") + cur.items.filter { it.id in ids }
+                    return@LaunchedEffect
+                }
                 val gi = GridPacker.insertionIndex(GridPacker.pack(rest, m.columns, m.rows, visible), cell.page, cell.row, cell.col, m.columns)
                 preview = rest.toMutableList().apply { addAll(gi.coerceIn(0, size), cur.items.filter { it.id in ids }) }
                 return@LaunchedEffect
@@ -215,6 +218,11 @@ internal fun HomeContent(
             val idx = GridPacker.insertionIndex(GridPacker.pack(without, m.columns, m.rows, visible), cell.page, cell.row, cell.col, m.columns)
             val dragged = cur.items.firstOrNull { it.id == dragKey }
                 ?: if (byKey.containsKey(dragKey)) AppItem(dragKey) else return@LaunchedEffect
+            // Sondaki boş sayfanın üzerinde: öğe yeni sayfada gösterilir.
+            if (cell.page >= GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))) {
+                preview = without + PageBreak("onizleme-yeni-sayfa") + dragged
+                return@LaunchedEffect
+            }
             preview = without.toMutableList().apply { add(idx.coerceIn(0, size), dragged) }
         }
         val shownItems = preview ?: items
@@ -316,6 +324,10 @@ internal fun HomeContent(
                 val colG = floor((pos.x - gridOrigin.x - mxG + (pxG - iconPxG) / 2f) / pxG).toInt().coerceIn(0, m.columns - 1)
                 val rowG = floor((pos.y - gridOrigin.y - firstTopPx) / pyG).toInt().coerceIn(0, m.rows - 1)
                 val rest = cur.items.filter { it.id !in ids.toSet() }
+                if (pagerState.currentPage >= GridPacker.pageCount(GridPacker.pack(rest, m.columns, m.rows, visible))) {
+                    vm.editLayout { it.moveGroupToNewPage(ids) }
+                    return
+                }
                 val gi = GridPacker.insertionIndex(GridPacker.pack(rest, m.columns, m.rows, visible), pagerState.currentPage, rowG, colG, m.columns)
                 vm.editLayout { it.moveGroup(ids, gi) }
                 return
@@ -351,6 +363,11 @@ internal fun HomeContent(
             val col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
             val without = cur.items.filter { it.id != id }
+            // Sondaki yeni (boş) sayfaya bırakıldı: öğe yeni sayfaya geçer.
+            if (pagerState.currentPage >= GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))) {
+                vm.editLayout { it.moveToNewPage(id) }
+                return
+            }
             val idx = GridPacker.insertionIndex(
                 GridPacker.pack(without, m.columns, m.rows, visible), pagerState.currentPage, row, col, m.columns,
             )

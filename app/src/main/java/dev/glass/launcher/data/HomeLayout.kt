@@ -232,6 +232,29 @@ data class HomeLayout(
     }
 
     /**
+     * [id] öğesini (ana ekrandaki öğe ya da dock/klasör/arşivdeki uygulama) en sona, YENİ bir sayfaya taşır
+     * (sürüklerken sondaki boş sayfaya bırakıldığında). Son sayfa doluysa sayfa sonu etkisizdir.
+     */
+    fun moveToNewPage(id: String): HomeLayout {
+        val top = items.firstOrNull { it.id == id }
+        val base = if (top != null) copy(items = items.filter { it.id != id }) else withoutKey(id)
+        val item = top ?: AppItem(id)
+        return base.copy(items = base.items + PageBreak(UUID.randomUUID().toString()) + item).normalized()
+    }
+
+    /** Seçilen uygulamaları birlikte en sona, YENİ bir sayfaya taşır. */
+    fun moveGroupToNewPage(ids: Collection<String>): HomeLayout {
+        val keys = appKeysOf(ids)
+        if (keys.isEmpty()) return this
+        val base = extract(keys.toSet())
+        return base.copy(
+            items = base.items + PageBreak(UUID.randomUUID().toString()) + keys.map { AppItem(it) },
+            dock = base.dock - keys.toSet(),
+            libraryOnly = base.libraryOnly - keys.toSet(),
+        ).normalized()
+    }
+
+    /**
      * Seçili uygulamalardan yeni klasör oluşturur. Klasör [anchorId] öğesinin yerine (yoksa seçilenlerin
      * ilkinin bulunduğu yere) konur; klasörlerden alınanlar o klasörlerden çıkar.
      */

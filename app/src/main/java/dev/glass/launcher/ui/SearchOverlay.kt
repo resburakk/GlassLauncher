@@ -203,7 +203,7 @@ fun SearchOverlay(
                 if (query.isNotBlank()) {
                     Box(
                         if (st.searchResultsPanel) {
-                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp, panel = true)
+                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 0.dp, panel = true)
                                 .glassBrightness(st.searchGlassBrightness).then(neutral)
                         } else Modifier
                     ) {
@@ -234,7 +234,7 @@ fun SearchOverlay(
                 Modifier
                     .fillMaxSize()
                     // Dock ile birebir aynı cam (dock ayarları burayı da değiştirir).
-                    .liquidGlass(CircleShape, strength * st.dockOpacity, 14.dp, panel = true)
+                    .liquidGlass(CircleShape, strength * st.dockOpacity, 0.dp, panel = true)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -337,7 +337,8 @@ private fun SuggestionsPanel(
                     },
                 ) { change, dy -> change.consume(); total += dy }
             }
-            .liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true)
+            // Gölgesiz: yarı saydam camın içinden gölge koyu bir dikdörtgen gibi görünüyordu.
+            .liquidGlass(panelShape, strength * st.dockOpacity, 0.dp, panel = true)
     ) {
         suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
             val row = i / 4
