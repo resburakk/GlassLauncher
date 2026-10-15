@@ -346,7 +346,7 @@ private fun GlassMasterGroup(s: LauncherSettings, onChange: ((LauncherSettings) 
     Group("Liquid Glass") {
         SliderRow("Şeffaflık", label, s.glassTint, 0f..1f, default = Def.glassTint) { v -> onChange { it.copy(glassTint = v) } }
     }
-    Footer("iOS 27 ve MagicOS 11'deki gibi tüm cam yüzeylerin (dock, klasör, menü, arama, paneller) şeffaflığını birlikte ayarlar. Ayrıntılı ayarlar: Cam Efekti.")
+    Footer("iOS 27 ve MagicOS 11'deki gibi tüm cam yüzeylerin (dock, klasör, menü, arama, paneller) şeffaflığını birlikte ayarlar. Ayrıntılı ayarlar: Ayarlar > Liquid Glass.")
 }
 
 @Composable
