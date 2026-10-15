@@ -408,6 +408,42 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f, default = Def.vSpacing) { v -> onChange { it.copy(vSpacing = v) } }
     }
     Footer("Uygulama adlarının yazı ayarları \"Yazı Tipi\" sayfasında.")
+    BadgeGroup(s, onChange)
+}
+
+/** Simgelerde bildirim sayıları: aç/kapat + bildirim erişimi izni. */
+@Composable
+private fun BadgeGroup(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var tick by remember { mutableStateOf(0) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) tick++ }
+        lifecycle.lifecycle.addObserver(obs)
+        onDispose { lifecycle.lifecycle.removeObserver(obs) }
+    }
+    val granted = remember(tick) { dev.glass.launcher.service.BadgeListener.isGranted(ctx) }
+    Group("Bildirim Sayıları") {
+        ToggleRow("Simgelerde bildirim sayısı", s.showBadges, default = Def.showBadges) { v -> onChange { it.copy(showBadges = v) } }
+        RowDivider()
+        if (granted) {
+            InfoRow("Bildirim erişimi", "İzin verildi")
+        } else {
+            ActionRow("Bildirim erişimi ver") {
+                val comp = dev.glass.launcher.service.BadgeListener.component(ctx)
+                val detail = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, comp.flattenToString())
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                val list = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { ctx.startActivity(detail) }.onFailure { runCatching { ctx.startActivity(list) } }
+            }
+        }
+    }
+    Footer(
+        "Kırmızı rozet, uygulamanın okunmamış bildirim sayısını gösterir; klasörde içindekilerin toplamı görünür. " +
+            "Launcher yalnızca uygulama başına sayıyı tutar; bildirimlerin içeriği okunmaz, saklanmaz, hiçbir yere gönderilmez."
+    )
 }
 
 @Composable

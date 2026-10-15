@@ -191,6 +191,34 @@ if [ -n "$mid" ]; then
   adb shell input keyevent KEYCODE_BACK; step "geri"
 fi
 
+# 17) Bildirim sayıları: erişim izni + örnek bildirim (çökme olmamalı)
+adb shell cmd notification allow_listener dev.glass.launcher/dev.glass.launcher.service.BadgeListener || true
+adb shell cmd notification post -t "Test" glasstest "Rozet testi" >/dev/null 2>&1 || true
+adb shell input keyevent KEYCODE_HOME; step "rozet" 3
+shot 18a-rozet
+
+# 18) Yeni yüklenen uygulama ana ekranın sonuna gelmeli
+newpkg=""; newlabel=""
+for pl in "com.google.android.contacts:Contacts" "com.android.contacts:Contacts" "com.google.android.calculator:Calculator" "com.android.calculator2:Calculator"; do
+  p=${pl%%:*}
+  if adb shell pm path $p >/dev/null 2>&1; then newpkg=$p; newlabel=${pl#*:}; break; fi
+done
+if [ -n "$newpkg" ]; then
+  adb shell pm uninstall -k --user 0 $newpkg >/dev/null; step "uygulama kaldırıldı" 4
+  adb shell cmd package install-existing $newpkg >/dev/null; step "uygulama yeniden yüklendi" 5
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+  shot 18b-yeni-uygulama
+  for t in 1 2 3 4 5; do
+    adb shell rm -f /sdcard/ui.xml; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    adb shell ls /sdcard/ui.xml >/dev/null 2>&1 && break; sleep 1
+  done
+  if adb shell cat /sdcard/ui.xml | grep -qF "text=\"$newlabel\""; then
+    echo "::notice::YENİ UYGULAMA ana ekranda: $newlabel"
+  else
+    echo "::warning::YENİ UYGULAMA ana ekranda görünmüyor: $newlabel ($newpkg)"
+  fi
+fi
+
 # 16) Son uygulamalar: ana ekran içeriği solmalı (yarı saydam kart görünmemeli)
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input keyevent KEYCODE_APP_SWITCH; sleep 0.25

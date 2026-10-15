@@ -84,6 +84,17 @@
             </intent-filter>
         </activity>
 
+        <!-- Simgelerdeki bildirim sayıları: yalnızca uygulama başına sayı tutulur, içerik okunmaz/gönderilmez. -->
+        <service
+            android:name=".service.BadgeListener"
+            android:exported="true"
+            android:label="Bildirim sayıları"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Çift dokunarak kilitleme: yalnızca sistemin kilitleme eylemini çağırır, içerik okumaz. -->
         <service
             android:name=".service.LockService"

@@ -291,7 +291,7 @@ fun ContextMenuOverlay(
                         rowH = rowH,
                         leading = {
                             when {
-                                icon == null -> AppIconImage(app!!, vm, 22.dp, false, 0f)
+                                icon == null -> AppIconImage(app!!, vm, 22.dp, false, 0f, badge = false)
                                 kind == 1 -> Image(icon, null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(textColor))
                                 else -> Image(icon, null, Modifier.size(22.dp).clip(RoundedCornerShape(5.dp)))
                             }

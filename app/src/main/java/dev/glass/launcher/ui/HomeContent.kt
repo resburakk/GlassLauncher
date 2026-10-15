@@ -1,5 +1,11 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.collectAsState
+
+import androidx.compose.foundation.layout.widthIn
+
+import androidx.compose.foundation.layout.BoxScope
+
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.animation.core.animateFloatAsState
@@ -568,7 +574,7 @@ private val LabelStyle: TextStyle get() = TextStyle(
  * yuvarlaklığıyla. Bitmap ekrandaki boyutta, arka planda üretilir ve önbelleğe alınır.
  */
 @Composable
-internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: Boolean, strength: Float) {
+internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: Boolean, strength: Float, badge: Boolean = true) {
     val st = LocalLauncherSettings.current
     val px = with(LocalDensity.current) { icon.roundToPx() }
     val look = vm.iconLook(app, st)
@@ -576,7 +582,8 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     // Kenar çizgisi kalınlığı: ana ekran boyutunda ayardaki değer, küçük simgelerde orantılı incelir.
     val rimW = st.iconRimWidth.dp * (icon / 60.dp).coerceAtMost(1f)
     if (live != null) {
-        Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
+        Box(Modifier.size(icon)) {
+        Box(Modifier.fillMaxSize().glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
             val dark = when (st.liveIconTheme) {
                 "light" -> false
                 "dark" -> true
@@ -584,11 +591,51 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
             }
             LiveIcon(live, icon, st.liveClockSeconds, dark)
         }
+        if (badge) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
+        }
         return
     }
     val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
-    Box(Modifier.size(icon).glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
-        bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
+    Box(Modifier.size(icon)) {
+        Box(Modifier.fillMaxSize().glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
+            bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
+        }
+        if (badge) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
+    }
+}
+
+/** Verilen paketlerin toplam bildirim sayısı ("Bildirim sayıları" ayarı kapalıysa 0). */
+@Composable
+internal fun badgeCount(packages: List<String>): Int {
+    if (!LocalLauncherSettings.current.showBadges) return 0
+    val counts by dev.glass.launcher.service.Badges.counts.collectAsState()
+    return packages.sumOf { counts[it] ?: 0 }
+}
+
+/**
+ * iOS rozeti: simgenin sağ üst köşesinde, kenardan hafifçe taşan kırmızı daire ve beyaz sayı.
+ * Çok basamaklı sayılarda hap şeklinde uzar.
+ */
+@Composable
+internal fun BoxScope.NotificationBadge(count: Int, icon: Dp) {
+    if (count <= 0) return
+    val h = (icon * 0.36f).coerceIn(14.dp, 26.dp)
+    val text = if (count > 999) "999+" else count.toString()
+    Box(
+        Modifier
+            .align(Alignment.TopEnd)
+            .offset(x = h * 0.32f, y = -h * 0.32f)
+            .height(h)
+            .widthIn(min = h)
+            .clip(CircleShape)
+            .background(Color(0xFFFF3B30))
+            .padding(horizontal = h * 0.26f),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text, color = Color.White, fontFamily = AppFont, fontWeight = FontWeight.SemiBold,
+            fontSize = (h.value * 0.62f).sp, lineHeight = (h.value * 0.62f).sp, maxLines = 1,
+        )
     }
 }
 

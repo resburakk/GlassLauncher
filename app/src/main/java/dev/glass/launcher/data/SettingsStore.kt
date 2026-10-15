@@ -180,6 +180,8 @@ data class LauncherSettings(
     // Uygulama Arşivi
     /** Yeni kurulan uygulamalar ana ekrana mı eklensin (kapalıysa yalnızca Uygulama Arşivi'nde). */
     val addNewToHome: Boolean = true,
+    /** Simgelerde bildirim sayısı (kırmızı rozet). Bildirim erişimi izni gerekir. */
+    val showBadges: Boolean = true,
     /** Son başlatılan uygulamalar (ComponentName.flattenToString), en yenisi başta. */
     val recents: List<String> = emptyList(),
 ) {
@@ -286,7 +288,7 @@ data class LauncherSettings(
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
         put("animSpeed", animSpeed.toDouble())
         put("realBlur", realBlur); put("autoQuality", autoQuality); put("lowPower", lowPower)
-        put("addNewToHome", addNewToHome); put("recents", JSONArray(recents))
+        put("addNewToHome", addNewToHome); put("showBadges", showBadges); put("recents", JSONArray(recents))
     }
 
     companion object {
@@ -332,6 +334,7 @@ data class LauncherSettings(
                 autoQuality = o.optBoolean("autoQuality", d.autoQuality),
                 lowPower = o.optBoolean("lowPower", d.lowPower),
                 addNewToHome = o.optBoolean("addNewToHome", d.addNewToHome),
+                showBadges = o.optBoolean("showBadges", d.showBadges),
                 recents = if (rec == null) emptyList() else List(rec.length()) { rec.optString(it) }.filter { it.isNotEmpty() },
                 dockBottom = f("dockBottom", d.dockBottom),
                 folderSize = f("folderSize", d.folderSize),

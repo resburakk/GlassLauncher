@@ -57,7 +57,7 @@ fun AppReturnOverlay(info: ReturnInfo, screen: IntSize, p: Float, vm: LauncherVi
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(iconDp).graphicsLayer { scaleX = iconNow / iconPx; scaleY = iconNow / iconPx }) {
-            AppIconImage(info.app, vm, iconDp, st.iconGlass, st.glassStrength)
+            AppIconImage(info.app, vm, iconDp, st.iconGlass, st.glassStrength, badge = false)
         }
     }
 }

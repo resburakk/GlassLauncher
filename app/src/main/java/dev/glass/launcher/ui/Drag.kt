@@ -399,6 +399,9 @@ internal fun FolderIcon(
     val block = mini * 3f + gap * 2f
     val pageCount = (folder.keys.size + 8) / 9
     val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
+    // Klasör rozeti: içindeki uygulamaların toplam bildirim sayısı (iOS gibi).
+    val folderBadge = badgeCount(folder.keys.mapNotNull { byKey[it]?.packageName })
+    Box(Modifier.size(icon)) {
     Box(
         // Gölgesiz: yarı saydam camın altındaki gölge içeriden kare gibi görünüyordu.
         // Köşe, uygulama simgeleriyle aynı "Köşe yuvarlaklığı" ayarını izler.
@@ -410,12 +413,14 @@ internal fun FolderIcon(
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                     row.forEach { k ->
                         val app = byKey[k]
-                        if (app != null) AppIconImage(app, vm, mini, false, 0f)
+                        if (app != null) AppIconImage(app, vm, mini, false, 0f, badge = false)
                         else Spacer(Modifier.size(mini))
                     }
                 }
             }
         }
+    }
+    NotificationBadge(folderBadge, icon)
     }
 }
 
