@@ -172,7 +172,6 @@ fun SearchOverlay(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.18f))
             .pointerInput(Unit) { detectTapGestures(onTap = { close() }) }
     ) {
         Column(
@@ -533,4 +532,4 @@ private fun highlight(text: String, query: String): AnnotatedString {
  * Öneri paneli ve arama çubuğu, camlarında duvar kâğıdını karartılmadan gösterdiği için aynı oranda
  * koyulaştırılır; böylece çevreleriyle uyumlu, dock ile aynı ayarda görünürler.
  */
-private const val SEARCH_DIM = 0.41f
+private const val SEARCH_DIM = 0.20f

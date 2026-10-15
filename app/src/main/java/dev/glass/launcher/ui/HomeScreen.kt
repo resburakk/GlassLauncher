@@ -189,6 +189,8 @@ fun HomeScreen(
         when {
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
             overlay == Overlay.Folder || overlay == Overlay.Group -> 0.06f
+            // Arama (iOS Spotlight gibi): koyuluk bulanıklıktan gelir, karartma çok hafif.
+            overlay == Overlay.Search -> 0.10f
             fullBlur -> 0.28f
             overlay == Overlay.Menu -> 0.18f
             overlay == Overlay.LockPrompt -> 0.10f

@@ -98,11 +98,11 @@ private fun LiveCalendar(p: LivePalette) {
         val day = TR_DAYS[cal.get(Calendar.DAY_OF_WEEK) - 1]
         val date = cal.get(Calendar.DAY_OF_MONTH).toString()
         val dayStyle = TextStyle(
-            color = p.calRed, fontFamily = AppFont, fontWeight = FontWeight.Medium,
+            color = p.calRed, fontFamily = AppFont, fontWeight = FontWeight.SemiBold,
             fontSize = (s * 0.165f).toSp(), letterSpacing = 0.sp,
         )
         val dateStyle = TextStyle(
-            color = p.calInk, fontFamily = AppFont, fontWeight = FontWeight.Light,
+            color = p.calInk, fontFamily = AppFont, fontWeight = FontWeight.Medium,
             fontSize = (s * 0.50f).toSp(), letterSpacing = (-0.02f * s).toSp(),
         )
         val d = measurer.measure(day, dayStyle)
