@@ -19,6 +19,14 @@ class AppInfo(
 ) {
     val key: String = "${componentName.flattenToString()}#${user.hashCode()}"
     val packageName: String get() = componentName.packageName
-    override fun equals(other: Any?) = other is AppInfo && other.key == key && other.label == label
+    /**
+     * Uygulamanın yüklü sürümünü belirten damga: her güncellemede APK yolu (ve simge kaynağı) değişir.
+     * Simge önbelleği bununla anahtarlanır; güncellenen uygulamanın yeni simgesi hemen görünür.
+     */
+    val iconStamp: String = runCatching {
+        val ai = activityInfo.applicationInfo
+        "${ai.sourceDir}:${ai.icon}:${activityInfo.activityInfo.icon}"
+    }.getOrDefault("")
+    override fun equals(other: Any?) = other is AppInfo && other.key == key && other.label == label && other.iconStamp == iconStamp
     override fun hashCode() = key.hashCode()
 }

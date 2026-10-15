@@ -595,7 +595,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
         }
         return
     }
-    val bmp by produceState<ImageBitmap?>(null, app.key, px, look) { value = vm.iconCache.get(app, px, look) }
+    val bmp by produceState<ImageBitmap?>(null, app.key, app.iconStamp, px, look) { value = vm.iconCache.get(app, px, look) }
     Box(Modifier.size(icon)) {
         Box(Modifier.fillMaxSize().glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
             bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
