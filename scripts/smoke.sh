@@ -208,15 +208,20 @@ if [ -n "$newpkg" ]; then
   adb shell cmd package install-existing $newpkg >/dev/null; step "uygulama yeniden yüklendi" 5
   adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
   shot 18b-yeni-uygulama
-  for t in 1 2 3 4 5; do
-    adb shell rm -f /sdcard/ui.xml; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-    adb shell ls /sdcard/ui.xml >/dev/null 2>&1 && break; sleep 1
+  found=""
+  for pg in 1 2 3 4 5 6; do
+    for t in 1 2 3 4 5; do
+      adb shell rm -f /sdcard/ui.xml; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+      adb shell ls /sdcard/ui.xml >/dev/null 2>&1 && break; sleep 1
+    done
+    xml=$(adb shell cat /sdcard/ui.xml)
+    echo "$xml" | grep -qF "Son Eklenenler" && break   # Uygulama Arşivi'ne gelindi: ana ekran sayfaları bitti
+    if echo "$xml" | grep -qF "text=\"$newlabel\""; then found=$pg; shot 18c-yeni-uygulama-sayfa; break; fi
+    adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa" 2
   done
-  if adb shell cat /sdcard/ui.xml | grep -qF "text=\"$newlabel\""; then
-    echo "::notice::YENİ UYGULAMA ana ekranda: $newlabel"
-  else
-    echo "::warning::YENİ UYGULAMA ana ekranda görünmüyor: $newlabel ($newpkg)"
-  fi
+  if [ -n "$found" ]; then echo "::notice::YENİ UYGULAMA ana ekranda, sayfa $found: $newlabel"
+  else echo "::warning::YENİ UYGULAMA ana ekran sayfalarında yok: $newlabel ($newpkg)"; fi
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 fi
 
 # 16) Son uygulamalar: ana ekran içeriği solmalı (yarı saydam kart görünmemeli)

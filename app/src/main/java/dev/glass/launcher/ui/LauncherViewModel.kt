@@ -75,7 +75,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                     if (added.isNotEmpty() || list.size < 200) android.util.Log.i(
                         "GlassDiag",
                         "reconcile apps=${list.size} add=$add new=${added.map { it.substringBefore('/') }} " +
-                            "home=${next.homeKeys.size} lib=${next.libraryOnly.size} items=${next.items.size}",
+                            "home=${next.homeKeys.size} lib=${next.libraryOnly.size} items=${next.items.size} " +
+                            "seq=" + next.items.joinToString("") { when (it) { is dev.glass.launcher.data.AppItem -> if (it.key in added) "N" else "A"; is dev.glass.launcher.data.FolderItem -> "F"; is dev.glass.launcher.data.PageBreak -> "|"; else -> "W" } },
                     )
                 }
                 val changed = next != base
