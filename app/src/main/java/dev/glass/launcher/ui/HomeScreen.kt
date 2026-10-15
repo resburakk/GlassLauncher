@@ -337,7 +337,20 @@ fun HomeScreen(
         ThemeMode.Dark -> true
     }
     // Otomatik kalite: Pil Tasarrufu açıksa veya kaydırmada kare süreleri uzunsa efektler sadeleşir.
-    val reduced = settings.lowPower || (settings.autoQuality && (powerSave || degraded))
+    // Pil tasarrufu / düşük güç: tüm efektler sadeleşir. Kaydırmada yavaşlık: yalnızca kırılma kapanır,
+    // bulanıklık (ucuz) kalır.
+    val reduced = settings.lowPower || (settings.autoQuality && powerSave)
+    val noLens = settings.autoQuality && degraded
+    SideEffect {
+        GlassStatus.text = when {
+            settings.lowPower -> "Düşük güç modu açık: cam efektleri sadeleştirildi."
+            settings.autoQuality && powerSave -> "Telefonun Pil Tasarrufu açık: cam efektleri sadeleştirildi."
+            noLens -> "Kaydırmada yavaşlık algılandı: bu oturumda kenar kırılması kapalı (bulanıklık açık)."
+            !settings.launcherWallpaper -> "Launcher duvar kâğıdı yok: dock ve klasörlerde bulanıklık yok."
+            blurred == null -> "Bulanık kopya henüz hazır değil."
+            else -> "Tam: bulanıklık ve kırılma açık."
+        }
+    }
     val useBackdrop = settings.launcherWallpaper && settings.realBlur && !reduced
     // Tanı kaydı (yalnızca durum değişince): kalite düşürme nedenleri ve pencere bulanıklığı desteği.
     LaunchedEffect(reduced, powerSave, degraded) {
@@ -361,6 +374,7 @@ fun HomeScreen(
         LocalGlass provides GlassLook(
             dark = dark,
             reduced = reduced,
+            noLens = noLens,
             backdrop = if (useBackdrop) blurred else null,
             rootW = rootSize.width.toFloat(),
             rootH = rootSize.height.toFloat(),

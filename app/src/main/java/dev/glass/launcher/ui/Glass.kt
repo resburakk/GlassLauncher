@@ -78,6 +78,8 @@ data class GlassLook(
     val dark: Boolean = false,
     /** Düşük güç / otomatik kalite düşürme: gölge, parlama ve bulanıklık katmanları kapatılır. */
     val reduced: Boolean = false,
+    /** Kaydırmada yavaşlık algılandı: kenar kırılması kapalı (bulanıklık açık kalır). */
+    val noLens: Boolean = false,
     /** Launcher duvar kâğıdının bulanık kopyası (gerçek arka plan bulanıklığı için); yoksa null. */
     val backdrop: Blurred? = null,
     /** Duvar kâğıdının çizildiği kök alanın boyutu (px). */
@@ -86,6 +88,11 @@ data class GlassLook(
 )
 
 val LocalGlass = staticCompositionLocalOf { GlassLook() }
+
+/** Cam efektinin o anki durumu (Ayarlar > Liquid Glass'ta gösterilir). */
+object GlassStatus {
+    @Volatile var text: String = "Bilinmiyor (ana ekran henüz açılmadı)."
+}
 
 /**
  * Launcher içeriğinin (duvar kâğıdı kopyası + simgeler) kaydedilmiş çizim katmanı. Üst katmandaki menü ve
@@ -149,7 +156,9 @@ fun Modifier.liquidGlass(
         )
         .clip(shape)
         .then(
-            if (bd != null) Modifier.drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin, lens, st.glassRefraction) }
+            if (bd != null) Modifier.drawBehind {
+                drawBackdrop(bd, look.rootW, look.rootH, origin, lens, if (look.noLens) 0f else st.glassRefraction)
+            }
             else Modifier
         )
 
@@ -333,7 +342,7 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
     val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
     val r = with(LocalDensity.current) { radius.toPx() }.coerceAtLeast(0.5f)
     val reduced = LocalGlass.current.reduced
-    val refr = LocalLauncherSettings.current.glassRefraction
+    val refr = if (LocalGlass.current.noLens) 0f else LocalLauncherSettings.current.glassRefraction
     // Her cam alanı için ayrı mercek düğümü ve gölgelendirici (uniform'lar alana özeldir).
     val lensNodes = remember { ArrayList<android.graphics.RenderNode>() }
     val lensShaders = remember { ArrayList<android.graphics.RuntimeShader>() }

@@ -219,7 +219,8 @@ internal fun HomeContent(
         LaunchedEffect(pagerState.isScrollInProgress, settings.autoQuality) {
             if (!settings.autoQuality || !pagerState.isScrollInProgress) return@LaunchedEffect
             val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
-            val budget = (1_000_000_000L / refresh).toLong()
+            // Ölçüt 60 Hz'e göre: 120 Hz ekranda 8 ms'lik bütçe çok sıkı; küçük takılmalar camı sadeleştirmesin.
+            val budget = (1_000_000_000L / minOf(refresh, 60f)).toLong()
             var last = 0L
             var n = 0
             var slow = 0
