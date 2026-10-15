@@ -178,7 +178,9 @@ fun HomeScreen(
 
     // Tam ekran bulanıklık yalnızca büyük katmanlarda; menü ve küçük pencerelerde yalnızca kendileri bulanık.
     val fullBlur = overlay in FullBlurOverlays
-    val blurAmount by animateFloatAsState(if (fullBlur) 1f else 0f, motion.tween(280), label = "blurAmount")
+    // Şeffaf camda açık klasörün arkası daha az bulanır: panel kenarındaki mercek görünür olsun (iOS 26).
+    val clearFolder = settings.glassStyle == "clear" && (overlay == Overlay.Folder || overlay == Overlay.Group)
+    val blurAmount by animateFloatAsState(if (fullBlur) (if (clearFolder) 0.45f else 1f) else 0f, motion.tween(280), label = "blurAmount")
     val blurK by rememberUpdatedState(settings.glassBlur)
     val blur = 22.dp * blurAmount * settings.glassBlur
     val scrim by animateFloatAsState(
@@ -491,7 +493,7 @@ fun HomeScreen(
             Modifier
                 .fillMaxSize()
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
-                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)
+                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, includeRoot = true)
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper

@@ -161,6 +161,11 @@ fun FolderOverlay(
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
             modifier = Modifier.width(panelW),
         )
+        val clearGlass = LocalGlass.current.clear
+        val panelCorner = (u * settings.folderCorner).coerceAtMost(panelW / 2f)
+        Box {
+        // Şeffaf cam: panelin arkasındaki ana ekran görüntüsü kenarda mercek gibi bükülür (yalnızca alt katmanda).
+        if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true)
         Column(
             Modifier
                 .width(panelW)
@@ -224,6 +229,7 @@ fun FolderOverlay(
                 }
             }
         }
+        } // Box (panel + arka mercek alanı)
         }, modifier = Modifier.fillMaxSize()) { ms, c ->
             val loose = c.copy(minWidth = 0, minHeight = 0)
             val title = ms[0].measure(loose)

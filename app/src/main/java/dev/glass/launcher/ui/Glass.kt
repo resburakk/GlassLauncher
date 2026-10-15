@@ -299,6 +299,8 @@ fun SearchGlyph(color: Color, glyphSize: Dp) {
  */
 class GlassRegions {
     val regions = mutableStateMapOf<Any, RoundRect>()
+    /** Yalnızca en alttaki ana ekran içeriğine uygulanan alanlar (ör. açık klasör paneli: kendi katmanı bulanmasın). */
+    val rootRegions = mutableStateMapOf<Any, RoundRect>()
 }
 
 val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
@@ -308,8 +310,9 @@ val LocalGlassRegions = staticCompositionLocalOf<GlassRegions?> { null }
  * Panelin arkasına aynı boyutta yerleştirilir; kendi alanını [GlassRegions]'a kaydeder.
  */
 @Composable
-fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
+fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier, rootOnly: Boolean = false) {
     val reg = LocalGlassRegions.current ?: return
+    val map = if (rootOnly) reg.rootRegions else reg.regions
     if (LocalGlass.current.reduced) return
     val key = remember { Any() }
     val cr = with(LocalDensity.current) { corner.toPx() }
@@ -321,9 +324,9 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
         // Açılış animasyonundaki ölçek de hesaba katılır; köşe yarıçapı ölçekle küçülür.
         val k = if (c.size.width > 0) b.width / c.size.width else 1f
         val rr = RoundRect(b, CornerRadius((cr * k).coerceAtMost(minOf(b.width, b.height) / 2f)))
-        if (reg.regions[key] != rr) reg.regions[key] = rr
+        if (map[key] != rr) map[key] = rr
     }
-    DisposableEffect(reg, key) { onDispose { reg.regions.remove(key) } }
+    DisposableEffect(reg, key) { onDispose { map.remove(key) } }
     // Yaylı açılış animasyonu (ölçek katmanda olduğu için yerleşim bildirimi gelmez) boyunca alan
     // HER KAREDE yeniden ölçülür; bulanıklık menüyle birlikte büyür. Sonra seyrek kontrol yeterli.
     LaunchedEffect(key) {
@@ -350,7 +353,7 @@ fun BlurBackdrop(corner: Dp, modifier: Modifier = Modifier) {
  * İçerik katmanına uygulanır: içeriği net çizer, ardından [GlassRegions]'daki alanlara içeriğin bulanık
  * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
  */
-fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = composed {
+fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot: Boolean = false): Modifier = composed {
     // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
     val node = remember { android.graphics.RenderNode("glassRegionContent") }
     val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
@@ -365,7 +368,7 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp): Modifier = 
     }
     this.drawWithContent {
         drawContent()
-        val list = reg.regions.values.toList()
+        val list = if (includeRoot) reg.regions.values.toList() + reg.rootRegions.values else reg.regions.values.toList()
         if (reduced || list.isEmpty()) return@drawWithContent
         val w = size.width.toInt(); val h = size.height.toInt()
         if (w <= 0 || h <= 0) return@drawWithContent
