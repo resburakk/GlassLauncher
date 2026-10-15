@@ -69,6 +69,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 // İlk kurulum: iOS 26 fabrika dizilimi (karşılıklar + türe göre klasörler).
                 if (base == null) base = IosDefaultLayout.build(la, list)
                 val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages, add)
+                run {
+                    val before = base?.let { it.homeKeys + it.libraryOnly } ?: emptySet()
+                    val added = list.map { it.key }.filter { it !in before }
+                    if (added.isNotEmpty() || list.size < 200) android.util.Log.i(
+                        "GlassDiag",
+                        "reconcile apps=${list.size} add=$add new=${added.map { it.substringBefore('/') }} " +
+                            "home=${next.homeKeys.size} lib=${next.libraryOnly.size} items=${next.items.size}",
+                    )
+                }
                 val changed = next != base
                 base = next
                 _layout.value = next
