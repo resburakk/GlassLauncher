@@ -87,6 +87,9 @@ class WallpaperRepository(private val context: Context) {
 
     private val prefs get() = context.getSharedPreferences("wallpaper_sync", Context.MODE_PRIVATE)
 
+    /** Launcher kopyası sistem duvar kâğıdından mı alındı (ikisi aynı görüntü mü)? */
+    fun isFromSync(): Boolean = prefs.getBoolean("fromSync", false)
+
     /** Son kopyalama denemesinin sonucu (Ayarlar'da gösterilir). */
     val syncStatus: String get() = prefs.getString("status", null) ?: "Henüz denenmedi."
 

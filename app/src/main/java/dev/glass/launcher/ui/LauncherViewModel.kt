@@ -218,6 +218,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Launcher duvar kâğıdı, sistemdekinin birebir kopyası mı? */
+    fun wallpaperFromSync(): Boolean = la.wallpaperRepository.isFromSync()
+
     fun reloadWallpaper() {
         viewModelScope.launch {
             _wallpaper.value = la.wallpaperRepository.load()

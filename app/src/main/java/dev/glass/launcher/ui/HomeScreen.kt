@@ -500,7 +500,13 @@ fun HomeScreen(
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
-        if (settings.launcherWallpaper && wp != null) {
+        // Kopya sistem duvar kâğıdıyla aynıysa normalde çizilmez; arkadan sistemin kendisi görünür. Böylece
+        // "Son uygulamalar" kartında (pencerenin küçültülmüş görüntüsü) arka plan dikdörtgen gibi görünmez.
+        // Bulanıklık gereken anlarda (arama, kütüphane, menü/klasör camı) kopya çizilir.
+        val fromSync = remember(wp) { vm.wallpaperFromSync() }
+        val needCopy = !fromSync || blurAmount > 0.001f || libProgress.floatValue > 0.001f ||
+            glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
+        if (settings.launcherWallpaper && wp != null && needCopy) {
             Image(
                 wp, null,
                 Modifier.fillMaxSize().graphicsLayer {
