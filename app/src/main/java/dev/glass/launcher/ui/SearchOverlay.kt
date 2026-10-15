@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalView
@@ -285,17 +287,43 @@ private fun SuggestionsPanel(
     val pad = hm.dockInnerStart
     val labelBlock: Dp = if (showLabels) 22.dp else 0.dp
     val cellH = hm.dockIcon + labelBlock
+    // Aşağı çekince 8 öneri (iki sıra), yukarı çekince 4; son durum ayarlarda saklanır.
+    val expanded = st.searchSuggestExpanded && suggestions.size > 4
+    val rowGap = pad * 0.6f
+    val motion = LocalMotion.current
+    val panelH by androidx.compose.animation.core.animateDpAsState(
+        pad * 2f + cellH + if (expanded) cellH + rowGap else 0.dp, motion.spring(damping = 0.8f, stiffness = 500f), label = "suggestH",
+    )
+    val secondRow by androidx.compose.animation.core.animateFloatAsState(if (expanded) 1f else 0f, motion.tween(200), label = "suggestRow2")
+    val threshold = with(androidx.compose.ui.platform.LocalDensity.current) { 28.dp.toPx() }
+    val expandedNow by rememberUpdatedState(st.searchSuggestExpanded)
     Box(
         Modifier
             .requiredWidth(panelW)
-            .height(pad * 2f + cellH)
+            .height(panelH)
+            .pointerInput(threshold) {
+                var total = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { total = 0f },
+                    onDragEnd = {
+                        if (total > threshold && !expandedNow) vm.updateSettings { it.copy(searchSuggestExpanded = true) }
+                        else if (total < -threshold && expandedNow) vm.updateSettings { it.copy(searchSuggestExpanded = false) }
+                    },
+                ) { change, dy -> change.consume(); total += dy }
+            }
             .liquidGlass(appShape(hm.dockH * st.searchSuggestCorner), strength * st.dockOpacity, 14.dp)
             .background(Color.Black.copy(alpha = SEARCH_DIM))
             .glassBrightness(st.searchGlassBrightness)
             .then(neutral)
     ) {
-        suggestions.take(4).forEachIndexed { i, app ->
-            Box(Modifier.offset(x = pad + hm.dockPitch * i.toFloat(), y = pad)) {
+        suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
+            val row = i / 4
+            val col = i % 4
+            Box(
+                Modifier
+                    .offset(x = pad + hm.dockPitch * col.toFloat(), y = pad + (cellH + rowGap) * row.toFloat())
+                    .graphicsLayer { if (row == 1) { alpha = secondRow; translationY = (1f - secondRow) * -24f } }
+            ) {
                 AppCell(
                     app, vm, hm.dockIcon, hm.dockPitch, cellH, showLabels, iconGlass, strength,
                     labelSize = st.searchSuggestLabelSize, labelWeight = st.searchSuggestLabelWeight,

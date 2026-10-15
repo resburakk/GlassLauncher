@@ -1,5 +1,6 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -599,9 +600,18 @@ internal fun AppCell(
     labelSize: Float? = null, labelWeight: Float? = null,
     onClick: () -> Unit,
 ) {
+    // Android'in gri kare "basıldı" efekti yerine iOS gibi: simge hafifçe küçülüp kararır.
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val motion = LocalMotion.current
+    val pressScale by animateFloatAsState(if (pressed) 0.92f else 1f, motion.spring(damping = 0.6f, stiffness = 600f), label = "cellPress")
+    val pressDim by animateFloatAsState(if (pressed) 0.75f else 1f, motion.tween(90), label = "cellDim")
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.requiredWidth(pitchX).clickable(onClick = onClick),
+            Modifier
+                .requiredWidth(pitchX)
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale; alpha = pressDim }
+                .clickable(interactionSource = interaction, indication = null, onClick = onClick),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AppIconImage(app, vm, icon, glass, strength)

@@ -313,7 +313,8 @@ fun HomeScreen(
     } else null
     val topInsetPx = WindowInsets.statusBars.getTop(density)
     val topZonePx = topInsetPx + with(density) { 72.dp.toPx() }
-    val suggestions = remember(recents, allApps) { (recents + allApps).distinctBy { it.key }.take(4) }
+    // Öneriler: 8'e kadar (panel aşağı çekilince ikinci sıra açılır).
+    val suggestions = remember(recents, allApps) { (recents + allApps).distinctBy { it.key }.take(8) }
 
     // Kapanış animasyonu sırasında son klasör/kategori/menü içeriği ekranda kalsın diye tutulur.
     val folderHolder = remember { arrayOfNulls<FolderItem>(1) }
