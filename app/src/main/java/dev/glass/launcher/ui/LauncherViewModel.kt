@@ -68,18 +68,23 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 if (list.isEmpty()) return@collect // liste henüz yüklenmedi: kayıtlı düzeni budama
                 // İlk kurulum: iOS 26 fabrika dizilimi (karşılıklar + türe göre klasörler).
                 if (base == null) base = IosDefaultLayout.build(la, list)
-                val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages, add)
-                run {
-                    val before = base?.let { it.homeKeys + it.libraryOnly } ?: emptySet()
-                    val added = list.map { it.key }.filter { it !in before }
-                    if (added.isNotEmpty() || list.size < 200) android.util.Log.i(
-                        "GlassDiag",
-                        "reconcile apps=${list.size} add=$add new=${added.map { it.substringBefore('/') }} " +
-                            "home=${next.homeKeys.size} lib=${next.libraryOnly.size} items=${next.items.size} " +
-                            "seq=" + next.items.joinToString("") { when (it) { is dev.glass.launcher.data.AppItem -> if (it.key in added) "N" else "A"; is dev.glass.launcher.data.FolderItem -> "F"; is dev.glass.launcher.data.PageBreak -> "|"; else -> "W" } },
-                    )
+                // Son kontrolden SONRA yüklenen uygulamalar, Arşiv'de eski bir kaydı kalmış olsa bile (ör. daha önce
+                // ana ekrandan kaldırılmış, launcher kapalıyken silinip yeniden yüklenmiş) ana ekranın sonuna gelir.
+                val meta = la.getSharedPreferences("layout_meta", android.content.Context.MODE_PRIVATE)
+                val seenAt = meta.getLong("appsSeenAt", 0L)
+                val b0 = base
+                if (add && seenAt > 0L && b0 != null) {
+                    val fresh = list.filter { it.installTime > seenAt && it.key in b0.libraryOnly }.map { it.key }
+                    if (fresh.isNotEmpty()) {
+                        base = b0.copy(
+                            items = b0.items + fresh.map { dev.glass.launcher.data.AppItem(it) },
+                            libraryOnly = b0.libraryOnly - fresh.toSet(),
+                        )
+                    }
                 }
-                val changed = next != base
+                meta.edit().putLong("appsSeenAt", maxOf(System.currentTimeMillis(), seenAt)).apply()
+                val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages, add)
+                val changed = next != b0
                 base = next
                 _layout.value = next
                 layoutReady = true
