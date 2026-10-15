@@ -68,11 +68,11 @@ private class LivePalette(
 
 private val LightPalette = LivePalette(
     calBg = Color.White, calRed = Color(0xFFFF3B30), calInk = Color.Black,
-    clockBg = Color(0xFFF4EFE4), clockInk = Color(0xFF1E1E1E), clockRed = Color(0xFFE63946),
+    clockBg = Color.White, clockInk = Color(0xFF1E1E1E), clockRed = Color(0xFFE63946),
 )
 private val DarkPalette = LivePalette(
     calBg = Color(0xFF1C1C1E), calRed = Color(0xFFFF453A), calInk = Color.White,
-    clockBg = Color(0xFF262320), clockInk = Color(0xFFF0E8D6), clockRed = Color(0xFFFF5C5C),
+    clockBg = Color(0xFF1C1C1E), clockInk = Color.White, clockRed = Color(0xFFFF5C5C),
 )
 
 /** [dark]: koyu mod renkleri (telefonun teması ya da ayardaki sabit seçim). */
