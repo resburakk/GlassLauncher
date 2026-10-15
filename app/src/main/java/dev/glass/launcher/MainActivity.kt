@@ -175,7 +175,6 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.getIntExtra("glassDebug", -1).takeIf { it >= 0 }?.let { dev.glass.launcher.ui.GlassDebug.mode = it }
         if (isSettingsEntry(intent)) {
             openSettingsRequest++
             return

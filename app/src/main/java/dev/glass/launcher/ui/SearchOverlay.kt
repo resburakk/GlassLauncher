@@ -229,7 +229,7 @@ fun SearchOverlay(
             // boşluğa dokunmak veya geri hareketi kapatır.
             // Çubuk da arkasındaki gerçek bulanık sahneyi (duvar kâğıdı + simgeler) gösterir.
             Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp).height(48.dp)) {
-            BlurBackdrop(24.dp, Modifier.matchParentSize(), shape = CircleShape, alpha = visibility)
+            BlurBackdrop(24.dp, Modifier.matchParentSize(), shape = CircleShape, alpha = visibility, strongBlur = true)
             Row(
                 Modifier
                     .fillMaxSize()
@@ -323,7 +323,7 @@ private fun SuggestionsPanel(
     // Panel, arkasındaki GERÇEK görüntünün (bulanık duvar kâğıdı + bulanık simgeler) bir derece daha bulanık
     // kopyasını gösterir; böylece çevresindeki bulanık alanla aynı sahnenin devamı gibi durur.
     Box(Modifier.requiredWidth(panelW).height(panelH)) {
-    if (GlassDebug.mode != 4) BlurBackdrop(panelCorner, Modifier.matchParentSize(), shape = panelShape, alpha = visibility)
+    BlurBackdrop(panelCorner, Modifier.matchParentSize(), shape = panelShape, alpha = visibility, strongBlur = true)
     Box(
         Modifier
             .fillMaxSize()
@@ -337,9 +337,9 @@ private fun SuggestionsPanel(
                     },
                 ) { change, dy -> change.consume(); total += dy }
             }
-            .then(if (GlassDebug.mode == 2) Modifier else Modifier.liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true))
+            .liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true)
     ) {
-        if (GlassDebug.mode != 3) suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
+        suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
             val row = i / 4
             val col = i % 4
             Box(
