@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.rememberUpdatedState
+
 import androidx.compose.runtime.collectAsState
 
 import androidx.compose.foundation.layout.widthIn
@@ -299,9 +301,11 @@ internal fun HomeContent(
             }
         }
 
+        val libIndexNow by rememberUpdatedState(libIndex)
         fun handleDrop(id: String, pos: Offset, hover: String?) {
-            android.util.Log.i("GlassDiag", "drop id=${id.take(24)} page=${pagerState.currentPage} lib=$libIndex total=$pageTotal hover=$hover")
-            if (pagerState.currentPage >= libIndex) return // arşiv sayfasına bırakma: değişiklik yok
+            // Güncel değer okunur: hücrenin elindeki bırakma işlevi sürükleme başlamadan önceki halinden kalmış
+            // olabilir (o anda sondaki yeni sayfa yoktu ve yeni sayfaya bırakma "arşive bırakma" sanılıyordu).
+            if (pagerState.currentPage >= libIndexNow) return // arşiv sayfasına bırakma: değişiklik yok
             val cur = vm.layout.value
             if (selection.isGroupDrag(id)) {
                 val ids = selection.ids.toList()
@@ -365,7 +369,6 @@ internal fun HomeContent(
             val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
             val without = cur.items.filter { it.id != id }
             // Sondaki yeni (boş) sayfaya bırakıldı: öğe yeni sayfaya geçer.
-            android.util.Log.i("GlassDiag", "drop step3 page=${pagerState.currentPage} pagesWithout=${GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))}")
             if (pagerState.currentPage >= GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))) {
                 vm.editLayout { it.moveToNewPage(id) }
                 return
