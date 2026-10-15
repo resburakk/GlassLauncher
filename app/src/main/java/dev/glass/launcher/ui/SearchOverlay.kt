@@ -323,7 +323,7 @@ private fun SuggestionsPanel(
     // Panel, arkasındaki GERÇEK görüntünün (bulanık duvar kâğıdı + bulanık simgeler) bir derece daha bulanık
     // kopyasını gösterir; böylece çevresindeki bulanık alanla aynı sahnenin devamı gibi durur.
     Box(Modifier.requiredWidth(panelW).height(panelH)) {
-    BlurBackdrop(panelCorner, Modifier.matchParentSize(), shape = panelShape, alpha = visibility)
+    if (GlassDebug.mode != 4) BlurBackdrop(panelCorner, Modifier.matchParentSize(), shape = panelShape, alpha = visibility)
     Box(
         Modifier
             .fillMaxSize()
@@ -337,9 +337,9 @@ private fun SuggestionsPanel(
                     },
                 ) { change, dy -> change.consume(); total += dy }
             }
-            .liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true)
+            .then(if (GlassDebug.mode == 2) Modifier else Modifier.liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true))
     ) {
-        suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
+        if (GlassDebug.mode != 3) suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
             val row = i / 4
             val col = i % 4
             Box(

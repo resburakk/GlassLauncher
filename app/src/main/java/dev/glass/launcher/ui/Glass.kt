@@ -434,7 +434,7 @@ fun Modifier.glassRegionBlur(reg: GlassRegions, radius: Dp = 30.dp, includeRoot:
                 else nc.drawPath(path, fadePaint.apply { alpha = (vis * 255).toInt() })
                 nc.saveLayerAlpha(rr.left, rr.top, rr.right, rr.bottom, (vis * 255).toInt())
                 val rw = rr.width.toInt(); val rh = rr.height.toInt()
-                if (refr > 0.01f && rw > 4 && rh > 4) {
+                if (refr > 0.01f && GlassDebug.mode != 1 && rw > 4 && rh > 4) {
                     // Kırılma: alanın bulanık kopyası kendi düğümüne alınır, kenarında mercek gibi bükülür.
                     while (lensNodes.size <= i) {
                         lensNodes += android.graphics.RenderNode("glassLens")

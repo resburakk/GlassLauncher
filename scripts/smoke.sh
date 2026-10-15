@@ -191,6 +191,15 @@ if [ -n "$mid" ]; then
   adb shell input keyevent KEYCODE_BACK; step "geri"
 fi
 
+# TANI (geçici): öneri paneli katmanlarını tek tek kapat
+for m in 1 2 3 4 0; do
+  adb shell am start -n dev.glass.launcher/.MainActivity --ei glassDebug $m >/dev/null; step "tanı $m" 2
+  adb shell input tap $cx $((H*81/100)); step "arama" 3
+  adb shell input keyevent KEYCODE_BACK; sleep 0.6
+  shot 17-tani-$m
+  adb shell input keyevent KEYCODE_BACK; step "geri" 1
+done
+
 # 16) Son uygulamalar: ana ekran içeriği solmalı (yarı saydam kart görünmemeli)
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input keyevent KEYCODE_APP_SWITCH; sleep 0.25
