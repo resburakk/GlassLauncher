@@ -43,20 +43,22 @@ half4 main(float2 coord) {
     float2 c = size * 0.5;
     float2 p = coord - c;
     float r = min(radius, min(c.x, c.y));
-    float d = sdRoundRect(p, c, r);
+    // Bant hesabı daha yuvarlak bir köşeyle yapılır: köşe yarıçapı bant genişliğinden küçükken bandın iç
+    // sınırı kare köşeli bir dikdörtgen oluyor ve köşede bükülme yönü çapraz bir çizgide aniden dönüyordu
+    // (camın içinde silik köşeli çerçeve). Böylece iç sınır da yuvarlak, köşedeki bükülme yönü yumuşak döner.
+    float rb = min(r + edge * 0.85, min(c.x, c.y));
+    float d = sdRoundRect(p, c, rb);
     // 0: camın derin içi, 1: tam kenar.
     float t = clamp(1.0 + d / max(edge, 1.0), 0.0, 1.0);
     float k = t * t * t;
-    // Köşelerde iki kenarın etkisi üst üste biner: köşe yayında bükülmeyi ve parlamayı yumuşat (leke oluşmasın).
-    // Azaltma KADEMELİDİR: köşe bölgesinin sınırında 1'den başlar, yayın ortasına doğru yumuşakça 0.55'e iner.
-    // (Ani geçiş camın içinde düz çizgiler, kare kare bir ızgara gibi görünüyordu.)
-    float2 q = abs(p) - (c - r);
-    float corner = 1.0 - 0.45 * smoothstep(0.0, max(r * 0.7, 1.0), min(q.x, q.y));
+    // Köşelerde iki kenarın etkisi üst üste biner: köşe yayında bükülmeyi ve parlamayı kademeli yumuşat.
+    float2 q = abs(p) - (c - rb);
+    float corner = 1.0 - 0.45 * smoothstep(0.0, max(rb * 0.7, 1.0), min(q.x, q.y));
     k *= corner;
     float2 e = float2(1.0, 0.0);
     float2 g = float2(
-        sdRoundRect(p + e.xy, c, r) - sdRoundRect(p - e.xy, c, r),
-        sdRoundRect(p + e.yx, c, r) - sdRoundRect(p - e.yx, c, r));
+        sdRoundRect(p + e.xy, c, rb) - sdRoundRect(p - e.xy, c, rb),
+        sdRoundRect(p + e.yx, c, rb) - sdRoundRect(p - e.yx, c, rb));
     float2 n = g / max(length(g), 0.0001);
     // Kenarda içeriden örnekle (mercek), tüm yüzeyde çok hafif büyütme.
     float2 src = coord - n * k * strength;

@@ -205,9 +205,14 @@ fun HomeScreen(
     // Arşive geçiş oranı (HomeContent yazar); arka plan geçiş sırasında kademeli bulanıklaşır.
     val libProgress = remember { mutableFloatStateOf(0f) }
     val windowBlur = LocalWindowBlur.current
+    // Launcher'ın kendi duvar kâğıdı kopyası çiziliyorsa sistem duvar kâğıdı zaten görünmez: pencere arkası
+    // bulanıklığı gereksiz. Her yarıçap değişimi pencere yerleşimini yeniden tetiklediği için açılış
+    // animasyonlarını 120 Hz'in altına düşürüyordu; bu durumda hiç kullanılmaz.
+    val copyCovers by rememberUpdatedState(settings.launcherWallpaper && wallpaper != null)
     LaunchedEffect(windowBlur) {
         // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
-        snapshotFlow { maxOf(blurAmount, libProgress.floatValue) }.collect { f -> windowBlur?.invoke(f * blurK) }
+        snapshotFlow { if (copyCovers) 0f else maxOf(blurAmount, libProgress.floatValue) }
+            .collect { f -> windowBlur?.invoke(f * blurK) }
     }
     var lockReason by remember { mutableStateOf(LockReason.Lock) }
 
