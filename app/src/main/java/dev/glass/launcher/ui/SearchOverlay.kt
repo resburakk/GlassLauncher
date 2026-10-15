@@ -203,7 +203,8 @@ fun SearchOverlay(
                 if (query.isNotBlank()) {
                     Box(
                         if (st.searchResultsPanel) {
-                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp, panel = true).then(neutral)
+                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp, panel = true)
+                                .glassBrightness(st.searchGlassBrightness).then(neutral)
                         } else Modifier
                     ) {
                         if (st.searchResultsPanel) {
@@ -232,10 +233,8 @@ fun SearchOverlay(
             Row(
                 Modifier
                     .fillMaxSize()
-                    .liquidGlass(CircleShape, strength * st.dockOpacity, 4.dp, panel = true)
-                    .background(Color.Black.copy(alpha = SEARCH_DIM))
-            .glassBrightness(st.searchGlassBrightness)
-                    .then(neutral)
+                    // Dock ile birebir aynı cam (dock ayarları burayı da değiştirir).
+                    .liquidGlass(CircleShape, strength * st.dockOpacity, 14.dp, panel = true)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -339,9 +338,6 @@ private fun SuggestionsPanel(
                 ) { change, dy -> change.consume(); total += dy }
             }
             .liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true)
-            .background(Color.Black.copy(alpha = SEARCH_DIM))
-            .glassBrightness(st.searchGlassBrightness)
-            .then(neutral)
     ) {
         suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
             val row = i / 4
@@ -537,4 +533,3 @@ private fun highlight(text: String, query: String): AnnotatedString {
  * Öneri paneli ve arama çubuğu, camlarında duvar kâğıdını karartılmadan gösterdiği için aynı oranda
  * koyulaştırılır; böylece çevreleriyle uyumlu, dock ile aynı ayarda görünürler.
  */
-private const val SEARCH_DIM = 0.20f

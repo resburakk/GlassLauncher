@@ -259,6 +259,8 @@ internal fun HomeContent(
             if (pagerState.isScrollInProgress) showDots = true else { delay(900); showDots = false }
         }
         val dotsAlpha by animateFloatAsState(if (showDots) 1f else 0f, motion.tween(220), label = "dots")
+        // Düzenleme modunda "Ara" düğmesi kaybolur; yerine "Seç" / "Bu Sayfayı Sil" gelir (HomeScreen).
+        val pillShown by animateFloatAsState(if (edit) 0f else 1f, motion.tween(160), label = "pillEdit")
 
         // Sürüklerken ekran kenarında bekleyince sayfa değişir (arşive geçmez).
         val widthPx = with(density) { maxWidth.toPx() }
@@ -486,7 +488,7 @@ internal fun HomeContent(
                             .background(if (pagerState.currentPage == libIndex) Color.White else Color(0x40FFFFFF))
                     )
                 }
-                SearchPill(m, settings.glassStrength, (1f - dotsAlpha) * (1f - libFraction), onOpenSearch)
+                SearchPill(m, settings.glassStrength, (1f - dotsAlpha) * (1f - libFraction) * pillShown, onOpenSearch)
             }
 
             if (libFraction < 0.98f) {

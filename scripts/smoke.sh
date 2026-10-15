@@ -51,6 +51,8 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 # 2) Boş alana uzun bas: düzenleme modu ve düğmeler
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
 shot 04-duzenleme
+tap_text "+"; step "artı menüsü" 2
+shot 04p-arti-menu
 tap_text "Duvar Kâğıdı"; step "duvar kâğıdı paneli" 2
 shot 04w-duvar-kagidi-paneli
 adb shell input keyevent KEYCODE_BACK; step "paneli kapat" 1
@@ -154,7 +156,8 @@ shot 13c-donus-sonrasi
 adb shell appwidget grantbind --package dev.glass.launcher --user 0 || true
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
-tap_text "+"; step "widget galerisi" 7
+tap_text "+"; step "artı menüsü" 2
+tap_text "Widget Ekle"; step "widget galerisi" 7
 shot 14a-widget-galerisi
 tap_text "Clock"; step "saat widgetları" 4
 shot 14b-widget-detay

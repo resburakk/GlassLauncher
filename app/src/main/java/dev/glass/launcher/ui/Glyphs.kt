@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Özgün, basit çizgi simgeler (Apple simgeleri kullanılmaz). */
-enum class Glyph { Edit, Info, Minus, Trash, Plus, Folder, Pencil, Grid, Search, Close, Check, Widget, Wallpaper, Mic, Person, Message, Doc, Globe, Bag }
+enum class Glyph { Edit, Info, Minus, Trash, Plus, Folder, Pencil, Grid, Search, Close, Check, Widget, Wallpaper, Mic, Person, Message, Doc, Globe, Bag, Gear }
 
 @Composable
 fun GlyphIcon(glyph: Glyph, color: Color, size: Dp = 18.dp) {
@@ -93,6 +93,16 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
             drawRoundRect(color, Offset(s * 0.12f, s * 0.12f), Size(s * 0.76f, s * 0.34f), CornerRadius(s * 0.1f), style = stroke)
             drawRoundRect(color, Offset(s * 0.12f, s * 0.56f), Size(s * 0.32f, s * 0.32f), CornerRadius(s * 0.1f), style = stroke)
             drawRoundRect(color, Offset(s * 0.56f, s * 0.56f), Size(s * 0.32f, s * 0.32f), CornerRadius(s * 0.1f), style = stroke)
+        }
+        Glyph.Gear -> {
+            // Ayarlar: dış halka + 8 kısa diş + ortada küçük daire.
+            drawCircle(color, s * 0.26f, c, style = stroke)
+            drawCircle(color, s * 0.09f, c, style = stroke)
+            for (k in 0 until 8) {
+                val a = Math.toRadians(k * 45.0)
+                val ca = kotlin.math.cos(a).toFloat(); val sa = kotlin.math.sin(a).toFloat()
+                drawLine(color, Offset(c.x + ca * s * 0.30f, c.y + sa * s * 0.30f), Offset(c.x + ca * s * 0.42f, c.y + sa * s * 0.42f), w * 1.2f, StrokeCap.Round)
+            }
         }
         Glyph.Wallpaper -> {
             drawRoundRect(color, Offset(s * 0.12f, s * 0.16f), Size(s * 0.76f, s * 0.68f), CornerRadius(s * 0.12f), style = stroke)

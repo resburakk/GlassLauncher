@@ -433,12 +433,12 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
     Group("Görünüm") {
         ToggleRow("Önerilerde uygulama adları", s.searchShowLabels, default = Def.searchShowLabels) { v -> onChange { it.copy(searchShowLabels = v) } }
         RowDivider()
-        ToggleRow("Nötr cam rengi", s.searchNeutral, default = Def.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
+        ToggleRow("Sonuç paneli: nötr renk", s.searchNeutral, default = Def.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
         RowDivider()
         ToggleRow("Sonuçlar cam panel içinde", s.searchResultsPanel, default = Def.searchResultsPanel) { v -> onChange { it.copy(searchResultsPanel = v) } }
         RowDivider()
         SliderRow(
-            "Cam parlaklığı",
+            "Sonuç paneli parlaklığı",
             when { s.searchGlassBrightness > 0.01f -> "+${(s.searchGlassBrightness * 100).roundToInt()}"; s.searchGlassBrightness < -0.01f -> "${(s.searchGlassBrightness * 100).roundToInt()}"; else -> "0" },
             s.searchGlassBrightness, -1f..1f, default = Def.searchGlassBrightness,
         ) { v -> onChange { it.copy(searchGlassBrightness = v) } }
@@ -447,7 +447,7 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
             onChange { it.copy(searchSuggestCorner = v) }
         }
     }
-    Footer("Öneri paneli ve arama çubuğu dock ile aynı camı kullanır; parlaklık, arama açıkken kararan arka planla uyum içindir. Öneri paneli köşesi dock'tan bağımsızdır. Yazı ayarları: Yazı Tipi > Arama.")
+    Footer("Öneri paneli ve arama çubuğu dock ile birebir aynı camı kullanır; Dock ayarları (saydamlık, ton) onları da değiştirir. Nötr renk ve parlaklık yalnızca sonuç panelini etkiler. Öneri paneli köşesi dock'tan bağımsızdır. Yazı ayarları: Yazı Tipi > Arama.")
     Group("Telefonda ara") {
         ToggleRow("Kişiler (${status(contactsOk)})", s.searchContacts, default = Def.searchContacts) { v ->
             onChange { it.copy(searchContacts = v) }

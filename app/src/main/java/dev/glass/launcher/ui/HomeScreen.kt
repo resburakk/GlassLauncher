@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import kotlinx.coroutines.delay
+
 import androidx.compose.ui.graphics.CompositingStrategy
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -34,6 +36,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.layout.ContentScale
@@ -112,7 +115,8 @@ enum class Overlay { None, Search, Settings, Folder, Menu, Group, Widgets, LockP
 enum class LockReason { Lock, Panels }
 
 /** Tüm ekranın (ve sistem duvar kâğıdının) bulanıklaştığı katmanlar; küçük menüler bu listede değildir. */
-private val FullBlurOverlays = setOf(Overlay.Search, Overlay.Settings, Overlay.Folder, Overlay.Group, Overlay.Widgets)
+// Ayarlar opak bir sayfa: arkası bulanıklaştırılmaz (boşuna GPU yükü, 120 Hz kaydırmayı bozuyordu).
+private val FullBlurOverlays = setOf(Overlay.Search, Overlay.Folder, Overlay.Group, Overlay.Widgets)
 
 /**
  * Ana ekran katmanları arasında köprü: bırakma işlemi ve sayfa geçişleri ana ekran içeriğinde
@@ -493,10 +497,17 @@ fun HomeScreen(
     ) {
         // İçerik katmanı kaydedilir: üstteki menü/düğmeler bunu bulanıklaştırıp yalnızca kendi arkalarında gösterir.
         val glassRegions = remember { GlassRegions() }
+        // Ayarlar tamamen açılınca arkadaki ana ekran hiç çizilmez (opak sayfanın arkası); kapanırken hemen görünür.
+        var settingsCovering by remember { mutableStateOf(false) }
+        LaunchedEffect(overlay) {
+            settingsCovering = false
+            if (overlay == Overlay.Settings) { delay(450); settingsCovering = true }
+        }
         val maxBlurPx = with(density) { 22.dp.toPx() }
         Box(
             Modifier
                 .fillMaxSize()
+                .graphicsLayer { if (settingsCovering) alpha = 0f }
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
                 .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, includeRoot = true)
         ) {
@@ -771,21 +782,23 @@ fun HomeScreen(
         val btnH = 30.dp
         val btnY = homeMetrics?.let { (statusTopDp + it.firstTop) / 2f - btnH / 2f } ?: (statusTopDp + 8.dp)
         val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet
-        // "Bu Sayfayı Sil": birden çok sayfa varken, arama hapının hemen üstünde.
+        var plusMenu by remember { mutableStateOf(false) }
+        LaunchedEffect(showEditBar) { if (!showEditBar) plusMenu = false }
+        // "Seç" / "Bu Sayfayı Sil": düzenleme modunda "Ara" düğmesinin YERİNDE (Ara düğmesi o sırada gizlenir).
         var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }
         val bottomBar = showEditBar && !bridge.onLibrary && drag.key == null && !selection.active
         val canDeletePage = bridge.homePageCount > 1
         homeMetrics?.let { hm ->
             AnimatedVisibility(
                 bottomBar,
-                modifier = Modifier.align(Alignment.TopCenter).offset(y = hm.pillCenterY - hm.pillH / 2f - 14.dp - btnH),
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = hm.pillCenterY - hm.pillH / 2f),
                 enter = scaleIn(motion.bouncy(), initialScale = 0.5f) + fadeIn(motion.tween(160)),
                 exit = scaleOut(motion.tween(140), targetScale = 0.6f) + fadeOut(motion.tween(120)),
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GlassButton("Seç", settings.glassStrength, btnH) { selection.start() }
+                    GlassButton("Seç", settings.glassStrength, hm.pillH) { selection.start() }
                     if (canDeletePage) {
-                        GlassButton("Bu Sayfayı Sil", settings.glassStrength, btnH) { confirmDeletePage = bridge.currentPageIds }
+                        GlassButton("Bu Sayfayı Sil", settings.glassStrength, hm.pillH) { confirmDeletePage = bridge.currentPageIds }
                     }
                 }
             }
@@ -846,10 +859,44 @@ fun HomeScreen(
             enter = scaleIn(motion.bouncy(), initialScale = 0.4f, transformOrigin = TransformOrigin(0f, 0f)) + fadeIn(motion.tween(160)),
             exit = scaleOut(motion.tween(160), targetScale = 0.6f, transformOrigin = TransformOrigin(0f, 0f)) + fadeOut(motion.tween(140)),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GlassButton("+", settings.glassStrength, btnH) { overlay = Overlay.Widgets }
-                GlassButton("Duvar Kâğıdı", settings.glassStrength, btnH) { wallpaperSheet = true }
-                GlassButton("Ayarlar", settings.glassStrength, btnH) { overlay = Overlay.Settings }
+            GlassButton("+", settings.glassStrength, btnH) { plusMenu = !plusMenu }
+        }
+        // "+" menüsü: düğmenin altından aşağı doğru açılan Liquid Glass menü (basılı tutma menüsüyle aynı cam).
+        if (plusMenu && showEditBar) {
+            Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { plusMenu = false } })
+        }
+        AnimatedVisibility(
+            plusMenu && showEditBar,
+            modifier = Modifier.align(Alignment.TopStart).offset(x = 16.dp, y = btnY + btnH + 10.dp),
+            enter = scaleIn(motion.bouncy(), initialScale = 0.3f, transformOrigin = TransformOrigin(0f, 0f)) + fadeIn(motion.tween(140)),
+            exit = scaleOut(motion.tween(150), targetScale = 0.5f, transformOrigin = TransformOrigin(0f, 0f)) + fadeOut(motion.tween(120)),
+        ) {
+            val vis by transition.animateFloat(transitionSpec = { motion.tween(150) }, label = "plusVis") {
+                if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
+            }
+            val u = LocalPt.current
+            val corner = u * settings.menuCorner
+            val ink = if (settings.menuDark) Color.White else Color(0xF21C1C1E)
+            val rowH = u * settings.menuRowHeight
+            Box(Modifier.width(u * 230f)) {
+                BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { vis })
+                Column(
+                    Modifier
+                        .width(u * 230f)
+                        .menuGlass(appShape(corner), settings.menuOpacity, settings.menuDark)
+                        .pointerInput(Unit) { detectTapGestures { } }
+                        .padding(vertical = u * 6f)
+                ) {
+                    MenuRow("Widget Ekle", ink, rowH, leading = { GlyphIcon(Glyph.Widget, ink, u * 22f) }) {
+                        plusMenu = false; overlay = Overlay.Widgets
+                    }
+                    MenuRow("Duvar Kâğıdı", ink, rowH, leading = { GlyphIcon(Glyph.Wallpaper, ink, u * 22f) }) {
+                        plusMenu = false; wallpaperSheet = true
+                    }
+                    MenuRow("Ayarlar", ink, rowH, leading = { GlyphIcon(Glyph.Gear, ink, u * 22f) }) {
+                        plusMenu = false; overlay = Overlay.Settings
+                    }
+                }
             }
         }
         AnimatedVisibility(
