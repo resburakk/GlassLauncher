@@ -97,6 +97,8 @@ fun SearchOverlay(
     strength: Float,
     iconGlass: Boolean,
     onClose: () -> Unit,
+    /** Açılış/kapanış geçişinin görünürlüğü (0..1); öneri panelinin arka plan bulanıklığı buna uyar. */
+    visibility: () -> Float = { 1f },
 ) {
     val ctx = LocalContext.current
     val st = LocalLauncherSettings.current
@@ -194,7 +196,7 @@ fun SearchOverlay(
                     )
                 }
             }
-            SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, ::open)
+            SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, visibility, ::open)
             Spacer(Modifier.height(10.dp))
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -291,6 +293,7 @@ private fun SuggestionsPanel(
     iconGlass: Boolean,
     showLabels: Boolean,
     neutral: Modifier,
+    visibility: () -> Float,
     onOpen: (AppInfo) -> Unit,
 ) {
     val hm = LocalHomeMetrics.current ?: return
@@ -311,10 +314,15 @@ private fun SuggestionsPanel(
     val secondRow by androidx.compose.animation.core.animateFloatAsState(if (expanded) 1f else 0f, motion.tween(200), label = "suggestRow2")
     val threshold = with(androidx.compose.ui.platform.LocalDensity.current) { 28.dp.toPx() }
     val expandedNow by rememberUpdatedState(st.searchSuggestExpanded)
+    val panelCorner = hm.dockH * st.searchSuggestCorner
+    val panelShape = appShape(panelCorner)
+    // Panel, arkasındaki GERÇEK görüntünün (bulanık duvar kâğıdı + bulanık simgeler) bir derece daha bulanık
+    // kopyasını gösterir; böylece çevresindeki bulanık alanla aynı sahnenin devamı gibi durur.
+    Box(Modifier.requiredWidth(panelW).height(panelH)) {
+    BlurBackdrop(panelCorner, Modifier.matchParentSize(), shape = panelShape, alpha = visibility)
     Box(
         Modifier
-            .requiredWidth(panelW)
-            .height(panelH)
+            .fillMaxSize()
             .pointerInput(threshold) {
                 var total = 0f
                 detectVerticalDragGestures(
@@ -325,7 +333,7 @@ private fun SuggestionsPanel(
                     },
                 ) { change, dy -> change.consume(); total += dy }
             }
-            .liquidGlass(appShape(hm.dockH * st.searchSuggestCorner), strength * st.dockOpacity, 14.dp)
+            .liquidGlass(panelShape, strength * st.dockOpacity, 14.dp, panel = true)
             .background(Color.Black.copy(alpha = SEARCH_DIM))
             .glassBrightness(st.searchGlassBrightness)
             .then(neutral)
@@ -344,6 +352,7 @@ private fun SuggestionsPanel(
                 ) { onOpen(app) }
             }
         }
+    }
     }
 }
 

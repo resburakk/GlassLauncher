@@ -20,7 +20,6 @@ import androidx.activity.viewModels
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.graphicsLayer
 import dev.glass.launcher.ui.CrashScreen
 import dev.glass.launcher.ui.AppFont
 import androidx.compose.material3.LocalTextStyle
@@ -76,7 +75,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         enableEdgeToEdge()
         requestHighestRefreshRate()
         updateDefault()
-        applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
+        // Durum çubuğu tonu onResume'da arka planda hesaplanır (renk hesabı yavaş olabilir).
         // Kurulum/güncellemeden sonra "Aç" ile gelinirse (ilk açılış) ayarlar değil ana ekran gösterilir.
         val firstRun = consumeFirstRunAfterUpdate()
         if (isSettingsEntry(intent) && !firstRun) openSettingsRequest++
@@ -98,19 +97,12 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                     else androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 380f),
                     label = "homeHide",
                 )
-                androidx.compose.foundation.layout.Box(
-                    androidx.compose.ui.Modifier.graphicsLayer {
-                        alpha = 1f - hide
-                        val k = 1f - 0.06f * hide
-                        scaleX = k; scaleY = k
-                    }
-                ) {
-                    HomeScreen(
-                        vm, isDefault,
-                        onRequestDefault = ::requestHomeRole,
-                        openSettingsRequest = openSettingsRequest,
-                    )
-                }
+                HomeScreen(
+                    vm, isDefault,
+                    onRequestDefault = ::requestHomeRole,
+                    openSettingsRequest = openSettingsRequest,
+                    homeHide = { hide },
+                )
             }
         }
     }
@@ -153,11 +145,22 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         super.onResume()
         homeHidden = false
         coveredByApp = false
-        hideFromRecents()
-        updateDefault()
+        // Sistem çağrıları (bazıları yavaş: duvar kâğıdı renk hesabı) ana iş parçacığını meşgul etmesin;
+        // uygulamadan alttan kaydırarak dönerken sistemin geçişi launcher'ı beklerken takılıyordu.
+        bg.execute {
+            hideFromRecents()
+            val held = runCatching { getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME) }.getOrNull()
+            val colors = runCatching { wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+            runOnUiThread {
+                if (isDestroyed) return@runOnUiThread
+                if (held != null) isDefault = held
+                applyBarTone(colors)
+            }
+        }
         vm.syncSystemWallpaper()
-        applyBarTone(wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM))
     }
+
+    private val bg = java.util.concurrent.Executors.newSingleThreadExecutor()
 
     /**
      * Launcher "Son uygulamalar" ekranında kart olarak görünmesin. Manifestteki excludeFromRecents, uygulama

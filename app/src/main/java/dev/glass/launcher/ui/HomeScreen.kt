@@ -141,6 +141,8 @@ fun HomeScreen(
     isDefaultHome: Boolean,
     onRequestDefault: () -> Unit,
     openSettingsRequest: Int = 0,
+    /** Son uygulamalar ekranına geçiş (0..1): simgeler solar, duvar kâğıdı kalır. */
+    homeHide: () -> Float = { 0f },
 ) {
     val layout by vm.layout.collectAsStateWithLifecycle()
     val byKey by vm.appsByKey.collectAsStateWithLifecycle()
@@ -514,10 +516,12 @@ fun HomeScreen(
                 .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
                 .graphicsLayer {
-                    if (returnInfo != null) {
-                        val k = 1f + 0.05f * (1f - returnAnim.value)
-                        scaleX = k; scaleY = k
-                    }
+                    var k = 1f
+                    if (returnInfo != null) k = 1f + 0.05f * (1f - returnAnim.value)
+                    // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
+                    val h = homeHide()
+                    if (h > 0f) { k *= 1f - 0.06f * h; alpha = 1f - h }
+                    scaleX = k; scaleY = k
                 }
         ) {
             HomeContent(
@@ -551,7 +555,13 @@ fun HomeScreen(
             enter = fadeIn(motion.tween(180)) + scaleIn(motion.spring(), initialScale = 0.96f),
             exit = fadeOut(motion.tween(140)),
         ) {
-            SearchOverlay(vm, allApps, suggestions, settings.glassStrength, settings.iconGlass, onClose = { closeOverlay() })
+            val searchVis by transition.animateFloat(transitionSpec = { motion.tween(170) }, label = "searchVis") {
+                if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
+            }
+            SearchOverlay(
+                vm, allApps, suggestions, settings.glassStrength, settings.iconGlass,
+                onClose = { closeOverlay() }, visibility = { searchVis },
+            )
         }
         AnimatedVisibility(
             overlay == Overlay.Settings,
