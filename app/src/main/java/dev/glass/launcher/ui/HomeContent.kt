@@ -389,7 +389,9 @@ internal fun HomeContent(
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
-            beyondViewportPageCount = 1,
+            // Sürüklerken TÜM sayfalar bellekte kalır: sürüklemenin başladığı sayfa (ve onu izleyen dokunma
+            // kodu) uzak bir sayfaya geçilince atılmasın, yoksa bırakma kayboluyordu.
+            beyondViewportPageCount = if (dragging) homeCount else 1,
             modifier = Modifier.fillMaxSize().onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
