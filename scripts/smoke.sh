@@ -86,7 +86,7 @@ shot 05k-sag-kaydirma
 adb shell cmd statusbar collapse; step "paneli kapat" 2
 adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 2
 shot 05-arama
-tap_text "Daha Fazla" && { step "öneriler: daha fazla" 2; shot 05a-oneri-8; tap_text "Daha Az" && step "öneriler: daha az" 1; }
+tap_text "Daha Fazla" && { step "öneriler: daha fazla" 2; shot 05a-oneri-8; sleep 3; shot 05a2-oneri-8-gec; tap_text "Daha Az" && step "öneriler: daha az" 1; }
 adb shell input text "c"; step "arama yaz" 2
 shot 05b-arama-sonuc
 adb shell input text "c"; step "arama yaz" 2
