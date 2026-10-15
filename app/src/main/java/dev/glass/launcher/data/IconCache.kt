@@ -25,7 +25,9 @@ class IconCache(private val context: Context) {
 
     private val iconDir: File get() = File(context.filesDir, "icons").apply { mkdirs() }
 
-    suspend fun get(app: AppInfo, sizePx: Int, look: IconLook): ImageBitmap {
+    suspend fun get(app: AppInfo, sizePx0: Int, look: IconLook): ImageBitmap {
+        // Animasyonun ilk karesinde (ör. 0'dan büyüyen menü/hücre) boyut 0 gelebilir: en az 1 px.
+        val sizePx = sizePx0.coerceAtLeast(1)
         val k = "${app.key}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}"
         cache.get(k)?.let { return it }
         val bmp = withContext(Dispatchers.Default) {
