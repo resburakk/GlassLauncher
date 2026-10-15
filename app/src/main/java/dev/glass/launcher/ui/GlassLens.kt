@@ -47,6 +47,10 @@ half4 main(float2 coord) {
     // 0: camın derin içi, 1: tam kenar.
     float t = clamp(1.0 + d / max(edge, 1.0), 0.0, 1.0);
     float k = t * t * t;
+    // Köşelerde iki kenarın etkisi üst üste biner: köşe yayında bükülmeyi ve parlamayı yumuşat (leke oluşmasın).
+    float2 q = abs(p) - (c - r);
+    float corner = (q.x > 0.0 && q.y > 0.0) ? 0.55 : 1.0;
+    k *= corner;
     float2 e = float2(1.0, 0.0);
     float2 g = float2(
         sdRoundRect(p + e.xy, c, r) - sdRoundRect(p - e.xy, c, r),
@@ -56,12 +60,15 @@ half4 main(float2 coord) {
     float2 src = coord - n * k * strength;
     src = c + (src - c) * 0.985;
     half4 col = sampleAt(origin + src);
-    col.rgb = min(col.rgb + half3(k * glow), half3(1.0));
+    col.rgb = min(col.rgb + half3(k * glow * corner), half3(1.0));
     return col;
 }
 """
 
 object GlassLens {
+    /** Ekran yoğunluğu (dp → px); uygulama açılışında ayarlanır. */
+    @Volatile var density: Float = 3f
+
     /** Her cam yüzeyi kendi örneğini kullanır (uniform'lar örneğe özeldir). */
     fun newShader(): RuntimeShader = RuntimeShader(LENS_AGSL)
 
@@ -75,12 +82,15 @@ object GlassLens {
         soft: Float = 0f,
     ) {
         val m = minOf(w, h)
+        // iOS'taki gibi kırılma yalnızca ince bir kenar şeridinde: büyük panellerde bant ve bükülme sınırlı.
+        val edge = minOf(m * 0.30f, 34f * density)
+        val strength = minOf(m * 0.30f * amount, 16f * density * amount.coerceAtMost(1.2f))
         s.setFloatUniform("size", w, h)
         s.setFloatUniform("origin", ox, oy)
         s.setFloatUniform("radius", radius)
-        s.setFloatUniform("edge", m * 0.30f)
-        s.setFloatUniform("strength", m * 0.30f * amount)
-        s.setFloatUniform("glow", 0.07f * amount)
+        s.setFloatUniform("edge", edge)
+        s.setFloatUniform("strength", strength)
+        s.setFloatUniform("glow", 0.05f * amount)
         s.setFloatUniform("soft", soft)
     }
 }

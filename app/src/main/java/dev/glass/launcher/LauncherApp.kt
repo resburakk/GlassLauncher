@@ -26,6 +26,7 @@ class LauncherApp : Application() {
     override fun onCreate() {
         super.onCreate()
         installCrashRecorder()
+        dev.glass.launcher.ui.GlassLens.density = resources.displayMetrics.density
         appRepository = AppRepository(this)
         iconCache = IconCache(this)
         settingsStore = SettingsStore(this)
