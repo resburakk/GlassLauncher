@@ -203,9 +203,12 @@ fun SearchOverlay(
                 if (query.isNotBlank()) {
                     Box(
                         if (st.searchResultsPanel) {
-                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp).then(neutral)
+                            Modifier.liquidGlass(RoundedCornerShape(24.dp), strength * 0.8f, 6.dp, panel = true).then(neutral)
                         } else Modifier
                     ) {
+                        if (st.searchResultsPanel) {
+                            BlurBackdrop(24.dp, Modifier.matchParentSize(), alpha = visibility)
+                        }
                         ResultsList(
                             vm = vm, query = query.trim(), apps = results, device = device,
                             iconGlass = iconGlass, strength = strength,
@@ -223,16 +226,18 @@ fun SearchOverlay(
 
             // Arama kutusu: klavyenin üstünde, arada küçük bir boşlukla. "İptal" yok (iOS 26); × temizler,
             // boşluğa dokunmak veya geri hareketi kapatır.
+            // Çubuk da arkasındaki gerçek bulanık sahneyi (duvar kâğıdı + simgeler) gösterir.
+            Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp).height(48.dp)) {
+            BlurBackdrop(24.dp, Modifier.matchParentSize(), shape = CircleShape, alpha = visibility)
             Row(
                 Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp, bottom = 10.dp)
-                    .height(48.dp)
-                    .liquidGlass(CircleShape, strength * st.dockOpacity, 4.dp)
+                    .fillMaxSize()
+                    .liquidGlass(CircleShape, strength * st.dockOpacity, 4.dp, panel = true)
                     .background(Color.Black.copy(alpha = SEARCH_DIM))
             .glassBrightness(st.searchGlassBrightness)
                     .then(neutral)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
+            }
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
