@@ -27,6 +27,14 @@ class LauncherApp : Application() {
         super.onCreate()
         installCrashRecorder()
         dev.glass.launcher.ui.GlassLens.density = resources.displayMetrics.density
+        // Bildirim sayıları: izin verilmişse dinleyiciyi bağla (bazı telefonlar kendiliğinden bağlamıyor).
+        runCatching {
+            if (dev.glass.launcher.service.BadgeListener.isGranted(this)) {
+                android.service.notification.NotificationListenerService.requestRebind(
+                    dev.glass.launcher.service.BadgeListener.component(this)
+                )
+            }
+        }
         appRepository = AppRepository(this)
         iconCache = IconCache(this)
         settingsStore = SettingsStore(this)

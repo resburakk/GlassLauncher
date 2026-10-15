@@ -429,17 +429,32 @@ private fun BadgeGroup(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
         if (granted) {
             InfoRow("Bildirim erişimi", "İzin verildi")
         } else {
-            ActionRow("Bildirim erişimi ver") {
-                val comp = dev.glass.launcher.service.BadgeListener.component(ctx)
-                val detail = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS)
-                    .putExtra(android.provider.Settings.EXTRA_NOTIFICATION_LISTENER_COMPONENT_NAME, comp.flattenToString())
-                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            ActionRow("1. Kısıtlanmış ayarlara izin ver") {
+                // Mağaza dışından yüklenen uygulamalarda Android 13+ bildirim erişimini kilitler: önce uygulama
+                // bilgisi > ⋮ > "Kısıtlanmış ayarlara izin ver".
+                runCatching {
+                    ctx.startActivity(
+                        android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            .setData(android.net.Uri.parse("package:" + ctx.packageName))
+                            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }
+            RowDivider()
+            ActionRow("2. Bildirim erişimini aç") {
+                // Doğrudan bildirim erişimi listesi (bazı telefonlar ayrıntı ekranı yerine uygulamanın kendi
+                // bildirim ayarını açıyordu).
                 val list = android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                runCatching { ctx.startActivity(detail) }.onFailure { runCatching { ctx.startActivity(list) } }
+                runCatching { ctx.startActivity(list) }
             }
         }
     }
+    if (!granted) Footer(
+        "Rozetler için \"Bildirim erişimi\" gerekir (uygulamanın kendi bildirim izni değil). " +
+            "1) İlk satır uygulama bilgisini açar: sağ üstteki ⋮ menüsünden \"Kısıtlanmış ayarlara izin ver\" seç " +
+            "(menüde yoksa bu adımı atla). 2) İkinci satırda listeden Glass Launcher'ı aç."
+    )
     Footer(
         "Kırmızı rozet, uygulamanın okunmamış bildirim sayısını gösterir; klasörde içindekilerin toplamı görünür. " +
             "Launcher yalnızca uygulama başına sayıyı tutar; bildirimlerin içeriği okunmaz, saklanmaz, hiçbir yere gönderilmez."
