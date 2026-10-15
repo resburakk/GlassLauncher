@@ -219,7 +219,7 @@ fun SettingsScreen(
                         SettingsPage.Fonts -> FontsPage(s, onChange)
                         SettingsPage.Menu -> MenuPage(s, onChange)
                         SettingsPage.Search -> SearchPage(s, onChange)
-                        SettingsPage.Glass -> GlassPage(s, onChange)
+                        SettingsPage.Glass -> GlassPage(vm, s, onChange)
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
                         SettingsPage.Gestures -> GesturesPage(s, onChange)
@@ -282,7 +282,7 @@ private fun LayoutOrderGroup(vm: LauncherViewModel) {
  * duvar kâğıdını okumak "Tüm dosyalara erişim" izni ister; izin yoksa izin ekranına götüren satır gösterilir.
  */
 @Composable
-private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+private fun SystemWallpaperSyncGroup(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     val ctx = LocalContext.current
     var tick by remember { mutableStateOf(0) }
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { tick++ }
@@ -299,6 +299,15 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
     Group("Duvar kâğıdı ile cam") {
         ToggleRow("Sistem duvar kâğıdını cam için kullan", s.syncSystemWallpaper, default = Def.syncSystemWallpaper) { v ->
             onChange { it.copy(syncSystemWallpaper = v) }
+        }
+        if (s.syncSystemWallpaper && granted) {
+            RowDivider()
+            val scope = rememberCoroutineScope()
+            ActionRow("Duvar kâğıdını şimdi yeniden kopyala") {
+                vm.syncSystemWallpaper(force = true)
+                // Kopyalama arka planda sürer; durum satırı kısa bir süre sonra yenilenir.
+                scope.launch { kotlinx.coroutines.delay(1500); tick++ }
+            }
         }
         if (s.syncSystemWallpaper && !allFiles) {
             RowDivider()
@@ -328,7 +337,7 @@ private fun SystemWallpaperSyncGroup(s: LauncherSettings, onChange: ((LauncherSe
     Footer(
         when {
             !s.syncSystemWallpaper -> "Kapalı: cam yalnızca launcher'dan seçilen duvar kâğıdında bulanık ve kırılmalı görünür."
-            granted -> "Açık: telefonun duvar kâğıdı launcher'a kopyalanır, değişince kendiliğinden güncellenir. Dock ve klasörler gerçek bulanıklık ve kırılmayla çizilir. Görüntü telefonda kalır, hiçbir yere gönderilmez.\n\nDurum: ${la.wallpaperRepository.syncStatus}"
+            granted -> "Açık: telefonun duvar kâğıdı launcher'a kopyalanır, değişince kendiliğinden güncellenir. Dock ve klasörler gerçek bulanıklık ve kırılmayla çizilir. Görüntü telefonda kalır, hiçbir yere gönderilmez.\n\nDurum: ${remember(tick) { la.wallpaperRepository.syncStatus }}"
             else -> "Android, launcher'ın sistem duvar kâğıdını görebilmesi için iki izin ister: Tüm dosyalara erişim ve Fotoğraflar (\"Tümüne izin ver\" seçilmeli). İzin vermezsen duvar kâğıdını launcher'dan (boşluğa basılı tut > Duvar Kâğıdı) seçebilirsin."
         }
     )
@@ -713,7 +722,7 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
 }
 
 @Composable
-private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group(null) {
         SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f, default = Def.glassStrength) { v -> onChange { it.copy(glassStrength = v) } }
         RowDivider()
@@ -733,7 +742,7 @@ private fun GlassPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         RowDivider()
         SliderRow("Dolgu yoğunluğu (saydamlık)", pct(s.glassOpacity), s.glassOpacity, 0f..2f, default = Def.glassOpacity) { v -> onChange { it.copy(glassOpacity = v) } }
     }
-    SystemWallpaperSyncGroup(s, onChange)
+    SystemWallpaperSyncGroup(vm, s, onChange)
     Group("iOS 26 / 27 efektleri") {
         SliderRow("Kenar kırılması (mercek)", if (s.glassRefraction < 0.01f) "Kapalı" else pct(s.glassRefraction), s.glassRefraction, 0f..1f, default = Def.glassRefraction) { v ->
             onChange { it.copy(glassRefraction = v) }
