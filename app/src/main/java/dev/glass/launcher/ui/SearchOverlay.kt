@@ -237,7 +237,6 @@ fun SearchOverlay(
             .glassBrightness(st.searchGlassBrightness)
                     .then(neutral)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
-            }
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -284,6 +283,7 @@ fun SearchOverlay(
                         contentAlignment = Alignment.Center,
                     ) { GlyphIcon(Glyph.Mic, Color(0xCCFFFFFF), 20.dp) }
                 }
+            }
             }
         }
     }
