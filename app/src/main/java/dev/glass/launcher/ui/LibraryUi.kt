@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
+
+import androidx.compose.ui.draw.drawWithContent
+
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
@@ -131,11 +135,13 @@ fun LibraryPage(
                 Modifier
                     .weight(1f)
                     .height(LocalPt.current * 43f)
-                    .liquidGlass(CircleShape, strength, 4.dp)
+                    // Buzlu (bulanık) cam, gölgesiz: şeffaf cam stilinde arkada net/pikselli duvar kâğıdı görünüyordu.
+                    .liquidGlass(CircleShape, strength, 0.dp, frosted = true)
                     .clickable(remember { MutableInteractionSource() }, null) { searching = true }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
+                // Aramada iOS gibi sola hizalı (yazı tek satır kalır); boştayken ortada.
+                horizontalArrangement = if (searching) Arrangement.Start else Arrangement.Center,
             ) {
                 SearchGlyph(Color(0xCCFFFFFF), LocalPt.current * 17f)
                 Spacer(Modifier.width(8.dp))
@@ -152,17 +158,20 @@ fun LibraryPage(
                                 endSearch(); vm.launch(it)
                             }
                         }),
-                        // İkon + yazı bir bütün olarak ortada kalır; metin genişledikçe sağa-sola kaymaz.
-                        modifier = Modifier.width(IntrinsicSize.Min).widthIn(max = 260.dp).focusRequester(focus),
+                        modifier = Modifier.weight(1f).focusRequester(focus),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (query.isEmpty()) Text("Uygulama Arşivi", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
+                                if (query.isEmpty()) Text(
+                                    "Uygulama Arşivi", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont,
+                                    style = TextStyle(shadow = IosTextShadow), maxLines = 1, softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                                 inner()
                             }
                         },
                     )
                 } else {
-                    Text("Uygulama Arşivi", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
+                    Text("Uygulama Arşivi", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow), maxLines = 1, softWrap = false)
                 }
             }
             if (searching) {
@@ -173,7 +182,7 @@ fun LibraryPage(
                 )
             }
         }
-        Spacer(Modifier.height(u * 20f))
+        Spacer(Modifier.height(u * 10f))
 
         if (searching) {
             LibrarySearchList(vm, allApps, query, settings) { app -> endSearch(); vm.launch(app) }
@@ -186,9 +195,9 @@ fun LibraryPage(
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                     verticalArrangement = Arrangement.spacedBy(u * 12f),
-                    // Son satır gezinme çubuğunun üstüne kadar kaydırılabilsin.
-                    contentPadding = PaddingValues(bottom = 64.dp),
-                    modifier = Modifier.fillMaxSize(),
+                    // Son satır gezinme çubuğunun üstüne kadar kaydırılabilsin; üstte solma payı.
+                    contentPadding = PaddingValues(top = u * 10f, bottom = 72.dp),
+                    modifier = Modifier.fillMaxSize().edgeFade(top = u * 14f, bottom = 46.dp),
                 ) {
                     items(groups, key = { it.title }) { g ->
                         CategoryTile(vm, g, tile, settings, drag, edit, jiggle, onDropFromLibrary) { onOpenGroup(g) }
@@ -305,16 +314,16 @@ private fun LibrarySearchList(
         }.toList()
     }
     LazyColumn(
-        Modifier.fillMaxWidth().fillMaxHeight().liquidGlass(RoundedCornerShape(24.dp), settings.glassStrength * 0.8f, 4.dp),
+        Modifier.fillMaxWidth().fillMaxHeight().liquidGlass(RoundedCornerShape(24.dp), settings.glassStrength * 0.8f, 0.dp, frosted = true),
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         sections.forEach { (letter, apps) ->
             if (letter.isNotEmpty()) {
-                stickyHeader(key = "h:$letter") {
+                // Sade harf başlığı (iOS gibi): ayrı bir bant/çubuk yok.
+                item(key = "h:$letter") {
                     Text(
-                        letter, color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth().background(Color(0x26000000))
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        letter, color = Color(0x99FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp),
                     )
                 }
             }
@@ -395,3 +404,20 @@ fun LibraryGroupOverlay(
         }
     }
 }
+
+/** Kaydırılan içerik üst ve alt kenarda yumuşakça solar (iOS gibi; keskin kesik yerine). */
+private fun Modifier.edgeFade(top: Dp, bottom: Dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val h = size.height
+        if (h <= 0f) return@drawWithContent
+        val t = (top.toPx() / h).coerceIn(0f, 0.5f)
+        val b = (bottom.toPx() / h).coerceIn(0f, 0.5f)
+        drawRect(
+            androidx.compose.ui.graphics.Brush.verticalGradient(
+                0f to Color.Transparent, t to Color.Black, (1f - b) to Color.Black, 1f to Color.Transparent,
+            ),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }

@@ -44,6 +44,10 @@ object AppCategorizer {
             "bank", "banka", "akbank", "garanti", "ziraat", "isbank", "isbankasi", "yapikredi", "vakif",
             "halkbank", "qnb", "enpara", "denizbank", "papara", "pay", "wallet", "cuzdan",
             "finans", "kart", "albest", "midas", "binance", "btcturk", "paribu", "borsa", "e-devlet", "edevlet",
+            // Türk bankaları / ödeme uygulamalarının paket ve uygulama adları
+            "ykb", "iscep", "pozitron", "vakifbank", "kuveyt", "ingbank", "sekerbank", "odeabank", "fibabanka",
+            "albaraka", "turkiyefinans", "ziraatkatilim", "vakifkatilim", "emlakkatilim", "cepsube", "mobilsube",
+            "paycell", "tosla", "ininal", "param", "kredi", "fastpay", "colendi",
         ),
         AppCategory.Travel to listOf(
             "maps", "harita", "booking", "airbnb", "uber", "bitaksi", "thy", "turkishairlines", "pegasus",
@@ -81,6 +85,11 @@ object AppCategorizer {
     }
 
     fun categorize(packageName: String, label: String, androidCategory: Int, isSystem: Boolean): AppCategory {
+        // Boşluksuz da karşılaştırılır: "Yapı Kredi" -> "yapikredi".
+        val hay = normalize(packageName) + " " + normalize(label) + " " + normalize(label).replace(" ", "")
+        fun matches(words: List<String>) = words.any { hay.contains(normalize(it)) }
+        // Banka/ödeme uygulamaları bazen başka bir Android kategorisi bildiriyor: önce onlara bakılır.
+        keywords.firstOrNull { it.first == AppCategory.Finance }?.let { if (matches(it.second)) return AppCategory.Finance }
         when (androidCategory) {
             ApplicationInfo.CATEGORY_GAME -> return AppCategory.Games
             ApplicationInfo.CATEGORY_SOCIAL -> return AppCategory.Social
@@ -91,9 +100,8 @@ object AppCategorizer {
             ApplicationInfo.CATEGORY_PRODUCTIVITY -> return AppCategory.Productivity
             ApplicationInfo.CATEGORY_ACCESSIBILITY -> return AppCategory.Utilities
         }
-        val hay = normalize(packageName) + " " + normalize(label)
         for ((cat, words) in keywords) {
-            if (words.any { hay.contains(normalize(it)) }) return cat
+            if (matches(words)) return cat
         }
         return if (isSystem) AppCategory.Utilities else AppCategory.Other
     }

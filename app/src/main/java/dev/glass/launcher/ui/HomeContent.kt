@@ -643,7 +643,10 @@ internal fun badgeCount(packages: List<String>): Int {
 @Composable
 internal fun BoxScope.NotificationBadge(count: Int, icon: Dp) {
     if (count <= 0) return
-    val h = (icon * 0.36f).coerceIn(14.dp, 26.dp)
+    // Küçük simgelerde (arşiv/klasör önizlemesi) rozet de orantılı küçülür; çok küçükse yalnızca nokta.
+    val small = icon < 30.dp
+    val h = if (small) (icon * 0.42f).coerceIn(6.dp, 12.dp) else (icon * 0.36f).coerceIn(14.dp, 26.dp)
+    val dot = h < 11.dp
     val text = if (count > 999) "999+" else count.toString()
     Box(
         Modifier
@@ -653,10 +656,10 @@ internal fun BoxScope.NotificationBadge(count: Int, icon: Dp) {
             .widthIn(min = h)
             .clip(CircleShape)
             .background(Color(0xFFFF3B30))
-            .padding(horizontal = h * 0.26f),
+            .padding(horizontal = if (dot) 0.dp else h * 0.26f),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
+        if (!dot) Text(
             text, color = Color.White, fontFamily = AppFont, fontWeight = FontWeight.SemiBold,
             fontSize = (h.value * 0.62f).sp, lineHeight = (h.value * 0.62f).sp, maxLines = 1,
         )

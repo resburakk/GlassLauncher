@@ -130,8 +130,11 @@ fun Modifier.liquidGlass(
     elevation: Dp = 14.dp,
     /** true: üst katman paneli — arkasındaki launcher içeriğini gerçek zamanlı bulanıklaştırır. */
     panel: Boolean = false,
+    /** true: "Şeffaf" cam stilinde bile arkada duvar kâğıdının BULANIK kopyası (okunabilirlik gereken yüzeyler). */
+    frosted: Boolean = false,
 ): Modifier = composed {
-    val look = LocalGlass.current
+    val look0 = LocalGlass.current
+    val look = if (frosted && look0.clear) look0.copy(clear = false) else look0
     val st = LocalLauncherSettings.current
     val rimW = st.glassRimWidth
     val op = st.glassOpacity * glassTintFactor(st.glassTint)
