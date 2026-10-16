@@ -791,6 +791,17 @@ private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((La
         "Şeffaf: iOS 26'daki gibi camın arkası net görünür, kenarlarda mercek gibi bükülür (düzenleme düğmeleri gibi). " +
             "Buzlu: arkası güçlü bulanık ve beyazımsı. Şeffafta yazılar okunur kalsın diye hafif yazı gölgesi kendiliğinden açılır."
     )
+    Group("Arama ve Uygulama Arşivi camı") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("general" to "Genel cam ayarları", "dock" to "Dock ile eşit").forEach { (k, t) ->
+                Chip(t, s.panelGlassSync == k, Modifier.weight(1f)) { onChange { it.copy(panelGlassSync = k) } }
+            }
+        }
+    }
+    Footer(
+        "Arama paneli, arama çubuğu ve arşiv kartları her iki seçenekte de aşağıdaki cam ayarlarını kullanır. " +
+            "Dock ile eşit: ayrıca Dock > Cam yoğunluğu ayarı da uygulanır, hepsi dock ile aynı yoğunlukta görünür."
+    )
     Group(null) {
         SliderRow("Cam yoğunluğu", pct(s.glassStrength), s.glassStrength, 0.5f..1.5f, default = Def.glassStrength) { v -> onChange { it.copy(glassStrength = v) } }
         RowDivider()

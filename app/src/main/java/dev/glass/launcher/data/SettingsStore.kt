@@ -143,6 +143,8 @@ data class LauncherSettings(
     val syncSystemWallpaper: Boolean = true,
     /** Cam stili: "clear" (iOS 26 Şeffaf: arkası net, kenarda mercek) veya "frosted" (buzlu, bulanık). */
     val glassStyle: String = "clear",
+    /** Arama paneli/çubuğu ve Uygulama Arşivi camı: "general" = yalnızca genel cam ayarları, "dock" = dock ile aynı yoğunluk. */
+    val panelGlassSync: String = "general",
     /** Arama önerileri 8 (iki sıra) mı açık, 4 (tek sıra) mı? Son durum hatırlanır. */
     val searchSuggestExpanded: Boolean = false,
     /** Arama önerilerindeki uygulama adlarının yazı boyutu (pt) ve kalınlığı. */
@@ -192,6 +194,9 @@ data class LauncherSettings(
     /** Son başlatılan uygulamalar (ComponentName.flattenToString), en yenisi başta. */
     val recents: List<String> = emptyList(),
 ) {
+    /** Arama ve arşiv camının yoğunluğu: genel cam yoğunluğu; "dock ile eşitle" seçiliyse dock'un yoğunluğu da uygulanır. */
+    val panelGlassStrength: Float get() = glassStrength * (if (panelGlassSync == "dock") dockOpacity else 1f)
+
     fun sanitized(): LauncherSettings = copy(
         columns = columns.coerceIn(3, 6),
         rows = rows.coerceIn(4, 8),
@@ -278,7 +283,7 @@ data class LauncherSettings(
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
-        put("syncSystemWallpaper", syncSystemWallpaper); put("glassStyle", glassStyle)
+        put("syncSystemWallpaper", syncSystemWallpaper); put("glassStyle", glassStyle); put("panelGlassSync", panelGlassSync)
         put("searchSuggestExpanded", searchSuggestExpanded)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
@@ -386,6 +391,7 @@ data class LauncherSettings(
                 syncSystemWallpaper = o.optBoolean("syncSystemWallpaper", d.syncSystemWallpaper),
                 searchSuggestExpanded = o.optBoolean("searchSuggestExpanded", d.searchSuggestExpanded),
                 glassStyle = o.optString("glassStyle", d.glassStyle).takeIf { it == "clear" || it == "frosted" } ?: d.glassStyle,
+                panelGlassSync = o.optString("panelGlassSync", d.panelGlassSync).takeIf { it == "general" || it == "dock" } ?: d.panelGlassSync,
                 searchSuggestLabelSize = o.optDouble("searchSuggestLabelSize", d.searchSuggestLabelSize.toDouble()).toFloat(),
                 searchSuggestLabelWeight = o.optDouble("searchSuggestLabelWeight", d.searchSuggestLabelWeight.toDouble()).toFloat(),
                 wallpaperTarget = o.optString("wallpaperTarget", d.wallpaperTarget),

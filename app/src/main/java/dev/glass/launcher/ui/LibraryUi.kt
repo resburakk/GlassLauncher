@@ -137,7 +137,7 @@ fun LibraryPage(
     var query by remember { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = remember { FocusRequester() }
-    val strength = settings.glassStrength
+    val strength = settings.panelGlassStrength
 
     LaunchedEffect(searching) {
         if (searching) {
@@ -273,8 +273,10 @@ private fun CategoryTile(
             Modifier
                 .size(tile)
                 .onGloballyPositioned { center = it.boundsInRoot().center }
-                // iOS 26: kart camı daha açık ve saydam, kenarında ince açık çizgi.
-                .lightGlass(appShape(u * settings.libraryTileCorner), 0.75f, 0.35f, fill = 1.25f)
+                // Dock ile aynı Liquid Glass (kırılma, parlama, kenar ışığı; tüm cam ayarları uygulanır).
+                // Arkası bulanık arşiv zemini: şeffaf stilde de bulanık kopya kullanılır. Gölgesiz: yarı saydam
+                // camın altından gölge koyu bir kare gibi görünüyordu.
+                .liquidGlass(appShape(u * settings.libraryTileCorner), settings.panelGlassStrength, 0.dp, frosted = true)
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {

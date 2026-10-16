@@ -221,6 +221,8 @@ fun HomeScreen(
     // animasyonlarını 120 Hz'in altına düşürüyordu; bu durumda hiç kullanılmaz.
     val copyCovers by rememberUpdatedState(settings.launcherWallpaper && wallpaper != null)
     val homeBlurNow by rememberUpdatedState(settings.homeWallpaperBlur)
+    // Arama paneli/çubuğunun arkası da cam ayarlarına bağlı: Bulanıklık şiddeti ve cam stili (şeffafta daha az).
+    val strongBlurR = (if (settings.glassStyle == "clear") 28.dp else 56.dp) * settings.glassBlur
     LaunchedEffect(windowBlur) {
         // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
         // Son uygulamalar açılırken (ana ekran soluyor) pencere bulanıklığı da kalkar: küçültülen pencerede dikdörtgen olmasın.
@@ -552,7 +554,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 .graphicsLayer { if (settingsCovering) alpha = 0f }
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
-                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, includeRoot = true)
+                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, includeRoot = true)
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
@@ -630,7 +632,7 @@ fun HomeScreen(
                 if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
             }
             SearchOverlay(
-                vm, allApps, suggestions, settings.glassStrength, settings.iconGlass,
+                vm, allApps, suggestions, settings.panelGlassStrength, settings.iconGlass,
                 onClose = { closeOverlay() }, visibility = { searchVis },
             )
         }
@@ -660,7 +662,7 @@ fun HomeScreen(
         ) {
             folderHolder[0]?.let { f ->
                 // Klasör katmanı da menünün arkasında bulanıklaşır (ayrı katmanda: alttaki ana ekran silinmez).
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)) {
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR)) {
                 FolderOverlay(
                     folder = f,
                     byKey = byKey,
@@ -697,7 +699,7 @@ fun HomeScreen(
             exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = groupOrigin) + fadeOut(motion.tween(200)),
         ) {
             groupHolder[0]?.let { g ->
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)) {
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR)) {
                 LibraryGroupOverlay(
                     group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
