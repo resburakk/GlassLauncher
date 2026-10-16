@@ -268,10 +268,15 @@ private fun MiniCluster(vm: LauncherViewModel, apps: List<AppInfo>, size: Dp, on
         Modifier.size(size).clickable(remember { MutableInteractionSource() }, null, onClick = onOpen),
         contentAlignment = Alignment.Center,
     ) {
+        // Her zaman 2×2 sabit yuvalar: ikonlar sol üstten sırayla dizilir, eksikler boş kalır
+        // (2-3 ikon olunca ortaya/aşağı kaymasın).
         Column(verticalArrangement = Arrangement.spacedBy(gap)) {
-            apps.chunked(2).forEach { row ->
+            (0 until 2).forEach { r ->
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    row.forEach { AppIconImage(it, vm, mini, false, 0f) }
+                    (0 until 2).forEach { c ->
+                        val app = apps.getOrNull(r * 2 + c)
+                        if (app != null) AppIconImage(app, vm, mini, false, 0f) else Spacer(Modifier.size(mini))
+                    }
                 }
             }
         }
