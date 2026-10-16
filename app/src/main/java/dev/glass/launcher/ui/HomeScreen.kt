@@ -887,12 +887,21 @@ fun HomeScreen(
         LaunchedEffect(showEditBar) { if (!showEditBar) plusMenu = false }
         // "Seç" / "Bu Sayfayı Sil": düzenleme modunda "Ara" düğmesinin YERİNDE (Ara düğmesi o sırada gizlenir).
         var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }
-        val bottomBar = showEditBar && !bridge.onLibrary && drag.key == null && !selection.active
+        // Arşive geçiş oranı ekrana yansıyan bir değerden okunur (bridge.onLibrary düz değişken olduğu için arşive
+        // kaydırınca düğmeler yeniden çizilmiyor, arşivin üstünde kalıyordu).
+        val onLibraryNow by remember { derivedStateOf { libProgress.floatValue > 0.98f } }
+        val bottomBar = showEditBar && !onLibraryNow && drag.key == null && !selection.active
         val canDeletePage = bridge.homePageCount > 1
         homeMetrics?.let { hm ->
             AnimatedVisibility(
                 bottomBar,
-                modifier = Modifier.align(Alignment.TopCenter).offset(y = hm.pillCenterY - hm.pillH / 2f),
+                modifier = Modifier.align(Alignment.TopCenter).offset(y = hm.pillCenterY - hm.pillH / 2f)
+                    // Arşive kaydırırken "Ara" ve dock ile birlikte aşağı kayıp solar.
+                    .graphicsLayer {
+                        val f = libProgress.floatValue
+                        alpha = 1f - f
+                        translationY = f * (rootSize.height - hm.pillCenterY.toPx() + hm.pillH.toPx())
+                    },
                 enter = scaleIn(motion.bouncy(), initialScale = 0.5f) + fadeIn(motion.tween(160)),
                 exit = scaleOut(motion.tween(140), targetScale = 0.6f) + fadeOut(motion.tween(120)),
             ) {
