@@ -111,7 +111,7 @@ data class LauncherSettings(
     /** Boş alana çift dokununca ekranı kilitle (Erişilebilirlik hizmeti gerekir). */
     val doubleTapLock: Boolean = true,
     /** Uygulama arşivi sayfası (ana ekranın sağı). Varsayılan kapalı: sayfa hiç görünmez. */
-    val showLibrary: Boolean = false,
+    val showLibrary: Boolean = true,
     /** Yuvarlak (köşeleri boş) simgeleri dolu kareye tamamla. */
     val iconFillRound: Boolean = true,
     /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
@@ -182,6 +182,8 @@ data class LauncherSettings(
     val addNewToHome: Boolean = true,
     /** Simgelerde bildirim sayısı (kırmızı rozet). Bildirim erişimi izni gerekir. */
     val showBadges: Boolean = true,
+    /** Ana ekran duvar kâğıdının sürekli bulanıklığı (0 = net, 1 = en bulanık). */
+    val homeWallpaperBlur: Float = 0f,
     /** Son başlatılan uygulamalar (ComponentName.flattenToString), en yenisi başta. */
     val recents: List<String> = emptyList(),
 ) {
@@ -264,7 +266,7 @@ data class LauncherSettings(
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
-        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary", showLibrary); put("iconFillRound", iconFillRound)
+        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary2", showLibrary); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
         put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions)
@@ -288,7 +290,7 @@ data class LauncherSettings(
         put("launcherWallpaper", launcherWallpaper); put("wallpaperDim", wallpaperDim.toDouble())
         put("animSpeed", animSpeed.toDouble())
         put("realBlur", realBlur); put("autoQuality", autoQuality); put("lowPower", lowPower)
-        put("addNewToHome", addNewToHome); put("showBadges", showBadges); put("recents", JSONArray(recents))
+        put("addNewToHome", addNewToHome); put("showBadges", showBadges); put("homeWallpaperBlur", homeWallpaperBlur.toDouble()); put("recents", JSONArray(recents))
     }
 
     companion object {
@@ -335,6 +337,7 @@ data class LauncherSettings(
                 lowPower = o.optBoolean("lowPower", d.lowPower),
                 addNewToHome = o.optBoolean("addNewToHome", d.addNewToHome),
                 showBadges = o.optBoolean("showBadges", d.showBadges),
+                homeWallpaperBlur = o.optDouble("homeWallpaperBlur", d.homeWallpaperBlur.toDouble()).toFloat(),
                 recents = if (rec == null) emptyList() else List(rec.length()) { rec.optString(it) }.filter { it.isNotEmpty() },
                 dockBottom = f("dockBottom", d.dockBottom),
                 folderSize = f("folderSize", d.folderSize),
@@ -361,7 +364,8 @@ data class LauncherSettings(
                 topSwipe = runCatching { SwipeAction.valueOf(o.optString("topSwipe")) }.getOrDefault(d.topSwipe),
                 midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe2")) }.getOrDefault(d.midSwipe),
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
-                showLibrary = o.optBoolean("showLibrary", d.showLibrary),
+                // "showLibrary2": arşiv yeniden varsayılan olarak açık (eski kayıttaki kapalı değer bir kez yok sayılır).
+                showLibrary = o.optBoolean("showLibrary2", d.showLibrary),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
                 liveIcons = o.optBoolean("liveIcons", d.liveIcons),
                 iconRimWidth = o.optDouble("iconRimWidth", d.iconRimWidth.toDouble()).toFloat(),

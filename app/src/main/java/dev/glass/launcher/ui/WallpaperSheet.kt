@@ -47,6 +47,9 @@ fun WallpaperSheet(
     target: WallpaperTarget,
     strength: Float,
     hasLauncherWallpaper: Boolean,
+    /** Ana ekran duvar kâğıdı bulanıklığı (0..1); kaydırdıkça arkada canlı uygulanır. */
+    homeBlur: Float,
+    onHomeBlur: (Float) -> Unit,
     onTarget: (WallpaperTarget) -> Unit,
     onPick: () -> Unit,
     onSystem: () -> Unit,
@@ -116,7 +119,26 @@ fun WallpaperSheet(
                             }
                         }
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Ana ekran bulanıklığı", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Text(
+                            if (homeBlur < 0.01f) "Kapalı" else "%${(homeBlur * 100).toInt()}",
+                            color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp,
+                        )
+                    }
+                    androidx.compose.material3.Slider(
+                        value = homeBlur,
+                        onValueChange = onHomeBlur,
+                        valueRange = 0f..1f,
+                        colors = androidx.compose.material3.SliderDefaults.colors(
+                            thumbColor = Color.White,
+                            activeTrackColor = Color.White.copy(alpha = 0.85f),
+                            inactiveTrackColor = Color.White.copy(alpha = 0.2f),
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(6.dp))
                     SheetButton("Galeriden Seç", primary = true, onClick = onPick)
                     Spacer(Modifier.height(8.dp))
                     SheetButton("Telefonun duvar kâğıdı ayarları", onClick = onSystem)

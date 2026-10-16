@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import kotlinx.coroutines.launch
+
+import androidx.compose.ui.graphics.graphicsLayer
+
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.border
@@ -127,6 +131,10 @@ fun FolderOverlay(
         LaunchedEffect(closing) {
             if (closing && pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
         }
+        // Tek sayfalı klasör: yana kaydırınca iOS gibi esnekçe kayar, bırakınca yaylı geri döner (başka sayfa yok).
+        val rubber = remember { androidx.compose.animation.core.Animatable(0f) }
+        val rubberScope = androidx.compose.runtime.rememberCoroutineScope()
+        val singlePage = pages.size <= 1
 
         // Sürüklenen uygulama panelden çıkıp kısa süre dışarıda kalırsa klasör kapanır (iOS davranışı).
         val outside by remember {
@@ -181,6 +189,30 @@ fun FolderOverlay(
                 state = pagerState,
                 userScrollEnabled = drag.key == null,
                 modifier = Modifier
+                    .then(
+                        if (!singlePage) Modifier
+                        else Modifier.pointerInput(Unit) {
+                            var raw = 0f
+                            val limit = size.width.toFloat().coerceAtLeast(1f)
+                            fun settle() = rubberScope.launch {
+                                raw = 0f
+                                rubber.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 360f))
+                            }
+                            androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                                onDragStart = { raw = rubber.value; rubberScope.launch { rubber.stop() } },
+                                onDragEnd = { settle() },
+                                onDragCancel = { settle() },
+                            ) { change, dx ->
+                                change.consume()
+                                raw += dx
+                                // iOS lastik formülü: çekildikçe direnç artar, en fazla panel genişliğinin ~yarısı.
+                                val a = kotlin.math.abs(raw)
+                                val band = (1f - 1f / (a * 0.55f / limit + 1f)) * limit
+                                rubberScope.launch { rubber.snapTo(if (raw < 0f) -band else band) }
+                            }
+                        }
+                    )
+                    .graphicsLayer { translationX = rubber.value }
                     .fillMaxWidth()
                         .height(rowH * 3),
             ) { page ->

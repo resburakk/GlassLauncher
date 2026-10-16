@@ -209,9 +209,10 @@ fun HomeScreen(
     // bulanıklığı gereksiz. Her yarıçap değişimi pencere yerleşimini yeniden tetiklediği için açılış
     // animasyonlarını 120 Hz'in altına düşürüyordu; bu durumda hiç kullanılmaz.
     val copyCovers by rememberUpdatedState(settings.launcherWallpaper && wallpaper != null)
+    val homeBlurNow by rememberUpdatedState(settings.homeWallpaperBlur)
     LaunchedEffect(windowBlur) {
         // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
-        snapshotFlow { if (copyCovers) 0f else maxOf(blurAmount, libProgress.floatValue) }
+        snapshotFlow { if (copyCovers) 0f else maxOf(blurAmount, libProgress.floatValue, homeBlurNow) }
             .collect { f -> windowBlur?.invoke(f * blurK) }
     }
     var lockReason by remember { mutableStateOf(LockReason.Lock) }
@@ -512,6 +513,7 @@ fun HomeScreen(
             if (overlay == Overlay.Settings) { delay(450); settingsCovering = true }
         }
         val maxBlurPx = with(density) { 22.dp.toPx() }
+        val homeBlurPx = with(density) { 28.dp.toPx() }
         Box(
             Modifier
                 .fillMaxSize()
@@ -525,13 +527,14 @@ fun HomeScreen(
         // "Son uygulamalar" kartında (pencerenin küçültülmüş görüntüsü) arka plan dikdörtgen gibi görünmez.
         // Bulanıklık gereken anlarda (arama, kütüphane, menü/klasör camı) kopya çizilir.
         val fromSync = remember(wp) { vm.wallpaperFromSync() }
-        val needCopy = !fromSync || blurAmount > 0.001f || libProgress.floatValue > 0.001f ||
+        val needCopy = !fromSync || blurAmount > 0.001f || libProgress.floatValue > 0.001f || settings.homeWallpaperBlur > 0.01f ||
             glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
         if (settings.launcherWallpaper && wp != null && needCopy) {
             Image(
                 wp, null,
                 Modifier.fillMaxSize().graphicsLayer {
-                    val r = maxBlurPx * maxOf(blurAmount, libProgress.floatValue) * settings.glassBlur
+                    // Kalıcı ana ekran bulanıklığı (duvar kâğıdı panelindeki kaydırıcı) + açılan katmanların bulanıklığı.
+                    val r = maxOf(maxBlurPx * maxOf(blurAmount, libProgress.floatValue) * settings.glassBlur, homeBlurPx * settings.homeWallpaperBlur)
                     renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
                 },
                 contentScale = ContentScale.Crop,
@@ -923,6 +926,8 @@ fun HomeScreen(
             target = dev.glass.launcher.data.WallpaperTarget.of(settings.wallpaperTarget),
             strength = settings.glassStrength,
             hasLauncherWallpaper = settings.launcherWallpaper,
+            homeBlur = settings.homeWallpaperBlur,
+            onHomeBlur = { v -> vm.updateSettings { it.copy(homeWallpaperBlur = v) } },
             onTarget = { t -> vm.updateSettings { it.copy(wallpaperTarget = t.code) } },
             onPick = {
                 wallpaperSheet = false
