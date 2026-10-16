@@ -389,6 +389,7 @@ fun LibraryGroupOverlay(
         val icon = minOf(LocalHomeMetrics.current?.icon ?: (pitch * 0.72f), pitch * 0.92f)
         val rowH = icon + 26.dp
         val maxGridH = maxHeight * 0.6f
+        val badgeRoom = minOf(12.dp, u * 29f)
         // Ad, ana ekrandaki klasörle aynı biçimde panelin ÜSTÜNDE; etiket stili dışarıdaki etiketle aynı.
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
@@ -401,12 +402,14 @@ fun LibraryGroupOverlay(
                 .width(panelW)
                 .lightGlass(appShape(u * settings.libraryGroupCorner), 0.75f, 0.35f)
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(top = u * 29f, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
+                .padding(top = u * 29f - badgeRoom, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(4),
-                modifier = Modifier.fillMaxWidth().height(minOf(rowH * ((group.apps.size + 3) / 4), maxGridH)),
+                // Izgara kendi sınırında kırpar: üst sıradaki bildirim rozeti taşabilsin diye üstte boşluk.
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = badgeRoom),
+                modifier = Modifier.fillMaxWidth().height(minOf(rowH * ((group.apps.size + 3) / 4) + badgeRoom, maxGridH)),
             ) {
                 items(group.apps, key = { it.key }) { app ->
                     Box(Modifier.fillMaxWidth().height(rowH), contentAlignment = Alignment.TopCenter) {
