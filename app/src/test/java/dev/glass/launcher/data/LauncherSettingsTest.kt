@@ -30,7 +30,7 @@ class LauncherSettingsTest {
     @Test fun oldMetrics_areResetToNewDefaults_otherSettingsKept() {
         val s = LauncherSettings.fromJson(JSONObject("""{"iconScale": 1.3, "labelSize": 10, "theme": "Dark"}"""))
         assertEquals(1f, s.iconScale)
-        assertEquals(12f, s.labelSize)
+        assertEquals(LauncherSettings().labelSize, s.labelSize)
         assertEquals(ThemeMode.Dark, s.theme)
     }
 
