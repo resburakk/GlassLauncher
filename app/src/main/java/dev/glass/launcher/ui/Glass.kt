@@ -500,9 +500,9 @@ fun Modifier.glassBrightness(b: Float): Modifier = when {
  * Açık tonlu buzlu cam panel (klasörler ve arşiv kutuları). Saydamlık, parlaklık, kenar ışığı ve
  * çizgi kalınlığı ayarlarını uygular.
  */
-fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float): Modifier = composed {
+fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Float = 1f): Modifier = composed {
     val st = LocalLauncherSettings.current
-    val op = st.glassOpacity * glassTintFactor(st.glassTint) * (if (LocalGlass.current.clear) 0.5f else 1f)
+    val op = st.glassOpacity * glassTintFactor(st.glassTint) * (if (LocalGlass.current.clear) 0.5f else 1f) * fill
     val glow = st.glassRimGlow
     this
         .smoothClip(shape)

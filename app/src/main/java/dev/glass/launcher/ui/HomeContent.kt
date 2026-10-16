@@ -121,7 +121,7 @@ internal fun HomeContent(
     onRequestDefault: () -> Unit,
     onOpenSearch: () -> Unit,
     onOpenFolder: (FolderItem, Offset) -> Unit,
-    onOpenGroup: (LibraryGroup) -> Unit,
+    onOpenGroup: (LibraryGroup, Offset) -> Unit,
     /** Çoklu seçim durumu (düzenleme modunda "Seç"). */
     selection: SelectionState,
     /** Arşive geçiş oranı (0 = ana ekran, 1 = arşiv); arka plan bulanıklığı için üst bileşen okur. */

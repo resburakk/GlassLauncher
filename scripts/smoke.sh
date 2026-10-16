@@ -35,6 +35,16 @@ tap_text() {
   echo "::warning::Ekranda bulunamadı: $want"; return 1
 }
 
+# Ekrandaki bir öğeye erişilebilirlik açıklamasından dokun
+tap_desc() {
+  adb shell rm -f /sdcard/ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "content-desc=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  set -- $b
+  if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
+  echo "::warning::Ekranda bulunamadı (açıklama)"; return 1
+}
+
 shot 01-ana-ekran
 
 # 1) Uzun basma: menü parmak ekrandayken açılmalı
@@ -106,9 +116,14 @@ shot 07a-arsiv-hemen
 step "arşiv" 3
 shot 07-arsiv
 tap_text "Uygulama Arşivi" && { step "arşiv arama listesi" 3; shot 07b-arsiv-liste
+  tap_text "M" && { step "harf dizini: M" 2; shot 07b2-arsiv-dizin-M; }
   adb shell input keyevent KEYCODE_BACK; step "klavye kapandı" 1
   adb shell input keyevent KEYCODE_BACK; step "geri: liste kapanmalı" 2
   shot 07c-arsiv-geri; }
+tap_desc "Son Eklenenler kategorisini aç" && { sleep 0.15; shot 07d0-kategori-acilis; step "kategori tam ekran" 2
+  shot 07d-arsiv-kategori
+  adb shell input tap $cx $((H*90/100)); step "boş yere dokun: kapanmalı" 2
+  shot 07e-kategori-kapandi; }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 
 # 7) Üstten kaydırma (sistem Kontrol Merkezi) — en sonda, sistem paneli diğer adımları etkilemesin

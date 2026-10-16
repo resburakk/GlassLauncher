@@ -183,6 +183,8 @@ fun HomeScreen(
     // Klasör/arşiv kategorisi açıkken basılı tutulan simgenin menüsü (klasör açık kalır).
     var folderMenu by remember { mutableStateOf<MenuRequest?>(null) }
     var group by remember { mutableStateOf<LibraryGroup?>(null) }
+    // Arşiv kategorisi, dokunulan kartın yerinden büyüyerek açılır ve oraya küçülerek kapanır.
+    var groupOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
     val overlayNow by rememberUpdatedState(overlay)
     val settingsNow by rememberUpdatedState(settings)
@@ -191,14 +193,17 @@ fun HomeScreen(
     // Tam ekran bulanıklık yalnızca büyük katmanlarda; menü ve küçük pencerelerde yalnızca kendileri bulanık.
     val fullBlur = overlay in FullBlurOverlays
     // Şeffaf camda açık klasörün arkası daha az bulanır: panel kenarındaki mercek görünür olsun (iOS 26).
-    val clearFolder = settings.glassStyle == "clear" && (overlay == Overlay.Folder || overlay == Overlay.Group)
+    // (Arşiv kategorisi panelsiz, tam ekran: arkası her zaman tam bulanık — iOS 26.)
+    val clearFolder = settings.glassStyle == "clear" && overlay == Overlay.Folder
     val blurAmount by animateFloatAsState(if (fullBlur) (if (clearFolder) 0.45f else 1f) else 0f, motion.tween(280), label = "blurAmount")
     val blurK by rememberUpdatedState(settings.glassBlur)
     val blur = 22.dp * blurAmount * settings.glassBlur
     val scrim by animateFloatAsState(
         when {
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
-            overlay == Overlay.Folder || overlay == Overlay.Group -> 0.06f
+            overlay == Overlay.Folder -> 0.06f
+            // Arşiv kategorisi tam ekran açılır: iOS 26'daki gibi arka plan bulanık ve biraz koyulaşmış.
+            overlay == Overlay.Group -> 0.22f
             // Arama (iOS Spotlight gibi): koyuluk bulanıklıktan gelir, karartma çok hafif.
             overlay == Overlay.Search -> 0.10f
             fullBlur -> 0.28f
@@ -601,7 +606,12 @@ fun HomeScreen(
                 onRequestDefault = onRequestDefault,
                 onOpenSearch = { overlay = Overlay.Search },
                 onOpenFolder = { f, c -> openFolderAt(f, c) },
-                onOpenGroup = { g -> group = g; overlay = Overlay.Group },
+                onOpenGroup = { g, c ->
+                    groupOrigin = if (c == Offset.Zero || rootSize.width == 0) TransformOrigin.Center else TransformOrigin(
+                        (c.x / rootSize.width).coerceIn(0f, 1f), (c.y / rootSize.height.coerceAtLeast(1)).coerceIn(0f, 1f),
+                    )
+                    group = g; overlay = Overlay.Group
+                },
                 libProgress = libProgress,
                 selection = selection,
             )
@@ -683,8 +693,8 @@ fun HomeScreen(
         }
         AnimatedVisibility(
             overlay == Overlay.Group,
-            enter = scaleIn(motion.bouncy(), initialScale = 0.85f) + fadeIn(motion.tween(200)),
-            exit = scaleOut(motion.tween(180), targetScale = 0.85f) + fadeOut(motion.tween(160)),
+            enter = scaleIn(motion.bouncy(), initialScale = 0.2f, transformOrigin = groupOrigin) + fadeIn(motion.tween(180)),
+            exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = groupOrigin) + fadeOut(motion.tween(200)),
         ) {
             groupHolder[0]?.let { g ->
                 Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur)) {

@@ -1,6 +1,25 @@
 package dev.glass.launcher.ui
 
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.launch
 
 import androidx.compose.ui.graphics.graphicsLayer
 
@@ -90,7 +109,8 @@ fun LibraryPage(
     edit: Boolean,
     jiggle: State<Float>,
     onDropFromLibrary: (String, androidx.compose.ui.geometry.Offset, String?) -> Unit,
-    onOpenGroup: (LibraryGroup) -> Unit,
+    /** Kategori açılır; ikinci değer kartın ekrandaki merkezi (açılış oradan büyür). */
+    onOpenGroup: (LibraryGroup, Offset) -> Unit,
     /** Arşiv sayfası şu an ekranda mı (başka sayfaya geçilince arşiv ilk haline döner). */
     active: Boolean = true,
 ) {
@@ -143,8 +163,11 @@ fun LibraryPage(
     }
 
     val u = LocalPt.current
-    Column(Modifier.fillMaxSize().padding(horizontal = u * 29f).nestedScroll(pullDown)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val side = u * 29f
+    // Kenar boşluğu arama çubuğu ve kartlara ayrı verilir: arama listesi (iOS gibi) ekran kenarına kadar uzanır,
+    // sağdaki harf dizini kenara yakın durur.
+    Column(Modifier.fillMaxSize().nestedScroll(pullDown)) {
+        Row(Modifier.padding(horizontal = side), verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
                     .weight(1f)
@@ -199,22 +222,23 @@ fun LibraryPage(
         Spacer(Modifier.height(u * 10f))
 
         if (searching) {
-            LibrarySearchList(vm, allApps, query, settings) { app -> endSearch(); vm.launch(app) }
+            LibrarySearchList(vm, allApps, query, settings, side) { app -> endSearch(); vm.launch(app) }
         } else {
-            BoxWithConstraints(Modifier.fillMaxSize()) {
+            BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = side)) {
                 val gap = u * 24f
                 val tile = (maxWidth - gap) / 2f
                 LazyVerticalGrid(
                     state = gridState,
                     columns = GridCells.Fixed(2),
                     horizontalArrangement = Arrangement.spacedBy(gap),
-                    verticalArrangement = Arrangement.spacedBy(u * 12f),
+                    // iOS 26: kart satırları arası ≈ 199 pt (kart 160 + etiket + boşluk).
+                    verticalArrangement = Arrangement.spacedBy(u * 20f),
                     // Son satır gezinme çubuğunun üstüne kadar kaydırılabilsin; üstte solma payı.
                     contentPadding = PaddingValues(top = u * 10f, bottom = 72.dp),
                     modifier = Modifier.fillMaxSize().edgeFade(top = u * 14f, bottom = 46.dp),
                 ) {
                     items(groups, key = { it.title }) { g ->
-                        CategoryTile(vm, g, tile, settings, drag, edit, jiggle, onDropFromLibrary) { onOpenGroup(g) }
+                        CategoryTile(vm, g, tile, settings, drag, edit, jiggle, onDropFromLibrary) { c -> onOpenGroup(g, c) }
                     }
                 }
             }
@@ -232,12 +256,14 @@ private fun CategoryTile(
     edit: Boolean,
     jiggle: State<Float>,
     onDrop: (String, androidx.compose.ui.geometry.Offset, String?) -> Unit,
-    onOpen: () -> Unit,
+    onOpen: (Offset) -> Unit,
 ) {
     val view = androidx.compose.ui.platform.LocalView.current
     val u = LocalPt.current
-    val pad = u * 12.6f
-    val gap = u * 12.8f
+    // iOS 26 ölçüleri (kart genişliğine oranla): iç boşluk %8,5, büyük simgeler arası %7,3.
+    val pad = tile * 0.085f
+    val gap = tile * 0.073f
+    var center by remember { mutableStateOf(Offset.Zero) }
     val big = (tile - pad * 2f - gap) / 2f
     val bigApps = if (g.apps.size <= 4) g.apps.take(4) else g.apps.take(3)
     val rest = if (g.apps.size <= 4) emptyList() else g.apps.drop(3).take(4)
@@ -246,7 +272,9 @@ private fun CategoryTile(
         Box(
             Modifier
                 .size(tile)
-                .lightGlass(appShape(u * settings.libraryTileCorner), 0.6f, 0.25f)
+                .onGloballyPositioned { center = it.boundsInRoot().center }
+                // iOS 26: kart camı daha açık ve saydam, kenarında ince açık çizgi.
+                .lightGlass(appShape(u * settings.libraryTileCorner), 0.75f, 0.35f, fill = 1.25f)
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -264,7 +292,7 @@ private fun CategoryTile(
                                     onClick = { r -> vm.launchFrom(app, view, r) },
                                     onDrop = { p, h -> onDrop(app.key, p, h) },
                                 ) { AppIconImage(app, vm, big, settings.iconGlass, settings.glassStrength) }
-                                i == 3 && rest.isNotEmpty() -> MiniCluster(vm, rest, big, onOpen)
+                                i == 3 && rest.isNotEmpty() -> MiniCluster(vm, rest, big, "${g.title} kategorisini aç") { onOpen(center) }
                                 else -> Spacer(Modifier.size(big))
                             }
                         }
@@ -273,22 +301,25 @@ private fun CategoryTile(
             }
         }
         Text(
-            g.title, color = Color.White, fontSize = (u.value * 13f).sp, fontWeight = FontWeight.Medium,
+            // iOS 26: kategori adı küçük (≈12 pt) ve orta kalınlıkta.
+            g.title, color = Color.White, fontSize = (u.value * 12f).sp, fontWeight = FontWeight.Medium,
             fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = u * 4f).width(tile),
+            modifier = Modifier.padding(top = u * 5f).width(tile),
         )
     }
 }
 
 /** Kutunun dördüncü köşesi: 2×2 küçük simge, dokununca kategorinin tamamı açılır. */
 @Composable
-private fun MiniCluster(vm: LauncherViewModel, apps: List<AppInfo>, size: Dp, onOpen: () -> Unit) {
+private fun MiniCluster(vm: LauncherViewModel, apps: List<AppInfo>, size: Dp, description: String, onOpen: () -> Unit) {
     val gap = size * 0.1f
     // Küçük simgeler, dördüncü hücrenin ortasında biraz daha küçük durur.
     val mini = ((size - gap) / 2f) * 0.8f
     Box(
-        Modifier.size(size).clickable(remember { MutableInteractionSource() }, null, onClick = onOpen),
+        Modifier.size(size)
+            .semantics { contentDescription = description }
+            .clickable(remember { MutableInteractionSource() }, null, onClick = onOpen),
         contentAlignment = Alignment.Center,
     ) {
         // Her zaman 2×2 sabit yuvalar: ikonlar sol üstten sırayla dizilir, eksikler boş kalır
@@ -306,7 +337,21 @@ private fun MiniCluster(vm: LauncherViewModel, apps: List<AppInfo>, size: Dp, on
     }
 }
 
-/** Alfabetik liste (harf başlıklı) veya arama sonuçları. */
+/** Sağdaki harf dizini: iOS'taki gibi A–Z ve #. */
+private val IndexLetters: List<String> = ('A'..'Z').map { it.toString() } + "#"
+
+/** Türkçe harfler dizinde temel harfle eşleşir (Ç → C, Ş → S ...). Harf olmayanlar "#". */
+private fun baseLetter(key: String): Char = when (val c = key.firstOrNull()) {
+    null -> '#'
+    'Ç' -> 'C'; 'Ğ' -> 'G'; 'İ', 'I' -> 'I'; 'Ö' -> 'O'; 'Ş' -> 'S'; 'Ü' -> 'U'
+    else -> if (c in 'A'..'Z') c else '#'
+}
+
+/**
+ * Alfabetik liste (harf başlıklı) veya arama sonuçları — iOS 26 gibi panelsiz, doğrudan bulanık arka planın
+ * üstünde. Satırlar arasında yazı hizasından başlayan ince çizgi; sağda harf dizini (yalnızca tam listede).
+ * Ölçüler (pt, iOS'tan): simge 43, satır 66, sol boşluk 27, simge–yazı arası 15,6, yazı 17.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibrarySearchList(
@@ -314,8 +359,10 @@ private fun LibrarySearchList(
     allApps: List<AppInfo>,
     query: String,
     settings: LauncherSettings,
+    side: Dp,
     onOpen: (AppInfo) -> Unit,
 ) {
+    val u = LocalPt.current
     val tr = remember { Locale("tr", "TR") }
     val results = remember(query, allApps) {
         if (query.isBlank()) allApps else SearchRanker.rank(query, allApps) { it.label }
@@ -327,45 +374,155 @@ private fun LibrarySearchList(
             if (ch.first().isLetter()) ch else "#"
         }.toList()
     }
-    LazyColumn(
+    // Her harf başlığının listedeki sırası (dizinden atlamak için).
+    val starts = remember(sections) {
+        val m = LinkedHashMap<String, Int>()
+        var i = 0
+        sections.forEach { (letter, apps) ->
+            if (letter.isNotEmpty()) { m[letter] = i; i++ }
+            i += apps.size
+        }
+        m
+    }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    // Arama metni değişince sonuçlar en üstten gösterilir.
+    LaunchedEffect(query) { runCatching { listState.scrollToItem(0) } }
+
+    val icon = u * 43f
+    val rowH = u * 66f
+    val textGap = u * 15.6f
+    val showIndex = query.isBlank() && starts.size > 1
+    val sepColor = Color(0x2EFFFFFF)
+
+    Box(
         Modifier
             .fillMaxWidth()
             .fillMaxHeight()
             // Klavyenin ÜSTÜNDE biter (arkasına uzanıp kenarı klavyenin üstünde kesik çizgi gibi görünmesin).
             .imePadding()
             .padding(bottom = 10.dp)
-            .liquidGlass(RoundedCornerShape(24.dp), settings.glassStrength * 0.8f, 0.dp, frosted = true)
-            .edgeFade(top = 10.dp, bottom = 22.dp),
-        contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        sections.forEach { (letter, apps) ->
-            if (letter.isNotEmpty()) {
-                // Sade harf başlığı (iOS gibi): ayrı bir bant/çubuk yok.
-                item(key = "h:$letter") {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().edgeFade(top = 10.dp, bottom = 22.dp),
+            contentPadding = PaddingValues(start = u * 27f, end = if (showIndex) u * 28f else side, top = 4.dp, bottom = 8.dp),
+        ) {
+            sections.forEach { (letter, apps) ->
+                if (letter.isNotEmpty()) {
+                    // Sade harf başlığı (iOS gibi): ayrı bir bant/çubuk yok.
+                    item(key = "h:$letter") {
+                        Text(
+                            letter, color = Color(0x99FFFFFF), fontSize = (u.value * 13f).sp, fontWeight = FontWeight.SemiBold,
+                            fontFamily = AppFont,
+                            modifier = Modifier.fillMaxWidth().padding(start = u * 4f, top = u * 12f, bottom = u * 2f),
+                        )
+                    }
+                }
+                itemsIndexed(apps, key = { _, a -> "a:${a.key}" }) { i, app ->
+                    val last = i == apps.size - 1
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(rowH)
+                            .clickable { onOpen(app) }
+                            .drawBehind {
+                                // Ayırıcı: yazının hizasından satırın sonuna kadar ince çizgi (bölümün son satırında yok).
+                                if (!last) {
+                                    val x0 = (icon + textGap).toPx()
+                                    val w = 0.5.dp.toPx().coerceAtLeast(1f)
+                                    drawLine(sepColor, Offset(x0, size.height - w / 2f), Offset(size.width, size.height - w / 2f), w)
+                                }
+                            },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength)
+                        Spacer(Modifier.width(textGap))
+                        Text(
+                            app.label, color = Color.White, fontSize = (u.value * 17f).sp, fontFamily = AppFont,
+                            style = TextStyle(shadow = IosTextShadow), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+            }
+            if (results.isEmpty()) {
+                item {
                     Text(
-                        letter, color = Color(0x99FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 2.dp),
+                        "Sonuç bulunamadı", color = Color(0xCCFFFFFF), fontSize = (u.value * 17f).sp,
+                        modifier = Modifier.padding(vertical = 16.dp),
                     )
                 }
             }
-            items(apps, key = { "a:${it.key}" }) { app ->
-                Row(
-                    Modifier.fillMaxWidth().clickable { onOpen(app) }.padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppIconImage(app, vm, 38.dp, settings.iconGlass, settings.glassStrength)
-                    Spacer(Modifier.width(12.dp))
-                    Text(app.label, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
         }
-        if (results.isEmpty()) {
-            item { Text("Sonuç bulunamadı", color = Color(0xCCFFFFFF), modifier = Modifier.padding(16.dp)) }
+        if (showIndex) {
+            AlphabetIndex(Modifier.align(Alignment.CenterEnd).padding(end = u * 3f)) { picked ->
+                // Seçilen harf ya da (o harfle başlayan uygulama yoksa) ondan sonraki ilk harf.
+                val keys = starts.keys.toList()
+                val target = if (picked == '#') keys.firstOrNull { baseLetter(it) == '#' } ?: keys.last()
+                else keys.firstOrNull { val b = baseLetter(it); b != '#' && b >= picked }
+                    ?: keys.lastOrNull { baseLetter(it) != '#' } ?: keys.last()
+                val idx = starts[target] ?: return@AlphabetIndex
+                scope.launch { runCatching { listState.scrollToItem(idx) } }
+            }
         }
     }
 }
 
-/** Bir kategorinin tamamı: ortada cam panel, 4 sütunlu ızgara (iOS'ta kategori kutusu açılınca olduğu gibi). */
+/** Dikey A–Z dizini: dokunulan ya da parmakla üzerinden geçilen harfe atlar (her harf değişiminde hafif titreşim). */
+@Composable
+private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
+    val u = LocalPt.current
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val pick by rememberUpdatedState(onPick)
+    val n = IndexLetters.size
+    BoxWithConstraints(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
+        // iOS: harf başına ≈ 12,4 pt; yer yetmezse (klavye açıkken) sıkışır.
+        val cell = minOf(u * 12.4f, maxHeight * 0.96f / n)
+        val font = with(density) { minOf(u * 11f, cell * 0.86f).toSp() }
+        Column(
+            Modifier
+                .width(u * 18f)
+                .height(cell * n.toFloat())
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        down.consume()
+                        var last = -1
+                        fun at(y: Float) {
+                            val i = (y / size.height * n).toInt().coerceIn(0, n - 1)
+                            if (i != last) {
+                                last = i
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                pick(IndexLetters[i].first())
+                            }
+                        }
+                        at(down.position.y)
+                        while (true) {
+                            val ev = awaitPointerEvent()
+                            val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!c.pressed) break
+                            at(c.position.y)
+                            c.consume()
+                        }
+                    }
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            IndexLetters.forEach { l ->
+                Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
+                    Text(l, color = Color(0xE6FFFFFF), fontSize = font, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bir kategorinin tamamı (iOS 26): panelsiz, tüm ekran. Bulanık arka planın üstünde sola yaslı büyük kalın
+ * başlık, altında ana ekran boyutunda simgelerle 4 sütunlu kayan ızgara. Boş yere dokununca kapanır.
+ * Ölçüler (pt, iOS'tan): kenar 29, satır 100,6, başlık 34 kalın (alt çizgisi üstten ≈ 217), başlık–ilk satır 44.
+ */
 @Composable
 fun LibraryGroupOverlay(
     group: LibraryGroup,
@@ -377,54 +534,43 @@ fun LibraryGroupOverlay(
     onClose: () -> Unit,
 ) {
     val view = androidx.compose.ui.platform.LocalView.current
-    BoxWithConstraints(
-        Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) },
-        contentAlignment = Alignment.Center,
-    ) {
+    BoxWithConstraints(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) }) {
         val u = LocalPt.current
-        val panelW = maxWidth * 0.9f
-        val inner = panelW - u * 54f
-        val pitch = inner / 4f
-        // Simgeler ana ekranla aynı boyutta (sığmazsa küçülür).
-        val icon = minOf(LocalHomeMetrics.current?.icon ?: (pitch * 0.72f), pitch * 0.92f)
-        val rowH = icon + 26.dp
-        val maxGridH = maxHeight * 0.6f
-        val badgeRoom = minOf(12.dp, u * 29f)
-        // Ad, ana ekrandaki klasörle aynı biçimde panelin ÜSTÜNDE; etiket stili dışarıdaki etiketle aynı.
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            group.title,
-            style = CellLabelStyle.copy(fontSize = (settings.openFolderTitleSize * u.value).sp),
-            modifier = Modifier.width(panelW).padding(bottom = u * 14f),
-        )
-        Column(
-            Modifier
-                .width(panelW)
-                .lightGlass(appShape(u * settings.libraryGroupCorner), 0.75f, 0.35f)
-                .pointerInput(Unit) { detectTapGestures { } }
-                .padding(top = u * 29f - badgeRoom, bottom = u * 15f, start = u * 27.5f, end = u * 27.5f),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        val side = u * 29f
+        // Simgeler ana ekranla aynı boyutta (4 sütuna sığmazsa küçülür).
+        val icon = minOf(LocalHomeMetrics.current?.icon ?: (u * 64f), (maxWidth - side * 2f) / 4.6f)
+        // iOS'ta ilk ve son sütundaki simgelerin dış kenarı kenar boşluğuna hizalı: sütunlar buna göre yayılır.
+        val pitch = (maxWidth - side * 2f - icon) / 3f
+        val gridSide = side + icon / 2f - pitch / 2f
+        val rowH = maxOf(u * 100.6f, icon + u * 34f)
+        val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            contentPadding = PaddingValues(start = gridSide, end = gridSide, bottom = navBottom + u * 24f),
+            modifier = Modifier.fillMaxSize(),
         ) {
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(4),
-                // Izgara kendi sınırında kırpar: üst sıradaki bildirim rozeti taşabilsin diye üstte boşluk.
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(top = badgeRoom),
-                modifier = Modifier.fillMaxWidth().height(minOf(rowH * ((group.apps.size + 3) / 4) + badgeRoom, maxGridH)),
-            ) {
-                items(group.apps, key = { it.key }) { app ->
-                    Box(Modifier.fillMaxWidth().height(rowH), contentAlignment = Alignment.TopCenter) {
-                        DraggableCell(
-                            id = "grp:${app.key}", itemId = app.key, place = CellPlace.Library,
-                            label = app.label, showLabel = true, icon = icon, pitchX = pitch, cellHeight = rowH,
-                            drag = drag, layer = DragLayer.Folder, isApp = true, acceptsMerge = false,
-                            edit = false, jiggle = jiggle,
-                            onClick = { r -> vm.launchFrom(app, view, r); onClose() },
-                            onDrop = { p, h -> onDrop(app.key, p, h) },
-                        ) { AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength) }
-                    }
+            item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
+                Text(
+                    group.title, color = Color.White, fontSize = (u.value * 34f).sp, fontWeight = FontWeight.Bold,
+                    fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = side - gridSide, end = side - gridSide, top = u * 176f, bottom = u * 38f),
+                )
+            }
+            items(group.apps, key = { it.key }) { app ->
+                Box(Modifier.fillMaxWidth().height(rowH), contentAlignment = Alignment.TopCenter) {
+                    DraggableCell(
+                        id = "grp:${app.key}", itemId = app.key, place = CellPlace.Library,
+                        label = app.label, showLabel = true, icon = icon, pitchX = pitch, cellHeight = rowH,
+                        drag = drag, layer = DragLayer.Folder, isApp = true, acceptsMerge = false,
+                        edit = false, jiggle = jiggle,
+                        onClick = { r -> vm.launchFrom(app, view, r); onClose() },
+                        onDrop = { p, h -> onDrop(app.key, p, h) },
+                    ) { AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength) }
                 }
             }
-        }
         }
     }
 }
