@@ -43,9 +43,9 @@ data class LauncherSettings(
     /** Etiketin simgeye uzaklığı (pt). */
     val labelGap: Float = 5f,
     /** Etiket yazı boyutu (pt; iOS'ta 12). */
-    val labelSize: Float = 12f,
+    val labelSize: Float = 11.2f,
     /** Ana ekran simge adlarının kalınlığı (300–700). */
-    val labelWeight: Float = 400f,
+    val labelWeight: Float = 500f,
     // Simgeler
     val iconScale: Float = 1f,
     /** Açık modda simge görünümü. */
@@ -55,7 +55,7 @@ data class LauncherSettings(
     /** Koyu modda da orijinal kalacak uygulamalar (basılı tutma menüsünden). */
     val darkOriginalApps: Set<String> = emptySet(),
     val tintColor: Int = 0xFF64D2FF.toInt(),
-    val iconCorner: Float = 0.225f,
+    val iconCorner: Float = 0.28125f,
     /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
     val cornerSmoothing: Float = 0.6f,
     /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
@@ -70,27 +70,27 @@ data class LauncherSettings(
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
     val dockBottom: Float = 15f,
     /** Dock köşe yuvarlaklığı (yüksekliğe oran; 0.5 = hap şekli). */
-    val dockCorner: Float = 0.34f,
+    val dockCorner: Float = 0.435f,
     /** Arama düğmesi boyut çarpanı. */
     val pillScale: Float = 1f,
     /** Arama düğmesinin ortalanmış konumdan yukarı (+) / aşağı (−) kayması (pt). */
-    val pillOffset: Float = 0f,
+    val pillOffset: Float = -10f,
     // Klasörler
     val folderOpacity: Float = 1f,
     /** Açık klasör panelinin ekran genişliğine oranı. */
     val folderSize: Float = 0.74f,
     /** Açık klasör panelinin köşe yuvarlaklığı (pt; iOS 26 ≈ 34). */
-    val folderCorner: Float = 34f,
+    val folderCorner: Float = 55f,
     /** Uygulama arşivindeki kapalı klasör kutusunun köşe yuvarlaklığı (pt; iOS ≈ 20). */
-    val libraryTileCorner: Float = 23f,
+    val libraryTileCorner: Float = 30f,
     /** true: arşivin büyük klasör kartlarının köşesi dock'un köşesiyle aynı (dock köşe ayarını izler). */
     val libraryTileCornerDock: Boolean = false,
     /** Uygulama arşivindeki açık klasörün köşe yuvarlaklığı (pt; iOS ≈ 34). */
     val libraryGroupCorner: Float = 34f,
     /** Tüm cam yüzeylerdeki beyaz kenar çizgisinin kalınlığı (pt; 0 = çizgi yok). */
-    val glassRimWidth: Float = 1f,
+    val glassRimWidth: Float = 0.5f,
     /** Açık klasörün (ana ekran ve arşiv) adının yazı boyutu (pt). */
-    val openFolderTitleSize: Float = 20f,
+    val openFolderTitleSize: Float = 25f,
     /** Cam bulanıklığının şiddeti (çarpan; 0 = bulanıklık yok, 1 = varsayılan, 2 = iki katı). */
     val glassBlur: Float = 1f,
     /** Cam parlaklığı (−1 = koyu, 0 = varsayılan, +1 = açık). */
@@ -100,12 +100,12 @@ data class LauncherSettings(
     /** Cam dolgusunun yoğunluğu; düşük = daha saydam (çarpan). */
     val glassOpacity: Float = 1f,
     /** Dock üstündeki "Ara" düğmesinin yazı boyutu (pt) ve kalınlığı (300–700). */
-    val pillTextSize: Float = 14f,
-    val pillTextWeight: Float = 600f,
+    val pillTextSize: Float = 12f,
+    val pillTextWeight: Float = 500f,
     /** Basılı tutma menüsü görünümü (iOS 26). */
     val menuCorner: Float = 30f,
     val menuWidth: Float = 260f,
-    val menuTextSize: Float = 17f,
+    val menuTextSize: Float = 15f,
     val menuRowHeight: Float = 48f,
     /** Menü camının açıklığı (beyaz dolgu yoğunluğu). */
     val menuOpacity: Float = 0.62f,
@@ -114,7 +114,7 @@ data class LauncherSettings(
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
     /** Ekranın ortasından (boş alandan) aşağı kaydırma. */
-    val midSwipe: SwipeAction = SwipeAction.Split,
+    val midSwipe: SwipeAction = SwipeAction.Search,
     /** Boş alana çift dokununca ekranı kilitle (Erişilebilirlik hizmeti gerekir). */
     val doubleTapLock: Boolean = true,
     /** Uygulama arşivi sayfası (ana ekranın sağı). Varsayılan kapalı: sayfa hiç görünmez. */
@@ -124,7 +124,7 @@ data class LauncherSettings(
     /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
     val liveIcons: Boolean = true,
     /** Simge kenarındaki ince beyaz çizginin (iOS kenar ışığı) kalınlığı, dp. */
-    val iconRimWidth: Float = 1.2f,
+    val iconRimWidth: Float = 1f,
     /** Duvar kâğıdı seçilince sistemde nereye uygulanır: "home", "lock", "both". */
     val wallpaperTarget: String = "both",
     /** Canlı saat simgesinde saniye ibresi. */
@@ -138,7 +138,7 @@ data class LauncherSettings(
     /** Liquid Glass kenar kırılması (mercek): 0 kapalı … 1 güçlü. */
     val glassRefraction: Float = 0.6f,
     /** iOS 27 tarzı koyu derinlik kenarı: 0 kapalı … 1 belirgin. */
-    val glassEdgeDark: Float = 0.6f,
+    val glassEdgeDark: Float = 0f,
     /** Genel şeffaflık (iOS 27 / MagicOS 11 kaydırıcısı): 0 çok şeffaf … 0.5 dengeli … 1 renkli. */
     val glassTint: Float = 0.5f,
     /** Sistem duvar kâğıdı kendiliğinden launcher kopyası olarak alınır ("Tüm dosyalara erişim" izni gerekir). */
@@ -146,7 +146,7 @@ data class LauncherSettings(
     /** Cam stili: "clear" (iOS 26 Şeffaf: arkası net, kenarda mercek) veya "frosted" (buzlu, bulanık). */
     val glassStyle: String = "clear",
     /** Arama paneli/çubuğu ve Uygulama Arşivi camı: "general" = yalnızca genel cam ayarları, "dock" = dock ile aynı yoğunluk. */
-    val panelGlassSync: String = "general",
+    val panelGlassSync: String = "dock",
     /** Arama önerileri 8 (iki sıra) mı açık, 4 (tek sıra) mı? Son durum hatırlanır. */
     val searchSuggestExpanded: Boolean = false,
     /** Arama önerilerindeki uygulama adlarının yazı boyutu (pt) ve kalınlığı. */
@@ -160,20 +160,20 @@ data class LauncherSettings(
     val searchFiles: Boolean = true,
     val searchDeviceCard: Boolean = true,
     /** Arama yazı ayarları (pt) ve sonuçların cam panel içinde gösterilmesi. */
-    val searchFieldTextSize: Float = 16f,
-    val searchResultTextSize: Float = 15f,
-    val searchResultWeight: Float = 400f,
+    val searchFieldTextSize: Float = 14f,
+    val searchResultTextSize: Float = 14f,
+    val searchResultWeight: Float = 300f,
     val searchResultsPanel: Boolean = false,
     /** Arama paneli ve çubuğunun cam parlaklığı (karartılmış arka planla uyum için varsayılan biraz koyu). */
     val searchGlassBrightness: Float = 0f,
     /** Yazı gölgesi (iOS tarzı dağınık gölge): açık/kapalı, yoğunluk ve yayılma. */
-    val textShadow: Boolean = false,
-    val textShadowStrength: Float = 0.35f,
-    val textShadowSpread: Float = 1f,
+    val textShadow: Boolean = true,
+    val textShadowStrength: Float = 0.455f,
+    val textShadowSpread: Float = 2.5f,
     /** Ayarlar ekranının teması: "auto" (telefona uyar), "light", "dark". */
     val settingsTheme: String = "auto",
     /** Düzenleme modundaki üst düğmelerin (+, Ayarlar, Bitti) yazı boyutu (pt) ve kalınlığı. */
-    val editButtonTextSize: Float = 14f,
+    val editButtonTextSize: Float = 12f,
     val editButtonWeight: Float = 400f,
     // Liquid Glass ve görünüm
     val glassStrength: Float = 1f,

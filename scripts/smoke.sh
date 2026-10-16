@@ -93,9 +93,10 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
 shot 04d-ikinci-sayfa
 adb shell input swipe $((W*2/10)) $cy $((W*8/10)) $cy 250; step "önceki sayfa"
-adb shell input swipe $((W*80/100)) $((H*40/100)) $((W*80/100)) $((H*70/100)) 300; step "sağdan kaydırma: kontrol merkezi" 2
+adb shell input swipe $((W*80/100)) $((H*40/100)) $((W*80/100)) $((H*70/100)) 300; step "ortadan aşağı kaydırma: arama (varsayılan)" 2
 shot 05k-sag-kaydirma
 adb shell cmd statusbar collapse; step "paneli kapat" 2
+adb shell input keyevent KEYCODE_BACK; step "aramayı kapat" 2
 adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 2
 shot 05-arama
 tap_text "Daha Fazla" && { step "öneriler: daha fazla" 2; sleep 3; shot 05a-oneri-8; tap_text "Daha Az" && step "öneriler: daha az" 1; }
@@ -124,6 +125,13 @@ tap_desc "Son Eklenenler kategorisini aç" && { sleep 0.15; shot 07d0-kategori-a
   shot 07d-arsiv-kategori
   adb shell input tap $cx $((H*90/100)); step "boş yere dokun: kapanmalı" 2
   shot 07e-kategori-kapandi; }
+adb shell input keyevent KEYCODE_HOME; step "ana ekran"
+# Düzenleme modunda arşive geçiş: Seç / Bu Sayfayı Sil arşivde görünmemeli
+adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
+for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 200; sleep 1; done
+step "arşiv (düzenleme modu)" 2
+shot 07f-arsiv-duzenleme
+adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 
 # 7) Üstten kaydırma (sistem Kontrol Merkezi) — en sonda, sistem paneli diğer adımları etkilemesin
