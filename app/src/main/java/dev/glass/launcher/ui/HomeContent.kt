@@ -143,7 +143,9 @@ internal fun HomeContent(
         val visible: (HomeItem) -> Boolean = { it !is AppItem || byKey.containsKey(it.key) }
         val placements = remember(items, m.columns, m.rows, byKey) { GridPacker.pack(items, m.columns, m.rows, visible) }
         val pageTotal = if (items.isEmpty()) 1 else GridPacker.pageCount(placements)
-        val dragging = drag.key != null
+        // Yalnızca parmak gerçekten kaydırılınca sürükleme sayılır: uzun basıp menü açmak (ör. arşivde) sona boş
+        // sayfa ekleyip arşivi bir sayfa kaydırmasın.
+        val dragging = drag.key != null && drag.moved
         // Sürüklerken sonda her zaman yeni boş bir sayfa görünür (iOS gibi); oraya bırakılan öğe yeni sayfaya geçer.
         val homeCount = pageTotal + if (dragging) 1 else 0
         val libIndex = homeCount

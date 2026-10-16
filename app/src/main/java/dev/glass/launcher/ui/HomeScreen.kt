@@ -218,7 +218,8 @@ fun HomeScreen(
     val homeBlurNow by rememberUpdatedState(settings.homeWallpaperBlur)
     LaunchedEffect(windowBlur) {
         // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
-        snapshotFlow { if (copyCovers) 0f else maxOf(blurAmount, libProgress.floatValue, homeBlurNow) }
+        // Son uygulamalar açılırken (ana ekran soluyor) pencere bulanıklığı da kalkar: küçültülen pencerede dikdörtgen olmasın.
+        snapshotFlow { if (copyCovers || homeHide() > 0.01f) 0f else maxOf(blurAmount, libProgress.floatValue, homeBlurNow) }
             .collect { f -> windowBlur?.invoke(f * blurK) }
     }
     var lockReason by remember { mutableStateOf(LockReason.Lock) }
@@ -560,13 +561,16 @@ fun HomeScreen(
             Image(
                 wp, null,
                 Modifier.fillMaxSize().graphicsLayer {
+                    // Son uygulamalar açılırken kopya da söner: sistem pencereyi küçültünce arkadaki gerçek duvar
+                    // kâğıdının önünde açık renkli bir dikdörtgen gibi görünüyordu.
+                    alpha = 1f - homeHide()
                     // Kalıcı ana ekran bulanıklığı (duvar kâğıdı panelindeki kaydırıcı) + açılan katmanların bulanıklığı.
                     val r = maxOf(maxBlurPx * maxOf(blurAmount, libProgress.floatValue) * settings.glassBlur, homeBlurPx * settings.homeWallpaperBlur)
                     renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
                 },
                 contentScale = ContentScale.Crop,
             )
-            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = settings.wallpaperDim)))
+            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
         Box(
             Modifier.fillMaxSize()
