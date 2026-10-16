@@ -770,16 +770,6 @@ private fun FoldersPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
         SliderRow("Açık klasör köşe yuvarlaklığı", "${s.folderCorner.roundToInt()} pt", s.folderCorner, 8f..80f, default = Def.folderCorner) { v ->
             onChange { it.copy(folderCorner = v) }
         }
-        RowDivider()
-        ToggleRow("Arşiv klasör köşesi dock ile aynı", s.libraryTileCornerDock, default = Def.libraryTileCornerDock) { v ->
-            onChange { it.copy(libraryTileCornerDock = v) }
-        }
-        if (!s.libraryTileCornerDock) {
-            RowDivider()
-            SliderRow("Arşiv büyük klasör köşesi", "${s.libraryTileCorner.roundToInt()} pt", s.libraryTileCorner, 8f..60f, default = Def.libraryTileCorner) { v ->
-                onChange { it.copy(libraryTileCorner = v) }
-            }
-        }
     }
     Footer("Klasör oluşturmak için bir simgeyi başka bir simgenin üzerine sürükleyin. Klasör adına dokunarak değiştirebilirsiniz.")
 }
@@ -828,10 +818,6 @@ private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((La
         SliderRow("Dolgu yoğunluğu (saydamlık)", pct(s.glassOpacity), s.glassOpacity, 0f..2f, default = Def.glassOpacity) { v -> onChange { it.copy(glassOpacity = v) } }
     }
     SystemWallpaperSyncGroup(vm, s, onChange)
-    Group("Performans") {
-        Text(FrameStats.text, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
-    }
-    Footer("Ana ekranda sayfa kaydırıp buraya dönün. 120 Hz ekranda akıcı kaydırmada ortalama 110–120 Hz ve az sayıda takılan kare görünmeli. Ortalama 60 Hz civarındaysa telefon launcher'ı 60 Hz'de çalıştırıyor demektir.")
     Group("iOS 26 / 27 efektleri") {
         SliderRow("Kenar kırılması (mercek)", if (s.glassRefraction < 0.01f) "Kapalı" else pct(s.glassRefraction), s.glassRefraction, 0f..1f, default = Def.glassRefraction) { v ->
             onChange { it.copy(glassRefraction = v) }
@@ -974,6 +960,18 @@ private fun LibraryPageSettings(s: LauncherSettings, onChange: ((LauncherSetting
         ToggleRow("Yeni uygulamaları ana ekrana ekle", s.addNewToHome, default = Def.addNewToHome) { v -> onChange { it.copy(addNewToHome = v) } }
     }
     Footer("Kapalıyken yeni kurulan uygulamalar yalnızca Uygulama Arşivi'nde görünür. Kategoriler, uygulamanın bildirdiği türe ve adına göre tahmin edilir.")
+    Group("Klasör kartları") {
+        ToggleRow("Köşe yuvarlaklığı dock ile aynı", s.libraryTileCornerDock, default = Def.libraryTileCornerDock) { v ->
+            onChange { it.copy(libraryTileCornerDock = v) }
+        }
+        if (!s.libraryTileCornerDock) {
+            RowDivider()
+            SliderRow("Köşe yuvarlaklığı", "${s.libraryTileCorner.roundToInt()} pt", s.libraryTileCorner, 8f..60f, default = Def.libraryTileCorner) { v ->
+                onChange { it.copy(libraryTileCorner = v) }
+            }
+        }
+    }
+    Footer("Dock ile aynı açıkken arşivdeki büyük klasör kartları dock'un köşe ayarını izler (Dock > Köşe yuvarlaklığı).")
 }
 
 @Composable
@@ -1027,6 +1025,10 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             "gölge, parlama) sadeleştirilir. Düşük güç modu bunları her zaman sadeleştirir ve sallanma/saniye " +
             "ibresi gibi sürekli animasyonları azaltır."
     )
+    Group("Kaydırma ölçümü") {
+        Text(FrameStats.text, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
+    }
+    Footer("Ana ekranda sayfa kaydırıp buraya dönün. 120 Hz ekranda akıcı kaydırmada ortalama 110–120 Hz ve az sayıda takılan kare görünmeli. Ortalama 60 Hz civarındaysa telefon launcher'ı 60 Hz'de çalıştırıyor demektir.")
 }
 
 @Composable
