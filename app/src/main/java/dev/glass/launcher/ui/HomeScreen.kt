@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.derivedStateOf
+
+import androidx.compose.ui.draw.drawBehind
+
 import androidx.compose.ui.graphics.asImageBitmap
 
 import androidx.compose.ui.graphics.asAndroidBitmap
@@ -197,7 +201,8 @@ fun HomeScreen(
     val clearFolder = settings.glassStyle == "clear" && overlay == Overlay.Folder
     val blurAmount by animateFloatAsState(if (fullBlur) (if (clearFolder) 0.45f else 1f) else 0f, motion.tween(280), label = "blurAmount")
     val blurK by rememberUpdatedState(settings.glassBlur)
-    val blur = 22.dp * blurAmount * settings.glassBlur
+    // (Bulanıklık yarıçapı çizim katmanında okunur: geçiş sırasında ana ekran her karede yeniden oluşturulmasın.)
+    val blurPxMax = with(LocalDensity.current) { 22.dp.toPx() } * settings.glassBlur
     val scrim by animateFloatAsState(
         when {
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
@@ -562,28 +567,68 @@ fun HomeScreen(
         // "Son uygulamalar" kartında (pencerenin küçültülmüş görüntüsü) arka plan dikdörtgen gibi görünmez.
         // Bulanıklık gereken anlarda (arama, kütüphane, menü/klasör camı) kopya çizilir.
         val fromSync = remember(wp) { vm.wallpaperFromSync() }
-        val needCopy = !fromSync || blurAmount > 0.001f || libProgress.floatValue > 0.001f || settings.homeWallpaperBlur > 0.01f ||
+        // Yalnızca eşik geçilince yeniden oluşturulur (geçiş oranı her karede değişse de).
+        val transitioning by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f } }
+        val needCopy = !fromSync || transitioning || settings.homeWallpaperBlur > 0.01f ||
             glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
+        // Arşive geçişte ve katman açılırken duvar kâğıdı bulanıklığı: önceden (bir kez) bulanıklaştırılmış küçük kopya
+        // netin üstünde kademeli belirir. Eskiden tam çözünürlüklü görüntü her karede yeniden bulanıklaştırılıyordu;
+        // ekran kartını yorup kaydırmayı 120 Hz'in altına düşürüyordu.
+        val homeBlurR = homeBlurPx * settings.homeWallpaperBlur
+        val overlayBlurR = maxBlurPx * settings.glassBlur
+        val overlayBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, overlayBlurR, rootSize) {
+            val src = wp
+            if (src == null || overlayBlurR < 1f || rootSize.width == 0) { value = null; return@produceState }
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching {
+                    val f = 4
+                    // Duvar kâğıdı ekran kartı belleğinde (HARDWARE) olabilir: önce okunabilir kopyası alınır.
+                    val full0 = src.asAndroidBitmap()
+                    val full = if (full0.config == android.graphics.Bitmap.Config.HARDWARE) full0.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else full0
+                    val small = android.graphics.Bitmap.createScaledBitmap(
+                        full, (full.width / f).coerceAtLeast(1), (full.height / f).coerceAtLeast(1), true,
+                    ).copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+                    // Ekrandaki Gauss bulanıklığının (sigma ≈ 0,577·r) küçük kopyadaki karşılığı; 3 geçişli kutu ≈ Gauss.
+                    val screenPerSrc = maxOf(rootSize.width.toFloat() / full.width, rootSize.height.toFloat() / full.height)
+                    val sigma = (overlayBlurR * 0.577f + 0.5f) / (screenPerSrc * f)
+                    dev.glass.launcher.data.BlurUtil.boxBlur(small, sigma.toInt().coerceIn(1, 40), 3)
+                    small.asImageBitmap()
+                }.getOrNull()
+            }
+        }
         if (settings.launcherWallpaper && wp != null && needCopy) {
+            val blurImg = overlayBlurImg
             Image(
                 wp, null,
                 Modifier.fillMaxSize().graphicsLayer {
                     // Son uygulamalar açılırken kopya da söner: sistem pencereyi küçültünce arkadaki gerçek duvar
                     // kâğıdının önünde açık renkli bir dikdörtgen gibi görünüyordu.
                     alpha = 1f - homeHide()
-                    // Kalıcı ana ekran bulanıklığı (duvar kâğıdı panelindeki kaydırıcı) + açılan katmanların bulanıklığı.
-                    val r = maxOf(maxBlurPx * maxOf(blurAmount, libProgress.floatValue) * settings.glassBlur, homeBlurPx * settings.homeWallpaperBlur)
+                    // Kalıcı ana ekran bulanıklığı (sabit; her karede değişmez). Hazır kopya yoksa eski yol.
+                    val r = if (blurImg != null) homeBlurR
+                    else maxOf(overlayBlurR * maxOf(blurAmount, libProgress.floatValue), homeBlurR)
                     renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
                 },
                 contentScale = ContentScale.Crop,
             )
+            if (blurImg != null && overlayBlurR > homeBlurR) {
+                Image(
+                    blurImg, null,
+                    Modifier.fillMaxSize().graphicsLayer {
+                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue).coerceIn(0f, 1f)
+                    },
+                    contentScale = ContentScale.Crop,
+                )
+            }
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
         Box(
             Modifier.fillMaxSize()
-                .then(if (blur > 0.dp) Modifier.blur(blur) else Modifier)
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
                 .graphicsLayer {
+                    // Açılan katmanın arkasında ana ekran içeriği bulanıklaşır (yarıçap çizimde okunur).
+                    val br = blurPxMax * blurAmount
+                    if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
                     var k = 1f
                     if (returnInfo != null) k = 1f + 0.05f * (1f - returnAnim.value)
                     // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
@@ -619,13 +664,15 @@ fun HomeScreen(
             )
         }
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = scrim)))
+        // Karartma çizimde okunur (geçişte ana ekran her karede yeniden oluşturulmasın).
+        Box(Modifier.fillMaxSize().drawBehind { if (scrim > 0.001f) drawRect(Color.Black.copy(alpha = scrim)) })
 
         CompositionLocalProvider(LocalGlassRegions provides glassRegions) {
 
         AnimatedVisibility(
             overlay == Overlay.Search,
-            enter = fadeIn(motion.tween(180)) + scaleIn(motion.spring(), initialScale = 0.96f),
+            // iOS 26: arama ekranı küçülüp büyümez; yalnızca belirir, öneriler yukarıdan iner (SearchOverlay).
+            enter = fadeIn(motion.tween(180)),
             exit = fadeOut(motion.tween(140)),
         ) {
             val searchVis by transition.animateFloat(transitionSpec = { motion.tween(170) }, label = "searchVis") {

@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.platform.LocalDensity
+
 
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 
@@ -178,6 +180,13 @@ fun SearchOverlay(
             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp)
         ) {
             Spacer(Modifier.height(12.dp))
+            // iOS 26: öneriler yukarıdan aşağı yumuşakça iner (açılışta), kapanırken yukarı çekilir.
+            val dropPx = with(LocalDensity.current) { 56.dp.toPx() }
+            Column(Modifier.graphicsLayer {
+                val v = visibility().coerceIn(0f, 1f)
+                val e = 1f - (1f - v) * (1f - v) // yavaşlayarak yerine oturur
+                translationY = -(1f - e) * dropPx
+            }) {
             // Başlık + sağda iOS'taki "Show More" gibi 4 ↔ 8 öneri geçişi (aşağı/yukarı çekmeyle aynı ayar).
             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -197,6 +206,7 @@ fun SearchOverlay(
                 }
             }
             SuggestionsPanel(vm, suggestions, strength, iconGlass, st.searchShowLabels, neutral, visibility, ::open)
+            }
             Spacer(Modifier.height(10.dp))
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -233,8 +243,8 @@ fun SearchOverlay(
             Row(
                 Modifier
                     .fillMaxSize()
-                    // Dock ile birebir aynı cam (dock ayarları burayı da değiştirir).
-                    .liquidGlass(CircleShape, strength * st.dockOpacity, 0.dp, panel = true)
+                    // Arama camı ayarı (Genel / Dock ile eşit) [strength] içinde zaten uygulanmış.
+                    .liquidGlass(CircleShape, strength, 0.dp, panel = true)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

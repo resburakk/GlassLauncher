@@ -234,6 +234,25 @@ internal fun HomeContent(
         val byPage = remember(shownPlacements) { shownPlacements.groupBy { it.page } }
         val shownDock = dockPreview ?: layout.dock
 
+        // Performans ölçümü: her sayfa kaydırmasında gerçek kare aralıkları (Ayarlar > Cam > Performans).
+        LaunchedEffect(pagerState.isScrollInProgress) {
+            if (!pagerState.isScrollInProgress) return@LaunchedEffect
+            val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
+            val list = ArrayList<Long>()
+            var last = 0L
+            try {
+                while (list.size < 600) {
+                    withFrameNanos { t ->
+                        if (last != 0L) list += t - last
+                        last = t
+                    }
+                }
+            } finally {
+                // Kaydırma bitince (etki iptal edilir) ölçüm raporlanır.
+                FrameStats.report(list.toLongArray(), refresh)
+            }
+        }
+
         // Otomatik kalite: kaydırma sırasında kare sürelerini örnekle (ek kare istemez; zaten çizilen kareler).
         LaunchedEffect(pagerState.isScrollInProgress, settings.autoQuality) {
             if (!settings.autoQuality || !pagerState.isScrollInProgress) return@LaunchedEffect
@@ -521,7 +540,8 @@ internal fun HomeContent(
                             .background(if (pagerState.currentPage == libIndex) Color.White else Color(0x40FFFFFF))
                     )
                 }
-                SearchPill(m, settings.glassStrength, (1f - dotsAlpha) * (1f - libFraction) * pillShown, onOpenSearch)
+                // Görünürlük çizimde okunur: sayfa kaydırılırken noktalar/hap geçişi ana ekranı yeniden oluşturmasın.
+                SearchPill(m, settings.glassStrength, { (1f - dotsAlpha) * (1f - libFraction) * pillShown }, onOpenSearch)
             }
 
             if (libFraction < 0.98f) {
@@ -563,14 +583,14 @@ internal fun HomeContent(
 }
 
 @Composable
-private fun SearchPill(m: HomeMetrics, strength: Float, alpha: Float, onClick: () -> Unit) {
+private fun SearchPill(m: HomeMetrics, strength: Float, alpha: () -> Float, onClick: () -> Unit) {
     Row(
         Modifier
-            .graphicsLayer { this.alpha = alpha }
+            .graphicsLayer { this.alpha = alpha() }
             .width(m.pillW)
             .height(m.pillH)
             .liquidGlass(CircleShape, strength * 0.8f, 6.dp)
-            .then(if (alpha > 0.5f) Modifier.clickable(onClick = onClick) else Modifier),
+            .clickable { if (alpha() > 0.5f) onClick() },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {

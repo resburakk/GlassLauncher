@@ -83,6 +83,8 @@ data class LauncherSettings(
     val folderCorner: Float = 34f,
     /** Uygulama arşivindeki kapalı klasör kutusunun köşe yuvarlaklığı (pt; iOS ≈ 20). */
     val libraryTileCorner: Float = 23f,
+    /** true: arşivin büyük klasör kartlarının köşesi dock'un köşesiyle aynı (dock köşe ayarını izler). */
+    val libraryTileCornerDock: Boolean = false,
     /** Uygulama arşivindeki açık klasörün köşe yuvarlaklığı (pt; iOS ≈ 34). */
     val libraryGroupCorner: Float = 34f,
     /** Tüm cam yüzeylerdeki beyaz kenar çizgisinin kalınlığı (pt; 0 = çizgi yok). */
@@ -226,7 +228,7 @@ data class LauncherSettings(
         folderOpacity = folderOpacity.coerceIn(0f, 2f),
         folderSize = folderSize.coerceIn(0.55f, 0.95f),
         folderCorner = folderCorner.coerceIn(8f, 80f),
-        libraryTileCorner = libraryTileCorner.coerceIn(8f, 40f),
+        libraryTileCorner = libraryTileCorner.coerceIn(8f, 60f),
         libraryGroupCorner = libraryGroupCorner.coerceIn(8f, 80f),
         glassRimWidth = glassRimWidth.coerceIn(0f, 4f),
         openFolderTitleSize = openFolderTitleSize.coerceIn(10f, 40f),
@@ -267,7 +269,7 @@ data class LauncherSettings(
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
         put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble()); put("folderCorner", folderCorner.toDouble())
-        put("libraryTileCorner2", libraryTileCorner.toDouble()); put("libraryGroupCorner", libraryGroupCorner.toDouble())
+        put("libraryTileCorner2", libraryTileCorner.toDouble()); put("libraryTileCornerDock", libraryTileCornerDock); put("libraryGroupCorner", libraryGroupCorner.toDouble())
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
         put("glassBlur", glassBlur.toDouble()); put("glassBrightness", glassBrightness.toDouble())
         put("glassRimGlow", glassRimGlow.toDouble()); put("glassOpacity", glassOpacity.toDouble())
@@ -356,6 +358,7 @@ data class LauncherSettings(
                 folderCorner = f("folderCorner", d.folderCorner),
                 // "libraryTileCorner2": iOS 26 ölçüsüne (23 pt) geçiş; eski kayıttaki değer bir kez yok sayılır.
                 libraryTileCorner = f("libraryTileCorner2", d.libraryTileCorner),
+                libraryTileCornerDock = o.optBoolean("libraryTileCornerDock", d.libraryTileCornerDock),
                 libraryGroupCorner = f("libraryGroupCorner", d.libraryGroupCorner),
                 glassRimWidth = f("glassRimWidth", d.glassRimWidth),
                 openFolderTitleSize = f("openFolderTitleSize", d.openFolderTitleSize),

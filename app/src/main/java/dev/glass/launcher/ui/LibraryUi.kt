@@ -264,6 +264,9 @@ private fun CategoryTile(
     val pad = tile * 0.085f
     val gap = tile * 0.073f
     var center by remember { mutableStateOf(Offset.Zero) }
+    // Köşe: kendi ayarı ya da (seçildiyse) dock'un köşesiyle aynı yarıçap; kartın yarısını geçmez.
+    val dockR = LocalHomeMetrics.current?.dockCorner
+    val tileCorner = (if (settings.libraryTileCornerDock && dockR != null) dockR else u * settings.libraryTileCorner).coerceAtMost(tile / 2f)
     val big = (tile - pad * 2f - gap) / 2f
     val bigApps = if (g.apps.size <= 4) g.apps.take(4) else g.apps.take(3)
     val rest = if (g.apps.size <= 4) emptyList() else g.apps.drop(3).take(4)
@@ -276,7 +279,7 @@ private fun CategoryTile(
                 // Dock ile aynı Liquid Glass (kırılma, parlama, kenar ışığı; tüm cam ayarları uygulanır).
                 // Arkası bulanık arşiv zemini: şeffaf stilde de bulanık kopya kullanılır. Gölgesiz: yarı saydam
                 // camın altından gölge koyu bir kare gibi görünüyordu.
-                .liquidGlass(appShape(u * settings.libraryTileCorner), settings.panelGlassStrength, 0.dp, frosted = true)
+                .liquidGlass(appShape(tileCorner), settings.panelGlassStrength, 0.dp, frosted = true)
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
