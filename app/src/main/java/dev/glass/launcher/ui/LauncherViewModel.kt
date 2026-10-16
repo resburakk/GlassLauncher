@@ -192,7 +192,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun iconLook(app: AppInfo, s: LauncherSettings, dark: Boolean = isSystemDark()): IconLook {
         val style = when {
             !dark -> s.iconStyle
-            app.key in s.darkOriginalApps -> IconStyle.Original
+            app.key in s.darkOriginalApps -> dev.glass.launcher.data.IconStyle.Original
             else -> s.iconStyleDark
         }
         return IconLook(style, s.tintColor, s.customIcons[app.key], s.iconFillRound)
