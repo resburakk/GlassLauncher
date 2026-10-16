@@ -601,7 +601,7 @@ private val LabelStyle: TextStyle get() = TextStyle(
 internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: Boolean, strength: Float, badge: Boolean = true) {
     val st = LocalLauncherSettings.current
     val px = with(LocalDensity.current) { icon.roundToPx() }
-    val look = vm.iconLook(app, st)
+    val look = vm.iconLook(app, st, androidx.compose.foundation.isSystemInDarkTheme())
     val live = vm.liveKind(app, st)
     // Kenar çizgisi kalınlığı: ana ekran boyutunda ayardaki değer, küçük simgelerde orantılı incelir.
     val rimW = st.iconRimWidth.dp * (icon / 60.dp).coerceAtMost(1f)

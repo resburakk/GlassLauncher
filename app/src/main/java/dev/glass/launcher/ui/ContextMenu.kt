@@ -175,6 +175,7 @@ fun ContextMenuOverlay(
     // iOS gibi: "Uygulamayı Kaldır" önce sorar (Sil / Ana Ekrandan Kaldır / Vazgeç).
     var confirmRemove by remember { mutableStateOf(false) }
 
+    val menuSettings = LocalLauncherSettings.current
     val actions = buildList {
         if (widget != null) {
             onEditWidget?.let { edit ->
@@ -192,6 +193,11 @@ fun ContextMenuOverlay(
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
             add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
             if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
+            // Koyu modda simge görünümü değişiyorsa: bu uygulamayı koyu modda orijinal bırak / yeniden koyulaştır.
+            if (menuSettings.iconStyleDark != dev.glass.launcher.data.IconStyle.Original) {
+                val keep = app.key in menuSettings.darkOriginalApps
+                add(MenuAction(if (keep) "Koyu Modda Koyulaştır" else "Koyu Modda Orijinal Kalsın", Glyph.Pencil) { vm.toggleDarkOriginal(app) })
+            }
             add(MenuAction("Uygulama Bilgisi", Glyph.Info) { vm.openAppInfo(app) })
             when (req.place) {
                 CellPlace.Library -> {

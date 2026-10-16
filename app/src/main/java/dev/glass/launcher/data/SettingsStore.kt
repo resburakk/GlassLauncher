@@ -48,7 +48,12 @@ data class LauncherSettings(
     val labelWeight: Float = 400f,
     // Simgeler
     val iconScale: Float = 1f,
+    /** Açık modda simge görünümü. */
     val iconStyle: IconStyle = IconStyle.Original,
+    /** Koyu modda simge görünümü (telefon koyu moda geçince kendiliğinden kullanılır). */
+    val iconStyleDark: IconStyle = IconStyle.Dark,
+    /** Koyu modda da orijinal kalacak uygulamalar (basılı tutma menüsünden). */
+    val darkOriginalApps: Set<String> = emptySet(),
     val tintColor: Int = 0xFF64D2FF.toInt(),
     val iconCorner: Float = 0.225f,
     /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
@@ -251,7 +256,7 @@ data class LauncherSettings(
         put("columns", columns); put("rows", rows); put("showLabels", showLabels)
         put("hSpacing", hSpacing.toDouble()); put("vSpacing", vSpacing.toDouble())
         put("labelGap", labelGap.toDouble()); put("labelSize", labelSize.toDouble())
-        put("iconScale", iconScale.toDouble()); put("iconStyle", iconStyle.name); put("tintColor", tintColor)
+        put("iconScale", iconScale.toDouble()); put("iconStyle", iconStyle.name); put("iconStyleDark", iconStyleDark.name); put("darkOriginalApps", JSONArray(darkOriginalApps.toList())); put("tintColor", tintColor)
         put("iconCorner", iconCorner.toDouble()); put("iconGlass", iconGlass)
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
@@ -319,6 +324,8 @@ data class LauncherSettings(
                 labelSize = f("labelSize", d.labelSize),
                 iconScale = f("iconScale", d.iconScale),
                 iconStyle = runCatching { IconStyle.valueOf(o.optString("iconStyle")) }.getOrDefault(d.iconStyle),
+                iconStyleDark = runCatching { IconStyle.valueOf(o.optString("iconStyleDark")) }.getOrDefault(d.iconStyleDark),
+                darkOriginalApps = o.optJSONArray("darkOriginalApps")?.let { arr -> (0 until arr.length()).map { arr.optString(it) }.toSet() } ?: d.darkOriginalApps,
                 tintColor = o.optInt("tintColor", d.tintColor),
                 iconCorner = f("iconCorner", d.iconCorner),
                 iconGlass = o.optBoolean("iconGlass", d.iconGlass),

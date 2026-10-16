@@ -651,12 +651,20 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         SliderRow("Simge boyutu", pct(s.iconScale), s.iconScale, 0.7f..1.4f, default = Def.iconScale) { v -> onChange { it.copy(iconScale = v) } }
     }
     Group("Görünüm") {
-        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Açık modda", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconStyle.entries.forEach { st ->
                 Chip(st.title, s.iconStyle == st, Modifier.weight(1f)) { onChange { it.copy(iconStyle = st) } }
             }
         }
-        if (s.iconStyle == IconStyle.Tinted) {
+        RowDivider()
+        Text("Koyu modda", color = Muted, fontSize = 13.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconStyle.entries.forEach { st ->
+                Chip(st.title, s.iconStyleDark == st, Modifier.weight(1f)) { onChange { it.copy(iconStyleDark = st) } }
+            }
+        }
+        if (s.iconStyle == IconStyle.Tinted || s.iconStyleDark == IconStyle.Tinted) {
             RowDivider()
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 TintPalette.forEach { c ->
@@ -673,8 +681,10 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         }
     }
     Footer(
-        "Açık/Koyu: simgenin arka planı açık veya koyu zeminle değiştirilir. Renkli: simge tek renk çizilir " +
-            "(uygulama monokrom katman sunuyorsa o kullanılır; sunmuyorsa parlaklıktan üretilir)."
+        "Telefon koyu moda geçince \"Koyu modda\" seçimi, açık moda dönünce \"Açık modda\" seçimi kendiliğinden kullanılır. " +
+            "Koyu: iOS gibi düz zemin koyulaşır, beyaz semboller zeminin rengini alır, siyah yazılar açılır; fotoğraf gibi " +
+            "simgeler yalnızca karartılır. Tek bir uygulamayı koyu modda orijinal bırakmak için simgesine basılı tut. " +
+            "Renkli: simge tek renk çizilir."
     )
     Group("Şekil") {
         SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.225f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->

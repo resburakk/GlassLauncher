@@ -248,6 +248,17 @@ adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa" 
 shot 19d-sonraki-sayfa
 adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 
+# 20) Koyu mod: tüm simgeler iOS gibi koyu sürüme geçmeli
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 1
+adb shell cmd uimode night yes; step "koyu mod" 6
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+shot 20a-koyu-mod
+adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa" 3
+shot 20b-koyu-mod-sayfa2
+adb shell cmd uimode night no; step "açık mod" 5
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+shot 20c-acik-mod
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

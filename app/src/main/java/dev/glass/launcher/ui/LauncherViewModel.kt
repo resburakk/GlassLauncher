@@ -188,8 +188,26 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         else -> null
     }
 
-    fun iconLook(app: AppInfo, s: LauncherSettings): IconLook =
-        IconLook(s.iconStyle, s.tintColor, s.customIcons[app.key], s.iconFillRound)
+    /** [dark]: telefon koyu modda mı. Açık ve koyu mod için ayrı ayrı seçilen simge görünümü kullanılır. */
+    fun iconLook(app: AppInfo, s: LauncherSettings, dark: Boolean = isSystemDark()): IconLook {
+        val style = when {
+            !dark -> s.iconStyle
+            app.key in s.darkOriginalApps -> IconStyle.Original
+            else -> s.iconStyleDark
+        }
+        return IconLook(style, s.tintColor, s.customIcons[app.key], s.iconFillRound)
+    }
+
+    private fun isSystemDark(): Boolean =
+        (la.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+    /** Bu uygulama koyu modda orijinal mi kalsın (basılı tutma menüsü). */
+    fun toggleDarkOriginal(app: AppInfo) {
+        updateSettings { s ->
+            s.copy(darkOriginalApps = if (app.key in s.darkOriginalApps) s.darkOriginalApps - app.key else s.darkOriginalApps + app.key)
+        }
+    }
 
     fun setCustomIcon(app: AppInfo, uri: Uri) {
         viewModelScope.launch {

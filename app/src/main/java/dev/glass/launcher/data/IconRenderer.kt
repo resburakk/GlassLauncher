@@ -36,6 +36,7 @@ import kotlin.math.sin
 object IconRenderer {
 
     fun render(d: Drawable, size: Int, style: IconStyle, tint: Int, fillRound: Boolean = true): Bitmap {
+        if (style == IconStyle.Dark) return renderDark(d, size, tint, fillRound)
         val out = createBitmap(size, size)
         val c = Canvas(out)
         if (d is AdaptiveIconDrawable) {
@@ -105,6 +106,28 @@ object IconRenderer {
             val off = size * (1f - k) / 2f
             c.drawBitmap(src, null, RectF(off, off, off + size * k, off + size * k), paint)
         }
+        return out
+    }
+
+    /**
+     * iOS tarzı koyu simge (bkz. [DarkIcon]): uyarlanabilir simgede zemin/ön plan katmanları ayrı ayrı
+     * değerlendirilir; eski tip simgede zemin kenar piksellerinden bulunur.
+     */
+    private fun renderDark(d: Drawable, size: Int, tint: Int, fillRound: Boolean): Bitmap {
+        val orig = render(d, size, IconStyle.Original, tint, fillRound)
+        val out = if (d is AdaptiveIconDrawable) {
+            val a = d.mutate() as AdaptiveIconDrawable
+            val inset = (size * 0.25f).toInt()
+            val bounds = Rect(-inset, -inset, size + inset, size + inset)
+            val bgB = createBitmap(size, size)
+            val fgB = createBitmap(size, size)
+            a.background?.let { it.bounds = bounds; it.draw(Canvas(bgB)) }
+            a.foreground?.let { it.bounds = bounds; it.draw(Canvas(fgB)) }
+            DarkIcon.fromLayers(bgB, fgB, orig).also { bgB.recycle(); fgB.recycle() }
+        } else {
+            DarkIcon.fromFlat(orig)
+        }
+        if (out !== orig) orig.recycle()
         return out
     }
 
