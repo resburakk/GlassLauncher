@@ -1,5 +1,11 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.asImageBitmap
+
+import androidx.compose.ui.graphics.asAndroidBitmap
+
+import androidx.compose.runtime.produceState
+
 import kotlinx.coroutines.delay
 
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -372,6 +378,26 @@ fun HomeScreen(
     val clearGlass = settings.glassStyle == "clear"
     // Şeffaf cam: duvar kâğıdının net kopyası (doku olarak; kendi boyutuyla eşlenir).
     val sharpBackdrop = remember(wallpaper) { wallpaper?.let { dev.glass.launcher.data.Blurred(it, it.width, it.height) } }
+    // Ana ekran bulanıklığı açıkken camların (dock, Ara, klasör simgeleri) içi de en az arkadaki duvar kâğıdı
+    // kadar bulanık olmalı; yoksa cam arkasını netleştiriyormuş gibi görünüyordu. Bulanık kopya ekranla aynı
+    // oranda ek bulanıklaştırılır (kaydırıcı 0,1'lik adımlarla; arka planda hazırlanır).
+    val homeBlurStep = kotlin.math.round(settings.homeWallpaperBlur * 10f) / 10f
+    val homeBlurScreenPx = with(density) { 28.dp.toPx() } * homeBlurStep
+    val homeBackdrop by produceState<dev.glass.launcher.data.Blurred?>(null, blurred, homeBlurStep, rootSize) {
+        val b = blurred
+        if (b == null || homeBlurStep < 0.05f || rootSize.width == 0) { value = null; return@produceState }
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching {
+                val src = b.image.asAndroidBitmap().copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+                // Ekrandaki 1 piksel, küçük kopyada kaç piksel? (duvar kâğıdı ekranı kırparak doldurur)
+                val crop = maxOf(rootSize.width.toFloat() / b.srcW, rootSize.height.toFloat() / b.srcH)
+                val screenPerSmall = crop * b.srcW / src.width
+                val r = (homeBlurScreenPx / screenPerSmall * 0.6f).toInt().coerceIn(1, 24)
+                dev.glass.launcher.data.BlurUtil.boxBlur(src, r, 3)
+                dev.glass.launcher.data.Blurred(src.asImageBitmap(), b.srcW, b.srcH)
+            }.getOrNull()
+        }
+    }
     // Tanı kaydı (yalnızca durum değişince): kalite düşürme nedenleri ve pencere bulanıklığı desteği.
     LaunchedEffect(reduced, powerSave, degraded) {
         android.util.Log.i(
@@ -398,8 +424,9 @@ fun HomeScreen(
             reduced = reduced,
             noLens = noLens,
             clear = clearGlass,
-            sharp = if (useBackdrop) sharpBackdrop else null,
-            backdrop = if (useBackdrop) blurred else null,
+            // Ana ekran bulanıklığı açıkken şeffaf cam da net kopya yerine aynı oranda bulanık kopyayı kullanır.
+            sharp = if (!useBackdrop) null else homeBackdrop ?: sharpBackdrop,
+            backdrop = if (!useBackdrop) null else homeBackdrop ?: blurred,
             rootW = rootSize.width.toFloat(),
             rootH = rootSize.height.toFloat(),
         ),

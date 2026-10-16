@@ -391,7 +391,7 @@ fun Modifier.glassRegionBlur(
     includeRoot: Boolean = false,
     /** Yoğun bulanık alanların (arama paneli/çubuğu) yarıçapı: cam stilinden bağımsız, arkadaki simge
      *  sıraları kenarı belli olmayan bir ışığa dönüşsün diye büyük. */
-    strongRadius: Dp = 84.dp,
+    strongRadius: Dp = 56.dp,
 ): Modifier = composed {
     // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
     val node = remember { android.graphics.RenderNode("glassRegionContent") }
