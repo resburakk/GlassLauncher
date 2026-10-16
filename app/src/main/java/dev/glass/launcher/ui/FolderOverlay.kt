@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+
 import kotlinx.coroutines.launch
 
 import androidx.compose.ui.graphics.graphicsLayer
@@ -198,7 +200,7 @@ fun FolderOverlay(
                                 raw = 0f
                                 rubber.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 360f))
                             }
-                            androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                            detectHorizontalDragGestures(
                                 onDragStart = { raw = rubber.value; rubberScope.launch { rubber.stop() } },
                                 onDragEnd = { settle() },
                                 onDragCancel = { settle() },
