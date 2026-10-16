@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.foundation.layout.imePadding
+
 import androidx.compose.ui.graphics.graphicsLayer
 
 import androidx.compose.ui.draw.drawWithContent
@@ -89,6 +91,8 @@ fun LibraryPage(
     jiggle: State<Float>,
     onDropFromLibrary: (String, androidx.compose.ui.geometry.Offset, String?) -> Unit,
     onOpenGroup: (LibraryGroup) -> Unit,
+    /** Arşiv sayfası şu an ekranda mı (başka sayfaya geçilince arşiv ilk haline döner). */
+    active: Boolean = true,
 ) {
     var searching by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
@@ -126,6 +130,16 @@ fun LibraryPage(
         keyboard?.hide()
         query = ""
         searching = false
+    }
+
+    // Liste açıkken telefonun geri hareketi listeyi kapatır.
+    androidx.activity.compose.BackHandler(enabled = searching) { endSearch() }
+    // Başka sayfaya geçilince (ana ekran vb.) arşiv ilk haline döner: liste kapanır, kategoriler en üstten.
+    LaunchedEffect(active) {
+        if (!active) {
+            if (searching) endSearch()
+            runCatching { gridState.scrollToItem(0) }
+        }
     }
 
     val u = LocalPt.current
@@ -314,7 +328,14 @@ private fun LibrarySearchList(
         }.toList()
     }
     LazyColumn(
-        Modifier.fillMaxWidth().fillMaxHeight().liquidGlass(RoundedCornerShape(24.dp), settings.glassStrength * 0.8f, 0.dp, frosted = true),
+        Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            // Klavyenin ÜSTÜNDE biter (arkasına uzanıp kenarı klavyenin üstünde kesik çizgi gibi görünmesin).
+            .imePadding()
+            .padding(bottom = 10.dp)
+            .liquidGlass(RoundedCornerShape(24.dp), settings.glassStrength * 0.8f, 0.dp, frosted = true)
+            .edgeFade(top = 10.dp, bottom = 22.dp),
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
         sections.forEach { (letter, apps) ->

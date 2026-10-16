@@ -105,6 +105,10 @@ for i in 1 2 3 4 5 6; do adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 2
 shot 07a-arsiv-hemen
 step "arşiv" 3
 shot 07-arsiv
+tap_text "Uygulama Arşivi" && { step "arşiv arama listesi" 3; shot 07b-arsiv-liste
+  adb shell input keyevent KEYCODE_BACK; step "klavye kapandı" 1
+  adb shell input keyevent KEYCODE_BACK; step "geri: liste kapanmalı" 2
+  shot 07c-arsiv-geri; }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 
 # 7) Üstten kaydırma (sistem Kontrol Merkezi) — en sonda, sistem paneli diğer adımları etkilemesin

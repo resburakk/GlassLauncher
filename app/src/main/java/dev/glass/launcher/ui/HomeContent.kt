@@ -407,6 +407,7 @@ internal fun HomeContent(
                         drag = drag, edit = edit, jiggle = jiggle,
                         onDropFromLibrary = { k, p, h -> handleDrop(k, p, h) },
                         onOpenGroup = onOpenGroup,
+                        active = pagerState.settledPage == libIndex,
                     )
                 }
                 return@HorizontalPager
