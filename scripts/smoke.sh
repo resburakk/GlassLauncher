@@ -29,7 +29,10 @@ tap_text() {
     adb shell ls /sdcard/ui.xml >/dev/null 2>&1 && break
     sleep 1
   done
-  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  xml=$(adb shell cat /sdcard/ui.xml | tr '>' '\n')
+  b=$(echo "$xml" | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  # Bulunamazsa: yazısı bununla başlayan öğe (birleşik satırlar, ör. "Glass Launcher\n5 widget")
+  [ -z "$b" ] && b=$(echo "$xml" | grep -F "text=\"$1" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
   set -- $b
   if [ -n "$4" ]; then adb shell input tap $(( ($1+$3)/2 )) $(( ($2+$4)/2 )); return 0; fi
   echo "::warning::Ekranda bulunamadı: $want"; return 1
