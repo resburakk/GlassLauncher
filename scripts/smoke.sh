@@ -139,9 +139,8 @@ adb shell input swipe $((W*15/100)) $cy $((W*60/100)) $cy 400; sleep 0.05; shot 
 shot 21a-bugun
 tap_text "Widget Ekle" && { step "widget galerisi (bugün)" 7
   # Galeride ara: yalnızca galeride olan "Glass Launcher" (arka plandaki ana ekran yazılarıyla karışmaz)
-  tap_text "Widget Ara"; step "arama" 1
-  adb shell input text "Glass"; step "aranıyor" 2
-  adb shell input keyevent KEYCODE_BACK; step "klavye kapandı" 1
+  for i in 1 2 3 4 5; do adb shell input swipe $cx $((H*80/100)) $cx $((H*35/100)) 250; sleep 0.6; done
+  step "liste sonu" 1
   tap_text "Glass Launcher"; step "launcher widgetları" 3
   shot 21b0-bugun-galeri-detay
   tap_text "Widget Ekle"; step "bugüne eklendi" 4
