@@ -134,6 +134,17 @@ shot 07f-arsiv-duzenleme
 adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 
+# Widget sayfası (iOS Bugün görünümü): ilk sayfada sağa kaydır
+adb shell input swipe $((W*15/100)) $cy $((W*60/100)) $cy 400; sleep 0.05; shot 21a0-bugun-acilis; step "widget sayfası" 2
+shot 21a-bugun
+tap_text "Widget Ekle" && { step "widget galerisi (bugün)" 7
+  tap_text "Clock"; step "saat widgetları" 4
+  tap_text "Widget Ekle"; step "bugüne eklendi" 4
+  shot 21b-bugun-widget; }
+adb shell input swipe $((W*85/100)) $cy $((W*15/100)) $cy 300; step "widget sayfası kapandı" 2
+shot 21c-bugun-kapandi
+adb shell input keyevent KEYCODE_HOME; step "ana ekran"
+
 # 7) Üstten kaydırma (sistem Kontrol Merkezi) — en sonda, sistem paneli diğer adımları etkilemesin
 adb shell input swipe $cx $((H*8/100)) $cx $((H*50/100)) 300; step "kontrol merkezi" 3
 shot 08-kontrol-merkezi

@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import androidx.compose.runtime.rememberUpdatedState
 
 import androidx.compose.runtime.collectAsState
@@ -126,6 +128,10 @@ internal fun HomeContent(
     selection: SelectionState,
     /** Arşive geçiş oranı (0 = ana ekran, 1 = arşiv); arka plan bulanıklığı için üst bileşen okur. */
     libProgress: MutableFloatState,
+    /** Widget sayfası (ilk sayfanın solunda); null ise kapalı. */
+    today: TodayState? = null,
+    /** Widget sayfasına şu an kaydırılabilir mi (düzenleme/sürükleme yokken). */
+    todayAllowed: () -> Boolean = { true },
 ) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -419,13 +425,48 @@ internal fun HomeContent(
                 .let { if (it < 0) items.size else it }
         }
 
+        // İlk sayfada sağa kaydırma: pager'ın kullanamadığı kaydırma widget sayfasını açar (iOS Bugün görünümü);
+        // açıkken ters yöne kaydırma önce onu kapatır. Bırakınca hıza göre açılır/kapanır.
+        val todayAllowedNow by rememberUpdatedState(todayAllowed)
+        val todayConn = remember(today, pagerState) {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                    val t = today ?: return Offset.Zero
+                    if (source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) return Offset.Zero
+                    if (t.progress > 0f && available.x < 0f) {
+                        val before = t.progress
+                        t.dragBy(available.x)
+                        return Offset((t.progress - before) * t.widthPx, 0f)
+                    }
+                    return Offset.Zero
+                }
+                override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                    val t = today ?: return Offset.Zero
+                    if (source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) return Offset.Zero
+                    if (available.x > 0f && pagerState.currentPage == 0 && todayAllowedNow()) {
+                        val before = t.progress
+                        t.dragBy(available.x)
+                        return Offset((t.progress - before) * t.widthPx, 0f)
+                    }
+                    return Offset.Zero
+                }
+                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                    val t = today ?: return androidx.compose.ui.unit.Velocity.Zero
+                    if (t.progress > 0f) {
+                        t.settle(scope, available.x)
+                        return available
+                    }
+                    return androidx.compose.ui.unit.Velocity.Zero
+                }
+            }
+        }
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
             // Sürüklerken TÜM sayfalar bellekte kalır: sürüklemenin başladığı sayfa (ve onu izleyen dokunma
             // kodu) uzak bir sayfaya geçilince atılmasın, yoksa bırakma kayboluyordu.
             beyondViewportPageCount = if (dragging) homeCount else 1,
-            modifier = Modifier.fillMaxSize().onGloballyPositioned { gridOrigin = it.positionInRoot() },
+            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
                 // Arama çubuğu, ana ekrandaki ilk simge satırıyla AYNI üst çizgiden başlar.

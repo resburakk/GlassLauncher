@@ -161,4 +161,25 @@ class HomeLayoutTest {
         assertTrue("p" in rem.libraryOnly)
         assertTrue(rem.items.any { it is AppItem && it.key == "q" })
     }
+
+    @Test fun todayWidgets_surviveEditsJsonAndReconcile() {
+        val t1 = WidgetItem("t1", WidgetKind.Battery, 2, 2)
+        val t2 = WidgetItem("t2", WidgetKind.DigitalClock, 4, 2)
+        var l = HomeLayout(items = apps("a", "b"), dock = listOf("x")).addTodayWidget(t1).addTodayWidget(t2)
+        // Ana ekran düzenlemeleri widget sayfasını silmez
+        l = l.removeAppsFromHome(listOf("a")).takeOutOfFolder("b").moveToDock("b", 1)
+        assertEquals(listOf("t1", "t2"), l.today.map { it.id })
+        // Sıralama, boyut, kaldırma
+        l = l.moveTodayWidget("t2", 0)
+        assertEquals(listOf("t2", "t1"), l.today.map { it.id })
+        l = l.resizeWidget("t1", 4, 4)
+        assertEquals(4, l.today.first { it.id == "t1" }.spanY)
+        // JSON gidiş-dönüş ve uzlaştırma
+        val back = HomeLayout.fromJson(l.toJson())!!
+        assertEquals(l.today, back.today)
+        val rec = HomeLayout.reconcileKeys(back, listOf("a", "b", "x"), emptyList())
+        assertEquals(l.today, rec.today)
+        assertEquals(listOf("t2"), l.removeItem("t1").today.map { it.id })
+        assertEquals(2, l.widgets.size)
+    }
 }

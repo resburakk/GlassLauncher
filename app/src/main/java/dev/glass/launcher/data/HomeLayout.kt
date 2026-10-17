@@ -52,6 +52,8 @@ data class HomeLayout(
     val items: List<HomeItem> = emptyList(),
     val dock: List<String> = emptyList(),
     val libraryOnly: List<String> = emptyList(),
+    /** Widget sayfası (iOS "Bugün" görünümü, ilk sayfanın solunda): yukarıdan aşağı sıralı widget'lar. */
+    val today: List<WidgetItem> = emptyList(),
 ) {
 
     /** Ana ekranda (ızgara, klasör veya dock) görünen tüm uygulama anahtarları. */
@@ -84,7 +86,7 @@ data class HomeLayout(
         return copy(items = out)
     }
 
-    private fun withoutKey(key: String): HomeLayout = HomeLayout(
+    private fun withoutKey(key: String): HomeLayout = copy(
         items = items.mapNotNull { item ->
             when (item) {
                 is AppItem -> if (item.key == key) null else item
@@ -189,7 +191,7 @@ data class HomeLayout(
             }
             false
         }
-        return HomeLayout(kept, dock, lib.distinct()).normalized()
+        return copy(items = kept, libraryOnly = lib.distinct()).normalized()
     }
 
     // --- Çoklu seçim (toplu işlemler). [ids]: seçilen uygulama anahtarları; ana ekranda veya bir klasörün
@@ -283,7 +285,7 @@ data class HomeLayout(
             }
         }
         if (!placed) out += folder
-        return HomeLayout(out, dock - set, libraryOnly - set).normalized()
+        return copy(items = out, dock = dock - set, libraryOnly = libraryOnly - set).normalized()
     }
 
     /** Seçili uygulamaları mevcut [folderId] klasörünün sonuna taşır (başka klasörlerden de çıkarak). */
@@ -300,7 +302,7 @@ data class HomeLayout(
                 else -> item
             }
         }
-        return HomeLayout(out, dock - set, libraryOnly - set).normalized()
+        return copy(items = out, dock = dock - set, libraryOnly = libraryOnly - set).normalized()
     }
 
     /** Seçili uygulamaları ana ekrandan (ve klasörlerden) kaldırır; Uygulama Arşivi'nde kalırlar. */
@@ -331,17 +333,34 @@ data class HomeLayout(
         return copy(items = list)
     }
 
-    fun removeItem(id: String): HomeLayout = copy(items = items.filter { it.id != id })
+    fun removeItem(id: String): HomeLayout = copy(items = items.filter { it.id != id }, today = today.filter { it.id != id })
 
     fun resizeWidget(id: String, spanX: Int, spanY: Int): HomeLayout = copy(
-        items = items.map { if (it is WidgetItem && it.id == id) it.copy(spanX = spanX, spanY = spanY) else it }
+        items = items.map { if (it is WidgetItem && it.id == id) it.copy(spanX = spanX, spanY = spanY) else it },
+        today = today.map { if (it.id == id) it.copy(spanX = spanX, spanY = spanY) else it },
     )
 
     fun setWidgetData(id: String, data: String): HomeLayout = copy(
-        items = items.map { if (it is WidgetItem && it.id == id) it.copy(data = data) else it }
+        items = items.map { if (it is WidgetItem && it.id == id) it.copy(data = data) else it },
+        today = today.map { if (it.id == id) it.copy(data = data) else it },
     )
 
-    val widgets: List<WidgetItem> get() = items.filterIsInstance<WidgetItem>()
+    /** Widget sayfasının sonuna ekler. */
+    fun addTodayWidget(w: WidgetItem): HomeLayout = copy(today = today + w)
+
+    /** Widget sayfasında bir widget'ı [toIndex] sırasına taşır. */
+    fun moveTodayWidget(id: String, toIndex: Int): HomeLayout {
+        val w = today.firstOrNull { it.id == id } ?: return this
+        val rest = today.filter { it.id != id }.toMutableList()
+        rest.add(toIndex.coerceIn(0, rest.size), w)
+        return copy(today = rest)
+    }
+
+    /** Ana ekrandaki widget'lar. */
+    val homeWidgets: List<WidgetItem> get() = items.filterIsInstance<WidgetItem>()
+
+    /** Tüm widget'lar (ana ekran + widget sayfası). */
+    val widgets: List<WidgetItem> get() = homeWidgets + today
 
     fun toJson(): String = toJsonObject().toString()
 
@@ -353,9 +372,7 @@ data class HomeLayout(
                     is AppItem -> JSONObject().put("t", "a").put("k", item.key)
                     is FolderItem -> JSONObject().put("t", "f").put("id", item.id)
                         .put("n", item.name).put("k", JSONArray(item.keys))
-                    is WidgetItem -> JSONObject().put("t", "w").put("id", item.id)
-                        .put("k", item.kind.code).put("sx", item.spanX).put("sy", item.spanY)
-                        .put("aw", item.appWidgetId).put("d", item.data)
+                    is WidgetItem -> widgetJson(item)
                     is PageBreak -> JSONObject().put("t", "b").put("id", item.id)
                 }
             )
@@ -365,7 +382,12 @@ data class HomeLayout(
             .put("items", arr)
             .put("dock", JSONArray(dock))
             .put("lib", JSONArray(libraryOnly))
+            .put("today", JSONArray().also { a -> today.forEach { a.put(widgetJson(it)) } })
     }
+
+    private fun widgetJson(item: WidgetItem): JSONObject = JSONObject().put("t", "w").put("id", item.id)
+        .put("k", item.kind.code).put("sx", item.spanX).put("sy", item.spanY)
+        .put("aw", item.appWidgetId).put("d", item.data)
 
     companion object {
         fun fromJson(json: String): HomeLayout? = try {
@@ -385,14 +407,7 @@ data class HomeLayout(
                 } else if (t == "b") {
                     items += PageBreak(j.optString("id").ifEmpty { UUID.randomUUID().toString() })
                 } else if (t == "w") {
-                    items += WidgetItem(
-                        id = j.optString("id").ifEmpty { UUID.randomUUID().toString() },
-                        kind = WidgetKind.of(j.optString("k")),
-                        spanX = j.optInt("sx", 2).coerceIn(1, 6),
-                        spanY = j.optInt("sy", 2).coerceIn(1, 6),
-                        appWidgetId = j.optInt("aw", -1),
-                        data = j.optString("d"),
-                    )
+                    items += widgetFrom(j)
                 } else {
                     val ka = j.getJSONArray("k")
                     items += FolderItem(
@@ -404,10 +419,23 @@ data class HomeLayout(
             }
             val da = o.optJSONArray("dock") ?: JSONArray()
             val la = o.optJSONArray("lib") ?: JSONArray()
-            HomeLayout(items, List(da.length()) { da.getString(it) }, List(la.length()) { la.getString(it) })
+            val ta = o.optJSONArray("today") ?: JSONArray()
+            HomeLayout(
+                items, List(da.length()) { da.getString(it) }, List(la.length()) { la.getString(it) },
+                List(ta.length()) { widgetFrom(ta.getJSONObject(it)) },
+            )
         } catch (e: Exception) {
             null
         }
+
+        private fun widgetFrom(j: JSONObject) = WidgetItem(
+            id = j.optString("id").ifEmpty { UUID.randomUUID().toString() },
+            kind = WidgetKind.of(j.optString("k")),
+            spanX = j.optInt("sx", 2).coerceIn(1, 6),
+            spanY = j.optInt("sy", 2).coerceIn(1, 6),
+            appWidgetId = j.optInt("aw", -1),
+            data = j.optString("d"),
+        )
 
         /**
          * Kayıtlı yerleşimi yüklü uygulamalarla uzlaştırır: kaldırılanlar silinir, yeni uygulamalar
@@ -455,7 +483,7 @@ data class HomeLayout(
             for (k in appKeys) if (seen.add(k)) {
                 if (toHome) items += AppItem(k) else lib += k
             }
-            return HomeLayout(items, dock, lib).normalized()
+            return HomeLayout(items, dock, lib, src.today).normalized()
         }
     }
 }

@@ -295,7 +295,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Ana ekranda görünen sayfanın ilk öğesinin listedeki sırası (yeni widget'lar buraya eklenir). */
     var currentPageStart: Int = 0
 
-    fun addWidget(w: WidgetItem) = editLayout { it.addWidget(w, currentPageStart) }
+    /** Widget sayfası açıkken eklenen widget'lar oraya gider (HomeScreen günceller). */
+    @Volatile var todayOpen: Boolean = false
+
+    fun addWidget(w: WidgetItem) = editLayout { if (todayOpen) it.addTodayWidget(w) else it.addWidget(w, currentPageStart) }
 
     /** Yeni klasör adı: uygulamaların hepsi aynı türdeyse o türün adı (ör. "Sosyal"), değilse "Klasör". */
     fun folderNameFor(keys: List<String>): String {
@@ -352,7 +355,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val imported = la.settingsStore.importJson(json) ?: return false
         val host = la.widgetHost
         val cleaned = imported.copy(
-            items = imported.items.filter { it !is WidgetItem || it.kind != WidgetKind.System || host.info(it.appWidgetId) != null }
+            items = imported.items.filter { it !is WidgetItem || it.kind != WidgetKind.System || host.info(it.appWidgetId) != null },
+            today = imported.today.filter { it.kind != WidgetKind.System || host.info(it.appWidgetId) != null },
         )
         val next = HomeLayout.reconcile(cleaned, repo.apps.value, repo.defaultDockPackages, settings.value.addNewToHome)
         base = next
@@ -374,7 +378,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             la.settingsStore.saveLayoutBackup(cur.toJson())
             val fresh = IosDefaultLayout.build(la, list)
-            val withWidgets = fresh.copy(items = fresh.items + cur.widgets)
+            val withWidgets = fresh.copy(items = fresh.items + cur.homeWidgets, today = cur.today)
             editLayout { HomeLayout.reconcile(withWidgets, list, repo.defaultDockPackages, true) }
         }
     }

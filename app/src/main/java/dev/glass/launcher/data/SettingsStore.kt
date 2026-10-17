@@ -119,6 +119,8 @@ data class LauncherSettings(
     val doubleTapLock: Boolean = true,
     /** Uygulama arşivi sayfası (ana ekranın sağı). Varsayılan kapalı: sayfa hiç görünmez. */
     val showLibrary: Boolean = true,
+    /** Widget sayfası (iOS Bugün görünümü, ilk sayfanın solunda). */
+    val showToday: Boolean = true,
     /** Yuvarlak (köşeleri boş) simgeleri dolu kareye tamamla. */
     val iconFillRound: Boolean = true,
     /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
@@ -278,7 +280,7 @@ data class LauncherSettings(
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
-        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary2", showLibrary); put("iconFillRound", iconFillRound)
+        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
         put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions)
@@ -382,6 +384,7 @@ data class LauncherSettings(
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
                 // "showLibrary2": arşiv yeniden varsayılan olarak açık (eski kayıttaki kapalı değer bir kez yok sayılır).
                 showLibrary = o.optBoolean("showLibrary2", d.showLibrary),
+                showToday = o.optBoolean("showToday", d.showToday),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
                 liveIcons = o.optBoolean("liveIcons", d.liveIcons),
                 iconRimWidth = o.optDouble("iconRimWidth", d.iconRimWidth.toDouble()).toFloat(),

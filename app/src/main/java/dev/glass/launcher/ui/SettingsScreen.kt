@@ -223,7 +223,7 @@ fun SettingsScreen(
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
                         SettingsPage.Gestures -> GesturesPage(s, onChange)
-                        SettingsPage.Widgets -> WidgetsPage(onAddWidget)
+                        SettingsPage.Widgets -> WidgetsPage(s, onChange, onAddWidget)
                         SettingsPage.Library -> LibraryPageSettings(s, onChange)
                         SettingsPage.Backup -> BackupPage(vm)
                         SettingsPage.Performance -> PerformancePage(s, onChange)
@@ -943,9 +943,12 @@ private fun GesturesPage(s: LauncherSettings, onChange: ((LauncherSettings) -> L
 }
 
 @Composable
-private fun WidgetsPage(onAddWidget: () -> Unit) {
+private fun WidgetsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit, onAddWidget: () -> Unit) {
     Group(null) {
         NavRow("Widget ekle", Glyph.Plus, Color(0xFFFF375F)) { onAddWidget() }
+    }
+    Group("Widget sayfası") {
+        ToggleRow("Widget sayfası (ilk sayfanın solunda)", s.showToday, default = Def.showToday) { v -> onChange { it.copy(showToday = v) } }
     }
     Footer(
         "Saat, analog saat, takvim, pil ve fotoğraf widget'ları launcher'ın kendi widget'larıdır. Diğer uygulamaların " +

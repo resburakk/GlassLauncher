@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.rememberCoroutineScope
+
 import androidx.compose.runtime.derivedStateOf
 
 import androidx.compose.ui.draw.drawBehind
@@ -187,6 +189,12 @@ fun HomeScreen(
     // Klasör/arşiv kategorisi açıkken basılı tutulan simgenin menüsü (klasör açık kalır).
     var folderMenu by remember { mutableStateOf<MenuRequest?>(null) }
     var group by remember { mutableStateOf<LibraryGroup?>(null) }
+    // Widget sayfası (iOS Bugün görünümü): ilk sayfanın solundan kayarak açılır.
+    val today = remember { TodayState() }
+    val todayScope = rememberCoroutineScope()
+    val todayVisible by remember { derivedStateOf { today.progress > 0.001f } }
+    val todayOpenNow by remember { derivedStateOf { today.progress > 0.5f } }
+    LaunchedEffect(today) { snapshotFlow { today.progress > 0.5f }.collect { vm.todayOpen = it } }
     // Arşiv kategorisi, dokunulan kartın yerinden büyüyerek açılır ve oraya küçülerek kapanır.
     var groupOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
@@ -266,6 +274,7 @@ fun HomeScreen(
         else if (overlay != Overlay.None) closeOverlay()
         else if (selection.active) selection.end()
         else if (editMode) editMode = false
+        else if (today.progress > 0f) today.close(todayScope)
     }
 
     LaunchedEffect(openSettingsRequest) {
@@ -329,11 +338,13 @@ fun HomeScreen(
         vm.homePressed.collect {
             closeOverlay()
             editMode = false
+            today.close(todayScope)
             bridge.goToPage?.invoke(0)
         }
     }
 
     SideEffect {
+        today.widthPx = rootSize.width.toFloat()
         drag.activeLayer = if (overlay == Overlay.Folder || overlay == Overlay.Group) DragLayer.Folder else DragLayer.Home
     }
 
@@ -452,7 +463,9 @@ fun HomeScreen(
                 detectHomeDrag(
                     drag = drag,
                     enabled = {
-                        overlayNow == Overlay.None || overlayNow == Overlay.Folder || overlayNow == Overlay.Group
+                        // Widget sayfası açıkken ana ekranın uzun basma/sürükleme algılayıcısı çalışmaz (sayfa kendi işler).
+                        today.progress < 0.01f &&
+                            (overlayNow == Overlay.None || overlayNow == Overlay.Folder || overlayNow == Overlay.Group)
                     },
                     isEditing = { editNow },
                     // Seçim modunda yalnızca seçili öğeler parmak kaydırılınca sürüklenir; seçilmemiş bir simgenin
@@ -501,7 +514,7 @@ fun HomeScreen(
                 }, onDoubleTap = {
                     val st = settingsNow
                     if (editNow && overlayNow == Overlay.None) { editMode = false; return@detectTapGestures }
-                    if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && st.doubleTapLock) {
+                    if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f && st.doubleTapLock) {
                         if (!LockService.lock()) {
                             lockReason = LockReason.Lock
                             overlay = Overlay.LockPrompt
@@ -516,7 +529,7 @@ fun HomeScreen(
                 detectVerticalDragGestures(
                     onDragStart = { startY = it.y; startX = it.x; total = 0f },
                     onDragEnd = {
-                        if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && total > 80.dp.toPx()) {
+                        if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f && total > 80.dp.toPx()) {
                             // Hangi hareketin ne açacağı Ayarlar > Hareketler'den seçilir.
                             val chosen = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
                             // Bölünmüş: sağ yarı Kontrol Merkezi, sol yarı bildirimler.
@@ -618,7 +631,7 @@ fun HomeScreen(
                 Image(
                     blurImg, null,
                     Modifier.fillMaxSize().graphicsLayer {
-                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue).coerceIn(0f, 1f)
+                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress).coerceIn(0f, 1f)
                     },
                     contentScale = ContentScale.Crop,
                 )
@@ -638,6 +651,8 @@ fun HomeScreen(
                     val h = homeHide()
                     if (h > 0f) { k *= 1f - 0.06f * h; alpha = 1f - h }
                     scaleX = k; scaleY = k
+                    // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
+                    translationX = today.progress * size.width
                 }
         ) {
             HomeContent(
@@ -664,6 +679,29 @@ fun HomeScreen(
                 },
                 libProgress = libProgress,
                 selection = selection,
+                today = if (settings.showToday) today else null,
+                todayAllowed = { !editNow && drag.key == null && overlayNow == Overlay.None },
+            )
+        }
+        if (settings.showToday && todayVisible) {
+            // iOS Bugün görünümünde arka plan bulanık ve biraz koyu.
+            Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
+            TodayPage(
+                state = today,
+                widgets = layout.today,
+                vm = vm,
+                settings = settings,
+                edit = editMode,
+                jiggle = jiggle,
+                onOpenSearch = { overlay = Overlay.Search },
+                onAddWidget = { vm.todayOpen = true; overlay = Overlay.Widgets },
+                onEdit = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); editMode = true },
+                onMenu = { w, r ->
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    openFolderId = null
+                    menu = MenuRequest(w.id, CellPlace.Grid, r, r, 0.dp)
+                    overlay = Overlay.Menu
+                },
             )
         }
         }
@@ -814,7 +852,7 @@ fun HomeScreen(
             }
             menuHolder[0]?.let { req ->
                 val folder = layout.items.firstOrNull { it.id == req.itemId } as? FolderItem
-                val widget = layout.items.firstOrNull { it.id == req.itemId } as? WidgetItem
+                val widget = (layout.items + layout.today).firstOrNull { it.id == req.itemId } as? WidgetItem
                 ContextMenuOverlay(
                     visibility = { menuVis },
                     req = req,
@@ -893,7 +931,7 @@ fun HomeScreen(
         // Arşive geçiş oranı ekrana yansıyan bir değerden okunur (bridge.onLibrary düz değişken olduğu için arşive
         // kaydırınca düğmeler yeniden çizilmiyor, arşivin üstünde kalıyordu).
         val onLibraryNow by remember { derivedStateOf { libProgress.floatValue > 0.98f } }
-        val bottomBar = showEditBar && !onLibraryNow && drag.key == null && !selection.active
+        val bottomBar = showEditBar && !onLibraryNow && !todayOpenNow && drag.key == null && !selection.active
         val canDeletePage = bridge.homePageCount > 1
         homeMetrics?.let { hm ->
             AnimatedVisibility(
