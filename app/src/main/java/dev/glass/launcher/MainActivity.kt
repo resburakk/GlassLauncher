@@ -204,6 +204,12 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                 preferredRefreshRate = best.refreshRate
             }
         }
+        // Android 15 QPR1+/16 "uyarlanabilir yenileme hızı": görünümler varsayılan olarak ≈60 Hz ister; parmak
+        // kalkınca sayfa kaydırma/yerine oturma animasyonu 60 Hz'e düşüyordu. Launcher penceresi için kapatılır:
+        // pencere yukarıda istenen en yüksek hızda (120 Hz) çizilir.
+        if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {
+            window.isFrameRatePowerSavingsBalanced = false
+        }
     }
 
     private var lastBlur = -1

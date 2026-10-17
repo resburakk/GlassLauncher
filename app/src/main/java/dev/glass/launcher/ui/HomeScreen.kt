@@ -569,8 +569,11 @@ fun HomeScreen(
         val fromSync = remember(wp) { vm.wallpaperFromSync() }
         // Yalnızca eşik geçilince yeniden oluşturulur (geçiş oranı her karede değişse de).
         val transitioning by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f } }
-        val needCopy = !fromSync || transitioning || settings.homeWallpaperBlur > 0.01f ||
-            glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
+        // Kopya her zaman çizilir: yalnızca geçişte çizildiğinde arşive/aramaya geçerken sistemin duvar kâğıdından
+        // bizim kopyamıza atlanıyor, parlaklık bir anda biraz artıyordu. Son uygulamalar ekranında kopya zaten
+        // simgelerle birlikte söner (dikdörtgen görünmez).
+        @Suppress("UNUSED_VARIABLE") val unused = fromSync to transitioning
+        val needCopy = true
         // Arşive geçişte ve katman açılırken duvar kâğıdı bulanıklığı: önceden (bir kez) bulanıklaştırılmış küçük kopya
         // netin üstünde kademeli belirir. Eskiden tam çözünürlüklü görüntü her karede yeniden bulanıklaştırılıyordu;
         // ekran kartını yorup kaydırmayı 120 Hz'in altına düşürüyordu.

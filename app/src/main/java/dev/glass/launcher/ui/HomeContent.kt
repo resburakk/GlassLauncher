@@ -234,7 +234,14 @@ internal fun HomeContent(
         val byPage = remember(shownPlacements) { shownPlacements.groupBy { it.page } }
         val shownDock = dockPreview ?: layout.dock
 
-        // Performans ölçümü: her sayfa kaydırmasında gerçek kare aralıkları (Ayarlar > Cam > Performans).
+        // Kaydırma sürerken (parmak kalktıktan sonraki yerine oturma dahil) yüksek kare hızı istenir (Android 15+).
+        LaunchedEffect(pagerState.isScrollInProgress) {
+            if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {
+                view.requestedFrameRate = if (pagerState.isScrollInProgress) android.view.View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
+                else android.view.View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+            }
+        }
+        // Performans ölçümü: her sayfa kaydırmasında gerçek kare aralıkları (Ayarlar > Performans).
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (!pagerState.isScrollInProgress) return@LaunchedEffect
             val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
