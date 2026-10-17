@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Yalnızca sistemin "Uygulamayı kaldır" onay penceresini açmak için (kaldırma kararını kullanıcı verir). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Yalnızca kullanıcı "sistem duvar kâğıdı olarak da ayarla" seçerse kullanılır. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Üstten kaydırınca telefonun kendi Kontrol Merkezi'ni / bildirim gölgesini açmak için. -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <!-- Arama: yalnızca kullanıcı izin verirse kişiler, mesajlar ve dosyalar cihazda, çevrimdışı aranır. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- İsteğe bağlı: belgeleri (PDF vb.) de aramak için kullanıcı ayarlardan "tüm dosyalara erişim" verebilir. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- Paket görünürlüğü: QUERY_ALL_PACKAGES yerine yalnızca başlatılabilir uygulamalar sorgulanır -->
+    <queries>
+        <!-- Arama: "internette ara", "Play Store'da ara" ve sesle yazma için açılacak uygulamayı bulmak -->
+        <intent>
+            <action android:name="android.intent.action.WEB_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- Dock varsayılanları: telefon, mesaj, tarayıcı, kamera -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent><action android:name="android.media.action.STILL_IMAGE_CAMERA" /></intent>
+    </queries>
+
+    <application
+        android:name=".LauncherApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.GlassLauncher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:resumeWhilePausing="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|fontScale|density"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Simgelerdeki bildirim sayıları: yalnızca uygulama başına sayı tutulur, içerik okunmaz/gönderilmez. -->
+        <service
+            android:name=".service.BadgeListener"
+            android:exported="true"
+            android:label="Bildirim sayıları"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Çift dokunarak kilitleme: yalnızca sistemin kilitleme eylemini çağırır, içerik okumaz. -->
+        <service
+            android:name=".service.LockService"
+            android:exported="false"
+            android:label="@string/lock_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lock_service" />
+        </service>
+
+        <!-- Galeride bir görseli açıp ⋮ > "Farklı ayarla" (ATTACH_DATA) ile launcher duvar kâğıdı yapmak. -->
+        <activity
+            android:name=".WallpaperImportActivity"
+            android:exported="true"
+            android:label="@string/wallpaper_import_label"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@style/Theme.GlassLauncher.Import"
+            android:excludeFromRecents="true"
+            android:taskAffinity="dev.glass.launcher.import"
+            android:launchMode="standard">
+            <intent-filter android:label="@string/wallpaper_import_label">
+                <action android:name="android.intent.action.ATTACH_DATA" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Uygulama listesinde "Glass Ayarları" olarak görünür: ayarları açar (launcher varsayılan değilken de). -->
+        <activity-alias
+            android:name=".SettingsEntry"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/settings_label"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>
