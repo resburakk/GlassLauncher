@@ -76,20 +76,30 @@ class TodayState {
     /** Ekran genişliği (px); kaydırma miktarını orana çevirmek için. */
     var widthPx = 1f
     private var anim: Job? = null
+    /** Parmağın son hareket yönü (yakın geçmişe ağırlık veren toplam): bırakınca açılıp kapanmayı belirler. */
+    private var recentDx = 0f
 
     fun dragBy(dx: Float) {
         anim?.cancel()
+        recentDx = recentDx * 0.6f + dx
         progress = (progress + dx / widthPx.coerceAtLeast(1f)).coerceIn(0f, 1f)
     }
 
-    /** Parmak kalkınca: hızlı fırlatmada yönüne, yavaşta yarıyı geçip geçmediğine göre açılır/kapanır. */
+    /**
+     * Parmak kalkınca (iOS gibi): parmak en son sağa gidiyorsa açılır, sola gidiyorsa kapanır; neredeyse
+     * duruyorsa yarıyı geçip geçmediğine bakılır. Hız yalnızca animasyonun başlangıç hızı olarak kullanılır.
+     */
     fun settle(scope: CoroutineScope, velocityX: Float) {
+        val px = widthPx.coerceAtLeast(1f)
+        val minMove = px * 0.004f
         val target = when {
-            velocityX > 700f -> 1f
-            velocityX < -700f -> 0f
+            recentDx > minMove -> 1f
+            recentDx < -minMove -> 0f
             else -> if (progress > 0.5f) 1f else 0f
         }
-        animateTo(scope, target, velocityX / widthPx.coerceAtLeast(1f))
+        recentDx = 0f
+        val v = kotlin.math.abs(velocityX) / px * (if (target > progress) 1f else -1f)
+        animateTo(scope, target, v)
     }
 
     fun open(scope: CoroutineScope) = animateTo(scope, 1f, 0f)
