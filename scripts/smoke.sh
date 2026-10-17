@@ -138,7 +138,12 @@ adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 adb shell input swipe $((W*15/100)) $cy $((W*60/100)) $cy 400; sleep 0.05; shot 21a0-bugun-acilis; step "widget sayfası" 2
 shot 21a-bugun
 tap_text "Widget Ekle" && { step "widget galerisi (bugün)" 7
-  tap_text "Clock"; step "saat widgetları" 4
+  # Galeride ara: yalnızca galeride olan "Glass Launcher" (arka plandaki ana ekran yazılarıyla karışmaz)
+  tap_text "Widget Ara"; step "arama" 1
+  adb shell input text "Glass"; step "aranıyor" 2
+  adb shell input keyevent KEYCODE_BACK; step "klavye kapandı" 1
+  tap_text "Glass Launcher"; step "launcher widgetları" 3
+  shot 21b0-bugun-galeri-detay
   tap_text "Widget Ekle"; step "bugüne eklendi" 4
   shot 21b-bugun-widget; }
 adb shell input swipe $((W*85/100)) $cy $((W*15/100)) $cy 300; step "widget sayfası kapandı" 2
