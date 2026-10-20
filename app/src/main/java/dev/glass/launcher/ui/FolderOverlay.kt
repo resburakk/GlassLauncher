@@ -133,8 +133,10 @@ fun FolderOverlay(
         LaunchedEffect(closing) {
             if (closing && pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
         }
-        // Tek sayfalı klasör: yana kaydırınca iOS gibi esnekçe kayar, bırakınca yaylı geri döner (başka sayfa yok).
+        // Esnek çekme (iOS lastik bandı): ekranın HERHANGİ bir yerinden çekince tek sayfalı klasörün simgeleri yana,
+        // klasör (ad + panel) yukarı/aşağı direnç artarak kayar; bırakınca yaylı geri döner.
         val rubber = remember { androidx.compose.animation.core.Animatable(0f) }
+        val rubberY = remember { androidx.compose.animation.core.Animatable(0f) }
         val rubberScope = androidx.compose.runtime.rememberCoroutineScope()
         val singlePage = pages.size <= 1
 
@@ -189,31 +191,9 @@ fun FolderOverlay(
         ) {
             HorizontalPager(
                 state = pagerState,
-                userScrollEnabled = drag.key == null,
+                // Tek sayfada kaydırılacak yer yok: çekmeyi aşağıdaki esnek çekme karşılar.
+                userScrollEnabled = drag.key == null && !singlePage,
                 modifier = Modifier
-                    .then(
-                        if (!singlePage) Modifier
-                        else Modifier.pointerInput(Unit) {
-                            var raw = 0f
-                            val limit = size.width.toFloat().coerceAtLeast(1f)
-                            fun settle() = rubberScope.launch {
-                                raw = 0f
-                                rubber.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 360f))
-                            }
-                            detectHorizontalDragGestures(
-                                onDragStart = { raw = rubber.value; rubberScope.launch { rubber.stop() } },
-                                onDragEnd = { settle() },
-                                onDragCancel = { settle() },
-                            ) { change, dx ->
-                                change.consume()
-                                raw += dx
-                                // iOS lastik formülü: çekildikçe direnç artar, en fazla panel genişliğinin ~yarısı.
-                                val a = kotlin.math.abs(raw)
-                                val band = (1f - 1f / (a * 0.55f / limit + 1f)) * limit
-                                rubberScope.launch { rubber.snapTo(if (raw < 0f) -band else band) }
-                            }
-                        }
-                    )
                     .graphicsLayer { translationX = rubber.value }
                     .fillMaxWidth()
                         .height(rowH * 3),
@@ -264,7 +244,49 @@ fun FolderOverlay(
             }
         }
         } // Box (panel + arka mercek alanı)
-        }, modifier = Modifier.fillMaxSize()) { ms, c ->
+        }, modifier = Modifier
+            .fillMaxSize()
+            .pointerInput(singlePage) {
+                // iOS lastik formülü: çekildikçe direnç artar; d = o yöndeki boyut.
+                fun band(raw: Float, d: Float): Float {
+                    val a = kotlin.math.abs(raw)
+                    val b = (1f - 1f / (a * 0.55f / d + 1f)) * d
+                    return if (raw < 0f) -b else b
+                }
+                var rawX = 0f
+                var rawY = 0f
+                fun settle() {
+                    rawX = 0f; rawY = 0f
+                    val spec = androidx.compose.animation.core.spring<Float>(dampingRatio = 0.62f, stiffness = 340f)
+                    rubberScope.launch { rubber.animateTo(0f, spec) }
+                    rubberScope.launch { rubberY.animateTo(0f, spec) }
+                }
+                androidx.compose.foundation.gestures.detectDragGestures(
+                    onDragStart = {
+                        rubberScope.launch { rubber.stop(); rubberY.stop() }
+                        // Geri dönerken yakalanırsa kaldığı yerden devam eder (ters formülle ham değere çevir).
+                        fun inv(v: Float, d: Float): Float {
+                            val a = kotlin.math.abs(v).coerceAtMost(d * 0.98f)
+                            val r = (1f / (1f - a / d) - 1f) * d / 0.55f
+                            return if (v < 0f) -r else r
+                        }
+                        rawX = inv(rubber.value, size.width.toFloat())
+                        rawY = inv(rubberY.value, size.height.toFloat())
+                    },
+                    onDragEnd = { settle() },
+                    onDragCancel = { settle() },
+                ) { change, d ->
+                    if (drag.key != null) return@detectDragGestures
+                    change.consume()
+                    if (singlePage) rawX += d.x
+                    rawY += d.y
+                    val x = if (singlePage) band(rawX, size.width.toFloat()) else 0f
+                    val y = band(rawY, size.height.toFloat())
+                    rubberScope.launch { rubber.snapTo(x); rubberY.snapTo(y) }
+                }
+            }
+            .graphicsLayer { translationY = rubberY.value }
+        ) { ms, c ->
             val loose = c.copy(minWidth = 0, minHeight = 0)
             val title = ms[0].measure(loose)
             val panel = ms[1].measure(loose)

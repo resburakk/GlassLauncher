@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import androidx.compose.ui.platform.LocalDensity
 
 
@@ -171,10 +173,14 @@ fun SearchOverlay(
     val fieldSize = st.searchFieldTextSize.sp
     // iOS 26 düzeni: arka plan hafif kararır; öneriler hep üstte, sonuçlar ortada, arama kutusu altta
     // klavyenin hemen üstünde (safeDrawing klavye yüksekliğini de kapsar).
+    // iOS gibi esnek: boş alanda ya da sonuç listesinin başında/sonunda çekince öneriler ve sonuçlar direnç artarak
+    // kayar, bırakınca yaylı geri döner (arama kutusu klavyenin üstünde sabit kalır).
+    val rb = rememberRubberBand()
     Box(
         Modifier
             .fillMaxSize()
             .pointerInput(Unit) { detectTapGestures(onTap = { close() }) }
+            .rubberDrag(rb)
     ) {
         Column(
             Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 16.dp)
@@ -185,7 +191,7 @@ fun SearchOverlay(
             Column(Modifier.graphicsLayer {
                 val v = visibility().coerceIn(0f, 1f)
                 val e = 1f - (1f - v) * (1f - v) // yavaşlayarak yerine oturur
-                translationY = -(1f - e) * dropPx
+                translationY = -(1f - e) * dropPx + rb.value
             }) {
             // Başlık + sağda iOS'taki "Show More" gibi 4 ↔ 8 öneri geçişi (aşağı/yukarı çekmeyle aynı ayar).
             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -221,6 +227,7 @@ fun SearchOverlay(
                             BlurBackdrop(24.dp, Modifier.matchParentSize(), alpha = visibility)
                         }
                         ResultsList(
+                            rb = rb,
                             vm = vm, query = query.trim(), apps = results, device = device,
                             iconGlass = iconGlass, strength = strength,
                             showPermissionCard = missing.isNotEmpty() && st.searchDeviceCard,
@@ -370,6 +377,7 @@ private fun SuggestionsPanel(
 
 @Composable
 private fun ResultsList(
+    rb: RubberBand,
     vm: LauncherViewModel,
     query: String,
     apps: List<AppInfo>,
@@ -394,9 +402,11 @@ private fun ResultsList(
     LazyColumn(
         // Alt kenarda yumuşak solma: liste klavyenin üstünde kesik görünmez.
         Modifier
+            .nestedScroll(rb.connection)
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
-                drawContent()
+                // Esneme yalnızca çizimde uygulanır (listenin dokunma alanı kaymaz, titreme olmaz).
+                androidx.compose.ui.graphics.drawscope.translate(0f, rb.value) { this@drawWithContent.drawContent() }
                 val h = 28.dp.toPx()
                 drawRect(
                     Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - h, endY = size.height),

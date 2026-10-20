@@ -188,7 +188,7 @@ fun TodayPage(
                     return Offset.Zero
                 }
                 override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
-                    if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && available.y > 0f && !fired) {
+                    if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && available.y > 0f && !fired && !editNow) {
                         acc += available.y
                         if (acc > pullPx) { fired = true; acc = 0f; openSearchNow() }
                     }
@@ -201,21 +201,31 @@ fun TodayPage(
             }
         }
 
+        // iOS gibi esnek: en üstte/altta çekmeye devam edince içerik direnç artarak kayar, bırakınca geri döner.
+        val rb = rememberRubberBand()
+        rb.extent = constraints.maxHeight.toFloat().coerceAtLeast(1f)
         Column(
             Modifier
                 .fillMaxSize()
+                .nestedScroll(rb.connection)
                 .nestedScroll(pullToSearch)
                 .verticalScroll(rememberScrollState())
                 .padding(top = statusTop + u * 14f, bottom = navBottom + u * 28f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Arama çubuğu (dokununca launcher araması açılır).
+        Column(Modifier.fillMaxWidth().rubberY(rb), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Arama çubuğu (dokununca launcher araması açılır). Düzenleme modunda iOS gibi kaybolur: üstteki
+            // "+" ve "Bitti" düğmeleri onun yerine geçer (üst üste binmesinler). Yeri korunur, içerik zıplamaz.
+            val searchAlpha by androidx.compose.animation.core.animateFloatAsState(
+                if (edit) 0f else 1f, androidx.compose.animation.core.tween(180), label = "todaySearch",
+            )
             Row(
                 Modifier
                     .width(contentW)
                     .height(u * 43f)
+                    .graphicsLayer { alpha = searchAlpha; scaleX = 0.94f + 0.06f * searchAlpha; scaleY = scaleX }
                     .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, frosted = true)
-                    .clickable(remember { MutableInteractionSource() }, null) { onOpenSearch() }
+                    .clickable(remember { MutableInteractionSource() }, null, enabled = !edit) { onOpenSearch() }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -339,6 +349,7 @@ fun TodayPage(
                 if (!edit) TodayButton("Düzenle", settings) { onEdit() }
                 else TodayButton("Widget Ekle", settings) { onAddWidget() }
             }
+        }
         }
     }
 }

@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.layout.layout
+
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -473,7 +475,8 @@ private fun LibrarySearchList(
     }
 }
 
-/** Dikey A–Z dizini: dokunulan ya da parmakla üzerinden geçilen harfe atlar (her harf değişiminde hafif titreşim). */
+/** Dikey A–Z dizini: dokunulan ya da parmakla üzerinden geçilen harfe atlar (her harf değişiminde hafif titreşim).
+ *  Parmak dizindeyken solunda, o anki harfi gösteren küçük bir cam baloncuk belirir ve harfle birlikte kayar. */
 @Composable
 private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
     val u = LocalPt.current
@@ -481,10 +484,54 @@ private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
     val haptic = LocalHapticFeedback.current
     val pick by rememberUpdatedState(onPick)
     val n = IndexLetters.size
+    // Parmağın üstündeki harf (-1: dokunulmuyor) ve baloncuğun görünürlüğü.
+    var active by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+    var shown by remember { androidx.compose.runtime.mutableIntStateOf(0) }
     BoxWithConstraints(modifier.fillMaxHeight(), contentAlignment = Alignment.Center) {
         // iOS: harf başına ≈ 12,4 pt; yer yetmezse (klavye açıkken) sıkışır.
         val cell = minOf(u * 12.4f, maxHeight * 0.96f / n)
         val font = with(density) { minOf(u * 11f, cell * 0.86f).toSp() }
+        val colTop = (maxHeight - cell * n.toFloat()) / 2f
+        if (active >= 0 && shown != active) shown = active
+        val vis by androidx.compose.animation.core.animateFloatAsState(
+            if (active >= 0) 1f else 0f,
+            if (active >= 0) androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 700f)
+            else androidx.compose.animation.core.tween(160),
+            label = "idxBubble",
+        )
+        val bubbleY by androidx.compose.animation.core.animateFloatAsState(
+            with(density) { (colTop + cell * (shown + 0.5f)).toPx() },
+            androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 900f),
+            label = "idxBubbleY",
+        )
+        if (vis > 0.01f) {
+            val d = u * 52f
+            Box(
+                Modifier
+                    .align(Alignment.TopStart)
+                    // Boyutsuz yerleşim: baloncuk dizinin genişliğini değiştirmez, solunda durur.
+                    .layout { m, _ ->
+                        val p = m.measure(androidx.compose.ui.unit.Constraints())
+                        layout(0, 0) {
+                            p.place(-(p.width + (u * 14f).roundToPx()), (bubbleY - p.height / 2f).toInt())
+                        }
+                    }
+                    .graphicsLayer {
+                        alpha = vis
+                        val sc = 0.6f + 0.4f * vis
+                        scaleX = sc; scaleY = sc
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
+                    }
+                    .size(d)
+                    .liquidGlass(CircleShape, LocalLauncherSettings.current.panelGlassStrength, 0.dp, frosted = true),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    IndexLetters[shown.coerceIn(0, n - 1)], color = Color.White, fontSize = (u.value * 26f).sp,
+                    fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1,
+                )
+            }
+        }
         Column(
             Modifier
                 .width(u * 18f)
@@ -498,25 +545,30 @@ private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
                             val i = (y / size.height * n).toInt().coerceIn(0, n - 1)
                             if (i != last) {
                                 last = i
+                                active = i
                                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                 pick(IndexLetters[i].first())
                             }
                         }
                         at(down.position.y)
-                        while (true) {
-                            val ev = awaitPointerEvent()
-                            val c = ev.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!c.pressed) break
-                            at(c.position.y)
-                            c.consume()
+                        try {
+                            while (true) {
+                                val ev = awaitPointerEvent()
+                                val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                                if (!c.pressed) break
+                                at(c.position.y)
+                                c.consume()
+                            }
+                        } finally {
+                            active = -1
                         }
                     }
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            IndexLetters.forEach { l ->
+            IndexLetters.forEachIndexed { li, l ->
                 Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
-                    Text(l, color = Color(0xE6FFFFFF), fontSize = font, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
+                    Text(l, color = if (li == active) Color.White else Color(0xE6FFFFFF), fontSize = font, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
                 }
             }
         }
@@ -549,10 +601,13 @@ fun LibraryGroupOverlay(
         val gridSide = side + icon / 2f - pitch / 2f
         val rowH = maxOf(u * 100.6f, icon + u * 34f)
         val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        // iOS gibi esnek: başta/sonda çekmeye devam edince öğeler direnç artarak kayar (ızgaranın kendisi değil).
+        val rb = rememberRubberBand()
+        rb.extent = constraints.maxHeight.toFloat().coerceAtLeast(1f)
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
             contentPadding = PaddingValues(start = gridSide, end = gridSide, bottom = navBottom + u * 24f),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().nestedScroll(rb.connection),
         ) {
             item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
@@ -561,11 +616,12 @@ fun LibraryGroupOverlay(
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .rubberY(rb)
                         .padding(start = side - gridSide, end = side - gridSide, top = u * 176f, bottom = u * 38f),
                 )
             }
             items(group.apps, key = { it.key }) { app ->
-                Box(Modifier.fillMaxWidth().height(rowH), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.fillMaxWidth().height(rowH).rubberY(rb), contentAlignment = Alignment.TopCenter) {
                     DraggableCell(
                         id = "grp:${app.key}", itemId = app.key, place = CellPlace.Library,
                         label = app.label, showLabel = true, icon = icon, pitchX = pitch, cellHeight = rowH,
