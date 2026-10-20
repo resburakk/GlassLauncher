@@ -143,7 +143,7 @@ internal fun HomeContent(
     val statusTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
     val navBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val m = HomeMetrics.compute(maxWidth, maxHeight, statusTop, settings)
+        val m = HomeMetrics.compute(maxWidth, maxHeight, statusTop, settings, navButtonsDp())
         val firstTopPx = with(density) { m.firstTop.toPx() }
         val motion = LocalMotion.current
         val view = LocalView.current

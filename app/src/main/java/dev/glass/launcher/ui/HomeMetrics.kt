@@ -3,6 +3,8 @@ package dev.glass.launcher.ui
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
 import dev.glass.launcher.data.LauncherSettings
@@ -65,8 +67,9 @@ data class HomeMetrics(
         /**
          * @param width/height tam ekran boyutu (dp)
          * @param statusTop durum çubuğu yüksekliği; ilk satır en az bunun biraz altında başlar
+         * @param navButtons üç tuşlu gezinti çubuğunun yüksekliği (hareketle gezintide 0): dock onun üstünde durur
          */
-        fun compute(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings): HomeMetrics {
+        fun compute(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp = 0.dp): HomeMetrics {
             val u = pt(width)
             val cols = s.columns
             val f = 4f / cols
@@ -84,7 +87,9 @@ data class HomeMetrics(
             // Dock (her zaman 4 simge; ızgara sütunlarından bağımsız)
             val dockH = u * 98f * s.dockHeight
             val dockMarginX = (u * 16.5f + width * (1f - s.dockWidth) * 0.5f).coerceAtLeast(4.dp)
-            val dockTop = height - u * s.dockBottom - dockH
+            // Üç tuşlu gezintide dock tuş çubuğunun üstüne binmez: çubuğun üstünde küçük bir boşlukla durur.
+            val dockBottom = if (navButtons > 0.dp) max(u * s.dockBottom, navButtons + u * 8f) else u * s.dockBottom
+            val dockTop = height - dockBottom - dockH
             val innerW = width - dockMarginX * 2f
             val dockIcon = (u * 65f * s.iconScale).coerceAtMost(min(u * 90f * 0.96f, dockH * 0.8f))
             val dockPitch = min(u * 90f, (innerW * 0.94f - dockIcon) / 3f)
@@ -107,4 +112,14 @@ data class HomeMetrics(
             )
         }
     }
+}
+
+/**
+ * Üç tuşlu gezinti çubuğunun yüksekliği; hareketle gezintide 0. (Hareket çubuğu dokunulabilir öğe değildir,
+ * tuşlar ise dokunulabilirdir: "tappableElement" alt kenarı yalnızca üç tuşta dolu gelir.)
+ */
+@androidx.compose.runtime.Composable
+fun navButtonsDp(): Dp {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    return with(d) { WindowInsets.tappableElement.getBottom(this).toDp() }
 }
