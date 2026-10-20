@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        dev.glass.launcher.ui.BarTone.apply = { runOnUiThread { applyCurrentBarTone() } }
         enableEdgeToEdge()
         requestHighestRefreshRate()
         updateDefault()
@@ -383,9 +384,19 @@ class MainActivity : ComponentActivity(), WidgetRequester {
      * Durum/gezinme çubuğu simgeleri duvar kâğıdına göre otomatik siyah veya beyaz olur.
      * Duvar kâğıdı koyu metni destekliyorsa (açık renkli) simgeler siyah, aksi halde beyaz.
      */
+    /** Duvar kâğıdına göre son hesaplanan ton (koyu yazı mı). */
+    private var wallpaperDarkText = false
+
     private fun applyBarTone(colors: WallpaperColors?) {
-        val darkText = colors != null &&
+        wallpaperDarkText = colors != null &&
             (colors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+        applyCurrentBarTone()
+    }
+
+    /** Açık bir ekran (Ayarlar) tonu sabitlemişse ona, değilse duvar kâğıdına göre uygular. */
+    private fun applyCurrentBarTone() {
+        if (isDestroyed) return
+        val darkText = dev.glass.launcher.ui.BarTone.override ?: wallpaperDarkText
         WindowCompat.getInsetsController(window, window.decorView).apply {
             isAppearanceLightStatusBars = darkText
             isAppearanceLightNavigationBars = darkText

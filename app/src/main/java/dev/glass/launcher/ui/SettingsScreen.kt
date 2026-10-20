@@ -148,20 +148,10 @@ fun SettingsScreen(
 
     val dark = when (s.settingsTheme) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
     // Açık temada durum/gezinme çubuğu simgeleri koyu olmalı; ayarlar kapanınca eski hâline döner.
-    val view = LocalView.current
+    // Ayarlar açıkken ton sabitlenir: launcher öne gelince yapılan duvar kâğıdı hesabı bunu bozmasın.
     DisposableEffect(dark) {
-        val win = (view.context as? android.app.Activity)?.window
-        val ctrl = win?.let { WindowCompat.getInsetsController(it, view) }
-        val prevS = ctrl?.isAppearanceLightStatusBars
-        val prevN = ctrl?.isAppearanceLightNavigationBars
-        ctrl?.isAppearanceLightStatusBars = !dark
-        ctrl?.isAppearanceLightNavigationBars = !dark
-        onDispose {
-            if (ctrl != null) {
-                prevS?.let { ctrl.isAppearanceLightStatusBars = it }
-                prevN?.let { ctrl.isAppearanceLightNavigationBars = it }
-            }
-        }
+        BarTone.override = !dark
+        onDispose { BarTone.override = null }
     }
 
     CompositionLocalProvider(
