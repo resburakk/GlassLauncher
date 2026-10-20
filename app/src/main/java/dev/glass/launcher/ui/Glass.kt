@@ -134,7 +134,8 @@ fun Modifier.liquidGlass(
     frosted: Boolean = false,
 ): Modifier = composed {
     val look0 = LocalGlass.current
-    val look = if (frosted && look0.clear) look0.copy(clear = false) else look0
+    // Düşük güçte her cam buzlu kabul edilir (arkası hazır bulanık kopya); şeffaf cam net kopya ister.
+    val look = if ((frosted || look0.reduced) && look0.clear) look0.copy(clear = false) else look0
     val st = LocalLauncherSettings.current
     val rimW = st.glassRimWidth
     val op = st.glassOpacity * glassTintFactor(st.glassTint)
@@ -144,7 +145,13 @@ fun Modifier.liquidGlass(
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalGlassRegions.current else null
     val clear = look.clear
-    val bd = if (look.reduced || content != null) null else if (clear) (look.sharp ?: look.backdrop) else look.backdrop
+    val bd = when {
+        content != null -> null
+        // Düşük güç: gerçek zamanlı bölge bulanıklığı yerine hazır bulanık duvar kâğıdı (ucuz, her yüzeyde aynı).
+        look.reduced -> look.backdrop
+        clear -> look.sharp ?: look.backdrop
+        else -> look.backdrop
+    }
     // Gerçek arka plan varken dolgu daha ince; şeffaf camda neredeyse yok (arkası görünsün).
     val fill = when {
         bd != null || content != null -> if (clear) 0.2f else 0.55f
@@ -152,7 +159,7 @@ fun Modifier.liquidGlass(
     }
     val softPx = if (clear && bd != null && bd === look.sharp) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
     val refr = when {
-        look.noLens -> 0f
+        look.noLens || look.reduced -> 0f
         clear -> (st.glassRefraction * 1.3f).coerceAtMost(1.2f)
         else -> st.glassRefraction
     }
@@ -215,6 +222,21 @@ fun Modifier.liquidGlass(
  * Bulanık duvar kâğıdının bu yüzeyin arkasına düşen bölümünü çizer. Kaynak bölge %4 küçültülür: içerik
  * hafifçe büyümüş görünür ve kenarlarda kayar — camdaki ışık kırılmasına benzer bir "mercek" hissi verir.
  */
+/**
+ * Düşük güç modunda kendi gerçek zamanlı bulanıklığı olmayan yüzeylerin (açılır menüler, "+" menüsü) arkasına
+ * hazır bulanık duvar kâğıdı kopyası çizer: arkadaki simgeler yazıların arasından görünmez, okunur kalır.
+ * Tam kalitede hiçbir şey yapmaz (orada gerçek bulanıklık var). Şekle kırpılmış bir zincirde kullanılmalı.
+ */
+fun Modifier.reducedBackdrop(): Modifier = composed {
+    val look = LocalGlass.current
+    val bd = look.backdrop
+    if (!look.reduced || bd == null) return@composed this
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    this
+        .onGloballyPositioned { origin = it.positionInRoot() }
+        .drawBehind { drawBackdrop(bd, look.rootW, look.rootH, origin) }
+}
+
 private fun DrawScope.drawBackdrop(
     bd: Blurred, rootW: Float, rootH: Float, origin: Offset,
     lens: android.graphics.RuntimeShader? = null, refraction: Float = 0f, soft: Float = 0f, forceLens: Boolean = false,
@@ -506,6 +528,7 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
     val glow = st.glassRimGlow
     this
         .smoothClip(shape)
+        .reducedBackdrop()
         .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
         .glassBrightness(st.glassBrightness)
         .darkEdge(shape, st.glassEdgeDark, (st.glassRimWidth + 1.6f).dp)

@@ -437,6 +437,8 @@ internal fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opaci
     this
         .shadow(24.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
         .smoothClip(shape)
+        // Düşük güçte arkası hazır bulanık kopya (gerçek zamanlı bulanıklık kapalıyken menü okunur kalsın).
+        .reducedBackdrop()
         .background(fill)
         .glassBrightness(st.glassBrightness)
         .then(

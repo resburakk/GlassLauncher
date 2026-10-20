@@ -124,8 +124,14 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     /** Launcher başka bir uygulamanın arkasında kaldı mı (onStop)? Home ile dönüşte sayfa korunur. */
     private var coveredByApp = false
 
+    /** Kare süresi ölçümü (Ayarlar > Performans) için arka plan iş parçacığı. */
+    private val metricsHandler by lazy {
+        android.os.Handler(android.os.HandlerThread("frameMetrics").apply { start() }.looper)
+    }
+
     override fun onPause() {
         super.onPause()
+        runCatching { window.removeOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener) }
         // Launcher bir uygulama/pencere açmadan arka plana geçiyor: büyük olasılıkla son uygulamalar ekranı.
         if (!LaunchTracker.recent() && !isChangingConfigurations) homeHidden = true
     }
@@ -143,6 +149,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onResume() {
         super.onResume()
+        runCatching { window.addOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener, metricsHandler) }
         homeHidden = false
         coveredByApp = false
         // Sistem çağrıları (bazıları yavaş: duvar kâğıdı renk hesabı) ana iş parçacığını meşgul etmesin;

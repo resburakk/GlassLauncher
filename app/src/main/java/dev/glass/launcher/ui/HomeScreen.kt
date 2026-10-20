@@ -398,7 +398,9 @@ fun HomeScreen(
             else -> "Tam: bulanıklık ve kırılma açık."
         }
     }
-    val useBackdrop = settings.launcherWallpaper && settings.realBlur && !reduced
+    // Düşük güçte de hazır (bir kez bulanıklaştırılmış) kopya kullanılır: bütün cam yüzeyler aynı kuralla, okunur
+    // çizilir (gerçek zamanlı bulanıklık ve kırılma kapalı). Net kopya (şeffaf cam) düşük güçte kullanılmaz.
+    val useBackdrop = settings.launcherWallpaper && settings.realBlur
     val clearGlass = settings.glassStyle == "clear"
     // Şeffaf cam: duvar kâğıdının net kopyası (doku olarak; kendi boyutuyla eşlenir).
     val sharpBackdrop = remember(wallpaper) { wallpaper?.let { dev.glass.launcher.data.Blurred(it, it.width, it.height) } }
@@ -449,7 +451,7 @@ fun HomeScreen(
             noLens = noLens,
             clear = clearGlass,
             // Ana ekran bulanıklığı açıkken şeffaf cam da net kopya yerine aynı oranda bulanık kopyayı kullanır.
-            sharp = if (!useBackdrop) null else homeBackdrop ?: sharpBackdrop,
+            sharp = if (!useBackdrop || reduced) null else homeBackdrop ?: sharpBackdrop,
             backdrop = if (!useBackdrop) null else homeBackdrop ?: blurred,
             rootW = rootSize.width.toFloat(),
             rootH = rootSize.height.toFloat(),
@@ -612,10 +614,29 @@ fun HomeScreen(
                 }.getOrNull()
             }
         }
+        // Duvar kâğıdı dosyası çoğu zaman ekrandan çok büyük: her karede küçültülerek çizilmesi ekran kartını yoruyordu.
+        // Bir kez (arka planda) ekranı kaplayacak boyuta indirilir; görünüm aynıdır (aynı oran, aynı kırpma).
+        val screenWp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, rootSize) {
+            val src = wp
+            if (src == null || rootSize.width == 0) { value = null; return@produceState }
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                runCatching {
+                    val full0 = src.asAndroidBitmap()
+                    val k = maxOf(rootSize.width.toFloat() / full0.width, rootSize.height.toFloat() / full0.height)
+                    if (k >= 0.9f) return@runCatching null // zaten ekran boyutunda
+                    val full = if (full0.config == android.graphics.Bitmap.Config.HARDWARE) full0.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else full0
+                    val out = android.graphics.Bitmap.createScaledBitmap(
+                        full, (full.width * k).toInt().coerceAtLeast(1), (full.height * k).toInt().coerceAtLeast(1), true,
+                    )
+                    out.prepareToDraw()
+                    out.asImageBitmap()
+                }.getOrNull()
+            }
+        }
         if (settings.launcherWallpaper && wp != null && needCopy) {
             val blurImg = overlayBlurImg
             Image(
-                wp, null,
+                screenWp ?: wp, null,
                 Modifier.fillMaxSize().graphicsLayer {
                     // Son uygulamalar açılırken kopya da söner: sistem pencereyi küçültünce arkadaki gerçek duvar
                     // kâğıdının önünde açık renkli bir dikdörtgen gibi görünüyordu.
@@ -686,6 +707,11 @@ fun HomeScreen(
         if (settings.showToday && todayVisible) {
             // iOS Bugün görünümünde arka plan bulanık ve biraz koyu.
             Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
+            // Arama/menü/galeri açılınca widget sayfası da ana ekran gibi bulanıklaşır (yarıçap çizimde okunur).
+            Box(Modifier.fillMaxSize().graphicsLayer {
+                val br = blurPxMax * blurAmount
+                if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
+            }) {
             TodayPage(
                 state = today,
                 widgets = layout.today,
@@ -703,6 +729,7 @@ fun HomeScreen(
                     overlay = Overlay.Menu
                 },
             )
+            }
         }
         }
         // Karartma çizimde okunur (geçişte ana ekran her karede yeniden oluşturulmasın).

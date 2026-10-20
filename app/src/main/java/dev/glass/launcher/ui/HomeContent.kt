@@ -251,6 +251,7 @@ internal fun HomeContent(
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (!pagerState.isScrollInProgress) return@LaunchedEffect
             val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
+            FrameStats.begin()
             val list = ArrayList<Long>()
             var last = 0L
             try {

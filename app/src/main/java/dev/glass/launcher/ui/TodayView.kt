@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
@@ -174,10 +176,35 @@ fun TodayPage(
         val gapY = (hm.pitchX - hm.icon).coerceAtLeast(12.dp)
         var dragId by remember { mutableStateOf<String?>(null) }
         var dragOffset by remember { mutableStateOf(Offset.Zero) }
+        // En üstteyken aşağı çekince arama açılır (klavyeyle), iOS gibi. Sayfa aşağı kaydırılmışsa önce yukarı kayar.
+        val pullPx = with(density) { (u * 70f).toPx() }
+        val openSearchNow by rememberUpdatedState(onOpenSearch)
+        val pullToSearch = remember(pullPx) {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                var acc = 0f
+                var fired = false
+                override fun onPreScroll(available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                    if (available.y < 0f) acc = 0f
+                    return Offset.Zero
+                }
+                override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                    if (source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput && available.y > 0f && !fired) {
+                        acc += available.y
+                        if (acc > pullPx) { fired = true; acc = 0f; openSearchNow() }
+                    }
+                    return Offset.Zero
+                }
+                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                    acc = 0f; fired = false
+                    return androidx.compose.ui.unit.Velocity.Zero
+                }
+            }
+        }
 
         Column(
             Modifier
                 .fillMaxSize()
+                .nestedScroll(pullToSearch)
                 .verticalScroll(rememberScrollState())
                 .padding(top = statusTop + u * 14f, bottom = navBottom + u * 28f),
             horizontalAlignment = Alignment.CenterHorizontally,
