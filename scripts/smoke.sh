@@ -152,7 +152,7 @@ toggle_lowpower() {
   adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
   tap_text "+"; step "artı menüsü" 1
   tap_text "Ayarlar"; step "ayarlar" 2
-  adb shell input swipe $cx $((H*80/100)) $cx $((H*25/100)) 300; step "aşağı kaydır" 1
+  for i in 1 2 3; do adb shell input swipe $cx $((H*85/100)) $cx $((H*20/100)) 250; sleep 0.7; done; step "aşağı kaydır" 1
   tap_text "Performans"; step "performans" 2
   tap_text "Düşük güç modu"; step "düşük güç değişti" 1
   shot "$1"
