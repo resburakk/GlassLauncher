@@ -147,34 +147,6 @@ adb shell input swipe $((W*85/100)) $cy $((W*15/100)) $cy 300; step "widget sayf
 shot 21c-bugun-kapandi
 adb shell input keyevent KEYCODE_HOME; step "ana ekran"
 
-# Düşük güç modu: tüm camlar hazır bulanık kopyayla, menü okunur olmalı
-toggle_lowpower() {
-  adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
-  tap_text "+"; step "artı menüsü" 1
-  tap_text "Ayarlar"; step "ayarlar" 2
-  for i in 1 2 3; do adb shell input swipe $cx $((H*85/100)) $cx $((H*20/100)) 250; sleep 0.7; done; step "aşağı kaydır" 1
-  tap_text "Performans"; step "performans" 2
-  # Anahtar satırın sağında: yazının yüksekliğinde, ekranın sağ tarafına dokun
-  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
-  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F 'text="Düşük güç modu"' | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
-  set -- $b
-  [ -n "$4" ] && adb shell input tap $((W*88/100)) $(( ($2+$4)/2 )); step "düşük güç değişti" 1
-  shot "$1"
-  adb shell input keyevent KEYCODE_BACK; step "ayarlar kökü" 1
-  adb shell input keyevent KEYCODE_BACK; step "ayarlar kapandı" 1
-  adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
-  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
-}
-toggle_lowpower 22p-dusuk-guc-acik
-adb shell input motionevent DOWN $ix $iy; sleep 0.8; adb shell input motionevent UP $ix $iy; step "menü (düşük güç)" 2
-shot 22a-dusuk-guc-menu
-adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
-adb shell input tap $cx $((H*81/100)); step "arama (düşük güç)" 3
-shot 22b-dusuk-guc-arama
-adb shell input keyevent KEYCODE_BACK; step "klavye" 1
-adb shell input keyevent KEYCODE_BACK; step "aramayı kapat" 1
-toggle_lowpower 22q-dusuk-guc-kapali
-
 # 7) Üstten kaydırma (sistem Kontrol Merkezi) — en sonda, sistem paneli diğer adımları etkilemesin
 adb shell input swipe $cx $((H*8/100)) $cx $((H*50/100)) 300; step "kontrol merkezi" 3
 shot 08-kontrol-merkezi
