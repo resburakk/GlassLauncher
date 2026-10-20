@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.foundation.gestures.detectDragGestures
+
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 
 import kotlinx.coroutines.launch
@@ -261,7 +263,7 @@ fun FolderOverlay(
                     rubberScope.launch { rubber.animateTo(0f, spec) }
                     rubberScope.launch { rubberY.animateTo(0f, spec) }
                 }
-                androidx.compose.foundation.gestures.detectDragGestures(
+                detectDragGestures(
                     onDragStart = {
                         rubberScope.launch { rubber.stop(); rubberY.stop() }
                         // Geri dönerken yakalanırsa kaldığı yerden devam eder (ters formülle ham değere çevir).

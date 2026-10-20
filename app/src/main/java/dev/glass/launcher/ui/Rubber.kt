@@ -2,6 +2,7 @@ package dev.glass.launcher.ui
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -103,7 +104,7 @@ fun Modifier.rubberY(rb: RubberBand): Modifier = graphicsLayer { translationY = 
 fun Modifier.rubberDrag(rb: RubberBand, enabled: Boolean = true): Modifier =
     if (!enabled) this else pointerInput(rb) {
         rb.extent = size.height.toFloat().coerceAtLeast(1f)
-        androidx.compose.foundation.gestures.detectVerticalDragGestures(
+        detectVerticalDragGestures(
             onDragEnd = { rb.release() },
             onDragCancel = { rb.release() },
         ) { change, dy ->
