@@ -153,6 +153,19 @@ fun SettingsScreen(
         BarTone.override = !dark
         onDispose { BarTone.override = null }
     }
+    // 120 Hz: Android 15+ pencereleri varsayılan olarak 60 Hz'de çizer; ayarlar açıkken (kaydırma, sayfa geçişleri)
+    // en yüksek hız istenir. Yalnızca çizim olduğunda etkilidir, boşta pil harcamaz.
+    val frView = LocalView.current
+    DisposableEffect(frView) {
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            frView.requestedFrameRate = android.view.View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
+        }
+        onDispose {
+            if (android.os.Build.VERSION.SDK_INT >= 35) {
+                frView.requestedFrameRate = android.view.View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
+            }
+        }
+    }
 
     CompositionLocalProvider(
         LocalSettingsPalette provides if (dark) DarkPalette else LightPalette,
