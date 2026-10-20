@@ -154,7 +154,11 @@ toggle_lowpower() {
   tap_text "Ayarlar"; step "ayarlar" 2
   for i in 1 2 3; do adb shell input swipe $cx $((H*85/100)) $cx $((H*20/100)) 250; sleep 0.7; done; step "aşağı kaydır" 1
   tap_text "Performans"; step "performans" 2
-  tap_text "Düşük güç modu"; step "düşük güç değişti" 1
+  # Anahtar satırın sağında: yazının yüksekliğinde, ekranın sağ tarafına dokun
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F 'text="Düşük güç modu"' | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  set -- $b
+  [ -n "$4" ] && adb shell input tap $((W*88/100)) $(( ($2+$4)/2 )); step "düşük güç değişti" 1
   shot "$1"
   adb shell input keyevent KEYCODE_BACK; step "ayarlar kökü" 1
   adb shell input keyevent KEYCODE_BACK; step "ayarlar kapandı" 1
