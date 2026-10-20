@@ -53,7 +53,17 @@ jobs:
         run: |
           cp app/build/outputs/apk/release/app-release.apk GlassLauncher.apk
           gh release delete son-surum -y --cleanup-tag || true
+          # Etiketin silinmesi bitmeden yeni sürüm oluşturulursa sürüm taslakta kalabiliyor: kısa bekle.
+          sleep 5
           gh release create son-surum GlassLauncher.apk \
             --target "$GITHUB_SHA" --prerelease \
             --title "Glass Launcher (son derleme)" \
             --notes "Otomatik derleme: ${GITHUB_SHA::7}. Telefonda GlassLauncher.apk dosyasını indirip kurun."
+          # Taslakta kaldıysa yayınla ve doğrula (yayınlanmamış sürüm telefonda görünmez).
+          for i in 1 2 3; do
+            d=$(gh release view son-surum --json isDraft -q .isDraft || echo true)
+            [ "$d" = "false" ] && break
+            gh release edit son-surum --draft=false || true
+            sleep 3
+          done
+          test "$(gh release view son-surum --json isDraft -q .isDraft)" = "false"
