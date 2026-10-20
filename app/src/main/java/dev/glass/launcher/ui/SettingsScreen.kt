@@ -1029,7 +1029,7 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             "ibresi gibi sürekli animasyonları azaltır."
     )
     Group("Kaydırma ölçümü") {
-        Text(FrameStats.text, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
+        Text(FrameStats.text + "\n\n" + FrameStats.homeTask, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
     }
     Footer("Ana ekranda sayfa kaydırıp buraya dönün. 120 Hz ekranda akıcı kaydırmada ortalama 110–120 Hz ve az sayıda takılan kare görünmeli. Ortalama 60 Hz civarındaysa telefon launcher'ı 60 Hz'de çalıştırıyor demektir.")
 }

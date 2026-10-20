@@ -11,6 +11,8 @@ import androidx.compose.runtime.setValue
 object FrameStats {
     var text by mutableStateOf("Henüz ölçüm yok: ana ekranda birkaç kez sayfa kaydırın.")
         private set
+    /** Launcher'ın sistemin ana ekran görevinde çalışıp çalışmadığı (MainActivity.checkHomeTask). */
+    var homeTask by mutableStateOf("Ana ekran görevi: henüz kontrol edilmedi.")
 
     // --- Kare başına süre ayrımı (Android FrameMetrics): arayüz iş parçacığı, çizim (RenderThread), ekran kartı ---
     private val lock = Any()

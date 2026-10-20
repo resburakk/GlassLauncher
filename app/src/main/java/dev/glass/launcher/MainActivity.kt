@@ -164,6 +164,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 if (held != null) isDefault = held
+                checkHomeTask(held == true)
                 applyBarTone(colors)
             }
         }
@@ -171,6 +172,38 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     private val bg = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    /**
+     * Launcher sistemin ANA EKRAN görevinde mi çalışıyor? Sıradan bir uygulama görevinde kalırsa (ör. eski sürümde
+     * simgeden / "Aç" ile açıldıysa) sistem ana ekrandayken bile uygulamadaymışız gibi davranır: ana ekran ve son
+     * uygulamalar tuşları, son uygulamalarda boşluğa dokunma çalışmaz, son uygulamalar ancak ikinci kaydırmada açılır.
+     * Öyleyse launcher kendini bir kez kapatıp ana ekran isteğiyle yeniden açar. Durum Ayarlar > Performans'ta görünür.
+     */
+    private fun checkHomeTask(isDefaultHome: Boolean) {
+        val base = runCatching {
+            getSystemService(android.app.ActivityManager::class.java).appTasks
+                .map { it.taskInfo }.firstOrNull { it.taskId == taskId }?.baseIntent
+        }.getOrNull()
+        val homeTask = base != null && base.action == Intent.ACTION_MAIN && base.hasCategory(Intent.CATEGORY_HOME)
+        dev.glass.launcher.ui.FrameStats.homeTask = when {
+            !isDefaultHome -> "Ana ekran görevi: launcher varsayılan ana ekran değil."
+            homeTask -> "Ana ekran görevi: doğru (launcher sistemin ana ekranı olarak çalışıyor)."
+            else -> "Ana ekran görevi: YANLIŞ — launcher sıradan bir uygulama görevinde " +
+                "(açılış: ${base?.component?.shortClassName ?: "?"} ${base?.categories?.joinToString() ?: ""})." +
+                if (healedOnce) " Kendini onarma denendi ama düzelmedi." else ""
+        }
+        if (isDefaultHome && base != null && !homeTask && !healedOnce && !isFinishing) {
+            healedOnce = true
+            val app = applicationContext
+            finishAndRemoveTask()
+            runCatching {
+                app.startActivity(
+                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(packageName)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
+        }
+    }
     @Volatile private var needHideFromRecents = true
 
     /**
@@ -358,6 +391,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     companion object {
+        /** Kendini ana ekran görevine taşıma bu süreçte yalnızca bir kez denenir (döngüye girmesin). */
+        @Volatile private var healedOnce = false
         /** "Glass Ayarları" simgesinden gelindi: ayarlar açılsın (bkz. EntryActivity). */
         const val EXTRA_SETTINGS = "dev.glass.launcher.OPEN_SETTINGS"
         private const val REQ_CONFIGURE = 0x5701
