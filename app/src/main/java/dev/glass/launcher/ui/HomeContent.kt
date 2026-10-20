@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.draw.drawBehind
+
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
 import androidx.compose.runtime.rememberUpdatedState
@@ -461,6 +463,14 @@ internal fun HomeContent(
                 }
             }
         }
+        // Kaydırma sürerken her karede tüm ekran "değişti" sayılır: sayfalar önbellek katmanından taşınırken telefonun
+        // kısmi yeniden çizimi ekranın bir kısmını eski karede bırakıyordu (ortadaki sütunlar donuyordu). Bu kutu
+        // görünmezdir; yalnızca her karede tüm ekranı yeniletir (sayfaların kendisi yeniden çizilmez).
+        var fullDamageTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        LaunchedEffect(pagerState.isScrollInProgress) {
+            if (pagerState.isScrollInProgress) while (true) withFrameNanos { fullDamageTick++ }
+        }
+        Box(Modifier.fillMaxSize().drawBehind { if (fullDamageTick >= 0) drawRect(Color.Transparent) })
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
