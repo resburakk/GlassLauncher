@@ -121,5 +121,7 @@ data class HomeMetrics(
 @androidx.compose.runtime.Composable
 fun navButtonsDp(): Dp {
     val d = androidx.compose.ui.platform.LocalDensity.current
-    return with(d) { WindowInsets.tappableElement.getBottom(this).toDp() }
+    val h = with(d) { WindowInsets.tappableElement.getBottom(this).toDp() }
+    // MagicOS hareket çubuğunu da dokunulabilir bildiriyor (≈ 20–30 dp); üç tuşlu çubuk ≈ 48 dp.
+    return if (h >= 40.dp) h else 0.dp
 }
