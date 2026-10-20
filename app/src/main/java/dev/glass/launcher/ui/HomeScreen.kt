@@ -269,6 +269,7 @@ fun HomeScreen(
     }
 
     BackHandler(enabled = true) {
+        FrameStats.backCallbacks++
         if (wallpaperSheet) wallpaperSheet = false
         else if (folderMenu != null) folderMenu = null
         else if (overlay != Overlay.None) closeOverlay()

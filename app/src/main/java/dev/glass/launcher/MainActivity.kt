@@ -217,8 +217,22 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         }
     }
 
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
+            dev.glass.launcher.ui.FrameStats.backKeys++
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        dev.glass.launcher.ui.FrameStats.hasFocus = hasFocus
+        if (!hasFocus) dev.glass.launcher.ui.FrameStats.focusLost++
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.hasCategory(Intent.CATEGORY_HOME)) dev.glass.launcher.ui.FrameStats.homeIntents++
         if (isSettingsEntry(intent)) {
             needHideFromRecents = true
             openSettingsRequest++

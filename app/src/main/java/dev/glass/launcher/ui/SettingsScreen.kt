@@ -144,7 +144,7 @@ fun SettingsScreen(
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val onChange: ((LauncherSettings) -> LauncherSettings) -> Unit = { vm.updateSettings(it) }
 
-    BackHandler { if (page != null) page = null else onClose() }
+    BackHandler { FrameStats.backCallbacks++; if (page != null) page = null else onClose() }
 
     val dark = when (s.settingsTheme) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
     // Açık temada durum/gezinme çubuğu simgeleri koyu olmalı; ayarlar kapanınca eski hâline döner.
@@ -1029,7 +1029,7 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             "ibresi gibi sürekli animasyonları azaltır."
     )
     Group("Kaydırma ölçümü") {
-        Text(FrameStats.text + "\n\n" + FrameStats.homeTask, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
+        Text(FrameStats.text + "\n\n" + FrameStats.homeTask + "\n\n" + FrameStats.eventsText, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
     }
     Footer("Ana ekranda sayfa kaydırıp buraya dönün. 120 Hz ekranda akıcı kaydırmada ortalama 110–120 Hz ve az sayıda takılan kare görünmeli. Ortalama 60 Hz civarındaysa telefon launcher'ı 60 Hz'de çalıştırıyor demektir.")
 }
