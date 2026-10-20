@@ -16,11 +16,12 @@ object FrameStats {
     // Telefonda geri/ana ekran olaylarının launcher'a ulaşıp ulaşmadığını görmek için sayaçlar.
     var backCallbacks by mutableStateOf(0)
     var backKeys by mutableStateOf(0)
+    var directBacks by mutableStateOf(0)
     var homeIntents by mutableStateOf(0)
     var focusLost by mutableStateOf(0)
     var hasFocus by mutableStateOf(true)
     val eventsText: String
-        get() = "Olaylar: geri işlendi $backCallbacks, geri tuşu $backKeys, ana ekran $homeIntents, " +
+        get() = "Olaylar: geri işlendi $backCallbacks, geri (doğrudan) $directBacks, geri tuşu $backKeys, ana ekran $homeIntents, " +
             "odak kaybı $focusLost (şu an ${if (hasFocus) "odakta" else "odakta DEĞİL"})."
 
     // --- Kare başına süre ayrımı (Android FrameMetrics): arayüz iş parçacığı, çizim (RenderThread), ekran kartı ---
