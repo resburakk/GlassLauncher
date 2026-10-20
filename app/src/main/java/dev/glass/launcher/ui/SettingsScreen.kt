@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import android.net.Uri
 
 import androidx.compose.material3.LocalTextStyle
@@ -50,6 +52,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -199,9 +202,13 @@ fun SettingsScreen(
                         modifier = Modifier.clickable { onClose() }.padding(8.dp),
                     )
                 }
+                // Kaydırırken içerik her karede baştan çizilmesin: tek bir hazır katman olarak taşınır (akıcı 120 Hz).
+                val pageScroll = rememberScrollState()
+                SettingsScrollStats(pageScroll)
                 Column(
-                    Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)
+                    Modifier.fillMaxSize().verticalScroll(pageScroll).padding(horizontal = 16.dp)
                 ) {
+                Column(Modifier.fillMaxWidth().graphicsLayer { }) {
                     Text(
                         p?.title ?: "Ayarlar", color = Fg, fontSize = 32.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
@@ -239,6 +246,7 @@ fun SettingsScreen(
                         }
                     }
                     Spacer(Modifier.height(32.dp))
+                }
                 }
             }
         }
@@ -1248,6 +1256,30 @@ private fun SwipeChoices(selected: SwipeAction, onSelect: (SwipeAction) -> Unit)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { a -> Chip(a.title, selected == a, Modifier.weight(1f)) { onSelect(a) } }
             }
+        }
+    }
+}
+
+
+/** Ayarlardaki kaydırmanın kare ölçümü (Ayarlar > Performans'ta "Son kaydırma (Ayarlar)"). */
+@Composable
+private fun SettingsScrollStats(state: androidx.compose.foundation.ScrollState) {
+    val view = LocalView.current
+    LaunchedEffect(state.isScrollInProgress) {
+        if (!state.isScrollInProgress) return@LaunchedEffect
+        val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
+        FrameStats.begin()
+        val list = ArrayList<Long>()
+        var last = 0L
+        try {
+            while (list.size < 600) {
+                androidx.compose.runtime.withFrameNanos { t ->
+                    if (last != 0L) list += t - last
+                    last = t
+                }
+            }
+        } finally {
+            FrameStats.report(list.toLongArray(), refresh, "Son kaydırma (Ayarlar)")
         }
     }
 }

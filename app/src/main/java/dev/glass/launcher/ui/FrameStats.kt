@@ -61,7 +61,7 @@ object FrameStats {
     }
 
     /** [intervalsNs]: art arda karelerin arası (ns), [refresh]: ekranın bildirdiği yenileme hızı (Hz). */
-    fun report(intervalsNs: LongArray, refresh: Float) {
+    fun report(intervalsNs: LongArray, refresh: Float, label: String = "Son kaydırma (ana ekran)") {
         if (intervalsNs.size < 8) { recording = false; return }
         val ms = intervalsNs.map { it / 1_000_000f }.sorted()
         val median = ms[ms.size / 2]
@@ -69,7 +69,7 @@ object FrameStats {
         val late = ms.count { it > expected * 1.5f }
         val worst = ms.last()
         val hz = 1000f / median.coerceAtLeast(0.1f)
-        text = "Son kaydırma: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
+        text = "$label: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
             "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
     }
