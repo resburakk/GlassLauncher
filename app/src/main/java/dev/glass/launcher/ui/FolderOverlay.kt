@@ -280,14 +280,13 @@ fun FolderOverlay(
                 ) { change, d ->
                     if (drag.key != null) return@detectDragGestures
                     change.consume()
-                    if (singlePage) rawX += d.x
-                    rawY += d.y
-                    val x = if (singlePage) band(rawX, size.width.toFloat()) else 0f
-                    val y = band(rawY, size.height.toFloat())
-                    rubberScope.launch { rubber.snapTo(x); rubberY.snapTo(y) }
+                    // Açık klasörde yalnızca yana esner (yukarı/aşağı esneme yok).
+                    if (!singlePage) return@detectDragGestures
+                    rawX += d.x
+                    val x = band(rawX, size.width.toFloat())
+                    rubberScope.launch { rubber.snapTo(x) }
                 }
             }
-            .graphicsLayer { translationY = rubberY.value }
         ) { ms, c ->
             val loose = c.copy(minWidth = 0, minHeight = 0)
             val title = ms[0].measure(loose)
