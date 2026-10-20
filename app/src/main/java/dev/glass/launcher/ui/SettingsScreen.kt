@@ -1,5 +1,23 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.geometry.Offset
+
+import androidx.compose.runtime.snapshotFlow
+
+import androidx.compose.foundation.gestures.rememberDraggableState
+
+import androidx.compose.foundation.gestures.draggable
+
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import androidx.compose.ui.draw.drawWithContent
+
+import androidx.compose.ui.graphics.drawscope.clipPath
+
+import androidx.compose.ui.graphics.drawscope.translate
+
 import androidx.compose.ui.graphics.graphicsLayer
 
 import android.net.Uri
@@ -147,7 +165,7 @@ fun SettingsScreen(
     var page by rememberSaveable { mutableStateOf<String?>(null) }
     val onChange: ((LauncherSettings) -> LauncherSettings) -> Unit = { vm.updateSettings(it) }
 
-    BackHandler { FrameStats.backCallbacks++; if (page != null) page = null else onClose() }
+    BackHandler { if (page != null) page = null else onClose() }
 
     val dark = when (s.settingsTheme) { "light" -> false; "dark" -> true; else -> isSystemInDarkTheme() }
     // Açık temada durum/gezinme çubuğu simgeleri koyu olmalı; ayarlar kapanınca eski hâline döner.
@@ -170,11 +188,79 @@ fun SettingsScreen(
         }
     }
 
+    // iOS gibi aşağı çekerek kapatma: üst çubuktan ya da sayfa en üstteyken aşağı çekince sayfa parmağı izler;
+    // yeterince çekilip bırakılırsa (ya da hızlıca aşağı fırlatılırsa) kapanır, değilse yerine döner.
+    // Geri hareketi MagicOS'ta ana ekran uygulamasına hiç gelmediği için kapatmanın asıl yolu bu.
+    val sheetScope = rememberCoroutineScope()
+    val sheet = remember { androidx.compose.animation.core.Animatable(0f) }
+    var sheetH by remember { mutableStateOf(1f) }
+    val closeNow by rememberUpdatedState(onClose)
+    LaunchedEffect(sheet) { snapshotFlow { sheet.value }.collect { SettingsSheet.offset = it } }
+    DisposableEffect(Unit) { onDispose { SettingsSheet.offset = 0f } }
+    fun sheetDrag(dy: Float) {
+        val v = (sheet.value + dy).coerceAtLeast(0f)
+        sheetScope.launch { sheet.snapTo(v) }
+    }
+    fun sheetRelease(vy: Float) {
+        sheetScope.launch {
+            if (sheet.value > sheetH * 0.22f || (vy > 1400f && sheet.value > 0f)) {
+                sheet.animateTo(sheetH, androidx.compose.animation.core.tween(200))
+                closeNow()
+            } else {
+                sheet.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 500f))
+            }
+        }
+    }
+    val sheetConn = remember {
+        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                // Sayfa aşağı çekilmişken yukarı itmek önce sayfayı yerine götürür.
+                if (sheet.value <= 0f || available.y >= 0f) return Offset.Zero
+                val used = maxOf(available.y, -sheet.value)
+                sheetDrag(used)
+                return Offset(0f, used)
+            }
+            override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                // Liste en üstteyken artan aşağı çekme sayfayı aşağı taşır.
+                if (source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
+                sheetDrag(available.y)
+                return Offset(0f, available.y)
+            }
+            override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                if (sheet.value <= 0f) return androidx.compose.ui.unit.Velocity.Zero
+                sheetRelease(available.y)
+                return available
+            }
+        }
+    }
+
     CompositionLocalProvider(
         LocalSettingsPalette provides if (dark) DarkPalette else LightPalette,
         LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = AppFont),
     ) {
-    Box(Modifier.fillMaxSize().background(PageBg)) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onSizeChanged { sheetH = it.height.toFloat().coerceAtLeast(1f) }
+            .nestedScroll(sheetConn)
+            // Kaydırma yalnızca çizimde uygulanır: dokunma alanı sabit kalır, parmak altında titreme olmaz.
+            .drawWithContent {
+                val v = sheet.value
+                if (v <= 0f) drawContent()
+                else {
+                    val r = 12.dp.toPx() * (v / sheetH * 8f).coerceAtMost(1f)
+                    translate(0f, v) {
+                        clipPath(androidx.compose.ui.graphics.Path().apply {
+                            addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                                0f, 0f, size.width, size.height,
+                                androidx.compose.ui.geometry.CornerRadius(r, r),
+                            ))
+                        }) { this@drawWithContent.drawContent() }
+                    }
+                }
+            }
+            .background(PageBg)
+    ) {
         AnimatedContent(
             targetState = page,
             transitionSpec = {
@@ -189,7 +275,19 @@ fun SettingsScreen(
             val p = current?.let { name -> SettingsPage.entries.firstOrNull { it.name == name } }
             Column(Modifier.fillMaxSize().background(PageBg).windowInsetsPadding(WindowInsets.safeDrawing)) {
                 // Üst çubuk
-                Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        // Üst çubuktan da aşağı çekilebilir (iOS sayfa tutamağı gibi).
+                        .draggable(
+                            orientation = androidx.compose.foundation.gestures.Orientation.Vertical,
+                            state = rememberDraggableState { dy -> sheetDrag(dy) },
+                            onDragStopped = { vy -> sheetRelease(vy) },
+                        )
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (p != null) {
                         Text(
                             "‹ Ayarlar", color = Blue, fontSize = 17.sp,
@@ -1040,7 +1138,7 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             "ibresi gibi sürekli animasyonları azaltır."
     )
     Group("Kaydırma ölçümü") {
-        Text(FrameStats.text + "\n\n" + FrameStats.homeTask + "\n\n" + FrameStats.eventsText, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
+        Text(FrameStats.text, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
     }
     Footer("Ana ekranda sayfa kaydırıp buraya dönün. 120 Hz ekranda akıcı kaydırmada ortalama 110–120 Hz ve az sayıda takılan kare görünmeli. Ortalama 60 Hz civarındaysa telefon launcher'ı 60 Hz'de çalıştırıyor demektir.")
 }
@@ -1285,4 +1383,10 @@ private fun SettingsScrollStats(state: androidx.compose.foundation.ScrollState) 
             FrameStats.report(list.toLongArray(), refresh, "Son kaydırma (Ayarlar)")
         }
     }
+}
+
+
+/** Ayarlar sayfasının aşağı çekilme miktarı (px): çekilirken arkadaki ana ekran yeniden çizilir. */
+object SettingsSheet {
+    var offset by androidx.compose.runtime.mutableFloatStateOf(0f)
 }

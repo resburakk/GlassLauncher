@@ -73,14 +73,6 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dev.glass.launcher.ui.BarTone.apply = { runOnUiThread { applyCurrentBarTone() } }
-        // Geri: pencereye en yüksek öncelikle doğrudan kaydolunur. MagicOS ana ekranda (launcher) uygulamanın normal
-        // önceliğindeki geri kaydını görmüyor, geriyi bize vermeden "ana ekrana dön" animasyonunu oynatıyordu.
-        // Gelen geri, Compose'daki geri işleyicilerine (klasör, ayarlar, arama ...) iletilir.
-        if (android.os.Build.VERSION.SDK_INT >= 33) runCatching {
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(
-                android.window.OnBackInvokedDispatcher.PRIORITY_OVERLAY, directBack,
-            )
-        }
         enableEdgeToEdge()
         requestHighestRefreshRate()
         updateDefault()
@@ -182,11 +174,6 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     private val bg = java.util.concurrent.Executors.newSingleThreadExecutor()
 
-    private val directBack by lazy {
-        android.window.OnBackInvokedCallback {
-            dev.glass.launcher.ui.FrameStats.directBacks++
-            onBackPressedDispatcher.onBackPressed()
-        }
     }
 
     /**
@@ -233,22 +220,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         }
     }
 
-    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
-        if (event.keyCode == android.view.KeyEvent.KEYCODE_BACK && event.action == android.view.KeyEvent.ACTION_UP) {
-            dev.glass.launcher.ui.FrameStats.backKeys++
-        }
-        return super.dispatchKeyEvent(event)
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        dev.glass.launcher.ui.FrameStats.hasFocus = hasFocus
-        if (!hasFocus) dev.glass.launcher.ui.FrameStats.focusLost++
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasCategory(Intent.CATEGORY_HOME)) dev.glass.launcher.ui.FrameStats.homeIntents++
         if (isSettingsEntry(intent)) {
             needHideFromRecents = true
             openSettingsRequest++
