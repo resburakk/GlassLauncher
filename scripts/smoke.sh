@@ -99,6 +99,7 @@ adb shell input swipe $((W*2/10)) $cy $((W*8/10)) $cy 250; step "önceki sayfa"
 adb shell input swipe $((W*80/100)) $((H*40/100)) $((W*80/100)) $((H*70/100)) 300; step "ortadan aşağı kaydırma: arama (varsayılan)" 2
 shot 05k-sag-kaydirma
 adb shell cmd statusbar collapse; step "paneli kapat" 2
+adb shell input keyevent KEYCODE_BACK; step "klavyeyi kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "aramayı kapat" 2
 adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 2
 shot 05-arama
