@@ -34,10 +34,12 @@ object FrameStats {
         fun d(id: Int) = fm.getMetric(id).coerceAtLeast(0L) / 1_000_000f
         val ui = d(android.view.FrameMetrics.INPUT_HANDLING_DURATION) + d(android.view.FrameMetrics.ANIMATION_DURATION) +
             d(android.view.FrameMetrics.LAYOUT_MEASURE_DURATION) + d(android.view.FrameMetrics.DRAW_DURATION)
-        val rt = d(android.view.FrameMetrics.SYNC_DURATION) + d(android.view.FrameMetrics.COMMAND_ISSUE_DURATION) +
-            d(android.view.FrameMetrics.SWAP_BUFFERS_DURATION)
+        val sync = d(android.view.FrameMetrics.SYNC_DURATION)
+        val cmd = d(android.view.FrameMetrics.COMMAND_ISSUE_DURATION)
+        val swap = d(android.view.FrameMetrics.SWAP_BUFFERS_DURATION)
+        val rt = sync + cmd + swap
         val gpu = if (android.os.Build.VERSION.SDK_INT >= 31) d(android.view.FrameMetrics.GPU_DURATION) else 0f
-        synchronized(lock) { if (samples.size < 800) samples += floatArrayOf(ui, rt, gpu) }
+        synchronized(lock) { if (samples.size < 800) samples += floatArrayOf(ui, rt, gpu, sync, cmd, swap) }
     }
 
     /** Kaydırma başladı: ayrıntılı örnek toplamaya başla. */
@@ -56,7 +58,9 @@ object FrameStats {
             val over = v.count { it > budget }
             return "$name ort ${"%.1f".format(avg)} / en uzun ${"%.1f".format(v.last())} ms ($over kare bütçeyi aştı)"
         }
+        fun avg(i: Int) = "%.1f".format(list.map { it[i] }.average())
         return "\n\nKare süreleri (bütçe ${"%.1f".format(budget)} ms):\n• " + part(0, "Arayüz:") + "\n• " + part(1, "Çizim:") +
+            "\n   (hazırlık ${avg(3)} / komut ${avg(4)} / gönderim ${avg(5)} ms)" +
             "\n• " + part(2, "Ekran kartı:")
     }
 

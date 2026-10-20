@@ -573,7 +573,9 @@ fun HomeScreen(
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { if (settingsCovering) alpha = 0f }
+                // Görünmez yapmak yetmiyordu: katman çizim hattında her karede yine hazırlanıyordu. Artık içerik
+                // çizim listesine hiç girmez (alt katmanlar hazır kalır; kapanırken anında geri gelir).
+                .drawWithContent { if (!settingsCovering) drawContent() }
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
                 .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, includeRoot = true)
         ) {
