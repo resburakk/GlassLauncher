@@ -116,8 +116,7 @@ class PageAnchor {
 val LocalPageAnchor = staticCompositionLocalOf<PageAnchor?> { null }
 
 /**
- * Bir ana ekran sayfasının kabı: içerik ayrı bir katmanda bir kez çizilir; sayfa kayarken yalnızca bu hazır
- * görüntü taşınır (simgeler, yazı gölgeleri ve camlar her karede yeniden çizilmez → 120 Hz'de akıcı kaydırma).
+ * Bir ana ekran sayfasının kabı: içindeki camlara sayfanın konum çapasını verir (kayarken camlar yeniden çizilmez).
  */
 @Composable
 fun PageBox(anchor: PageAnchor, rest: Offset, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
@@ -126,8 +125,9 @@ fun PageBox(anchor: PageAnchor, rest: Offset, content: @Composable androidx.comp
         androidx.compose.foundation.layout.Box(
             Modifier
                 .fillMaxSize()
-                .onPlaced { anchor.coords = it }
-                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen },
+                // Not: sayfayı ayrı (ekran dışı) katmanda önbelleğe almak denendi; telefonda kayarken sayfanın bir
+                // kısmı eski görüntüde donup kalıyordu (kısmi yeniden çizim). Bu yüzden yalnızca konum çapası tutulur.
+                .onPlaced { anchor.coords = it },
             content = content,
         )
     }
