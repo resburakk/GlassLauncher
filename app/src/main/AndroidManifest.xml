@@ -127,12 +127,21 @@
         </activity>
 
         <!-- Uygulama listesinde "Glass Ayarları" olarak görünür: ayarları açar (launcher varsayılan değilken de). -->
+        <!-- "Glass Ayarları" simgesi: launcher'ı ana ekran isteğiyle açan görünmez ara ekran (bkz. EntryActivity). -->
+        <activity
+            android:name=".EntryActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="dev.glass.launcher.entry" />
+
         <activity-alias
             android:name=".SettingsEntry"
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/settings_label"
-            android:targetActivity=".MainActivity">
+            android:targetActivity=".EntryActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

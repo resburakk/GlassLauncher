@@ -272,7 +272,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }.getOrDefault(false)
 
     private fun isSettingsEntry(i: Intent?): Boolean =
-        i?.component?.className?.endsWith(".SettingsEntry") == true
+        i?.getBooleanExtra(EXTRA_SETTINGS, false) == true || i?.component?.className?.endsWith(".SettingsEntry") == true
 
     // --- WidgetRequester ---
 
@@ -357,9 +357,11 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         }
     }
 
-    private companion object {
-        const val REQ_CONFIGURE = 0x5701
-        const val REQ_RECONFIGURE = 0x5702
-        const val MAX_WALLPAPER_BLUR = 90f
+    companion object {
+        /** "Glass Ayarları" simgesinden gelindi: ayarlar açılsın (bkz. EntryActivity). */
+        const val EXTRA_SETTINGS = "dev.glass.launcher.OPEN_SETTINGS"
+        private const val REQ_CONFIGURE = 0x5701
+        private const val REQ_RECONFIGURE = 0x5702
+        private const val MAX_WALLPAPER_BLUR = 90f
     }
 }
