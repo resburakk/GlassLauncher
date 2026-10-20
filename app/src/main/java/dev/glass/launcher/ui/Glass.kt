@@ -111,6 +111,9 @@ class PageAnchor {
     var coords: androidx.compose.ui.layout.LayoutCoordinates? = null
     /** Sayfa dururken sol üst köşesinin kökteki konumu. */
     var rest: Offset = Offset.Zero
+    /** Sayfanın şu anki yatay kayması (px). Çizim sırasında okunur: kayarken yalnızca camların küçük katmanları
+     *  yeniden çizilir, sayfanın hazır görüntüsü bozulmaz. */
+    var shift: () -> Float = { 0f }
 }
 
 val LocalPageAnchor = staticCompositionLocalOf<PageAnchor?> { null }
@@ -207,6 +210,7 @@ fun Modifier.liquidGlass(
     }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val pageAnchor = LocalPageAnchor.current
+    var inPage by remember { mutableStateOf(false) }
     val rim = if (look.dark) {
         Brush.linearGradient(listOf(white(0.45f * s * glow), white(0.05f * s * glow), white(0.25f * s * glow)))
     } else {
@@ -222,13 +226,16 @@ fun Modifier.liquidGlass(
                 // Sayfa içindeyse konum sayfaya göre (kayarken değişmez → yeniden çizim yok); değilse köke göre.
                 val pc = pageAnchor?.coords
                 origin = if (pc != null && pc.isAttached) pageAnchor.rest + pc.localPositionOf(c, Offset.Zero) else c.positionInRoot()
+                inPage = pc != null && pc.isAttached
             }
             else Modifier
         )
         .smoothClip(shape)
         .then(
             if (bd != null) Modifier.drawBehind {
-                drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
+                // Sayfa içindeyse sayfanın o anki kayması eklenir (kayarken camın içi donuk kalmasın).
+                val o = if (inPage && pageAnchor != null) origin + Offset(pageAnchor.shift(), 0f) else origin
+                drawBackdrop(bd, look.rootW, look.rootH, o, lens, refr, softPx, clear)
             }
             else Modifier
         )

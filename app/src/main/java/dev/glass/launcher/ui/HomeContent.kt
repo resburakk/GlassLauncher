@@ -471,6 +471,8 @@ internal fun HomeContent(
             if (pagerState.isScrollInProgress) while (true) withFrameNanos { fullDamageTick++ }
         }
         Box(Modifier.fillMaxSize().drawBehind { if (fullDamageTick >= 0) drawRect(Color.Transparent) })
+        // Sayfa genişliği (camların arkası kayarken buna göre kaydırılır; çizimde okunur, durum değil).
+        val pagerWidthHolder = remember { floatArrayOf(0f) }
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
@@ -479,7 +481,7 @@ internal fun HomeContent(
             // Bütün ana ekran sayfaları hep hazır tutulur: sayfa değişince bir sonrakinin simgeleri baştan hazırlanıyor,
             // o karede 30 ms'lik tek bir takılma oluyordu. (Arşiv yalnızca son sayfadayken hazırlanır.)
             beyondViewportPageCount = if (dragging) homeCount else maxOf(1, pageTotal - 1),
-            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot() },
+            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot(); pagerWidthHolder[0] = it.size.width.toFloat() },
         ) { page ->
             if (page == libIndex) {
                 // Arama çubuğu, ana ekrandaki ilk simge satırıyla AYNI üst çizgiden başlar.
@@ -498,6 +500,7 @@ internal fun HomeContent(
             // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
             // Sayfa bir kez hazır görüntü olarak çizilir; kayarken yalnızca bu görüntü taşınır (bkz. PageBox).
             val anchor = remember { PageAnchor() }
+            anchor.shift = { (page - pagerState.currentPage - pagerState.currentPageOffsetFraction) * pagerWidthHolder[0] }
             PageBox(anchor, gridOrigin) {
                 pagePl.forEach { pl ->
                   key(pl.item.id) {
