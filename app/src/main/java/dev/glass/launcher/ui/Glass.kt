@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.layout.onPlaced
+
+import androidx.compose.foundation.layout.fillMaxSize
+
 import androidx.compose.runtime.snapshotFlow
 
 import androidx.compose.runtime.rememberUpdatedState
@@ -98,6 +102,37 @@ data class GlassLook(
 
 val LocalGlass = staticCompositionLocalOf { GlassLook() }
 
+/**
+ * Ana ekran sayfası: içindeki camlar (klasör simgeleri, widget'lar) arkalarındaki duvar kâğıdını sayfanın DURDUĞU
+ * andaki konumuna göre örnekler. Böylece sayfa kayarken camlar yeniden çizilmez ve sayfanın hazır çizilmiş hali
+ * (bkz. [PageBox]) her karede yeniden kullanılabilir. Kayma sırasındaki fark bulanık arka planda fark edilmez.
+ */
+class PageAnchor {
+    var coords: androidx.compose.ui.layout.LayoutCoordinates? = null
+    /** Sayfa dururken sol üst köşesinin kökteki konumu. */
+    var rest: Offset = Offset.Zero
+}
+
+val LocalPageAnchor = staticCompositionLocalOf<PageAnchor?> { null }
+
+/**
+ * Bir ana ekran sayfasının kabı: içerik ayrı bir katmanda bir kez çizilir; sayfa kayarken yalnızca bu hazır
+ * görüntü taşınır (simgeler, yazı gölgeleri ve camlar her karede yeniden çizilmez → 120 Hz'de akıcı kaydırma).
+ */
+@Composable
+fun PageBox(anchor: PageAnchor, rest: Offset, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
+    anchor.rest = rest
+    androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides anchor) {
+        androidx.compose.foundation.layout.Box(
+            Modifier
+                .fillMaxSize()
+                .onPlaced { anchor.coords = it }
+                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen },
+            content = content,
+        )
+    }
+}
+
 /** Cam efektinin o anki durumu (Ayarlar > Liquid Glass'ta gösterilir). */
 object GlassStatus {
     @Volatile var text: String = "Bilinmiyor (ana ekran henüz açılmadı)."
@@ -169,6 +204,7 @@ fun Modifier.liquidGlass(
         Brush.verticalGradient(listOf(white(0.30f * s * fill * op), white(0.12f * s * fill * op)))
     }
     var origin by remember { mutableStateOf(Offset.Zero) }
+    val pageAnchor = LocalPageAnchor.current
     val rim = if (look.dark) {
         Brush.linearGradient(listOf(white(0.45f * s * glow), white(0.05f * s * glow), white(0.25f * s * glow)))
     } else {
@@ -180,7 +216,11 @@ fun Modifier.liquidGlass(
             else Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
         )
         .then(
-            if (bd != null) Modifier.onGloballyPositioned { origin = it.positionInRoot() }
+            if (bd != null) Modifier.onGloballyPositioned { c ->
+                // Sayfa içindeyse konum sayfaya göre (kayarken değişmez → yeniden çizim yok); değilse köke göre.
+                val pc = pageAnchor?.coords
+                origin = if (pc != null && pc.isAttached) pageAnchor.rest + pc.localPositionOf(c, Offset.Zero) else c.positionInRoot()
+            }
             else Modifier
         )
         .smoothClip(shape)

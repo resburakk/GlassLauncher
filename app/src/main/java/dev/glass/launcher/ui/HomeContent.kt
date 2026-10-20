@@ -484,7 +484,9 @@ internal fun HomeContent(
             }
             val pagePl = byPage[page].orEmpty()
             // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
-            Box(Modifier.fillMaxSize()) {
+            // Sayfa bir kez hazır görüntü olarak çizilir; kayarken yalnızca bu görüntü taşınır (bkz. PageBox).
+            val anchor = remember { PageAnchor() }
+            PageBox(anchor, gridOrigin) {
                 pagePl.forEach { pl ->
                   key(pl.item.id) {
                     val x = m.marginX + m.pitchX * pl.col.toFloat()
