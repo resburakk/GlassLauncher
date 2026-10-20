@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.geometry.Size
+
 import androidx.compose.ui.graphics.addOutline
 
 import androidx.compose.ui.layout.onPlaced
