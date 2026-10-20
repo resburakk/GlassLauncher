@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.drawscope.translate
+
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
 import androidx.compose.ui.platform.LocalDensity
@@ -406,7 +408,7 @@ private fun ResultsList(
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 // Esneme yalnızca çizimde uygulanır (listenin dokunma alanı kaymaz, titreme olmaz).
-                androidx.compose.ui.graphics.drawscope.translate(0f, rb.value) { this@drawWithContent.drawContent() }
+                translate(0f, rb.value) { this@drawWithContent.drawContent() }
                 val h = 28.dp.toPx()
                 drawRect(
                     Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - h, endY = size.height),
