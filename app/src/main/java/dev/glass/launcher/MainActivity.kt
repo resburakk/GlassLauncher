@@ -155,7 +155,10 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         // Sistem çağrıları (bazıları yavaş: duvar kâğıdı renk hesabı) ana iş parçacığını meşgul etmesin;
         // uygulamadan alttan kaydırarak dönerken sistemin geçişi launcher'ı beklerken takılıyordu.
         bg.execute {
-            hideFromRecents()
+            // Her öne gelişte değil, yalnızca gerektiğinde (ilk açılış / "Glass Ayarları" kısayolu): her seferinde görev
+            // değiştirmek, son uygulamalar ekranı açılırken sistemin görev listesini karıştırıp ilk kaydırmayı boşa
+            // çıkarıyor olabilir (Honor/MagicOS).
+            if (needHideFromRecents) { needHideFromRecents = false; hideFromRecents() }
             val held = runCatching { getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME) }.getOrNull()
             val colors = runCatching { wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
             runOnUiThread {
@@ -168,6 +171,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     private val bg = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var needHideFromRecents = true
 
     /**
      * Launcher "Son uygulamalar" ekranında kart olarak görünmesin. Manifestteki excludeFromRecents, uygulama
@@ -183,6 +187,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         if (isSettingsEntry(intent)) {
+            needHideFromRecents = true
             openSettingsRequest++
             return
         }
