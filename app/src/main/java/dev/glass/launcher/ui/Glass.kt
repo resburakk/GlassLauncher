@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.addOutline
+
 import androidx.compose.ui.layout.onPlaced
 
 import androidx.compose.foundation.layout.fillMaxSize
@@ -111,9 +113,40 @@ class PageAnchor {
     var coords: androidx.compose.ui.layout.LayoutCoordinates? = null
     /** Sayfa dururken sol üst köşesinin kökteki konumu. */
     var rest: Offset = Offset.Zero
-    /** Sayfanın şu anki yatay kayması (px). Çizim sırasında okunur: kayarken yalnızca camların küçük katmanları
-     *  yeniden çizilir, sayfanın hazır görüntüsü bozulmaz. */
-    var shift: () -> Float = { 0f }
+    /** true iken (sayfalar kayarken) sayfadaki camların arkası sayfanın İÇİNDE değil, altındaki ayrı ince katmanda
+     *  her karede gerçek konumuna göre çizilir ([drawPageGlassHoles]); sayfanın hazır görüntüsü hiç bozulmaz. */
+    var holesActive: () -> Boolean = { false }
+    val holes = androidx.compose.runtime.mutableStateMapOf<Any, GlassHole>()
+}
+
+/** Sayfa içindeki bir camın arkası: sayfaya göre alanı, şekli ve çizim ayarları. */
+class GlassHole(
+    val rect: androidx.compose.ui.geometry.Rect,
+    val path: androidx.compose.ui.graphics.Path,
+    val bd: Blurred,
+    val lens: android.graphics.RuntimeShader,
+    val refr: Float,
+    val soft: Float,
+    val clear: Boolean,
+    val rootW: Float,
+    val rootH: Float,
+)
+
+/** Bir sayfanın cam arkalarını sayfa [dx] kadar kaymışken çizer. [rootOffset]: çizim alanının kökteki sol üst köşesi. */
+fun DrawScope.drawPageGlassHoles(anchor: PageAnchor, dx: Float, rootOffset: Offset) {
+    for (h in anchor.holes.values) {
+        val left = h.rect.left + dx
+        val top = h.rect.top
+        if (left > size.width || left + h.rect.width < 0f) continue
+        translate(left, top) {
+            clipPath(h.path) {
+                drawBackdrop(
+                    h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), h.lens, h.refr, h.soft, h.clear,
+                    area = Size(h.rect.width, h.rect.height),
+                )
+            }
+        }
+    }
 }
 
 val LocalPageAnchor = staticCompositionLocalOf<PageAnchor?> { null }
@@ -211,6 +244,12 @@ fun Modifier.liquidGlass(
     var origin by remember { mutableStateOf(Offset.Zero) }
     val pageAnchor = LocalPageAnchor.current
     var inPage by remember { mutableStateOf(false) }
+    val holeKey = remember { Any() }
+    val holeDensity = LocalDensity.current
+    val holeDir = androidx.compose.ui.platform.LocalLayoutDirection.current
+    if (pageAnchor != null) {
+        DisposableEffect(pageAnchor, holeKey) { onDispose { pageAnchor.holes.remove(holeKey) } }
+    }
     val rim = if (look.dark) {
         Brush.linearGradient(listOf(white(0.45f * s * glow), white(0.05f * s * glow), white(0.25f * s * glow)))
     } else {
@@ -227,15 +266,30 @@ fun Modifier.liquidGlass(
                 val pc = pageAnchor?.coords
                 origin = if (pc != null && pc.isAttached) pageAnchor.rest + pc.localPositionOf(c, Offset.Zero) else c.positionInRoot()
                 inPage = pc != null && pc.isAttached
+                if (inPage && pageAnchor != null && pc != null) {
+                    // Sayfaya göre alan: kayarken değişmez, yalnızca yerleşim değişince güncellenir.
+                    val r = androidx.compose.ui.geometry.Rect(pc.localPositionOf(c, Offset.Zero),
+                        Size(c.size.width.toFloat(), c.size.height.toFloat()))
+                    val old = pageAnchor.holes[holeKey]
+                    if (old == null || old.rect != r || old.bd !== bd || old.refr != refr || old.clear != clear ||
+                        old.soft != softPx || old.rootW != look.rootW || old.rootH != look.rootH
+                    ) {
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            addOutline(shape.createOutline(r.size, holeDir, holeDensity))
+                        }
+                        pageAnchor.holes[holeKey] = GlassHole(r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH)
+                    }
+                }
             }
             else Modifier
         )
         .smoothClip(shape)
         .then(
             if (bd != null) Modifier.drawBehind {
-                // Sayfa içindeyse sayfanın o anki kayması eklenir (kayarken camın içi donuk kalmasın).
-                val o = if (inPage && pageAnchor != null) origin + Offset(pageAnchor.shift(), 0f) else origin
-                drawBackdrop(bd, look.rootW, look.rootH, o, lens, refr, softPx, clear)
+                // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
+                if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
+                    drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
+                }
             }
             else Modifier
         )
@@ -289,6 +343,8 @@ fun Modifier.reducedBackdrop(): Modifier = composed {
 private fun DrawScope.drawBackdrop(
     bd: Blurred, rootW: Float, rootH: Float, origin: Offset,
     lens: android.graphics.RuntimeShader? = null, refraction: Float = 0f, soft: Float = 0f, forceLens: Boolean = false,
+    /** Çizilecek alanın boyutu (varsayılan: çizim alanının tamamı). */
+    area: Size = size,
 ) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
@@ -302,8 +358,8 @@ private fun DrawScope.drawBackdrop(
         m.postTranslate((rootW - bd.srcW * scaleR) / 2f, (rootH - bd.srcH * scaleR) / 2f)
         bs.setLocalMatrix(m)
         lens.setInputShader("content", bs)
-        GlassLens.configure(lens, size.width, size.height, minOf(size.width, size.height) * 0.3f, refraction, origin.x, origin.y, soft)
-        drawRect(androidx.compose.ui.graphics.ShaderBrush(lens))
+        GlassLens.configure(lens, area.width, area.height, minOf(area.width, area.height) * 0.3f, refraction, origin.x, origin.y, soft)
+        drawRect(androidx.compose.ui.graphics.ShaderBrush(lens), size = area)
         return
     }
     // Duvar kâğıdı kökte ContentScale.Crop ile çizilir: aynı eşlemeyi bulanık kopyaya uygula.
@@ -312,10 +368,10 @@ private fun DrawScope.drawBackdrop(
     val offY = (rootH - bd.srcH * scale) / 2f
     val k = img.width.toFloat() / bd.srcW // orijinal → küçük kopya
     val lens = 1.04f
-    val cx = origin.x + size.width / 2f
-    val cy = origin.y + size.height / 2f
-    val halfW = size.width / 2f / lens
-    val halfH = size.height / 2f / lens
+    val cx = origin.x + area.width / 2f
+    val cy = origin.y + area.height / 2f
+    val halfW = area.width / 2f / lens
+    val halfH = area.height / 2f / lens
     val sl = ((cx - halfW - offX) / scale * k)
     val st = ((cy - halfH - offY) / scale * k)
     val sw = (halfW * 2f / scale * k)
@@ -329,7 +385,7 @@ private fun DrawScope.drawBackdrop(
         srcOffset = IntOffset(il, itop),
         srcSize = IntSize(iw, ih),
         dstOffset = IntOffset.Zero,
-        dstSize = IntSize(size.width.toInt(), size.height.toInt()),
+        dstSize = IntSize(area.width.toInt(), area.height.toInt()),
         filterQuality = FilterQuality.Low,
     )
 }

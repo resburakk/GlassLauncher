@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.DisposableEffect
+
 import androidx.compose.ui.draw.drawBehind
 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -471,8 +473,14 @@ internal fun HomeContent(
             if (pagerState.isScrollInProgress) while (true) withFrameNanos { fullDamageTick++ }
         }
         Box(Modifier.fillMaxSize().drawBehind { if (fullDamageTick >= 0) drawRect(Color.Transparent) })
-        // Sayfa genişliği (camların arkası kayarken buna göre kaydırılır; çizimde okunur, durum değil).
-        val pagerWidthHolder = remember { floatArrayOf(0f) }
+        // Sayfa içi camların arkası (klasör simgeleri, widget'lar): yalnızca sayfalar kayarken, sayfaların ALTINDA
+        // her karede o anki kaymaya göre çizilir. Sayfalar hazır görüntü olarak taşınırken camların içi donuk kalmaz.
+        val pageAnchors = remember { androidx.compose.runtime.mutableStateMapOf<Int, PageAnchor>() }
+        Box(Modifier.fillMaxSize().drawBehind {
+            if (!pagerState.isScrollInProgress || edit || dragging) return@drawBehind
+            val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+            pageAnchors.forEach { (pg, a) -> drawPageGlassHoles(a, (pg - pos) * size.width, gridOrigin) }
+        })
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
@@ -481,7 +489,7 @@ internal fun HomeContent(
             // Bütün ana ekran sayfaları hep hazır tutulur: sayfa değişince bir sonrakinin simgeleri baştan hazırlanıyor,
             // o karede 30 ms'lik tek bir takılma oluyordu. (Arşiv yalnızca son sayfadayken hazırlanır.)
             beyondViewportPageCount = if (dragging) homeCount else maxOf(1, pageTotal - 1),
-            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot(); pagerWidthHolder[0] = it.size.width.toFloat() },
+            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
                 // Arama çubuğu, ana ekrandaki ilk simge satırıyla AYNI üst çizgiden başlar.
@@ -500,7 +508,12 @@ internal fun HomeContent(
             // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
             // Sayfa bir kez hazır görüntü olarak çizilir; kayarken yalnızca bu görüntü taşınır (bkz. PageBox).
             val anchor = remember { PageAnchor() }
-            anchor.shift = { (page - pagerState.currentPage - pagerState.currentPageOffsetFraction) * pagerWidthHolder[0] }
+            // Kayarken (düzenleme/sürükleme dışında) cam arkaları sayfanın altındaki katmanda çizilir.
+            anchor.holesActive = { pagerState.isScrollInProgress && !edit && !dragging }
+            DisposableEffect(page, anchor) {
+                pageAnchors[page] = anchor
+                onDispose { if (pageAnchors[page] === anchor) pageAnchors.remove(page) }
+            }
             PageBox(anchor, gridOrigin) {
                 pagePl.forEach { pl ->
                   key(pl.item.id) {
