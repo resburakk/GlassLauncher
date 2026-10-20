@@ -174,8 +174,6 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     private val bg = java.util.concurrent.Executors.newSingleThreadExecutor()
 
-    }
-
     /**
      * Launcher sistemin ANA EKRAN görevinde mi çalışıyor? Sıradan bir uygulama görevinde kalırsa (ör. eski sürümde
      * simgeden / "Aç" ile açıldıysa) sistem ana ekrandayken bile uygulamadaymışız gibi davranır: ana ekran ve son
