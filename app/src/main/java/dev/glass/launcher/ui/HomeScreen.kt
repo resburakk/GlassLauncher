@@ -584,38 +584,23 @@ fun HomeScreen(
         val fromSync = remember(wp) { vm.wallpaperFromSync() }
         // Yalnızca eşik geçilince yeniden oluşturulur (geçiş oranı her karede değişse de).
         val transitioning by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f } }
-        // Kopya her zaman çizilir: yalnızca geçişte çizildiğinde arşive/aramaya geçerken sistemin duvar kâğıdından
-        // bizim kopyamıza atlanıyor, parlaklık bir anda biraz artıyordu. Son uygulamalar ekranında kopya zaten
-        // simgelerle birlikte söner (dikdörtgen görünmez).
-        @Suppress("UNUSED_VARIABLE") val unused = fromSync to transitioning
-        val needCopy = true
-        // Arşive geçişte ve katman açılırken duvar kâğıdı bulanıklığı: önceden (bir kez) bulanıklaştırılmış küçük kopya
-        // netin üstünde kademeli belirir. Eskiden tam çözünürlüklü görüntü her karede yeniden bulanıklaştırılıyordu;
-        // ekran kartını yorup kaydırmayı 120 Hz'in altına düşürüyordu.
-        val homeBlurR = homeBlurPx * settings.homeWallpaperBlur
+        // Duvar kâğıdı katmanları (ekran kartı yükü en az olacak şekilde):
+        // • Ana ekranda, kopya sistem duvar kâğıdıyla aynıysa hiçbir şey çizilmez: telefonun kendi duvar kâğıdı
+        //   görünür (sistem bunu ekran kartını yormadan birleştirir). Her karede tam ekran bir görüntü çizmek
+        //   120 Hz'de kaydırmanın bütçesinin önemli bir kısmını yiyordu.
+        // • Arşive/aramaya/klasöre/widget sayfasına geçerken yalnızca hazır BULANIK kopya kademeli belirir (net kopya
+        //   hiç devreye girmez → parlaklık atlaması olmaz).
+        // • Ana ekran bulanıklığı açıksa: her karede yeniden bulanıklaştırmak yerine bir kez hazırlanmış bulanık kopya.
+        // • Menü/düğme camı açıkken (bölgesel bulanıklık içeriğin kopyasını kullanır) net kopya çizilir.
+        val homeBlurR = homeBlurPx * homeBlurStep
         val overlayBlurR = maxBlurPx * settings.glassBlur
         val overlayBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, overlayBlurR, rootSize) {
-            val src = wp
-            if (src == null || overlayBlurR < 1f || rootSize.width == 0) { value = null; return@produceState }
-            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                runCatching {
-                    val f = 4
-                    // Duvar kâğıdı ekran kartı belleğinde (HARDWARE) olabilir: önce okunabilir kopyası alınır.
-                    val full0 = src.asAndroidBitmap()
-                    val full = if (full0.config == android.graphics.Bitmap.Config.HARDWARE) full0.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else full0
-                    val small = android.graphics.Bitmap.createScaledBitmap(
-                        full, (full.width / f).coerceAtLeast(1), (full.height / f).coerceAtLeast(1), true,
-                    ).copy(android.graphics.Bitmap.Config.ARGB_8888, true)
-                    // Ekrandaki Gauss bulanıklığının (sigma ≈ 0,577·r) küçük kopyadaki karşılığı; 3 geçişli kutu ≈ Gauss.
-                    val screenPerSrc = maxOf(rootSize.width.toFloat() / full.width, rootSize.height.toFloat() / full.height)
-                    val sigma = (overlayBlurR * 0.577f + 0.5f) / (screenPerSrc * f)
-                    dev.glass.launcher.data.BlurUtil.boxBlur(small, sigma.toInt().coerceIn(1, 40), 3)
-                    small.asImageBitmap()
-                }.getOrNull()
-            }
+            value = blurredWallpaperCopy(wp, overlayBlurR, rootSize)
         }
-        // Duvar kâğıdı dosyası çoğu zaman ekrandan çok büyük: her karede küçültülerek çizilmesi ekran kartını yoruyordu.
-        // Bir kez (arka planda) ekranı kaplayacak boyuta indirilir; görünüm aynıdır (aynı oran, aynı kırpma).
+        val homeBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, homeBlurR, rootSize) {
+            value = if (homeBlurR < 1f) null else blurredWallpaperCopy(wp, homeBlurR, rootSize)
+        }
+        // Duvar kâğıdı dosyası çoğu zaman ekrandan çok büyük: net kopya gerektiğinde ekran boyutundaki hali çizilir.
         val screenWp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, rootSize) {
             val src = wp
             if (src == null || rootSize.width == 0) { value = null; return@produceState }
@@ -633,22 +618,33 @@ fun HomeScreen(
                 }.getOrNull()
             }
         }
-        if (settings.launcherWallpaper && wp != null && needCopy) {
+        // Geçiş sürüyor mu (yalnızca eşik geçilince yeniden oluşturulur).
+        val anyTransition by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f || today.progress > 0.001f } }
+        val regionsOpen = glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
+        if (settings.launcherWallpaper && wp != null) {
+            val homeImg = homeBlurImg
+            val needSharp = !fromSync || regionsOpen || (homeBlurR >= 1f && homeImg == null)
+            when {
+                // Ana ekran bulanıklığı: hazır bulanık kopya (sabit, ucuz).
+                homeImg != null -> Image(
+                    homeImg, null,
+                    Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() },
+                    contentScale = ContentScale.Crop,
+                )
+                needSharp -> Image(
+                    screenWp ?: wp, null,
+                    Modifier.fillMaxSize().graphicsLayer {
+                        // Son uygulamalar açılırken kopya da söner (küçültülen pencerede dikdörtgen görünmesin).
+                        alpha = 1f - homeHide()
+                        // Bulanık kopya hazırlanırken geçici olarak eski yol.
+                        renderEffect = if (homeBlurR >= 1f) BlurEffect(homeBlurR, homeBlurR, TileMode.Clamp) else null
+                    },
+                    contentScale = ContentScale.Crop,
+                )
+                else -> Unit // telefonun kendi duvar kâğıdı görünür
+            }
             val blurImg = overlayBlurImg
-            Image(
-                screenWp ?: wp, null,
-                Modifier.fillMaxSize().graphicsLayer {
-                    // Son uygulamalar açılırken kopya da söner: sistem pencereyi küçültünce arkadaki gerçek duvar
-                    // kâğıdının önünde açık renkli bir dikdörtgen gibi görünüyordu.
-                    alpha = 1f - homeHide()
-                    // Kalıcı ana ekran bulanıklığı (sabit; her karede değişmez). Hazır kopya yoksa eski yol.
-                    val r = if (blurImg != null) homeBlurR
-                    else maxOf(overlayBlurR * maxOf(blurAmount, libProgress.floatValue), homeBlurR)
-                    renderEffect = if (r > 0.5f) BlurEffect(r, r, TileMode.Clamp) else null
-                },
-                contentScale = ContentScale.Crop,
-            )
-            if (blurImg != null && overlayBlurR > homeBlurR) {
+            if (anyTransition && blurImg != null && overlayBlurR > homeBlurR) {
                 Image(
                     blurImg, null,
                     Modifier.fillMaxSize().graphicsLayer {
@@ -1286,5 +1282,30 @@ private fun GhostIcon(
         (layout.items.firstOrNull { it.id == id } as? FolderItem)?.let {
             FolderIcon(it, byKey, vm, size, settings.glassStrength, folderPages[it.id] ?: 0)
         }
+    }
+}
+
+
+/** Duvar kâğıdının, ekrandaki [radiusPx] Gauss bulanıklığına eşdeğer bulanık küçük kopyası (bir kez, arka planda). */
+private suspend fun blurredWallpaperCopy(
+    src: androidx.compose.ui.graphics.ImageBitmap?, radiusPx: Float, rootSize: IntSize,
+): androidx.compose.ui.graphics.ImageBitmap? {
+    if (src == null || radiusPx < 1f || rootSize.width == 0) return null
+    return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        runCatching {
+            val f = 4
+            // Duvar kâğıdı ekran kartı belleğinde (HARDWARE) olabilir: önce okunabilir kopyası alınır.
+            val full0 = src.asAndroidBitmap()
+            val full = if (full0.config == android.graphics.Bitmap.Config.HARDWARE) full0.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else full0
+            val small = android.graphics.Bitmap.createScaledBitmap(
+                full, (full.width / f).coerceAtLeast(1), (full.height / f).coerceAtLeast(1), true,
+            ).copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+            // Ekrandaki Gauss bulanıklığının (sigma ≈ 0,577·r) küçük kopyadaki karşılığı; 3 geçişli kutu ≈ Gauss.
+            val screenPerSrc = maxOf(rootSize.width.toFloat() / full.width, rootSize.height.toFloat() / full.height)
+            val sigma = (radiusPx * 0.577f + 0.5f) / (screenPerSrc * f)
+            dev.glass.launcher.data.BlurUtil.boxBlur(small, sigma.toInt().coerceIn(1, 40), 3)
+            small.prepareToDraw()
+            small.asImageBitmap()
+        }.getOrNull()
     }
 }

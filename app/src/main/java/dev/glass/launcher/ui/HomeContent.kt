@@ -476,7 +476,9 @@ internal fun HomeContent(
             userScrollEnabled = !dragging,
             // Sürüklerken TÜM sayfalar bellekte kalır: sürüklemenin başladığı sayfa (ve onu izleyen dokunma
             // kodu) uzak bir sayfaya geçilince atılmasın, yoksa bırakma kayboluyordu.
-            beyondViewportPageCount = if (dragging) homeCount else 1,
+            // Bütün ana ekran sayfaları hep hazır tutulur: sayfa değişince bir sonrakinin simgeleri baştan hazırlanıyor,
+            // o karede 30 ms'lik tek bir takılma oluyordu. (Arşiv yalnızca son sayfadayken hazırlanır.)
+            beyondViewportPageCount = if (dragging) homeCount else maxOf(1, pageTotal - 1),
             modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
