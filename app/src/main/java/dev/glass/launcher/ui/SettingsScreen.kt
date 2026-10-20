@@ -1277,6 +1277,9 @@ private fun SettingsScrollStats(state: androidx.compose.foundation.ScrollState) 
                     if (last != 0L) list += t - last
                     last = t
                 }
+                // Android 15+: içerik hızını bildir; sistem (MagicOS dahil) kaydırmada 120 Hz'e çıkar.
+                // Yalnızca istek yetmedi (ölçümde 60 Hz). Hız, gerçek kaydırma hızına yakın tutulur.
+                if (android.os.Build.VERSION.SDK_INT >= 35) runCatching { view.frameContentVelocity = 4000f }
             }
         } finally {
             FrameStats.report(list.toLongArray(), refresh, "Son kaydırma (Ayarlar)")

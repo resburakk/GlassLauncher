@@ -69,6 +69,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:enableOnBackInvokedCallback="false"
             android:exported="true"
             android:launchMode="singleTask"
             android:stateNotNeeded="true"
