@@ -10,7 +10,16 @@ import dev.glass.launcher.data.SettingsStore
 import dev.glass.launcher.data.WallpaperRepository
 import dev.glass.launcher.widget.WidgetHostManager
 
-class LauncherApp : Application() {
+class LauncherApp : Application(), androidx.lifecycle.ViewModelStoreOwner {
+    /** Ana ekran ve ayarlar AYNI ViewModel'i kullanır (ayrı ekranlarda iki kopya, birbirinin düzenini ezmesin). */
+    override val viewModelStore = androidx.lifecycle.ViewModelStore()
+
+    val launcherViewModel: dev.glass.launcher.ui.LauncherViewModel by lazy {
+        androidx.lifecycle.ViewModelProvider(
+            this, androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(this),
+        )[dev.glass.launcher.ui.LauncherViewModel::class.java]
+    }
+
     lateinit var appRepository: AppRepository
         private set
     lateinit var iconCache: IconCache

@@ -35,7 +35,7 @@ import dev.glass.launcher.ui.WidgetRequester
 import java.util.UUID
 
 class MainActivity : ComponentActivity(), WidgetRequester {
-    private val vm: LauncherViewModel by viewModels()
+    private val vm: LauncherViewModel get() = (application as LauncherApp).launcherViewModel
     private var isDefault by mutableStateOf(false)
     /**
      * Sistemin "Son uygulamalar" ekranı açılırken ana ekran görüntüsü yarı saydam bir kart gibi görünüyordu
@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     /** "Glass Ayarları" kısayoluyla açıldıysa ayarlar doğrudan gösterilir. */
     private var openSettingsRequest by mutableStateOf(0)
+    private var addWidgetRequest by mutableStateOf(0)
 
     private val roleLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { updateDefault() }
@@ -102,6 +103,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                     vm, isDefault,
                     onRequestDefault = ::requestHomeRole,
                     openSettingsRequest = openSettingsRequest,
+                    addWidgetRequest = addWidgetRequest,
                     homeHide = { hide },
                 )
             }
@@ -220,6 +222,10 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_ADD_WIDGET, false)) {
+            addWidgetRequest++
+            return
+        }
         if (isSettingsEntry(intent)) {
             needHideFromRecents = true
             openSettingsRequest++
@@ -406,6 +412,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         @Volatile private var healedOnce = false
         /** "Glass Ayarları" simgesinden gelindi: ayarlar açılsın (bkz. EntryActivity). */
         const val EXTRA_SETTINGS = "dev.glass.launcher.OPEN_SETTINGS"
+        /** Ayarlardaki "Widget ekle": ana ekranda widget galerisi açılsın. */
+        const val EXTRA_ADD_WIDGET = "dev.glass.launcher.ADD_WIDGET"
         private const val REQ_CONFIGURE = 0x5701
         private const val REQ_RECONFIGURE = 0x5702
         private const val MAX_WALLPAPER_BLUR = 90f

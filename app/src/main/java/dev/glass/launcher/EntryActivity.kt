@@ -19,14 +19,22 @@ class EntryActivity : Activity() {
         super.onCreate(savedInstanceState)
         val isHome = runCatching { getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME) }
             .getOrDefault(false)
-        val target = if (isHome) {
-            // Bileşen belirtilmeden ana ekran isteği: sistem launcher'ı gerçek ana ekran görevinde açar.
-            Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(packageName)
-        } else {
-            // Henüz varsayılan ana ekran değil: doğrudan aç (ayarlardan varsayılan yapılabilir).
-            Intent(this, MainActivity::class.java)
+        // Kurulum/güncellemeden sonraki ilk açılış ("Aç" düğmesi): ana ekran. Diğer durumlarda (ve henüz varsayılan
+        // ana ekran değilken: oradan varsayılan yapılabilir) ayarlar kendi ekranında açılır.
+        val firstRun = runCatching {
+            val stamp = packageManager.getPackageInfo(packageName, 0).lastUpdateTime
+            val prefs = getSharedPreferences("launch", MODE_PRIVATE)
+            val seen = prefs.getLong("seenUpdate", 0L)
+            prefs.edit().putLong("seenUpdate", stamp).apply()
+            seen != stamp
+        }.getOrDefault(false)
+        val target = when {
+            firstRun && isHome ->
+                // Bileşen belirtilmeden ana ekran isteği: sistem launcher'ı gerçek ana ekran görevinde açar.
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(packageName)
+            else -> Intent(this, SettingsActivity::class.java)
         }
-        target.putExtra(MainActivity.EXTRA_SETTINGS, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        target.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { startActivity(target) }.onFailure {
             runCatching {
                 startActivity(Intent(this, MainActivity::class.java).putExtra(MainActivity.EXTRA_SETTINGS, true)

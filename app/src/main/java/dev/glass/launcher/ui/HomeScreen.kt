@@ -157,6 +157,8 @@ fun HomeScreen(
     isDefaultHome: Boolean,
     onRequestDefault: () -> Unit,
     openSettingsRequest: Int = 0,
+    /** Ayarlardaki "Widget ekle" ile ana ekrana dönüldü: widget galerisi açılır. */
+    addWidgetRequest: Int = 0,
     /** Son uygulamalar ekranına geçiş (0..1): simgeler solar, duvar kâğıdı kalır. */
     homeHide: () -> Float = { 0f },
 ) {
@@ -277,10 +279,26 @@ fun HomeScreen(
         else if (today.progress > 0f) today.close(todayScope)
     }
 
+    // Ayarlar ayrı bir uygulama ekranında açılır (alttan kaydırma/geri onu kapatır, son uygulamalarda kart olur).
+    val settingsCtx = LocalContext.current
+    fun openSettings() {
+        runCatching {
+            settingsCtx.startActivity(
+                android.content.Intent(settingsCtx, dev.glass.launcher.SettingsActivity::class.java)
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
     LaunchedEffect(openSettingsRequest) {
         if (openSettingsRequest > 0) {
             closeOverlay()
-            overlay = Overlay.Settings
+            openSettings()
+        }
+    }
+    LaunchedEffect(addWidgetRequest) {
+        if (addWidgetRequest > 0) {
+            closeOverlay()
+            overlay = Overlay.Widgets
         }
     }
 
@@ -574,7 +592,7 @@ fun HomeScreen(
                 .fillMaxSize()
                 // Görünmez yapmak yetmiyordu: katman çizim hattında her karede yine hazırlanıyordu. Artık içerik
                 // çizim listesine hiç girmez (alt katmanlar hazır kalır; kapanırken anında geri gelir).
-                .drawWithContent { if (!settingsCovering || SettingsSheet.offset > 0f) drawContent() }
+                .drawWithContent { if (!settingsCovering) drawContent() }
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
                 .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, includeRoot = true)
         ) {
@@ -747,17 +765,6 @@ fun HomeScreen(
             SearchOverlay(
                 vm, allApps, suggestions, settings.panelGlassStrength, settings.iconGlass,
                 onClose = { closeOverlay() }, visibility = { searchVis },
-            )
-        }
-        AnimatedVisibility(
-            overlay == Overlay.Settings,
-            enter = slideInVertically(motion.spring(0.9f, 400f)) { it } + fadeIn(motion.tween(200)),
-            exit = slideOutVertically(motion.tween(220)) { it } + fadeOut(motion.tween(160)),
-        ) {
-            SettingsScreen(
-                vm = vm, s = settings, isDefaultHome = isDefaultHome, onRequestDefault = onRequestDefault,
-                onAddWidget = { overlay = Overlay.Widgets },
-                onClose = { closeOverlay() },
             )
         }
         AnimatedVisibility(
@@ -1070,7 +1077,7 @@ fun HomeScreen(
                         plusMenu = false; wallpaperSheet = true
                     }
                     MenuRow("Ayarlar", ink, rowH, leading = { GlyphIcon(Glyph.Gear, ink, u * 22f) }) {
-                        plusMenu = false; overlay = Overlay.Settings
+                        plusMenu = false; openSettings()
                     }
                 }
             }

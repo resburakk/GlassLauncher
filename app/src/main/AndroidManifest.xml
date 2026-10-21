@@ -127,6 +127,18 @@
         </activity>
 
         <!-- Uygulama listesinde "Glass Ayarları" olarak görünür: ayarları açar (launcher varsayılan değilken de). -->
+        <!-- Ayarlar: ayrı uygulama ekranı (kendi görevi). Alttan kaydırma/geri onu kapatır; son uygulamalarda kart olur. -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_label"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.glass.launcher.settings"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|fontScale|density"
+            android:windowSoftInputMode="adjustResize" />
+
         <!-- "Glass Ayarları" simgesi: launcher'ı ana ekran isteğiyle açan görünmez ara ekran (bkz. EntryActivity). -->
         <activity
             android:name=".EntryActivity"
