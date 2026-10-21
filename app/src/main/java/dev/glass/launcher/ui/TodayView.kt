@@ -170,16 +170,15 @@ fun TodayPage(
             )
             // Boş yere uzun basınca düzenleme modu (iOS gibi).
             .pointerInput(Unit) {
-    // Sayfa kayarak gelirken camlar (arama çubuğu, kartlar) bulanık kopyayı sayfanın o anki yerinden çizer
-    // (önceden son konumdan çizildiği için "resmi önceden kopyalamış" gibi görünüyordu).
-    CompositionLocalProvider(LocalPageAnchor provides todayAnchor) {
                 detectTapGestures(onLongPress = { p ->
                     // Widget'ın üstündeyse onun menüsü açılır; düzenleme modu yalnızca boşlukta.
                     if (!editNow && bounds.values.none { it.contains(p) }) onEdit()
                 })
             }
-    }
     ) {
+    // Sayfa kayarak gelirken camlar (arama çubuğu, kartlar) bulanık kopyayı sayfanın o anki yerinden çizer
+    // (önceden son konumdan çizildiği için "resmi önceden kopyalamış" gibi görünüyordu).
+    CompositionLocalProvider(LocalPageAnchor provides todayAnchor) {
         val columns = hm.columns
         val contentW = hm.widgetWidth(columns)
         val smallW = hm.widgetWidth(2)
@@ -363,6 +362,7 @@ fun TodayPage(
             }
         }
         }
+    }
     }
 }
 
