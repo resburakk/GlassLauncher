@@ -685,7 +685,10 @@ fun HomeScreen(
                 else -> Unit // telefonun kendi duvar kâğıdı görünür
             }
             val blurImg = overlayBlurImg
-            if (anyTransition && blurImg != null && overlayBlurR > homeBlurR) {
+            // Bulanık katman hep yerinde durur, yalnızca görünürlüğü geçişle değişir (görünürlük 0 iken çizilmez).
+            // Önceden yalnızca geçiş varken ekleniyordu: kaydırmanın başında koşul art arda açılıp kapanınca katman
+            // eklenip kaldırılıyor, eklendiği karede çizilemediği için duvar kâğıdı bir an net görünüyordu.
+            if (blurImg != null && overlayBlurR > homeBlurR) {
                 Image(
                     blurImg, null,
                     Modifier.fillMaxSize().graphicsLayer {
