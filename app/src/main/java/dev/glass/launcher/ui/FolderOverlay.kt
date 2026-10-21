@@ -179,7 +179,12 @@ fun FolderOverlay(
         val panelCorner = (u * settings.folderCorner).coerceAtMost(panelW / 2f)
         Box {
         // Şeffaf cam: panelin arkasındaki ana ekran görüntüsü kenarda mercek gibi bükülür (yalnızca alt katmanda).
-        if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true, shape = panelShape)
+        // Kapanırken panelle birlikte söner: önceden tam boyutta kalıp animasyon sonunda birden kayboluyor, bulanık
+        // arka planın içinde bir an net bir alan gibi görünüyordu.
+        val lensVis by androidx.compose.animation.core.animateFloatAsState(
+            if (closing) 0f else 1f, androidx.compose.animation.core.tween(160), label = "folderLens",
+        )
+        if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true, shape = panelShape, alpha = { lensVis })
         Column(
             Modifier
                 .width(panelW)
