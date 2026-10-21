@@ -21,6 +21,8 @@ uniform float edge;
 uniform float strength;
 uniform float glow;
 uniform float soft;
+// 0: eski ince bant; 1: iOS 26 kalın kenar (dışarıdan bükme, kavisli eğim, yönlü parlama).
+uniform float mode;
 
 // Şeffaf camda net görüntü çok hafif yumuşatılır (9 örnek); buzlu camda girdi zaten bulanıktır.
 half4 sampleAt(float2 p) {
@@ -60,6 +62,20 @@ half4 main(float2 coord) {
         sdRoundRect(p + e.xy, c, rb) - sdRoundRect(p - e.xy, c, rb),
         sdRoundRect(p + e.yx, c, rb) - sdRoundRect(p - e.yx, c, rb));
     float2 n = g / max(length(g), 0.0001);
+    if (mode > 0.5) {
+        // iOS 26: kenar, yuvarlatılmış kalın bir cam gibi. Eğim (kavisli profil) kenara yaklaştıkça hızla dikleşir;
+        // görüntü kenar bandında DIŞARIDAN içeri bükülür (arkadaki çizgiler kenar boyunca kıvrılır), ortası bozulmaz.
+        float tt = clamp(t, 0.0, 0.999);
+        float slope = 1.0 - sqrt(1.0 - tt * tt);
+        slope *= corner;
+        float2 src2 = coord + n * slope * strength;
+        half4 c2 = sampleAt(origin + src2);
+        // Yönlü parlama: ışık sol üstten; eğimin en dik yerinde ince bir çizgi (sol üst ve sağ alt kenar).
+        float lit = abs(dot(n, normalize(float2(-0.6, -0.8))));
+        float rim = pow(slope, 3.0) * (0.35 + 0.65 * lit);
+        c2.rgb = min(c2.rgb + half3(rim * glow * 6.0), half3(1.0));
+        return c2;
+    }
     // Kenarda içeriden örnekle (mercek), tüm yüzeyde çok hafif büyütme.
     float2 src = coord - n * k * strength;
     src = c + (src - c) * 0.985;
@@ -84,8 +100,24 @@ object GlassLens {
         s: RuntimeShader, w: Float, h: Float, radius: Float, amount: Float, ox: Float = 0f, oy: Float = 0f,
         /** Şeffaf camda net görüntüye uygulanan hafif yumuşatma (px); 0 = yok. */
         soft: Float = 0f,
+        /** iOS 26 kalın kenar profili (dock, klasör simgeleri: deneme). */
+        ios: Boolean = false,
     ) {
         val m = minOf(w, h)
+        s.setFloatUniform("mode", if (ios) 1f else 0f)
+        if (ios) {
+            // Kalın kenar: bant kısa kenarın ~%42'si (en çok 44 dp), bükülme bandın yarısı kadar dışarıdan.
+            val edgeI = minOf(m * 0.42f, 44f * density)
+            val a = amount.coerceIn(0.2f, 1.4f)
+            s.setFloatUniform("size", w, h)
+            s.setFloatUniform("origin", ox, oy)
+            s.setFloatUniform("radius", radius)
+            s.setFloatUniform("edge", edgeI)
+            s.setFloatUniform("strength", edgeI * 0.9f * a)
+            s.setFloatUniform("glow", 0.05f * a)
+            s.setFloatUniform("soft", soft)
+            return
+        }
         // iOS'taki gibi kırılma yalnızca ince bir kenar şeridinde: büyük panellerde bant ve bükülme sınırlı.
         val edge = minOf(m * 0.30f, 34f * density)
         val strength = minOf(m * 0.30f * amount, 16f * density * amount.coerceAtMost(1.2f))

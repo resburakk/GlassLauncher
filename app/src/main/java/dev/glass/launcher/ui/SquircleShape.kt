@@ -27,7 +27,7 @@ import kotlin.math.tan
  * (eğrilik süreklidir). [smoothing] 0 = düz çeyrek daire (RoundedCornerShape ile aynı),
  * ~0.6 = iOS simgelerine en yakın. Figma'nın "corner smoothing" formülüyle hesaplanır.
  */
-class SquircleShape(private val radius: Dp, private val smoothing: Float) : Shape {
+class SquircleShape(val radius: Dp, private val smoothing: Float) : Shape {
 
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
         val w = size.width

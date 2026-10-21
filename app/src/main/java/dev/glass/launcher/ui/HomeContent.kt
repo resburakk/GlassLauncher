@@ -646,7 +646,7 @@ internal fun HomeContent(
                         .width(dockW)
                         .height(m.dockH)
                         .onGloballyPositioned { dockRect = it.boundsInRoot() }
-                        .liquidGlass(appShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp)
+                        .liquidGlass(appShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp, ios = true)
                 ) {
                     shownDock.forEachIndexed { i, dk ->
                       key(dk) {

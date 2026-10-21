@@ -140,6 +140,8 @@ class GlassHole(
     val clip: androidx.compose.ui.geometry.Rect = rect,
     /** true: kayarken mercek çizilmez (çok sayıda büyük kart: arşiv). */
     val plain: Boolean = false,
+    val ios: Boolean = false,
+    val lensRadius: Float = -1f,
 )
 
 /** Bir sayfanın cam arkalarını sayfa [dx] kadar kaymışken çizer. [rootOffset]: çizim alanının kökteki sol üst köşesi. */
@@ -155,8 +157,8 @@ fun DrawScope.drawPageGlassHoles(anchor: PageAnchor, dx: Float, rootOffset: Offs
                     if (h.plain) drawBackdrop(h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), soft = h.soft,
                         area = Size(h.rect.width, h.rect.height))
                     else drawBackdrop(
-                        h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), h.lens, h.refr, h.soft, h.clear,
-                        area = Size(h.rect.width, h.rect.height),
+                        h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), h.lens, h.refr, h.soft, h.clear || h.ios,
+                        area = Size(h.rect.width, h.rect.height), ios = h.ios, lensRadius = h.lensRadius,
                     )
                 }
             }
@@ -240,6 +242,8 @@ fun Modifier.liquidGlass(
      * planı bükülür (cam, çevresindeki görüntünün devamı gibi durur).
      */
     overlay: Boolean = false,
+    /** iOS 26 kalın kenar merceği (dışarıdan bükme, kavisli eğim, yönlü parlama). */
+    ios: Boolean = false,
 ): Modifier = composed {
     val look1 = LocalGlass.current
     val ov = LocalOverlayBackdrop.current
@@ -281,6 +285,8 @@ fun Modifier.liquidGlass(
     } else {
         Brush.verticalGradient(listOf(white(0.30f * s * fill * op), white(0.12f * s * fill * op)))
     }
+    // iOS 26 kalın kenar merceği yalnızca kırılma açıkken (düşük güç / kırılma 0 ise kapalı).
+    val iosLens = ios && refr > 0.01f
     var origin by remember { mutableStateOf(Offset.Zero) }
     // Katman camı: hareket sırasında konum her karede izlenmez (her kartın her karede yeniden çizilmesine yol
     // açıyordu); hareket bitince son konum bir kez alınır.
@@ -329,10 +335,12 @@ fun Modifier.liquidGlass(
                     if (old == null || old.rect != r || old.clip != clipR || old.bd !== bd || old.refr != refr || old.clear != clear ||
                         old.soft != softPx || old.rootW != look.rootW || old.rootH != look.rootH
                     ) {
-                        val path = androidx.compose.ui.graphics.Path().apply {
-                            addOutline(shape.createOutline(r.size, holeDir, holeDensity))
-                        }
-                        pageAnchor.holes[holeKey] = GlassHole(r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = overlay)
+                        val outline = shape.createOutline(r.size, holeDir, holeDensity)
+                        val path = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
+                        pageAnchor.holes[holeKey] = GlassHole(
+                            r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = overlay,
+                            ios = ios && refr > 0.01f, lensRadius = (shape as? SquircleShape)?.let { with(holeDensity) { it.radius.toPx() } } ?: outlineRadius(outline),
+                        )
                     }
                 }
             }
@@ -348,9 +356,11 @@ fun Modifier.liquidGlass(
                     val sh = if (inPage) pageAnchor?.shift?.invoke() else null
                     if (sh != null) {
                         // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden (az sayıda cam, ucuz).
-                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear)
+                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
+                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
                     } else if (!(overlay && GlassMotion.moving)) {
-                        drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
+                        drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
+                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
                     }
                 }
             }
@@ -408,6 +418,10 @@ private fun DrawScope.drawBackdrop(
     lens: android.graphics.RuntimeShader? = null, refraction: Float = 0f, soft: Float = 0f, forceLens: Boolean = false,
     /** Çizilecek alanın boyutu (varsayılan: çizim alanının tamamı). */
     area: Size = size,
+    /** iOS 26 kalın kenar merceği. */
+    ios: Boolean = false,
+    /** Camın gerçek köşe yarıçapı (px); < 0: kısa kenarın %30'u. */
+    lensRadius: Float = -1f,
 ) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
@@ -421,7 +435,8 @@ private fun DrawScope.drawBackdrop(
         m.postTranslate((rootW - bd.srcW * scaleR) / 2f, (rootH - bd.srcH * scaleR) / 2f)
         bs.setLocalMatrix(m)
         lens.setInputShader("content", bs)
-        GlassLens.configure(lens, area.width, area.height, minOf(area.width, area.height) * 0.3f, refraction, origin.x, origin.y, soft)
+        val rad = if (lensRadius >= 0f) lensRadius else minOf(area.width, area.height) * 0.3f
+        GlassLens.configure(lens, area.width, area.height, rad, refraction, origin.x, origin.y, soft, ios)
         drawRect(androidx.compose.ui.graphics.ShaderBrush(lens), size = area)
         return
     }
@@ -725,3 +740,20 @@ private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
         ),
         shape,
     )
+
+
+/** Şeklin köşe yarıçapı (px): yuvarlak dikdörtgen ise sol üst köşe, değilse kısa kenarın %30'u. */
+internal fun outlineRadius(o: androidx.compose.ui.graphics.Outline): Float = when (o) {
+    is androidx.compose.ui.graphics.Outline.Rounded -> o.roundRect.topLeftCornerRadius.x
+    is androidx.compose.ui.graphics.Outline.Rectangle -> 0f
+    is androidx.compose.ui.graphics.Outline.Generic -> {
+        val b = o.path.getBounds(); minOf(b.width, b.height) * 0.3f
+    }
+}
+
+/** Köşe yarıçapı (px): yumuşak köşeli şekilde kendi yarıçapı, değilse çizgi şeklinden. */
+internal fun shapeRadiusPx(
+    shape: Shape, size: Size, dir: androidx.compose.ui.unit.LayoutDirection, density: androidx.compose.ui.unit.Density,
+): Float = (shape as? SquircleShape)?.let { with(density) { it.radius.toPx() } }
+    ?.coerceAtMost(minOf(size.width, size.height) / 2f)
+    ?: outlineRadius(shape.createOutline(size, dir, density))
