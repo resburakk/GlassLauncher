@@ -23,6 +23,8 @@ uniform float glow;
 uniform float soft;
 // 0: eski ince bant; 1: iOS 26 kalın kenar (dışarıdan bükme, kavisli eğim, yönlü parlama).
 uniform float mode;
+// Camın düğüm içindeki konumu (panel kayıtları kenar bandı kadar geniş tutulur; dışarıdan bükme için).
+uniform float2 pos;
 
 // Şeffaf camda net görüntü çok hafif yumuşatılır (9 örnek); buzlu camda girdi zaten bulanıktır.
 half4 sampleAt(float2 p) {
@@ -41,7 +43,9 @@ float sdRoundRect(float2 p, float2 b, float r) {
     return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-half4 main(float2 coord) {
+half4 main(float2 coord0) {
+    // Geometri camın kendi koordinatında; örnekleme düğüm koordinatında (coord0).
+    float2 coord = coord0 - pos;
     float2 c = size * 0.5;
     float2 p = coord - c;
     float r = min(radius, min(c.x, c.y));
@@ -68,7 +72,9 @@ half4 main(float2 coord) {
         float tt = clamp(t, 0.0, 0.999);
         float slope = 1.0 - sqrt(1.0 - tt * tt);
         slope *= corner;
-        float2 src2 = coord + n * slope * strength;
+        // Camın dışında (panel kaydının kenar payı): görüntü olduğu gibi (sonradan silinir).
+        if (d > 0.0) return sampleAt(origin + coord0);
+        float2 src2 = coord0 + n * slope * strength;
         half4 c2 = sampleAt(origin + src2);
         // Yönlü parlama: ışık sol üstten; eğimin en dik yerinde ince bir çizgi (sol üst ve sağ alt kenar).
         float lit = abs(dot(n, normalize(float2(-0.6, -0.8))));
@@ -77,8 +83,8 @@ half4 main(float2 coord) {
         return c2;
     }
     // Kenarda içeriden örnekle (mercek), tüm yüzeyde çok hafif büyütme.
-    float2 src = coord - n * k * strength;
-    src = c + (src - c) * 0.985;
+    float2 src = coord0 - n * k * strength;
+    src = (pos + c) + (src - (pos + c)) * 0.985;
     half4 col = sampleAt(origin + src);
     col.rgb = min(col.rgb + half3(k * glow * corner), half3(1.0));
     return col;
@@ -88,6 +94,10 @@ half4 main(float2 coord) {
 object GlassLens {
     /** Ekran yoğunluğu (dp → px); uygulama açılışında ayarlanır. */
     @Volatile var density: Float = 3f
+    /** iOS kalın kenar: bant genişliği, kısa kenarın oranı (Ayarlar > Liquid Glass > Kenar kalınlığı). */
+    @Volatile var edgeFrac: Float = 0.42f
+    /** Panel kayıtlarına eklenecek kenar payı (px): dışarıdan bükme için. */
+    fun padPx(): Int = (48f * density).toInt()
 
     /** Her cam yüzeyi kendi örneğini kullanır (uniform'lar örneğe özeldir). */
     fun newShader(): RuntimeShader = RuntimeShader(LENS_AGSL)
@@ -100,14 +110,17 @@ object GlassLens {
         s: RuntimeShader, w: Float, h: Float, radius: Float, amount: Float, ox: Float = 0f, oy: Float = 0f,
         /** Şeffaf camda net görüntüye uygulanan hafif yumuşatma (px); 0 = yok. */
         soft: Float = 0f,
-        /** iOS 26 kalın kenar profili (dock, klasör simgeleri: deneme). */
+        /** iOS 26 kalın kenar profili. */
         ios: Boolean = false,
+        /** Camın düğüm içindeki konumu (panel kaydının kenar payı). */
+        px: Float = 0f, py: Float = 0f,
     ) {
         val m = minOf(w, h)
         s.setFloatUniform("mode", if (ios) 1f else 0f)
+        s.setFloatUniform("pos", px, py)
         if (ios) {
-            // Kalın kenar: bant kısa kenarın ~%42'si (en çok 44 dp), bükülme bandın yarısı kadar dışarıdan.
-            val edgeI = minOf(m * 0.42f, 44f * density)
+            // Kalın kenar: bant kısa kenarın ayarlanan oranı (en çok 44 dp), bükülme bandın ~%90'ı kadar dışarıdan.
+            val edgeI = minOf(m * edgeFrac, 44f * density)
             val a = amount.coerceIn(0.2f, 1.4f)
             s.setFloatUniform("size", w, h)
             s.setFloatUniform("origin", ox, oy)

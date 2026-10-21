@@ -242,8 +242,8 @@ fun Modifier.liquidGlass(
      * planı bükülür (cam, çevresindeki görüntünün devamı gibi durur).
      */
     overlay: Boolean = false,
-    /** iOS 26 kalın kenar merceği (dışarıdan bükme, kavisli eğim, yönlü parlama). */
-    ios: Boolean = false,
+    /** iOS 26 kalın kenar merceği (dışarıdan bükme, kavisli eğim, yönlü parlama). Bütün camlarda açık. */
+    ios: Boolean = true,
 ): Modifier = composed {
     val look1 = LocalGlass.current
     val ov = LocalOverlayBackdrop.current
@@ -674,11 +674,16 @@ fun Modifier.glassRegionBlur(
                     }
                     val ln = lensNodes[i]; val sh = lensShaders[i]
                     val l = rr.left.toInt(); val t = rr.top.toInt()
-                    ln.setPosition(l, t, l + rw, t + rh)
-                    GlassLens.configure(sh, rw.toFloat(), rh.toFloat(), rr.topLeftCornerRadius.x, refr)
+                    // Kayıt kenar bandı kadar geniş: iOS kalın kenarı görüntüyü kenarda dışarıdan bükerek alır.
+                    val pad = GlassLens.padPx()
+                    ln.setPosition(l - pad, t - pad, l + rw + pad, t + rh + pad)
+                    GlassLens.configure(
+                        sh, rw.toFloat(), rh.toFloat(), rr.topLeftCornerRadius.x, refr,
+                        ios = true, px = pad.toFloat(), py = pad.toFloat(),
+                    )
                     ln.setRenderEffect(android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content"))
-                    val lc = ln.beginRecording(rw, rh)
-                    lc.translate(-l.toFloat(), -t.toFloat())
+                    val lc = ln.beginRecording(rw + pad * 2, rh + pad * 2)
+                    lc.translate(-(l - pad).toFloat(), -(t - pad).toFloat())
                     lc.drawRenderNode(if (entry.key in reg.strong) strongNode else blurNode)
                     ln.endRecording()
                     nc.drawRenderNode(ln)
