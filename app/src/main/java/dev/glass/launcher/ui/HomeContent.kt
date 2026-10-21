@@ -244,6 +244,8 @@ internal fun HomeContent(
         val byPage = remember(shownPlacements) { shownPlacements.groupBy { it.page } }
         val shownDock = dockPreview ?: layout.dock
 
+        // Kayarken katman camlarının merceği kapalı (bkz. GlassMotion).
+        LaunchedEffect(pagerState.isScrollInProgress) { GlassMotion.scrolling = pagerState.isScrollInProgress }
         // Kaydırma sürerken (parmak kalktıktan sonraki yerine oturma dahil) yüksek kare hızı istenir (Android 15+).
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {

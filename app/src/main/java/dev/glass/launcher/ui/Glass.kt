@@ -193,6 +193,15 @@ val LocalWindowBlur = staticCompositionLocalOf<((Float) -> Unit)?> { null }
 /** Geçerli ayarlar; simge ve etiket çizen bileşenler buradan okur. */
 val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
 
+/**
+ * Sayfalar ya da arşiv listesi kayarken true. Katman camları (arşiv kartları vb.) o sırada kenar merceğini çizmez,
+ * yalnızca bulanık arka planı gösterir: onlarca büyük kartta mercek her karede ekran kartını bütçenin üstüne
+ * çıkarıyordu (arşive kaydırırken %15 takılma). Kaydırma bitince mercek geri gelir. Çizimde okunur.
+ */
+object GlassMotion {
+    var scrolling by androidx.compose.runtime.mutableStateOf(false)
+}
+
 /** Arşiv/arama/widget sayfası açıkken arkadaki bulanık duvar kâğıdı (bu katmanlardaki camlar onu büker). */
 val LocalOverlayBackdrop = androidx.compose.runtime.compositionLocalOf<Blurred?> { null }
 
@@ -304,7 +313,8 @@ fun Modifier.liquidGlass(
             if (bd != null) Modifier.drawBehind {
                 // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
                 if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
-                    drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
+                    if (overlay && GlassMotion.scrolling) drawBackdrop(bd, look.rootW, look.rootH, origin, soft = softPx)
+                    else drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
                 }
             }
             else Modifier
