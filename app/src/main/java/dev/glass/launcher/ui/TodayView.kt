@@ -224,7 +224,7 @@ fun TodayPage(
                     .width(contentW)
                     .height(u * 43f)
                     .graphicsLayer { alpha = searchAlpha; scaleX = 0.94f + 0.06f * searchAlpha; scaleY = scaleX }
-                    .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, frosted = true)
+                    .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, overlay = true)
                     .clickable(remember { MutableInteractionSource() }, null, enabled = !edit) { onOpenSearch() }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -254,7 +254,7 @@ fun TodayPage(
                 Column(
                     Modifier
                         .width(contentW)
-                        .liquidGlass(RoundedCornerShape(widgetCorner(contentW)), settings.panelGlassStrength, 0.dp, frosted = true)
+                        .liquidGlass(RoundedCornerShape(widgetCorner(contentW)), settings.panelGlassStrength, 0.dp, overlay = true)
                         .padding(u * 20f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -360,7 +360,7 @@ private fun TodayButton(text: String, settings: LauncherSettings, onClick: () ->
     Box(
         Modifier
             .height(u * 36f)
-            .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, frosted = true)
+            .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, overlay = true)
             .clickable(onClick = onClick)
             .padding(horizontal = u * 18f),
         contentAlignment = Alignment.Center,

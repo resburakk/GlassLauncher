@@ -193,6 +193,9 @@ val LocalWindowBlur = staticCompositionLocalOf<((Float) -> Unit)?> { null }
 /** Geçerli ayarlar; simge ve etiket çizen bileşenler buradan okur. */
 val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
 
+/** Arşiv/arama/widget sayfası açıkken arkadaki bulanık duvar kâğıdı (bu katmanlardaki camlar onu büker). */
+val LocalOverlayBackdrop = androidx.compose.runtime.compositionLocalOf<Blurred?> { null }
+
 /**
  * Liquid Glass benzeri yüzey: buzlu dolgu, üst-sol speküler parlama, alt iç gölge ve kırılmayı andıran
  * iki tonlu kenar ışığı. Koyu temada cam koyu tonlanır. Gerçek arka plan bulanıklığı, launcher'ın kendi
@@ -207,10 +210,21 @@ fun Modifier.liquidGlass(
     panel: Boolean = false,
     /** true: "Şeffaf" cam stilinde bile arkada duvar kâğıdının BULANIK kopyası (okunabilirlik gereken yüzeyler). */
     frosted: Boolean = false,
+    /**
+     * true: bulanık arka planlı katmanlardaki (arşiv, arama, widget sayfası) cam ana ekrandaki klasör simgesiyle
+     * AYNI görünür: ince dolgu, kenarda belirgin mercek. Arkasında net duvar kâğıdı yerine o katmanın bulanık arka
+     * planı bükülür (cam, çevresindeki görüntünün devamı gibi durur).
+     */
+    overlay: Boolean = false,
 ): Modifier = composed {
-    val look0 = LocalGlass.current
+    val look1 = LocalGlass.current
+    val ov = LocalOverlayBackdrop.current
+    val look0 = if (overlay && !look1.reduced) {
+        val b = ov ?: look1.backdrop
+        look1.copy(clear = true, sharp = b, backdrop = b)
+    } else look1
     // Düşük güçte her cam buzlu kabul edilir (arkası hazır bulanık kopya); şeffaf cam net kopya ister.
-    val look = if ((frosted || look0.reduced) && look0.clear) look0.copy(clear = false) else look0
+    val look = if ((frosted && !overlay || look0.reduced) && look0.clear) look0.copy(clear = false) else look0
     val st = LocalLauncherSettings.current
     val rimW = st.glassRimWidth
     val op = st.glassOpacity * glassTintFactor(st.glassTint)

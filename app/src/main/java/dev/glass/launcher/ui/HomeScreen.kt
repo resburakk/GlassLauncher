@@ -458,8 +458,11 @@ fun HomeScreen(
         TextShadowConfig.strength = if (autoShadow) 0.3f else settings.textShadowStrength
         TextShadowConfig.spread = settings.textShadowSpread
     }
+    // Arşiv/arama/widget sayfasının bulanık arka planı (oradaki camlar bunu büker); aşağıda hazırlanır.
+    val overlayBackdropHolder = remember { mutableStateOf<dev.glass.launcher.data.Blurred?>(null) }
     CompositionLocalProvider(
         LocalLauncherSettings provides settings,
+        LocalOverlayBackdrop provides overlayBackdropHolder.value,
         LocalMotion provides motion,
         LocalPt provides HomeMetrics.pt(LocalConfiguration.current.screenWidthDp.dp),
         LocalHomeMetrics provides homeMetrics,
@@ -619,6 +622,14 @@ fun HomeScreen(
         }
         val homeBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, homeBlurR, rootSize) {
             value = if (homeBlurR < 1f) null else blurredWallpaperCopy(wp, homeBlurR, rootSize)
+        }
+        // Katmanlardaki camlar için: arkada hangi bulanık kopya görünüyorsa (katman bulanıklığı ana ekranınkinden
+        // güçlüyse o, değilse ana ekran bulanıklığı) aynısı.
+        LaunchedEffect(overlayBlurImg, homeBlurImg, wp) {
+            val img = (if (overlayBlurR > homeBlurR) overlayBlurImg else null) ?: homeBlurImg
+            val src = wp
+            overlayBackdropHolder.value =
+                if (img == null || src == null) null else dev.glass.launcher.data.Blurred(img, src.width, src.height)
         }
         // Duvar kâğıdı dosyası çoğu zaman ekrandan çok büyük: net kopya gerektiğinde ekran boyutundaki hali çizilir.
         val screenWp by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, rootSize) {

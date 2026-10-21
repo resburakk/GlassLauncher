@@ -175,7 +175,7 @@ fun LibraryPage(
                     .weight(1f)
                     .height(LocalPt.current * 43f)
                     // Buzlu (bulanık) cam, gölgesiz: şeffaf cam stilinde arkada net/pikselli duvar kâğıdı görünüyordu.
-                    .liquidGlass(CircleShape, strength, 0.dp, frosted = true)
+                    .liquidGlass(CircleShape, strength, 0.dp, overlay = true)
                     .clickable(remember { MutableInteractionSource() }, null) { searching = true }
                     .padding(horizontal = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -281,7 +281,7 @@ private fun CategoryTile(
                 // Dock ile aynı Liquid Glass (kırılma, parlama, kenar ışığı; tüm cam ayarları uygulanır).
                 // Arkası bulanık arşiv zemini: şeffaf stilde de bulanık kopya kullanılır. Gölgesiz: yarı saydam
                 // camın altından gölge koyu bir kare gibi görünüyordu.
-                .liquidGlass(appShape(tileCorner), settings.panelGlassStrength, 0.dp, frosted = true)
+                .liquidGlass(appShape(tileCorner), settings.panelGlassStrength, 0.dp, overlay = true)
                 .padding(pad)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(gap)) {
@@ -523,7 +523,7 @@ private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(1f, 0.5f)
                     }
                     .size(d)
-                    .liquidGlass(CircleShape, LocalLauncherSettings.current.panelGlassStrength, 0.dp, frosted = true),
+                    .liquidGlass(CircleShape, LocalLauncherSettings.current.panelGlassStrength, 0.dp, overlay = true),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
