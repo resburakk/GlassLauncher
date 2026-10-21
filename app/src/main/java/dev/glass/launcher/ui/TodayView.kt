@@ -210,7 +210,8 @@ fun TodayPage(
                 .nestedScroll(rb.connection)
                 .nestedScroll(pullToSearch)
                 .verticalScroll(rememberScrollState())
-                .padding(top = statusTop + u * 14f, bottom = navBottom + u * 28f),
+                                // Arama çubuğu, ana ekrandaki ilk simge satırıyla aynı hizada (çubuğun ortası simgelerin ortasında).
+                .padding(top = maxOf(statusTop + u * 6f, hm.firstTop + (hm.icon - u * 43f) / 2f), bottom = navBottom + u * 28f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
         Column(Modifier.fillMaxWidth().rubberY(rb), horizontalAlignment = Alignment.CenterHorizontally) {

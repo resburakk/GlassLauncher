@@ -200,6 +200,10 @@ val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
  */
 object GlassMotion {
     var scrolling by androidx.compose.runtime.mutableStateOf(false)
+    /** Widget (Bugün) sayfası kayarak açılıyor/kapanıyor. */
+    var todayMoving by androidx.compose.runtime.mutableStateOf(false)
+    /** Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez). */
+    val moving: Boolean get() = scrolling || todayMoving
 }
 
 /** Arşiv/arama/widget sayfası açıkken arkadaki bulanık duvar kâğıdı (bu katmanlardaki camlar onu büker). */
@@ -267,6 +271,17 @@ fun Modifier.liquidGlass(
         Brush.verticalGradient(listOf(white(0.30f * s * fill * op), white(0.12f * s * fill * op)))
     }
     var origin by remember { mutableStateOf(Offset.Zero) }
+    // Katman camı: hareket sırasında konum her karede izlenmez (her kartın her karede yeniden çizilmesine yol
+    // açıyordu); hareket bitince son konum bir kez alınır.
+    val lastCoords = remember { arrayOfNulls<androidx.compose.ui.layout.LayoutCoordinates>(1) }
+    if (overlay) {
+        LaunchedEffect(Unit) {
+            snapshotFlow { GlassMotion.moving }.collect { m ->
+                val c = lastCoords[0]
+                if (!m && c != null && c.isAttached) origin = c.positionInRoot()
+            }
+        }
+    }
     val pageAnchor = LocalPageAnchor.current
     var inPage by remember { mutableStateOf(false) }
     val holeKey = remember { Any() }
@@ -289,7 +304,10 @@ fun Modifier.liquidGlass(
             if (bd != null) Modifier.onGloballyPositioned { c ->
                 // Sayfa içindeyse konum sayfaya göre (kayarken değişmez → yeniden çizim yok); değilse köke göre.
                 val pc = pageAnchor?.coords
-                origin = if (pc != null && pc.isAttached) pageAnchor.rest + pc.localPositionOf(c, Offset.Zero) else c.positionInRoot()
+                lastCoords[0] = c
+                if (!(overlay && GlassMotion.moving)) {
+                    origin = if (pc != null && pc.isAttached) pageAnchor.rest + pc.localPositionOf(c, Offset.Zero) else c.positionInRoot()
+                }
                 inPage = pc != null && pc.isAttached
                 if (inPage && pageAnchor != null && pc != null) {
                     // Sayfaya göre alan: kayarken değişmez, yalnızca yerleşim değişince güncellenir.
@@ -313,8 +331,11 @@ fun Modifier.liquidGlass(
             if (bd != null) Modifier.drawBehind {
                 // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
                 if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
-                    if (overlay && GlassMotion.scrolling) drawBackdrop(bd, look.rootW, look.rootH, origin, soft = softPx)
-                    else drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
+                    // Katman camı hareket halindeyken kopya çizilmez: cam şeffaf kalır, arkadaki gerçek arka plan
+                    // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
+                    if (!(overlay && GlassMotion.moving)) {
+                        drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
+                    }
                 }
             }
             else Modifier
