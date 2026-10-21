@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.graphics.drawscope.clipRect
+
 import androidx.compose.ui.geometry.Size
 
 import androidx.compose.ui.graphics.addOutline
@@ -118,6 +120,8 @@ class PageAnchor {
     /** true iken (sayfalar kayarken) sayfadaki camların arkası sayfanın İÇİNDE değil, altındaki ayrı ince katmanda
      *  her karede gerçek konumuna göre çizilir ([drawPageGlassHoles]); sayfanın hazır görüntüsü hiç bozulmaz. */
     var holesActive: () -> Boolean = { false }
+    /** Sayfanın kendisi (katman dönüşümüyle) kayıyorsa o anki kayması; çizimde okunur (widget sayfası). */
+    var shift: (() -> Offset)? = null
     val holes = androidx.compose.runtime.mutableStateMapOf<Any, GlassHole>()
 }
 
@@ -132,6 +136,10 @@ class GlassHole(
     val clear: Boolean,
     val rootW: Float,
     val rootH: Float,
+    /** Görünür kısım (liste kenarında kırpılan kart taşmasın). */
+    val clip: androidx.compose.ui.geometry.Rect = rect,
+    /** true: kayarken mercek çizilmez (çok sayıda büyük kart: arşiv). */
+    val plain: Boolean = false,
 )
 
 /** Bir sayfanın cam arkalarını sayfa [dx] kadar kaymışken çizer. [rootOffset]: çizim alanının kökteki sol üst köşesi. */
@@ -140,12 +148,17 @@ fun DrawScope.drawPageGlassHoles(anchor: PageAnchor, dx: Float, rootOffset: Offs
         val left = h.rect.left + dx
         val top = h.rect.top
         if (left > size.width || left + h.rect.width < 0f) continue
-        translate(left, top) {
-            clipPath(h.path) {
-                drawBackdrop(
-                    h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), h.lens, h.refr, h.soft, h.clear,
-                    area = Size(h.rect.width, h.rect.height),
-                )
+        if (h.clip.width <= 0f || h.clip.height <= 0f) continue
+        clipRect(h.clip.left + dx, h.clip.top, h.clip.right + dx, h.clip.bottom) {
+            translate(left, top) {
+                clipPath(h.path) {
+                    if (h.plain) drawBackdrop(h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), soft = h.soft,
+                        area = Size(h.rect.width, h.rect.height))
+                    else drawBackdrop(
+                        h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), h.lens, h.refr, h.soft, h.clear,
+                        area = Size(h.rect.width, h.rect.height),
+                    )
+                }
             }
         }
     }
@@ -200,10 +213,8 @@ val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
  */
 object GlassMotion {
     var scrolling by androidx.compose.runtime.mutableStateOf(false)
-    /** Widget (Bugün) sayfası kayarak açılıyor/kapanıyor. */
-    var todayMoving by androidx.compose.runtime.mutableStateOf(false)
     /** Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez). */
-    val moving: Boolean get() = scrolling || todayMoving
+    val moving: Boolean get() = scrolling
 }
 
 /** Arşiv/arama/widget sayfası açıkken arkadaki bulanık duvar kâğıdı (bu katmanlardaki camlar onu büker). */
@@ -313,14 +324,15 @@ fun Modifier.liquidGlass(
                     // Sayfaya göre alan: kayarken değişmez, yalnızca yerleşim değişince güncellenir.
                     val r = androidx.compose.ui.geometry.Rect(pc.localPositionOf(c, Offset.Zero),
                         Size(c.size.width.toFloat(), c.size.height.toFloat()))
+                    val clipR = runCatching { pc.localBoundingBoxOf(c, clipBounds = true) }.getOrDefault(r)
                     val old = pageAnchor.holes[holeKey]
-                    if (old == null || old.rect != r || old.bd !== bd || old.refr != refr || old.clear != clear ||
+                    if (old == null || old.rect != r || old.clip != clipR || old.bd !== bd || old.refr != refr || old.clear != clear ||
                         old.soft != softPx || old.rootW != look.rootW || old.rootH != look.rootH
                     ) {
                         val path = androidx.compose.ui.graphics.Path().apply {
                             addOutline(shape.createOutline(r.size, holeDir, holeDensity))
                         }
-                        pageAnchor.holes[holeKey] = GlassHole(r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH)
+                        pageAnchor.holes[holeKey] = GlassHole(r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = overlay)
                     }
                 }
             }
@@ -333,7 +345,11 @@ fun Modifier.liquidGlass(
                 if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
                     // Katman camı hareket halindeyken kopya çizilmez: cam şeffaf kalır, arkadaki gerçek arka plan
                     // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
-                    if (!(overlay && GlassMotion.moving)) {
+                    val sh = if (inPage) pageAnchor?.shift?.invoke() else null
+                    if (sh != null) {
+                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden (az sayıda cam, ucuz).
+                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear)
+                    } else if (!(overlay && GlassMotion.moving)) {
                         drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear)
                     }
                 }

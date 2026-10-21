@@ -494,6 +494,15 @@ internal fun HomeContent(
             modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot() },
         ) { page ->
             if (page == libIndex) {
+                // Arşiv de ana ekran sayfaları gibi: kayarken kartların bulanık içi sayfanın altındaki ayrı katmanda
+                // (her karede ucuz), kartların kendisi hazır görüntü olarak taşınır.
+                val libAnchor = remember { PageAnchor() }
+                libAnchor.holesActive = { pagerState.isScrollInProgress && !edit && !dragging }
+                DisposableEffect(page, libAnchor) {
+                    pageAnchors[page] = libAnchor
+                    onDispose { if (pageAnchors[page] === libAnchor) pageAnchors.remove(page) }
+                }
+                PageBox(libAnchor, gridOrigin) {
                 // Arama çubuğu, ana ekrandaki ilk simge satırıyla AYNI üst çizgiden başlar.
                 Box(Modifier.fillMaxSize().padding(top = m.firstTop)) {
                     LibraryPage(
@@ -503,6 +512,7 @@ internal fun HomeContent(
                         onOpenGroup = onOpenGroup,
                         active = pagerState.settledPage == libIndex,
                     )
+                }
                 }
                 return@HorizontalPager
             }

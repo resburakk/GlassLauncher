@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.runtime.CompositionLocalProvider
+
+import androidx.compose.ui.layout.onPlaced
+
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
 import androidx.compose.animation.core.animate
@@ -151,10 +155,13 @@ fun TodayPage(
         bounds.keys.retainAll(ids)
     }
 
+    val todayAnchor = remember { PageAnchor() }
+    todayAnchor.shift = { Offset((state.progress - 1f) * state.widthPx, 0f) }
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
             .graphicsLayer { translationX = (state.progress - 1f) * size.width }
+            .onPlaced { todayAnchor.coords = it }
             // Sola kaydırınca sayfa kapanır (dikey kaydırma içerikte kalır).
             .draggable(
                 orientation = Orientation.Horizontal,
@@ -163,11 +170,15 @@ fun TodayPage(
             )
             // Boş yere uzun basınca düzenleme modu (iOS gibi).
             .pointerInput(Unit) {
+    // Sayfa kayarak gelirken camlar (arama çubuğu, kartlar) bulanık kopyayı sayfanın o anki yerinden çizer
+    // (önceden son konumdan çizildiği için "resmi önceden kopyalamış" gibi görünüyordu).
+    CompositionLocalProvider(LocalPageAnchor provides todayAnchor) {
                 detectTapGestures(onLongPress = { p ->
                     // Widget'ın üstündeyse onun menüsü açılır; düzenleme modu yalnızca boşlukta.
                     if (!editNow && bounds.values.none { it.contains(p) }) onEdit()
                 })
             }
+    }
     ) {
         val columns = hm.columns
         val contentW = hm.widgetWidth(columns)
@@ -210,8 +221,8 @@ fun TodayPage(
                 .nestedScroll(rb.connection)
                 .nestedScroll(pullToSearch)
                 .verticalScroll(rememberScrollState())
-                                // Arama çubuğu, ana ekrandaki ilk simge satırıyla aynı hizada (çubuğun ortası simgelerin ortasında).
-                .padding(top = maxOf(statusTop + u * 6f, hm.firstTop + (hm.icon - u * 43f) / 2f), bottom = navBottom + u * 28f),
+                                // Arama çubuğunun üst kenarı, ana ekrandaki ilk simge satırının üst kenarıyla aynı hizada.
+                .padding(top = maxOf(statusTop + u * 6f, hm.firstTop), bottom = navBottom + u * 28f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
         Column(Modifier.fillMaxWidth().rubberY(rb), horizontalAlignment = Alignment.CenterHorizontally) {

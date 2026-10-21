@@ -194,10 +194,6 @@ fun HomeScreen(
     // Widget sayfası (iOS Bugün görünümü): ilk sayfanın solundan kayarak açılır.
     val today = remember { TodayState() }
     val todayScope = rememberCoroutineScope()
-    // Widget sayfası kayarken katman camları kopya çizmez (bkz. GlassMotion).
-    LaunchedEffect(today) {
-        snapshotFlow { today.progress > 0.001f && today.progress < 0.999f }.collect { GlassMotion.todayMoving = it }
-    }
     val todayVisible by remember { derivedStateOf { today.progress > 0.001f } }
     val todayOpenNow by remember { derivedStateOf { today.progress > 0.5f } }
     LaunchedEffect(today) { snapshotFlow { today.progress > 0.5f }.collect { vm.todayOpen = it } }
