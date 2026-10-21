@@ -483,6 +483,9 @@ internal fun HomeContent(
             val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
             pageAnchors.forEach { (pg, a) -> drawPageGlassHoles(a, (pg - pos) * size.width, gridOrigin) }
         })
+        // Kenarda yana çekince Android'in esneme (gerilme) efekti kapalı: sayfa esnerken kartların camı (altındaki ayrı
+        // katmanda çizilen bulanık iç) esnemeye katılmıyor, kenarlarda kaymış ikinci bir hat oluşuyordu.
+        androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.LocalOverscrollFactory provides null) {
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
@@ -583,6 +586,7 @@ internal fun HomeContent(
                   }
                 }
             }
+        }
         }
 
         if (!isDefaultHome) {
