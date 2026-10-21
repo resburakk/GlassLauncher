@@ -625,8 +625,17 @@ fun HomeScreen(
         }
         // Katmanlardaki camlar için: arkada hangi bulanık kopya görünüyorsa (katman bulanıklığı ana ekranınkinden
         // güçlüyse o, değilse ana ekran bulanıklığı) aynısı.
-        LaunchedEffect(overlayBlurImg, homeBlurImg, wp) {
-            val img = (if (overlayBlurR > homeBlurR) overlayBlurImg else null) ?: homeBlurImg
+        // Telefonun kendi duvar kâğıdı kullanılıyorsa katmanların arkası sistem PENCERE bulanıklığıdır (yarıçap
+        // 90 px × bulanıklık ayarı); camın içindeki kopya da aynı güçte bulanıklaştırılır, yoksa kart çevresinden açık
+        // ve daha net görünüyordu.
+        val launcherDrawsWp = settings.launcherWallpaper
+        val windowMatchR = 90f * settings.glassBlur
+        val windowMatchImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, windowMatchR, rootSize, launcherDrawsWp) {
+            value = if (launcherDrawsWp) null else blurredWallpaperCopy(wp, windowMatchR, rootSize)
+        }
+        LaunchedEffect(overlayBlurImg, homeBlurImg, windowMatchImg, wp, launcherDrawsWp) {
+            val img = if (launcherDrawsWp) (if (overlayBlurR > homeBlurR) overlayBlurImg else null) ?: homeBlurImg
+            else windowMatchImg
             val src = wp
             overlayBackdropHolder.value =
                 if (img == null || src == null) null else dev.glass.launcher.data.Blurred(img, src.width, src.height)
