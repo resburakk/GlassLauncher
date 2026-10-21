@@ -208,8 +208,9 @@ fun HomeScreen(
     val fullBlur = overlay in FullBlurOverlays
     // Şeffaf camda açık klasörün arkası daha az bulanır: panel kenarındaki mercek görünür olsun (iOS 26).
     // (Arşiv kategorisi panelsiz, tam ekran: arkası her zaman tam bulanık — iOS 26.)
-    val clearFolder = settings.glassStyle == "clear" && overlay == Overlay.Folder
-    val blurAmount by animateFloatAsState(if (fullBlur) (if (clearFolder) 0.45f else 1f) else 0f, motion.tween(280), label = "blurAmount")
+    // Klasör açıkken de arşivdeki gibi TAM bulanıklık: şeffaf stilde %45'e düşürülüyordu; simgeler kendi
+    // bulanıklıklarıyla yine çok bulanıkken duvar kâğıdı neredeyse net kalıyor, arka plan tutarsız görünüyordu.
+    val blurAmount by animateFloatAsState(if (fullBlur) 1f else 0f, motion.tween(280), label = "blurAmount")
     val blurK by rememberUpdatedState(settings.glassBlur)
     // (Bulanıklık yarıçapı çizim katmanında okunur: geçiş sırasında ana ekran her karede yeniden oluşturulmasın.)
     val blurPxMax = with(LocalDensity.current) { 22.dp.toPx() } * settings.glassBlur
