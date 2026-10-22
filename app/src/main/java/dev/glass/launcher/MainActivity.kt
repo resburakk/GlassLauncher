@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     /** "Glass Ayarları" kısayoluyla açıldıysa ayarlar doğrudan gösterilir. */
     private var openSettingsRequest by mutableStateOf(0)
     private var addWidgetRequest by mutableStateOf(0)
+    private var openRecentsRequest by mutableStateOf(0)
 
     private val roleLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { updateDefault() }
@@ -81,6 +82,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         // Kurulum/güncellemeden sonra "Aç" ile gelinirse (ilk açılış) ayarlar değil ana ekran gösterilir.
         val firstRun = consumeFirstRunAfterUpdate()
         if (isSettingsEntry(intent) && !firstRun) openSettingsRequest++
+        if (intent?.getBooleanExtra(EXTRA_RECENTS, false) == true) openRecentsRequest++
         val lastCrash = (application as LauncherApp).takeLastCrash()
         setContent {
             var crash by remember { mutableStateOf(lastCrash) }
@@ -104,6 +106,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                     onRequestDefault = ::requestHomeRole,
                     openSettingsRequest = openSettingsRequest,
                     addWidgetRequest = addWidgetRequest,
+                    openRecentsRequest = openRecentsRequest,
                     homeHide = { hide },
                 )
             }
@@ -224,6 +227,10 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         super.onNewIntent(intent)
         if (intent.getBooleanExtra(EXTRA_ADD_WIDGET, false)) {
             addWidgetRequest++
+            return
+        }
+        if (intent.getBooleanExtra(EXTRA_RECENTS, false)) {
+            openRecentsRequest++
             return
         }
         if (isSettingsEntry(intent)) {
@@ -414,6 +421,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         const val EXTRA_SETTINGS = "dev.glass.launcher.OPEN_SETTINGS"
         /** Ayarlardaki "Widget ekle": ana ekranda widget galerisi açılsın. */
         const val EXTRA_ADD_WIDGET = "dev.glass.launcher.ADD_WIDGET"
+        /** Erişilebilirlik kısayolu: son kullanılanlar ekranını aç. */
+        const val EXTRA_RECENTS = "dev.glass.launcher.RECENTS"
         private const val REQ_CONFIGURE = 0x5701
         private const val REQ_RECONFIGURE = 0x5702
         private const val MAX_WALLPAPER_BLUR = 90f

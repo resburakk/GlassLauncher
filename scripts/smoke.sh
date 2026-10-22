@@ -162,6 +162,10 @@ tap_text "Uygula"; step "sıralamayı uygula" 2
 shot 09c-siralama-uygulandi
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 10-siralama-sonrasi
+# Launcher'ın kendi son kullanılanlar ekranı (izin yokken launcher'dan açılanlar listelenir)
+adb shell am start -a android.intent.action.MAIN -c android.intent.category.HOME -n dev.glass.launcher/.MainActivity --ez dev.glass.launcher.RECENTS true; step "son kullanılanlar" 3
+shot 10r-son-kullanilanlar
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 # Çoklu seçim: düzenleme modu > Seç > iki simge > Klasör Oluştur
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
 tap_text "Seç"; step "seçim modu" 2

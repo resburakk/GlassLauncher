@@ -19,8 +19,20 @@
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />
 
+    <!-- Launcher'ın kendi son kullanılanlar ekranı: hangi uygulamaların hangi sırayla kullanıldığı (kullanıcı
+         Ayarlar > Kullanım erişimi'nden açıkça izin verir) ve kartı kapatılan uygulamanın arka plan işlemini kapatmak. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+
     <!-- Paket görünürlüğü: QUERY_ALL_PACKAGES yerine yalnızca başlatılabilir uygulamalar sorgulanır -->
     <queries>
+        <!-- Son kullanılanlar: ana ekran uygulamalarını (önizleme alınmayacak) tanımak -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
         <!-- Arama: "internette ara", "Play Store'da ara" ve sesle yazma için açılacak uygulamayı bulmak -->
         <intent>
             <action android:name="android.intent.action.WEB_SEARCH" />
