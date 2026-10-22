@@ -70,7 +70,7 @@ object DarkIcon {
         val samples = raw.filterIndexed { k, _ -> dd[k] <= cut }.toIntArray()
         val info = analyze(samples)
         if (info.lum < 0.30f) return scaled(orig, 0.92f)
-        if (!info.uniform) return scaled(orig, 0.72f)
+        if (!info.uniform) return floodFlat(px, n, med, orig) ?: scaled(orig, 0.72f)
         val pal = IntArray(min(64, samples.size)) { samples[(it.toLong() * (samples.size - 1) / max(1, min(64, samples.size) - 1)).toInt()] }
         val weight = FloatArray(n * n) { p ->
             val c = px[p]
@@ -79,6 +79,54 @@ object DarkIcon {
                 var best = Float.MAX_VALUE
                 for (q in pal) { val d = dist(c, q); if (d < best) best = d }
                 smooth(24f, 72f, best) * ((c ushr 24) / 255f)
+            }
+        }
+        return compose(px, weight, info, orig, n)
+    }
+
+    /**
+     * Büyük logolu tek parça simge (Chrome gibi): zemin, kenar şeridinden içeri doğru zemin rengine yakın pikseller
+     * izlenerek bulunur (boya kovası). Zemin yeterince büyük ve düz renkse siyaha döner, logo olduğu gibi kalır.
+     */
+    private fun floodFlat(px: IntArray, n: Int, med: Int, orig: Bitmap): Bitmap? {
+        val tol = 46f
+        val mask = BooleanArray(n * n)
+        val queue = IntArray(n * n)
+        var head = 0; var tail = 0
+        val e0 = (n * 0.03f).toInt(); val e1 = (n * 0.08f).toInt()
+        fun seed(x: Int, y: Int) {
+            val p = y * n + x
+            if (mask[p]) return
+            val c = px[p]
+            if ((c ushr 24) > 200 && dist(c, med) < tol) { mask[p] = true; queue[tail++] = p }
+        }
+        for (k in 0 until n) for (e in e0..e1) {
+            seed(k, e); seed(k, n - 1 - e); seed(e, k); seed(n - 1 - e, k)
+        }
+        while (head < tail) {
+            val p = queue[head++]
+            val x = p % n; val y = p / n
+            if (x > 0) seed(x - 1, y)
+            if (x < n - 1) seed(x + 1, y)
+            if (y > 0) seed(x, y - 1)
+            if (y < n - 1) seed(x, y + 1)
+        }
+        var count = 0
+        for (m in mask) if (m) count++
+        if (count < 0.12f * n * n) return null
+        val samples = IntArray(minOf(count, 4000))
+        var k = 0; var idx = 0
+        val stepS = maxOf(1, count / samples.size)
+        for (p in mask.indices) if (mask[p]) { if (idx % stepS == 0 && k < samples.size) samples[k++] = px[p]; idx++ }
+        val info = analyze(samples.copyOf(k))
+        if (!info.uniform || info.lum < 0.30f) return null
+        // Ön plan ağırlığı: zemin dışı; kenarlarda zemine olan uzaklıkla yumuşak geçiş (pürüzsüz logo kenarı).
+        val weight = FloatArray(n * n) { p ->
+            val c = px[p]
+            when {
+                (c ushr 24) < 40 -> 0f
+                mask[p] -> 0f
+                else -> smooth(tol * 0.6f, tol * 1.6f, dist(c, med)) * ((c ushr 24) / 255f)
             }
         }
         return compose(px, weight, info, orig, n)
