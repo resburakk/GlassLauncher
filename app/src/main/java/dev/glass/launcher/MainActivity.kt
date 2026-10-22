@@ -413,8 +413,17 @@ class MainActivity : ComponentActivity(), WidgetRequester {
             val id = resources.getIdentifier("config_navBarInteractionMode", "integer", "android")
             if (id != 0) resources.getInteger(id) else -1
         }.getOrDefault(-1)
-        if (fromRes >= 0) return fromRes == 2
-        return runCatching { android.provider.Settings.Secure.getInt(contentResolver, "navigation_mode") == 2 }.getOrDefault(false)
+        if (fromRes == 2) return true
+        if (runCatching { android.provider.Settings.Secure.getInt(contentResolver, "navigation_mode") == 2 }.getOrDefault(false)) return true
+        // Bazı sistemler (MagicOS) modu farklı tutar: alttaki gezinti alanında dokunulabilir tuş yoksa (yalnızca
+        // ince hareket çubuğu) hareketle gezintidir. Üç tuşta tuşlar dokunulabilir alandır (≈ 48 dp).
+        return runCatching {
+            val ins = androidx.core.view.ViewCompat.getRootWindowInsets(window.decorView) ?: return@runCatching false
+            val tap = ins.getInsetsIgnoringVisibility(androidx.core.view.WindowInsetsCompat.Type.tappableElement()).bottom
+            val nav = ins.getInsetsIgnoringVisibility(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom
+            val dp = resources.displayMetrics.density
+            nav > 0 && tap < 40f * dp
+        }.getOrDefault(false)
     }
 
     /**
