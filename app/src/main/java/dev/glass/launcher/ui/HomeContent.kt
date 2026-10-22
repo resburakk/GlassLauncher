@@ -505,7 +505,7 @@ internal fun HomeContent(
                     pageAnchors[page] = libAnchor
                     onDispose { if (pageAnchors[page] === libAnchor) pageAnchors.remove(page) }
                 }
-                PageBox(libAnchor, gridOrigin) {
+                PageBox(libAnchor, gridOrigin, cache = !edit) {
                 // Arama çubuğu, ana ekrandaki ilk simge satırıyla AYNI üst çizgiden başlar.
                 Box(Modifier.fillMaxSize().padding(top = m.firstTop)) {
                     LibraryPage(
@@ -529,7 +529,7 @@ internal fun HomeContent(
                 pageAnchors[page] = anchor
                 onDispose { if (pageAnchors[page] === anchor) pageAnchors.remove(page) }
             }
-            PageBox(anchor, gridOrigin) {
+            PageBox(anchor, gridOrigin, cache = !edit) {
                 pagePl.forEach { pl ->
                   key(pl.item.id) {
                     val x = m.marginX + m.pitchX * pl.col.toFloat()

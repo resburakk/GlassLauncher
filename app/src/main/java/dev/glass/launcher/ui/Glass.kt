@@ -173,7 +173,13 @@ val LocalPageAnchor = staticCompositionLocalOf<PageAnchor?> { null }
  * görüntü taşınır (simgeler, yazı gölgeleri ve camlar her karede yeniden çizilmez → 120 Hz'de akıcı kaydırma).
  */
 @Composable
-fun PageBox(anchor: PageAnchor, rest: Offset, content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit) {
+fun PageBox(
+    anchor: PageAnchor, rest: Offset,
+    /** false: önbellek katmanı yok (düzenleme modu: simgeler her karede sallanıyor, önbellek her karede baştan
+     *  oluşturulup kaydırmayı 120 Hz'in altına düşürüyordu). */
+    cache: Boolean = true,
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit,
+) {
     anchor.rest = rest
     androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides anchor) {
         androidx.compose.foundation.layout.Box(
@@ -182,7 +188,10 @@ fun PageBox(anchor: PageAnchor, rest: Offset, content: @Composable androidx.comp
                 .onPlaced { anchor.coords = it }
                 // Sayfa ayrı katmanda bir kez çizilir; kayarken yalnızca bu hazır görüntü taşınır. (Telefonun kısmi
                 // yeniden çiziminde sayfanın bir kısmı donmasın diye kaydırma sırasında tüm ekran yenilenir: HomeContent.)
-                .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen },
+                .graphicsLayer {
+                    compositingStrategy = if (cache) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    else androidx.compose.ui.graphics.CompositingStrategy.Auto
+                },
             content = content,
         )
     }
