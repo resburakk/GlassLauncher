@@ -34,6 +34,9 @@ class LockService : AccessibilityService() {
         /** Sistemin Kontrol Merkezi'ni (hızlı ayarlar) açar; hizmet kapalıysa false. */
         fun quickSettings(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_QUICK_SETTINGS) == true
 
+        /** Sistemin kendi son kullanılanlar ekranını açar; hizmet kapalıysa false. */
+        fun systemRecents(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_RECENTS) == true
+
         /** Sistemin bildirim gölgesini açar; hizmet kapalıysa false. */
         fun notifications(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS) == true
 

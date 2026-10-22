@@ -1,5 +1,9 @@
 package dev.glass.launcher
 
+import kotlinx.coroutines.launch
+
+import androidx.lifecycle.lifecycleScope
+
 import android.app.Activity
 import android.app.WallpaperColors
 import android.app.WallpaperManager
@@ -74,6 +78,12 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         dev.glass.launcher.ui.BarTone.apply = { runOnUiThread { applyCurrentBarTone() } }
+        // Ana ekranda gezinti çubuğunu gizleme ayarı değişince hemen uygulanır.
+        lifecycleScope.launch {
+            vm.settings.collect { s ->
+                if (s.hideNavHandle != hideNavHandle) { hideNavHandle = s.hideNavHandle; applyNavHandle() }
+            }
+        }
         enableEdgeToEdge()
         requestHighestRefreshRate()
         updateDefault()
@@ -152,6 +162,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onResume() {
         super.onResume()
+        applyNavHandle()
         runCatching { window.addOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener, metricsHandler) }
         homeHidden = false
         coveredByApp = false
@@ -386,6 +397,39 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     /** Açık bir ekran (Ayarlar) tonu sabitlemişse ona, değilse duvar kâğıdına göre uygular. */
+    private var hideNavHandle = true
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Alttan kaydırınca çubuk geçici görünebilir: launcher yeniden odaklanınca tekrar gizlenir.
+        if (hasFocus) applyNavHandle()
+    }
+
+    /** Hareketle gezinti mi (üç tuş değil)? Sistem kaynağından okunur. */
+    private fun gestureNav(): Boolean = runCatching {
+        val r = android.content.res.Resources.getSystem()
+        val id = r.getIdentifier("config_navBarInteractionMode", "integer", "android")
+        id != 0 && r.getInteger(id) == 2
+    }.getOrDefault(false)
+
+    /**
+     * Hareketle gezintide ana ekrandayken alttaki ince çubuk gizlenir (ayar açıksa). Hareketler çalışmaya devam eder;
+     * uygulamalar kendi penceresinde çubuğu normal gösterir. Üç tuşlu gezintide tuşlar hiç gizlenmez.
+     */
+    private fun applyNavHandle() {
+        if (isDestroyed) return
+        runCatching {
+            WindowCompat.getInsetsController(window, window.decorView).apply {
+                if (hideNavHandle && gestureNav()) {
+                    systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+                    hide(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                } else {
+                    show(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                }
+            }
+        }
+    }
+
     private fun applyCurrentBarTone() {
         if (isDestroyed) return
         val darkText = dev.glass.launcher.ui.BarTone.override ?: wallpaperDarkText

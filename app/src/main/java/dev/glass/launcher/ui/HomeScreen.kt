@@ -554,6 +554,15 @@ fun HomeScreen(
                 detectVerticalDragGestures(
                     onDragStart = { startY = it.y; startX = it.x; total = 0f },
                     onDragEnd = {
+                        // Ortadan yukarı kaydırma: telefonun kendi son kullanılanlar ekranı (tek hareketle).
+                        if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f &&
+                            total < -80.dp.toPx() && startY > topZonePx && settingsNow.upSwipeRecents
+                        ) {
+                            if (!LockService.systemRecents()) {
+                                lockReason = LockReason.Panels
+                                overlay = Overlay.LockPrompt
+                            }
+                        }
                         if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f && total > 80.dp.toPx()) {
                             // Hangi hareketin ne açacağı Ayarlar > Hareketler'den seçilir.
                             val chosen = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe

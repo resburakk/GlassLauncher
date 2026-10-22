@@ -117,6 +117,10 @@ data class LauncherSettings(
     val midSwipe: SwipeAction = SwipeAction.Search,
     /** Boş alana çift dokununca ekranı kilitle (Erişilebilirlik hizmeti gerekir). */
     val doubleTapLock: Boolean = true,
+    /** Ortadan yukarı kaydırma telefonun kendi son kullanılanlar ekranını açar (tek hareketle). */
+    val upSwipeRecents: Boolean = true,
+    /** Hareketle gezintide ana ekrandayken alttaki gezinti çubuğu gizlenir (uygulamalarda görünür). */
+    val hideNavHandle: Boolean = true,
     /** Uygulama arşivi sayfası (ana ekranın sağı). Varsayılan kapalı: sayfa hiç görünmez. */
     val showLibrary: Boolean = true,
     /** Widget sayfası (iOS Bugün görünümü, ilk sayfanın solunda). */
@@ -283,7 +287,7 @@ data class LauncherSettings(
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
         put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
-        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
+        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
         put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions)
@@ -385,6 +389,8 @@ data class LauncherSettings(
                 topSwipe = runCatching { SwipeAction.valueOf(o.optString("topSwipe")) }.getOrDefault(d.topSwipe),
                 midSwipe = runCatching { SwipeAction.valueOf(o.optString("midSwipe2")) }.getOrDefault(d.midSwipe),
                 doubleTapLock = o.optBoolean("doubleTapLock", d.doubleTapLock),
+                upSwipeRecents = o.optBoolean("upSwipeRecents", d.upSwipeRecents),
+                hideNavHandle = o.optBoolean("hideNavHandle", d.hideNavHandle),
                 // "showLibrary2": arşiv yeniden varsayılan olarak açık (eski kayıttaki kapalı değer bir kez yok sayılır).
                 showLibrary = o.optBoolean("showLibrary2", d.showLibrary),
                 showToday = o.optBoolean("showToday", d.showToday),

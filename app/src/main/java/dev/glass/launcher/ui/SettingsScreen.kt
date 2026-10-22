@@ -442,6 +442,10 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         SliderRow("Dikey aralık", pct(s.vSpacing), s.vSpacing, 0.8f..1.4f, default = Def.vSpacing) { v -> onChange { it.copy(vSpacing = v) } }
     }
     Footer("Uygulama adlarının yazı ayarları \"Yazı Tipi\" sayfasında.")
+    Group("Gezinti çubuğu") {
+        ToggleRow("Ana ekranda gizle", s.hideNavHandle, default = Def.hideNavHandle) { v -> onChange { it.copy(hideNavHandle = v) } }
+    }
+    Footer("Hareketle gezintide alttaki ince çubuk yalnızca ana ekrandayken gizlenir; uygulamalarda görünür. Üç tuşlu gezintide tuşlar her zaman görünür.")
     BadgeGroup(s, onChange)
 }
 
@@ -955,6 +959,10 @@ private fun GesturesPage(s: LauncherSettings, onChange: ((LauncherSettings) -> L
     val ctx = LocalContext.current
     Group("Ekranın üstünden aşağı kaydırma") { SwipeChoices(s.topSwipe) { a -> onChange { it.copy(topSwipe = a) } } }
     Group("Ortadan (boş alandan) aşağı kaydırma") { SwipeChoices(s.midSwipe) { a -> onChange { it.copy(midSwipe = a) } } }
+    Group("Ortadan yukarı kaydırma") {
+        ToggleRow("Son kullanılanları aç", s.upSwipeRecents, default = Def.upSwipeRecents) { v -> onChange { it.copy(upSwipeRecents = v) } }
+    }
+    Footer("Telefonun kendi son kullanılanlar ekranı tek hareketle açılır (Erişilebilirlik izni gerekir).")
     Footer(
         "Kontrol Merkezi ve Bildirimler, telefonun KENDİ panelleridir. Güvenilir çalışması için aşağıdaki " +
             "Erişilebilirlik izni önerilir; izin kapalıyken de denenir ama bazı telefonlarda engellenebilir."
