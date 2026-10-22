@@ -144,6 +144,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onPause() {
         super.onPause()
+        dev.glass.launcher.ui.AppLock.paused(this)
         runCatching { window.removeOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener) }
         // Launcher bir uygulama/pencere açmadan arka plana geçiyor: büyük olasılıkla son uygulamalar ekranı.
         if (!LaunchTracker.recent() && !isChangingConfigurations) homeHidden = true

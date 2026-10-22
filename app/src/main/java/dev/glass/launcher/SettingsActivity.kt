@@ -50,6 +50,11 @@ class SettingsActivity : ComponentActivity() {
         updateDefault()
     }
 
+    override fun onPause() {
+        super.onPause()
+        dev.glass.launcher.ui.AppLock.paused(this)
+    }
+
     private fun updateDefault() {
         isDefault = runCatching { getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME) }.getOrDefault(true)
     }
