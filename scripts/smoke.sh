@@ -303,6 +303,20 @@ adb shell cmd uimode night no; step "açık mod" 5
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 20c-acik-mod
 
+# 22) Şeffaf (iOS 26 clear) simgeler ve Gizli/Kilitli uygulamalar sayfası
+adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 4
+tap_text "Simgeler" && { step "simgeler sayfası" 2
+  tap_text "Şeffaf" && step "şeffaf simge" 2
+  shot 22a0-simge-ayari
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 4
+  shot 22a-seffaf-simgeler
+  adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 3
+  tap_text "Orijinal"; step "orijinal simge" 2
+  adb shell input keyevent KEYCODE_BACK; step "geri" 2; }
+adb shell input swipe $cx $((H*80/100)) $cx $((H*20/100)) 300; step "aşağı kaydır" 2
+tap_text "Gizli ve Kilitli Uygulamalar" && { step "gizlilik sayfası" 3; shot 22b-gizlilik; }
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
