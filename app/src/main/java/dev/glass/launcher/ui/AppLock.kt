@@ -78,9 +78,7 @@ object AppLock {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) = runWhenResumed(onOk)
                 override fun onAuthenticationError(code: Int, msg: CharSequence?) {
                     // Kullanıcı vazgeçtiyse sessiz; başka bir hata (donanım, kayıt yok vb.) ise nedeni gösterilir.
-                    if (code != BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED && code != BiometricPrompt.BIOMETRIC_ERROR_CANCELED &&
-                        code != BiometricPrompt.BIOMETRIC_ERROR_NEGATIVE_BUTTON
-                    ) {
+                    if (code != BiometricPrompt.BIOMETRIC_ERROR_USER_CANCELED && code != BiometricPrompt.BIOMETRIC_ERROR_CANCELED) {
                         host?.get()?.let { Toast.makeText(it, "Kimlik doğrulanamadı: ${msg ?: code}", Toast.LENGTH_SHORT).show() }
                     }
                 }
