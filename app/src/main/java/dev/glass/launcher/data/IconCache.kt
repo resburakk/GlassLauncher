@@ -39,7 +39,7 @@ class IconCache(private val context: Context) {
             val custom = look.customFile?.let { f ->
                 runCatching { BitmapFactory.decodeFile(File(iconDir, f).path) }.getOrNull()
             }
-            val big = if (custom != null) {
+            val big0 = if (custom != null) {
                 IconRenderer.renderCustom(custom, renderPx).also { custom.recycle() }
             } else {
                 // En yüksek çözünürlüklü simge kaynağı istenir; ekrandaki boyuta yüksek kaliteyle küçültülür (daha net).
@@ -55,6 +55,7 @@ class IconCache(private val context: Context) {
                 val main = IconRenderer.render(scIcon ?: appIcon(), renderPx, look.style, look.tint, look.fillRound)
                 if (sc != null && scIcon != null) withAppBadge(main, appIcon(), renderPx, look) else main
             }
+            val big = if (app.profile == ProfileKind.Work) withWorkBadge(big0, renderPx) else big0
             val out = if (renderPx == sizePx) big else downscale(big, sizePx).also { if (it !== big) big.recycle() }
             out.asImageBitmap()
         }
@@ -79,6 +80,27 @@ class IconCache(private val context: Context) {
         c.drawRoundRect(l, t + b * 0.03f, l + b, t + b * 1.03f, b * 0.25f, b * 0.25f, ring)
         c.drawBitmap(badge, l, t, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
         badge.recycle()
+        return out
+    }
+
+    /** İş profili uygulaması: sağ altta mavi daire içinde beyaz çanta (Android'deki iş rozeti gibi). */
+    private fun withWorkBadge(main: android.graphics.Bitmap, size: Int): android.graphics.Bitmap {
+        val out = if (main.isMutable) main else main.copy(android.graphics.Bitmap.Config.ARGB_8888, true).also { main.recycle() }
+        val c = android.graphics.Canvas(out)
+        val r = size * 0.17f
+        val cx = size - r * 1.05f; val cy = size - r * 1.05f
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        p.color = android.graphics.Color.WHITE
+        c.drawCircle(cx, cy, r, p)
+        p.color = 0xFF1A73E8.toInt()
+        c.drawCircle(cx, cy, r * 0.86f, p)
+        // Çanta: gövde ve sap.
+        p.color = android.graphics.Color.WHITE
+        val bw = r * 0.95f; val bh = r * 0.66f
+        c.drawRoundRect(cx - bw / 2, cy - bh / 2 + r * 0.08f, cx + bw / 2, cy + bh / 2 + r * 0.08f, r * 0.12f, r * 0.12f, p)
+        p.style = android.graphics.Paint.Style.STROKE
+        p.strokeWidth = r * 0.12f
+        c.drawRoundRect(cx - bw * 0.22f, cy - bh / 2 - r * 0.16f, cx + bw * 0.22f, cy - bh / 2 + r * 0.1f, r * 0.08f, r * 0.08f, p)
         return out
     }
 

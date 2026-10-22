@@ -1368,6 +1368,33 @@ private fun PrivacyPage(vm: LauncherViewModel, s: LauncherSettings) {
             TextBlock("Telefonunuzda ekran kilidi (PIN, desen veya şifre) yok. Kilit ve gizli uygulama koruması için önce telefon ayarlarından ekran kilidi oluşturun.")
         }
     }
+    val profiles by vm.profiles.collectAsStateWithLifecycle()
+    // İş profili: duraklatınca iş uygulamaları bildirim göndermez ve açılmaz (Pixel'deki gibi).
+    profiles.filter { it.kind == dev.glass.launcher.data.ProfileKind.Work }.forEach { p ->
+        Group("İş profili") {
+            ToggleRow("İş uygulamaları açık", !p.quiet) { on -> vm.setProfileQuiet(p.user, !on) }
+        }
+        Footer("Kapatınca iş uygulamaları duraklatılır: bildirim gelmez, açılmaz. Arşivde \"İş\" kutusunda durur.")
+    }
+    // Özel Alan (Android 15+): uygulamaları yalnızca burada görünür; açmak için sistem kendi kilidini sorar.
+    profiles.filter { it.kind == dev.glass.launcher.data.ProfileKind.Private }.forEach { p ->
+        val privateApps = all.filter { it.profile == dev.glass.launcher.data.ProfileKind.Private && it.user == p.user }
+        Group("Özel Alan") {
+            ActionRow(if (p.quiet) "Özel Alanın Kilidini Aç" else "Özel Alanı Kilitle") { vm.setProfileQuiet(p.user, !p.quiet) }
+            if (!p.quiet) privateApps.forEach { app ->
+                RowDivider(inset = 60.dp)
+                Row(
+                    Modifier.fillMaxWidth().clickable { vm.launchUnlocked(app) }.padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AppIconImage(app, vm, 32.dp, false, 0f, badge = false)
+                    Spacer(Modifier.width(12.dp))
+                    Text(app.label, color = Fg, fontSize = 16.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        Footer("Özel Alan uygulamaları ana ekranda, arşivde ve aramada hiç görünmez; yalnızca burada, kilit açıkken listelenir.")
+    }
     val hidden = all.filter { it.key in s.hiddenApps }
     if (hidden.isNotEmpty()) {
         Group("Gizli uygulamalar") {
@@ -1378,10 +1405,11 @@ private fun PrivacyPage(vm: LauncherViewModel, s: LauncherSettings) {
         }
         Footer("Açmak için uygulamaya dokunun. Gizli uygulamalar ana ekranda, arşivde ve aramada görünmez.")
     }
+    val listed = all.filter { it.profile != dev.glass.launcher.data.ProfileKind.Private }
     Group("Tüm uygulamalar") {
-        all.forEachIndexed { i, app ->
+        listed.forEachIndexed { i, app ->
             PrivacyAppRow(vm, app, s, openable = false)
-            if (i < all.lastIndex) RowDivider(inset = 60.dp)
+            if (i < listed.lastIndex) RowDivider(inset = 60.dp)
         }
     }
     Footer(

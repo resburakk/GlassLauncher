@@ -46,12 +46,18 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Gizli uygulamalar çıkarılmış liste: ana ekran, arşiv ve arama bunu kullanır. */
     private val shownApps: StateFlow<List<AppInfo>> = combine(
         repo.apps, la.settingsStore.settings.map { it.hiddenApps }.distinctUntilChanged(),
-    ) { list, hidden -> if (hidden.isEmpty()) list else list.filter { it.key !in hidden } }
+    ) { list, hidden ->
+        // Özel Alan uygulamaları hiçbir yerde görünmez (yalnızca Ayarlar > Gizli ve Kilitli Uygulamalar içinde).
+        list.filter { it.profile != dev.glass.launcher.data.ProfileKind.Private && (hidden.isEmpty() || it.key !in hidden) }
+    }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val apps: StateFlow<List<AppInfo>> = shownApps
     /** Gizliler dahil tüm uygulamalar (yalnızca Ayarlar > Gizlilik). */
     val allApps: StateFlow<List<AppInfo>> = repo.apps
+    /** İş profili ve Özel Alan durumları. */
+    val profiles = repo.profiles
+    fun setProfileQuiet(user: android.os.UserHandle, quiet: Boolean) = repo.setQuiet(user, quiet)
 
     /** Uygulamalar + ana ekrana sabitlenmiş kısayollar (anahtar → giriş). Gizli uygulamanın kısayolu da gizlenir. */
     val appsByKey: StateFlow<Map<String, AppInfo>> = combine(shownApps, repo.pinned) { list, pins ->
@@ -156,10 +162,13 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (recent.isNotEmpty()) groups += LibraryGroup("Öneriler", recent)
         val newest = all.filter { it.installTime > 0 }.sortedByDescending { it.installTime }.take(8)
         if (newest.isNotEmpty()) groups += LibraryGroup("Son Eklenenler", newest)
-        val byCat = all.groupBy { it.category }
+        val (work, personal) = all.partition { it.profile == dev.glass.launcher.data.ProfileKind.Work }
+        val byCat = personal.groupBy { it.category }
         AppCategory.entries.forEach { c ->
             byCat[c]?.takeIf { it.isNotEmpty() }?.let { groups += LibraryGroup(c.title, it) }
         }
+        // İş profili uygulamaları kendi kutusunda (simgelerinde çanta rozeti).
+        if (work.isNotEmpty()) groups += LibraryGroup("İş", work)
         groups
     }.stateIn(viewModelScope, eager, emptyList())
 

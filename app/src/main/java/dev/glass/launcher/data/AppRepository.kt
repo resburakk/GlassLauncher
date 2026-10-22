@@ -33,6 +33,26 @@ class AppRepository(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _apps = MutableStateFlow<List<AppInfo>>(emptyList())
     val apps: StateFlow<List<AppInfo>> = _apps
+    private val userManager = context.getSystemService(android.os.UserManager::class.java)
+    private val _profiles = MutableStateFlow<List<ProfileState>>(emptyList())
+    /** İş profili ve Özel Alan durumları (ana profil hariç). */
+    val profiles: StateFlow<List<ProfileState>> = _profiles
+
+    private fun kindOf(user: UserHandle): ProfileKind {
+        if (user == android.os.Process.myUserHandle()) return ProfileKind.Main
+        if (android.os.Build.VERSION.SDK_INT >= 35) {
+            val t = runCatching { launcherApps.getLauncherUserInfo(user)?.userType }.getOrNull()
+            if (t == android.os.UserManager.USER_TYPE_PROFILE_PRIVATE) return ProfileKind.Private
+        }
+        return ProfileKind.Work
+    }
+
+    /** İş profilini duraklatır / açar ya da Özel Alan'ı kilitler / açar (açarken sistem kimlik sorar). */
+    fun setQuiet(user: UserHandle, quiet: Boolean) {
+        runCatching { userManager.requestQuietModeEnabled(quiet, user) }
+        refresh()
+    }
+
     private val _pinned = MutableStateFlow<List<AppInfo>>(emptyList())
     /** Ana ekrana sabitlenmiş kısayollar (yalnızca ana ekranda görünür; arşivde ve aramada yok). */
     val pinned: StateFlow<List<AppInfo>> = _pinned
@@ -54,6 +74,25 @@ class AppRepository(private val context: Context) {
 
     fun start() {
         launcherApps.registerCallback(callback, Handler(Looper.getMainLooper()))
+        // Profil açıldı / duraklatıldı / kilitlendi: liste ve durumlar yenilenir.
+        val f = android.content.IntentFilter().apply {
+            addAction(Intent.ACTION_MANAGED_PROFILE_AVAILABLE)
+            addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE)
+            addAction(Intent.ACTION_MANAGED_PROFILE_ADDED)
+            addAction(Intent.ACTION_MANAGED_PROFILE_REMOVED)
+            addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
+            if (android.os.Build.VERSION.SDK_INT >= 35) {
+                addAction(Intent.ACTION_PROFILE_AVAILABLE)
+                addAction(Intent.ACTION_PROFILE_UNAVAILABLE)
+                addAction(Intent.ACTION_PROFILE_ADDED)
+                addAction(Intent.ACTION_PROFILE_REMOVED)
+            }
+        }
+        runCatching {
+            context.registerReceiver(object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: Context?, i: Intent?) = refresh()
+            }, f, Context.RECEIVER_NOT_EXPORTED)
+        }
         refresh()
     }
 
@@ -61,7 +100,13 @@ class AppRepository(private val context: Context) {
         scope.launch {
             val collator = Collator.getInstance(Locale("tr", "TR"))
             val list = withContext(Dispatchers.Default) {
-                launcherApps.profiles.flatMap { profile ->
+                val states = launcherApps.profiles.map { u ->
+                    ProfileState(u, kindOf(u), runCatching { userManager.isQuietModeEnabled(u) }.getOrDefault(false))
+                }
+                _profiles.value = states.filter { it.kind != ProfileKind.Main }
+                states.flatMap { st ->
+                    val profile = st.user
+                    val kind = st.kind
                     launcherApps.getActivityList(null, profile).map { info ->
                         val ai = info.applicationInfo
                         val system = (ai.flags and ApplicationInfo.FLAG_SYSTEM) != 0 &&
@@ -75,6 +120,7 @@ class AppRepository(private val context: Context) {
                             category = AppCategorizer.categorize(info.componentName.packageName, label, ai.category, system),
                             installTime = info.firstInstallTime,
                             isSystem = system,
+                            profile = kind,
                         )
                     }
                 }.sortedWith { a, b -> collator.compare(a.label, b.label) }

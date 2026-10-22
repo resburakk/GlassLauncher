@@ -4,6 +4,12 @@ import android.content.ComponentName
 import android.content.pm.LauncherActivityInfo
 import android.os.UserHandle
 
+/** Uygulamanın bulunduğu kullanıcı profili. */
+enum class ProfileKind { Main, Work, Private }
+
+/** Bir kullanıcı profilinin durumu (iş profili / Özel Alan). [quiet]: duraklatılmış veya kilitli. */
+data class ProfileState(val user: UserHandle, val kind: ProfileKind, val quiet: Boolean)
+
 /** Başlatılabilir bir uygulama girişi. Kimlik: bileşen + kullanıcı profili. */
 class AppInfo(
     val componentName: ComponentName,
@@ -18,6 +24,8 @@ class AppInfo(
     val isSystem: Boolean = false,
     /** Ana ekrana sabitlenmiş uygulama kısayolu (Chrome "Ana ekrana ekle", WhatsApp sohbeti vb.); yoksa null. */
     val shortcut: android.content.pm.ShortcutInfo? = null,
+    /** Ana profil, iş profili veya Özel Alan (Android 15+). */
+    val profile: ProfileKind = ProfileKind.Main,
 ) {
     val key: String = shortcut?.let { shortcutKey(it.`package`, it.id, user) }
         ?: "${componentName.flattenToString()}#${user.hashCode()}"
