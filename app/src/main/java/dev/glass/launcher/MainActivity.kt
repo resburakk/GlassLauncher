@@ -406,11 +406,16 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     /** Hareketle gezinti mi (üç tuş değil)? Sistem kaynağından okunur. */
-    private fun gestureNav(): Boolean = runCatching {
-        val r = android.content.res.Resources.getSystem()
-        val id = r.getIdentifier("config_navBarInteractionMode", "integer", "android")
-        id != 0 && r.getInteger(id) == 2
-    }.getOrDefault(false)
+    private fun gestureNav(): Boolean {
+        // Gezinti modu sistem katmanıyla (overlay) belirlenir: uygulamanın kaynaklarına yansır, sistemin genel
+        // kaynaklarına yansımaz. Okunamazsa sistemin gezinti ayarına bakılır (2 = hareketler).
+        val fromRes = runCatching {
+            val id = resources.getIdentifier("config_navBarInteractionMode", "integer", "android")
+            if (id != 0) resources.getInteger(id) else -1
+        }.getOrDefault(-1)
+        if (fromRes >= 0) return fromRes == 2
+        return runCatching { android.provider.Settings.Secure.getInt(contentResolver, "navigation_mode") == 2 }.getOrDefault(false)
+    }
 
     /**
      * Hareketle gezintide ana ekrandayken alttaki ince çubuk gizlenir (ayar açıksa). Hareketler çalışmaya devam eder;
