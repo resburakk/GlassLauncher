@@ -873,6 +873,10 @@ private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((La
             onChange { it.copy(glassLightBack = v) }
         }
         RowDivider()
+        SliderRow("Alt temas gölgesi", if (s.glassContactShadow < 0.01f) "Kapalı" else pct(s.glassContactShadow), s.glassContactShadow, 0f..1f, default = Def.glassContactShadow) { v ->
+            onChange { it.copy(glassContactShadow = v) }
+        }
+        RowDivider()
         SliderRow("Koyu derinlik kenarı", if (s.glassEdgeDark < 0.01f) "Kapalı" else pct(s.glassEdgeDark), s.glassEdgeDark, 0f..1f, default = Def.glassEdgeDark) { v ->
             onChange { it.copy(glassEdgeDark = v) }
         }

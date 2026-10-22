@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -324,6 +325,7 @@ fun Modifier.liquidGlass(
         lightRim(0.80f * s * glow, 0.10f * s * glow, st.glassLightAngle, st.glassLightBack)
     }
     this
+        .then(if (look.reduced) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
         .then(
             if (look.reduced || elevation == 0.dp) Modifier
             else Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
@@ -489,8 +491,8 @@ private fun DrawScope.drawBackdrop(
 
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
 fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f, rimWidth: Dp = 1.2.dp): Modifier =
-    if (!enabled) this.clip(shape).iosRim(shape, rimGlow, rimWidth)
-    else this.clip(shape)
+    if (!enabled) this.contactShadow(shape, GlassLens.contactShadow).clip(shape).iosRim(shape, rimGlow, rimWidth)
+    else this.contactShadow(shape, GlassLens.contactShadow).clip(shape)
         .drawWithContent {
             drawContent()
             drawRect(
@@ -734,6 +736,7 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
     val op = st.glassOpacity * glassTintFactor(st.glassTint) * (if (LocalGlass.current.clear) 0.5f else 1f) * fill
     val glow = st.glassRimGlow
     this
+        .contactShadow(shape, st.glassContactShadow)
         .smoothClip(shape)
         .reducedBackdrop()
         .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
@@ -812,3 +815,26 @@ internal fun lightSpot(size: Size, angle: Float): Offset {
         size.height * (0.5f - 0.71f * kotlin.math.cos(r).toFloat()),
     )
 }
+
+
+/**
+ * iOS 26/27 temas gölgesi: camın alt kenarının hemen altında ince, koyu bir çizgi (nesne ekrandan hafifçe
+ * kalkmış gibi durur). Bulanıklık filtresi yerine şeklin aşağı kaydırılmış 3 kopyası azalan opaklıkla çizilir
+ * (ucuz; 120 Hz'i etkilemez). Şeklin içi kırpılır: saydam camın arkasında koyuluk görünmez.
+ */
+fun Modifier.contactShadow(shape: Shape, amount: Float): Modifier =
+    if (amount <= 0.01f) this
+    else this.drawWithCache {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val path = Path().apply { addOutline(outline) }
+        val dp1 = density
+        val steps = floatArrayOf(0.6f, 1.3f, 2.3f)
+        val alphas = floatArrayOf(0.20f, 0.11f, 0.05f)
+        onDrawBehind {
+            clipPath(path, androidx.compose.ui.graphics.ClipOp.Difference) {
+                for (i in steps.indices) {
+                    translate(0f, steps[i] * dp1) { drawPath(path, black(alphas[i] * amount * 2f)) }
+                }
+            }
+        }
+    }

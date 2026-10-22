@@ -106,6 +106,8 @@ object GlassLens {
     /** Işık yönü (derece, 0 üst, saat yönünde) ve karşı kenar yansıması (Ayarlar > Liquid Glass). */
     @Volatile var lightAngle: Float = 315f
     @Volatile var lightBack: Float = 0.3f
+    /** Alt temas gölgesi (simgeler bunu okur; diğer camlar ayarı doğrudan okur). */
+    @Volatile var contactShadow: Float = 0.5f
     /** Panel kayıtlarına eklenecek kenar payı (px): dışarıdan bükme için. */
     fun padPx(): Int = (48f * density).toInt()
 

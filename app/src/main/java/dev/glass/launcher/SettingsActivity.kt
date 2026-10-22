@@ -34,6 +34,7 @@ class SettingsActivity : ComponentActivity() {
             dev.glass.launcher.ui.GlassLens.edgeFrac = s.glassEdgeWidth
             dev.glass.launcher.ui.GlassLens.lightAngle = s.glassLightAngle
             dev.glass.launcher.ui.GlassLens.lightBack = s.glassLightBack
+            dev.glass.launcher.ui.GlassLens.contactShadow = s.glassContactShadow
             SettingsScreen(
                 vm = vm, s = s, isDefaultHome = isDefault,
                 onRequestDefault = ::requestHomeRole,
