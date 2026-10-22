@@ -34,6 +34,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.produceState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.LaunchedEffect
@@ -284,11 +286,17 @@ fun ContextMenuOverlay(
         // Güvenli alan: durum çubuğu ve gezinme çubuğunun içine taşmaz.
         val topLimit = statusTop + gapPx
         val bottomLimit = (if (screenH > 0f) screenH else 100000f) - navBottom - gapPx
+        // Son bildirimler (Pixel / One UI gibi): menünün simgeye en yakın ucunda, en çok 2 tane.
+        val previewMap by dev.glass.launcher.service.Badges.previews.collectAsState()
+        val notifs = if (app != null && !app.isShortcut && st.showBadges) previewMap[app.packageName].orEmpty().take(2) else emptyList()
         val n = shortcuts.size + actions.size
         val padV = with(density) { (u * 12f).toPx() }
-        val rowPx = with(density) { (u * st.menuRowHeight).toPx() }
+        val rowPx0 = with(density) { (u * st.menuRowHeight).toPx() }
+        // Bildirim satırı iki satır yazı taşır (~1,5 satır yüksekliği): toplam yükseklik hesabına eklenir.
+        val notifPx = rowPx0 * 1.5f * notifs.size
+        val rowPx = rowPx0
         val minRowPx = with(density) { (u * 36f).toPx() }
-        val natural = padV + rowPx * n
+        val natural = padV + rowPx * n + notifPx
         val spaceBelow = bottomLimit - (req.cellRect.bottom + gapPx)
         val spaceAbove = (req.iconRect.top - gapPx) - topLimit
         // Sığan tarafı seç; ikisine de sığmıyorsa geniş tarafı seç. Menü asla simgenin üstüne binmez.
@@ -302,6 +310,14 @@ fun ContextMenuOverlay(
 
         // Her satır (üst boşluk, alt boşluk) alır: ilk/son satırın basılı vurgusu menünün kenarına kadar uzansın.
         val rows: List<@Composable (androidx.compose.ui.unit.Dp, androidx.compose.ui.unit.Dp) -> Unit> = buildList {
+            notifs.forEachIndexed { i, nt ->
+                add { pt, pb ->
+                    NotifRow(nt, textColor, rowH * 1.5f, pt, pb, divider = i == notifs.lastIndex, dividerOnTop = reversed) {
+                        if (!dev.glass.launcher.service.Badges.open(nt)) vm.launch(app!!)
+                        onClose()
+                    }
+                }
+            }
             shortcuts.forEach { (info, icon, kind) ->
                 add { pt, pb ->
                     MenuRow(
@@ -498,5 +514,55 @@ internal fun MenuRow(
             title, color = color, fontSize = (st.menuTextSize * u.value).sp, fontWeight = FontWeight.Normal,
             fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
         )
+    }
+}
+
+
+/** Basılı tutma menüsünde bir bildirim: başlık (kalın) ve iki satıra kadar metin, sağda zamanı. */
+@Composable
+private fun NotifRow(
+    nt: dev.glass.launcher.service.NotifPreview,
+    color: Color,
+    h: androidx.compose.ui.unit.Dp,
+    padTop: androidx.compose.ui.unit.Dp,
+    padBottom: androidx.compose.ui.unit.Dp,
+    divider: Boolean,
+    /** Menü ters (simgenin üstünde) açıldıysa ayraç bildirimlerin üstünde durur. */
+    dividerOnTop: Boolean,
+    onClick: () -> Unit,
+) {
+    val u = LocalPt.current
+    val st = LocalLauncherSettings.current
+    val ago = remember(nt.time) {
+        val m = ((System.currentTimeMillis() - nt.time) / 60_000L).coerceAtLeast(0)
+        when { m < 1 -> "şimdi"; m < 60 -> "$m dk"; m < 1440 -> "${m / 60} sa"; else -> "${m / 1440} g" }
+    }
+    Column(Modifier.fillMaxWidth()) {
+        if (divider && dividerOnTop) Box(Modifier.fillMaxWidth().height(u * 6f).background(color.copy(alpha = 0.08f)))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .height(h + padTop + padBottom)
+                .clickable(onClick = onClick)
+                .padding(top = padTop, bottom = padBottom)
+                .padding(horizontal = u * 18f),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    nt.title.ifBlank { nt.text }, color = color, fontSize = (st.menuTextSize * u.value).sp,
+                    fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(ago, color = color.copy(alpha = 0.5f), fontSize = (st.menuTextSize * 0.8f * u.value).sp, fontFamily = AppFont)
+            }
+            if (nt.title.isNotBlank() && nt.text.isNotBlank()) {
+                Text(
+                    nt.text, color = color.copy(alpha = 0.75f), fontSize = (st.menuTextSize * 0.88f * u.value).sp,
+                    fontFamily = AppFont, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (divider && !dividerOnTop) Box(Modifier.fillMaxWidth().height(u * 6f).background(color.copy(alpha = 0.08f)))
     }
 }
