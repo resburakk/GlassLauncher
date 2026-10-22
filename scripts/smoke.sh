@@ -319,10 +319,10 @@ adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 
 # 23) Hızlı cevaplar: hesap makinesi, birim çevirme, ayar arama
 adb shell input tap $cx $((H*81/100)); step "arama" 2
-adb shell input text "12*(3+4)"; step "hesap" 2
+adb shell "input text '12*7+3'"; step "hesap" 2
 shot 23a-hesap
 for i in 1 2 3 4 5 6 7 8; do adb shell input keyevent KEYCODE_DEL; done
-adb shell input text "5%20km%20mil"; step "birim" 2
+adb shell "input text '5%skm%smil'"; step "birim" 2
 shot 23b-birim
 for i in 1 2 3 4 5 6 7 8 9 10; do adb shell input keyevent KEYCODE_DEL; done
 adb shell input text "wifi"; step "ayar arama" 2
