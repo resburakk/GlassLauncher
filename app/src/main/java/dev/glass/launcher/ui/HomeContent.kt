@@ -743,8 +743,15 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
         return
     }
     val bmp by produceState<ImageBitmap?>(null, app.key, app.iconStamp, px, look) { value = vm.iconCache.get(app, px, look) }
+    // iOS 26 "Şeffaf" simge: zemin gerçek Liquid Glass (klasör simgesiyle aynı cam), üstünde gri-beyaz sembol.
+    val clear = look.style == dev.glass.launcher.data.IconStyle.Clear && look.customFile == null
     Box(Modifier.size(icon)) {
-        Box(Modifier.fillMaxSize().glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
+        Box(
+            Modifier.fillMaxSize().then(
+                if (clear) Modifier.liquidGlass(appShape(icon * st.iconCorner), strength * 0.8f, 0.dp, ios = true)
+                else Modifier.glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)
+            )
+        ) {
             bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
         }
         if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)

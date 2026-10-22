@@ -16,7 +16,7 @@ import org.json.JSONObject
 private val Context.dataStore by preferencesDataStore(name = "launcher_settings")
 
 /** Simge görünümleri (bkz. [IconRenderer]). */
-enum class IconStyle(val title: String) { Original("Orijinal"), Light("Açık"), Dark("Koyu"), Tinted("Renkli") }
+enum class IconStyle(val title: String) { Original("Orijinal"), Light("Açık"), Dark("Koyu"), Tinted("Renkli"), Clear("Şeffaf") }
 
 /** Ana ekranda aşağı kaydırma hareketinin yapacağı iş. */
 enum class SwipeAction(val title: String) {

@@ -37,6 +37,7 @@ object IconRenderer {
 
     fun render(d: Drawable, size: Int, style: IconStyle, tint: Int, fillRound: Boolean = true): Bitmap {
         if (style == IconStyle.Dark) return renderDark(d, size, tint, fillRound)
+        if (style == IconStyle.Clear) return renderClear(d, size, tint, fillRound)
         val out = createBitmap(size, size)
         val c = Canvas(out)
         if (d is AdaptiveIconDrawable) {
@@ -131,6 +132,41 @@ object IconRenderer {
         return out
     }
 
+    /**
+     * iOS 26 "Şeffaf" simge: zemin tamamen saydam (ekranda arkası cam gibi görünür), sembol beyazımsı gri
+     * tonlarda kendi gölgelendirmesini korur. Sembol koyu simge yönteminden ([DarkIcon]) ayrıştırılır:
+     * koyu zeminden ayrılan her piksel, zemine uzaklığı kadar opak, parlaklığına göre açık gri olur.
+     */
+    private fun renderClear(d: Drawable, size: Int, tint: Int, fillRound: Boolean): Bitmap {
+        val dark = renderDark(d, size, tint, fillRound)
+        val w = dark.width; val h = dark.height
+        val px = IntArray(w * h)
+        dark.getPixels(px, 0, w, 0, 0, w, h)
+        // Zemin rengi: köşelere yakın dört noktanın ortalaması.
+        val m = (w * 0.10f).toInt().coerceAtLeast(1)
+        val pts = intArrayOf(px[m * w + m], px[m * w + (w - 1 - m)], px[(h - 1 - m) * w + m], px[(h - 1 - m) * w + (w - 1 - m)])
+        val br = pts.sumOf { Color.red(it) } / 4f
+        val bgG = pts.sumOf { Color.green(it) } / 4f
+        val bb = pts.sumOf { Color.blue(it) } / 4f
+        for (i in px.indices) {
+            val c = px[i]
+            val a0 = (c ushr 24) / 255f
+            if (a0 <= 0f) { px[i] = 0; continue }
+            val r = Color.red(c); val g = Color.green(c); val b = Color.blue(c)
+            val dist = maxOf(kotlin.math.abs(r - br), kotlin.math.abs(g - bgG), kotlin.math.abs(b - bb)) / 255f
+            val t = ((dist - 0.05f) / 0.28f).coerceIn(0f, 1f)
+            val a = t * t * (3f - 2f * t) * a0 * 0.96f
+            if (a <= 0.004f) { px[i] = 0; continue }
+            val lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+            val v = ((0.66f + 0.34f * lum) * 255f).toInt().coerceIn(0, 255)
+            px[i] = Color.argb((a * 255f).toInt(), v, v, v)
+        }
+        val out = createBitmap(w, h)
+        out.setPixels(px, 0, w, 0, 0, w, h)
+        dark.recycle()
+        return out
+    }
+
     /** Kullanıcının seçtiği PNG/WebP görselini kareye ortalayarak kırpar. */
     fun renderCustom(src: Bitmap, size: Int): Bitmap {
         val out = createBitmap(size, size)
@@ -145,7 +181,7 @@ object IconRenderer {
     private fun drawBackdrop(c: Canvas, size: Int, style: IconStyle) {
         val (top, bottom) = when (style) {
             IconStyle.Light -> Color.rgb(255, 255, 255) to Color.rgb(232, 232, 237)
-            IconStyle.Dark, IconStyle.Tinted -> Color.rgb(44, 44, 46) to Color.rgb(10, 10, 12)
+            IconStyle.Dark, IconStyle.Tinted, IconStyle.Clear -> Color.rgb(44, 44, 46) to Color.rgb(10, 10, 12)
             IconStyle.Original -> Color.WHITE to Color.WHITE
         }
         val p = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -164,7 +200,7 @@ object IconRenderer {
                 bg?.let { it.bounds = bounds; it.draw(c) }
                 fg?.let { it.bounds = bounds; it.draw(c) }
             }
-            IconStyle.Light, IconStyle.Dark -> {
+            IconStyle.Light, IconStyle.Dark, IconStyle.Clear -> {
                 drawBackdrop(c, size, style)
                 fg?.let { layer ->
                     layer.bounds = bounds

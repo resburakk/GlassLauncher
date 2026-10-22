@@ -1302,7 +1302,7 @@ private fun Chip(text: String, selected: Boolean, modifier: Modifier, onClick: (
             .background(if (selected) Blue else ChipBg)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Text(text, color = if (selected) Color.White else Fg, fontSize = 14.sp, maxLines = 1) }
+    ) { Text(text, color = if (selected) Color.White else Fg, fontSize = 13.sp, maxLines = 1, softWrap = false) }
 }
 
 @Composable
