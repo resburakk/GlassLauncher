@@ -748,7 +748,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     Box(Modifier.size(icon)) {
         Box(
             Modifier.fillMaxSize().then(
-                if (clear) Modifier.liquidGlass(appShape(icon * st.iconCorner), strength * 0.8f, 0.dp, ios = true)
+                if (clear) Modifier.liquidGlass(appShape(icon * st.iconCorner), strength * 0.8f, 0.dp, frosted = true, ios = true)
                 else Modifier.glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)
             )
         ) {
