@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import dev.glass.launcher.data.LaunchStats
+
 import android.app.Application
 import android.content.pm.ShortcutInfo
 import android.graphics.Rect
@@ -31,6 +33,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -153,11 +156,27 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         s.recents.mapNotNull { r -> all.firstOrNull { it.componentName.flattenToString() == r } }
     }.stateIn(viewModelScope, eager, emptyList())
 
+    /** Saat değiştikçe önerilerin yenilenmesi için (15 dakikada bir). */
+    private val clockTick = kotlinx.coroutines.flow.flow {
+        while (true) { emit(System.currentTimeMillis()); kotlinx.coroutines.delay(15 * 60_000L) }
+    }
+
+    /**
+     * Akıllı öneriler (iOS Siri önerileri gibi): bu saatte ve bu gün türünde (hafta içi/sonu) en çok açılan
+     * uygulamalar; geçmiş azsa son kullanılanlarla tamamlanır. En çok 8 uygulama.
+     */
+    val suggestedApps: StateFlow<List<AppInfo>> = combine(shownApps, recentApps, LaunchStats.version, clockTick) { all, recent, _, _ ->
+        val scores = LaunchStats.scores(la)
+        val byComp = all.associateBy { it.componentName.flattenToString() }
+        val ranked = scores.entries.sortedByDescending { it.value }.mapNotNull { byComp[it.key] }
+        (ranked.take(8) + recent).distinctBy { it.key }.take(8)
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(viewModelScope, eager, emptyList())
+
     /**
      * Uygulama Arşivi grupları: Öneriler (son kullanılanlar), Son Eklenenler, ardından kategoriler.
      * Boş kategoriler gösterilmez.
      */
-    val libraryGroups: StateFlow<List<LibraryGroup>> = combine(shownApps, recentApps) { all, recent ->
+    val libraryGroups: StateFlow<List<LibraryGroup>> = combine(shownApps, suggestedApps) { all, recent ->
         val groups = ArrayList<LibraryGroup>()
         if (recent.isNotEmpty()) groups += LibraryGroup("Öneriler", recent)
         val newest = all.filter { it.installTime > 0 }.sortedByDescending { it.installTime }.take(8)
@@ -241,6 +260,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private fun doLaunch(app: AppInfo, bounds: Rect?, options: Bundle?) {
         repo.launch(app, bounds, options)
         if (app.isShortcut) return
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { LaunchStats.record(la, app.componentName.flattenToString()) }
         viewModelScope.launch { la.settingsStore.addRecent(app.componentName.flattenToString()) }
     }
 

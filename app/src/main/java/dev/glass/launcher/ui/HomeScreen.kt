@@ -165,7 +165,7 @@ fun HomeScreen(
     val layout by vm.layout.collectAsStateWithLifecycle()
     val byKey by vm.appsByKey.collectAsStateWithLifecycle()
     val allApps by vm.apps.collectAsStateWithLifecycle()
-    val recents by vm.recentApps.collectAsStateWithLifecycle()
+    val recents by vm.suggestedApps.collectAsStateWithLifecycle()
     val groups by vm.libraryGroups.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val wallpaper by vm.wallpaper.collectAsStateWithLifecycle()
