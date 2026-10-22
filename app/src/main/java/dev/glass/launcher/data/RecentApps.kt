@@ -19,6 +19,11 @@ import java.io.File
  * görüntüleri; yalnızca telefonda, uygulamanın kendi klasöründe saklanır, hiçbir yere gönderilmez).
  */
 object RecentApps {
+    // UsageEvents.Event sabitleri (API 29+; adlarıyla eski SDK'larda da derlensin diye sayı olarak).
+    private const val EVENT_ACTIVITY_DESTROYED = 24
+    private const val EVENT_DEVICE_SHUTDOWN = 26
+    private const val EVENT_DEVICE_STARTUP = 27
+
     /** Önizlemeler değişince artar (ekran yeni görüntüleri yükler). */
     private val _thumbVersion = MutableStateFlow(0)
     val thumbVersion: StateFlow<Int> = _thumbVersion
@@ -67,18 +72,30 @@ object RecentApps {
         val byPkg = apps.groupBy { it.packageName }
         val now = System.currentTimeMillis()
         val last = HashMap<String, Long>()
+        // Yalnızca hâlâ AÇIK olan uygulamalar: her uygulamanın açık ekranları (etkinlikleri) izlenir. Geri ile çıkılan
+        // ya da sistemin son kullanılanlarından atılan uygulamanın ekranları kapanır ("yok edildi" olayı) ve listeden
+        // çıkar. Telefon yeniden başlayınca hepsi sıfırlanır.
+        val live = HashMap<String, HashSet<String>>()
         runCatching {
             val usm = ctx.getSystemService(UsageStatsManager::class.java)
             val ev = usm.queryEvents(now - 3L * 24 * 3600_000L, now)
             val e = UsageEvents.Event()
             while (ev.hasNextEvent()) {
                 ev.getNextEvent(e)
-                if (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED || e.eventType == UsageEvents.Event.ACTIVITY_PAUSED) {
-                    val prev = last[e.packageName] ?: 0L
-                    if (e.timeStamp > prev) last[e.packageName] = e.timeStamp
+                when (e.eventType) {
+                    UsageEvents.Event.ACTIVITY_RESUMED, UsageEvents.Event.ACTIVITY_PAUSED, UsageEvents.Event.ACTIVITY_STOPPED -> {
+                        live.getOrPut(e.packageName) { HashSet() } += (e.className ?: "")
+                        if (e.eventType != UsageEvents.Event.ACTIVITY_STOPPED) {
+                            val prev = last[e.packageName] ?: 0L
+                            if (e.timeStamp > prev) last[e.packageName] = e.timeStamp
+                        }
+                    }
+                    EVENT_ACTIVITY_DESTROYED -> live[e.packageName]?.remove(e.className ?: "")
+                    EVENT_DEVICE_SHUTDOWN, EVENT_DEVICE_STARTUP -> { live.clear(); last.clear() }
                 }
             }
         }
+        last.keys.retainAll { live[it]?.isNotEmpty() == true }
         val dismissed = dismissedPrefs(ctx)
         return last.entries
             .asSequence()
