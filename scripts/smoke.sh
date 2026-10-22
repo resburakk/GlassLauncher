@@ -8,6 +8,9 @@ adb shell cmd role add-role-holder --user 0 android.app.role.HOME dev.glass.laun
 # Cam efekti: sistem duvar kâğıdını okuma izni (telefonda kullanıcı verir)
 adb shell pm grant dev.glass.launcher android.permission.READ_MEDIA_IMAGES || true
 adb shell appops set --uid dev.glass.launcher MANAGE_EXTERNAL_STORAGE allow || true
+# Ana ekranda gezinti çubuğu gizlenir: Android'in ilk seferlik "tam ekran" bilgi penceresi görülmüş sayılır
+# (telefonda kullanıcı bir kez "Anladım" der; testte ekran görüntülerini kapatmasın).
+adb shell settings put secure immersive_mode_confirmations confirmed || true
 adb shell am start -W -n dev.glass.launcher/.MainActivity
 sleep 20
 adb shell input keyevent KEYCODE_HOME; sleep 4
