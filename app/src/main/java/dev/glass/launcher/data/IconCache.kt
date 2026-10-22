@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Simge görünümünü belirleyen ayarlar (önbellek anahtarının parçası). */
-data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?, val fillRound: Boolean = true)
+data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?, val fillRound: Boolean = true, val iconPack: String = "")
 
 /**
  * Sınırlı boyutlu simge önbelleği. Bitmap'ler ekrandaki gerçek boyutta üretilir (büyük bitmap yok);
@@ -28,7 +28,7 @@ class IconCache(private val context: Context) {
     suspend fun get(app: AppInfo, sizePx0: Int, look: IconLook): ImageBitmap {
         // Animasyonun ilk karesinde (ör. 0'dan büyüyen menü/hücre) boyut 0 gelebilir: en az 1 px.
         val sizePx = sizePx0.coerceAtLeast(1)
-        val k = "${app.key}~${app.iconStamp}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}"
+        val k = "${app.key}~${app.iconStamp}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}/${look.iconPack}"
         cache.get(k)?.let { return it }
         val bmp = withContext(Dispatchers.Default) {
             // Küçük simgeler (klasör önizlemesi vb.) de en az 192 px'te çizilip sonra küçültülür: yuvarlak simge
@@ -45,6 +45,10 @@ class IconCache(private val context: Context) {
                 // En yüksek çözünürlüklü simge kaynağı istenir; ekrandaki boyuta yüksek kaliteyle küçültülür (daha net).
                 val appIcon = { runCatching { app.activityInfo.getIcon(android.util.DisplayMetrics.DENSITY_XXXHIGH) }.getOrNull()
                     ?: app.activityInfo.getIcon(0) }
+                // Simge paketi seçiliyse paketteki çizim (paket içermiyorsa uygulamanın kendi simgesi).
+                val packIcon = if (look.iconPack.isNotEmpty() && app.shortcut == null) {
+                    IconPacks.icon(context, look.iconPack, app.componentName, android.util.DisplayMetrics.DENSITY_XXXHIGH)
+                } else null
                 val sc = app.shortcut
                 val scIcon = sc?.let { info ->
                     runCatching {
@@ -52,7 +56,10 @@ class IconCache(private val context: Context) {
                             .getShortcutIconDrawable(info, android.util.DisplayMetrics.DENSITY_XXXHIGH)
                     }.getOrNull()
                 }
-                val main = IconRenderer.render(scIcon ?: appIcon(), renderPx, look.style, look.tint, look.fillRound)
+                val main = if (packIcon != null) {
+                    // Paket tasarımı korunur: şekli (yuvarlak vb.) kareye tamamlanmaz.
+                    IconRenderer.render(packIcon, renderPx, look.style, look.tint, false)
+                } else IconRenderer.render(scIcon ?: appIcon(), renderPx, look.style, look.tint, look.fillRound)
                 if (sc != null && scIcon != null) withAppBadge(main, appIcon(), renderPx, look) else main
             }
             val big = if (app.profile == ProfileKind.Work) withWorkBadge(big0, renderPx) else big0

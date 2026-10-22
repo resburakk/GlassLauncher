@@ -688,6 +688,23 @@ private val TintPalette = listOf(
 
 @Composable
 private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
+    // Simge paketi (Play Store'daki Nova / ADW uyumlu paketler).
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val packs = remember { dev.glass.launcher.data.IconPacks.installed(ctx) }
+    Group("Simge paketi") {
+        PackRow("Yok (uygulamaların kendi simgeleri)", s.iconPack.isEmpty()) { onChange { it.copy(iconPack = "") } }
+        packs.forEach { p ->
+            RowDivider()
+            PackRow(p.label, s.iconPack == p.packageName) {
+                dev.glass.launcher.data.IconPacks.clear()
+                onChange { it.copy(iconPack = p.packageName) }
+            }
+        }
+    }
+    Footer(
+        if (packs.isEmpty()) "Yüklü simge paketi yok. Play Store'dan Nova veya ADW uyumlu bir simge paketi yükleyince burada görünür."
+        else "Paketin içermediği uygulamalar kendi simgesiyle kalır. Koyu, renkli ve şeffaf görünümler paket simgelerine de uygulanır."
+    )
     Group("Boyut") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             listOf("Küçük" to 0.9f, "Normal" to 1.1f, "Büyük" to 1.25f).forEach { (t, v) ->
@@ -1448,5 +1465,17 @@ private fun PrivacyChip(text: String, on: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 11.dp, vertical = 6.dp),
     ) {
         Text(text, color = if (on) Color.White else Fg, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+
+@Composable
+private fun PackRow(title: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f), maxLines = 1)
+        if (selected) GlyphIcon(Glyph.Check, Blue, 18.dp)
     }
 }
