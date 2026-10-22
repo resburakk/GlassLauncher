@@ -478,6 +478,7 @@ internal fun HomeContent(
         // Sayfa içi camların arkası (klasör simgeleri, widget'lar): yalnızca sayfalar kayarken, sayfaların ALTINDA
         // her karede o anki kaymaya göre çizilir. Sayfalar hazır görüntü olarak taşınırken camların içi donuk kalmaz.
         val pageAnchors = remember { androidx.compose.runtime.mutableStateMapOf<Int, PageAnchor>() }
+        val stillJiggle = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         Box(Modifier.fillMaxSize().drawBehind {
             if (!pagerState.isScrollInProgress || edit || dragging) return@drawBehind
             val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
@@ -523,6 +524,10 @@ internal fun HomeContent(
             // Üstten hizalı sabit ızgara: boş hücreler boş kalır, simgeler yayılmaz.
             // Sayfa bir kez hazır görüntü olarak çizilir; kayarken yalnızca bu görüntü taşınır (bkz. PageBox).
             val anchor = remember { PageAnchor() }
+            // Düzenleme modunda yalnızca görünen sayfa ve iki komşusu sallanır: bellekte tutulan uzak sayfaların
+            // simgeleri de her karede sallanınca çizim komutları bütçeyi aşıyordu (uzak sayfalar zaten görünmüyor).
+            val nearCurrent by remember(page) { derivedStateOf { kotlin.math.abs(page - pagerState.currentPage) <= 1 } }
+            val pageJiggle = if (nearCurrent) jiggle else stillJiggle
             // Kayarken (düzenleme/sürükleme dışında) cam arkaları sayfanın altındaki katmanda çizilir.
             anchor.holesActive = { pagerState.isScrollInProgress && !edit && !dragging }
             DisposableEffect(page, anchor) {
@@ -547,7 +552,7 @@ internal fun HomeContent(
                                         label = app.label, showLabel = settings.showLabels,
                                         icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                         drag = drag, layer = DragLayer.Home, isApp = true,
-                                        acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                        acceptsMerge = true, edit = edit, jiggle = pageJiggle,
                                         onClick = { r ->
                                             if (selection.active) selection.toggle(item.id) else if (!edit) launchFrom(app, r)
                                         },
@@ -562,7 +567,7 @@ internal fun HomeContent(
                                 label = item.name, showLabel = settings.showLabels,
                                 icon = m.icon, pitchX = m.pitchX, cellHeight = m.pitchY,
                                 drag = drag, layer = DragLayer.Home, isApp = false,
-                                acceptsMerge = true, edit = edit, jiggle = jiggle,
+                                acceptsMerge = true, edit = edit, jiggle = pageJiggle,
                                 // Seçim modunda da klasör açılır; seçim içindeki uygulamalarda yapılır.
                                 onClick = { r -> onOpenFolder(item, r.center) },
                                 onDrop = { p, h -> handleDrop(item.id, p, h) },
@@ -576,7 +581,7 @@ internal fun HomeContent(
                                 val w = m.widgetWidth(pl.spanX)
                                 val h = m.widgetHeight(pl.spanY)
                                 WidgetCell(
-                                    id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = jiggle,
+                                    id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = pageJiggle,
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
                             }
