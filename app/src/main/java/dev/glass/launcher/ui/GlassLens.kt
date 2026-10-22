@@ -69,11 +69,14 @@ half4 main(float2 coord0) {
     if (mode > 0.5) {
         // iOS 26: kenar, yuvarlatılmış kalın bir cam gibi. Eğim (kavisli profil) kenara yaklaştıkça hızla dikleşir;
         // görüntü kenar bandında DIŞARIDAN içeri bükülür (arkadaki çizgiler kenar boyunca kıvrılır), ortası bozulmaz.
-        float tt = clamp(t, 0.0, 0.999);
+        // Bandın yeri camın GERÇEK şekline göre (daha yuvarlak yardımcı şekil içeride ikinci bir hat gibi
+        // görünüyordu); yardımcı şekil yalnızca bükülme yönü için (köşede yön yumuşak dönsün, kırışma olmasın).
+        float dr = sdRoundRect(p, c, r);
+        if (dr > 0.0) return sampleAt(origin + coord0);
+        float ti = clamp(1.0 + dr / max(edge, 1.0), 0.0, 1.0);
+        float tt = clamp(ti, 0.0, 0.999);
         float slope = 1.0 - sqrt(1.0 - tt * tt);
         slope *= corner;
-        // Camın dışında (panel kaydının kenar payı): görüntü olduğu gibi (sonradan silinir).
-        if (d > 0.0) return sampleAt(origin + coord0);
         float2 src2 = coord0 + n * slope * strength;
         half4 c2 = sampleAt(origin + src2);
         // Yönlü parlama: ışık sol üstten; eğimin en dik yerinde ince bir çizgi (sol üst ve sağ alt kenar).
