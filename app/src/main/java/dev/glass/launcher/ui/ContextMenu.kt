@@ -153,7 +153,7 @@ fun ContextMenuOverlay(
     val density = LocalDensity.current
 
     val shortcuts by produceState<List<Triple<ShortcutInfo, ImageBitmap?, Int>>>(emptyList(), app?.key) {
-        if (app == null) return@produceState
+        if (app == null || app.isShortcut) return@produceState
         val px = with(density) { 24.dp.roundToPx() }
         value = vm.shortcuts(app).map { s ->
             val bmp = vm.shortcutIcon(s, ctx.resources.displayMetrics.densityDpi)?.toBitmap(px, px)
@@ -189,6 +189,13 @@ fun ContextMenuOverlay(
             }
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
             add(MenuAction("Widget'ı Kaldır", Glyph.Minus, destructive = true) { onRemoveWidget() })
+        } else if (app != null && app.isShortcut) {
+            // Sabitlenmiş kısayol (ör. Chrome "Ana ekrana ekle"): silmek yalnızca kısayolu kaldırır, uygulama kalır.
+            add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
+            add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
+            if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
+            if (req.place == CellPlace.Folder) add(MenuAction("Klasörden Çıkar", Glyph.Minus) { onRemoveFromFolder() })
+            add(MenuAction("Kısayolu Sil", Glyph.Trash, destructive = true) { vm.removeShortcut(app) })
         } else if (app != null) {
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
             add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })

@@ -16,8 +16,11 @@ class AppInfo(
     val installTime: Long = 0L,
     /** Kaldırılamayan sistem uygulaması mı? */
     val isSystem: Boolean = false,
+    /** Ana ekrana sabitlenmiş uygulama kısayolu (Chrome "Ana ekrana ekle", WhatsApp sohbeti vb.); yoksa null. */
+    val shortcut: android.content.pm.ShortcutInfo? = null,
 ) {
-    val key: String = "${componentName.flattenToString()}#${user.hashCode()}"
+    val key: String = shortcut?.let { shortcutKey(it.`package`, it.id, user) }
+        ?: "${componentName.flattenToString()}#${user.hashCode()}"
     val packageName: String get() = componentName.packageName
     /**
      * Uygulamanın yüklü sürümünü belirten damga: her güncellemede APK yolu (ve simge kaynağı) değişir.
@@ -25,8 +28,15 @@ class AppInfo(
      */
     val iconStamp: String = runCatching {
         val ai = activityInfo.applicationInfo
-        "${ai.sourceDir}:${ai.icon}:${activityInfo.activityInfo.icon}"
+        "${ai.sourceDir}:${ai.icon}:${activityInfo.activityInfo.icon}" + (shortcut?.let { ":sc${it.lastChangedTimestamp}" } ?: "")
     }.getOrDefault("")
+    val isShortcut: Boolean get() = shortcut != null
+
+    companion object {
+        /** Sabitlenmiş kısayolun düzendeki anahtarı ("sc:" ile başlar). */
+        fun shortcutKey(pkg: String, id: String, user: UserHandle) = "sc:$pkg/$id#${user.hashCode()}"
+        fun isShortcutKey(key: String) = key.startsWith("sc:")
+    }
     override fun equals(other: Any?) = other is AppInfo && other.key == key && other.label == label && other.iconStamp == iconStamp
     override fun hashCode() = key.hashCode()
 }

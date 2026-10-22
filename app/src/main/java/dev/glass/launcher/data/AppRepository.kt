@@ -33,6 +33,15 @@ class AppRepository(private val context: Context) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _apps = MutableStateFlow<List<AppInfo>>(emptyList())
     val apps: StateFlow<List<AppInfo>> = _apps
+    private val _pinned = MutableStateFlow<List<AppInfo>>(emptyList())
+    /** Ana ekrana sabitlenmiş kısayollar (yalnızca ana ekranda görünür; arşivde ve aramada yok). */
+    val pinned: StateFlow<List<AppInfo>> = _pinned
+    /**
+     * Kısayol listesi güvenilir mi: en az bir kez okundu ve launcher varsayılan ana ekran (Android kısayolları
+     * yalnızca ona verir). Değilse kayıtlı düzendeki kısayollar silinmez, korunur.
+     */
+    @Volatile var pinnedReliable = false
+        private set
 
     private val callback = object : LauncherApps.Callback() {
         override fun onPackageRemoved(packageName: String, user: UserHandle) = refresh()
@@ -40,6 +49,7 @@ class AppRepository(private val context: Context) {
         override fun onPackageChanged(packageName: String, user: UserHandle) = refresh()
         override fun onPackagesAvailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = refresh()
         override fun onPackagesUnavailable(packageNames: Array<out String>, user: UserHandle, replacing: Boolean) = refresh()
+        override fun onShortcutsChanged(packageName: String, shortcuts: MutableList<ShortcutInfo>, user: UserHandle) = refreshPinned()
     }
 
     fun start() {
@@ -70,7 +80,46 @@ class AppRepository(private val context: Context) {
                 }.sortedWith { a, b -> collator.compare(a.label, b.label) }
             }
             _apps.value = list
+            refreshPinned()
         }
+    }
+
+    /** Sabitlenmiş kısayolları yeniden okur. */
+    fun refreshPinned() {
+        scope.launch {
+            val host = runCatching { launcherApps.hasShortcutHostPermission() }.getOrDefault(false)
+            if (!host) { pinnedReliable = false; return@launch }
+            val list = runCatching {
+                launcherApps.profiles.flatMap { user ->
+                    val q = LauncherApps.ShortcutQuery().setQueryFlags(LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED)
+                    val acts = HashMap<String, List<android.content.pm.LauncherActivityInfo>>()
+                    launcherApps.getShortcuts(q, user).orEmpty().mapNotNull { sc ->
+                        val list = acts.getOrPut(sc.`package`) { launcherApps.getActivityList(sc.`package`, user) }
+                        val act = list.firstOrNull { it.componentName == sc.activity } ?: list.firstOrNull()
+                            ?: return@mapNotNull null
+                        AppInfo(
+                            componentName = act.componentName,
+                            user = user,
+                            label = (sc.shortLabel ?: sc.longLabel ?: act.label).toString(),
+                            activityInfo = act,
+                            isSystem = true,
+                            shortcut = sc,
+                        )
+                    }
+                }
+            }.getOrNull() ?: return@launch
+            _pinned.value = list
+            pinnedReliable = true
+        }
+    }
+
+    /** Kısayolun sabitlemesini kaldırır (ana ekrandan silindi). Listeden hemen düşer. */
+    fun unpin(app: AppInfo) {
+        val sc = app.shortcut ?: return
+        val rest = _pinned.value.filter { it.key != app.key }
+        _pinned.value = rest
+        val keep = rest.mapNotNull { it.shortcut }.filter { it.`package` == sc.`package` && it.userHandle == sc.userHandle }.map { it.id }
+        runCatching { launcherApps.pinShortcuts(sc.`package`, keep, sc.userHandle) }
     }
 
     /** Varsayılan dock: Telefon, Mesajlar, Tarayıcı, Kamera (cihazın varsayılan çözümleyicilerinden). */
@@ -106,6 +155,11 @@ class AppRepository(private val context: Context) {
     /** [options]: simgeden büyüyen açılış animasyonu (ActivityOptions). Animasyonu sistem çizer. */
     fun launch(app: AppInfo, sourceBounds: Rect? = null, options: Bundle? = null) {
         dev.glass.launcher.LaunchTracker.mark()
+        val sc = app.shortcut
+        if (sc != null) {
+            runCatching { launcherApps.startShortcut(sc, sourceBounds, options) }
+            return
+        }
         runCatching {
             launcherApps.startMainActivity(app.componentName, app.user, sourceBounds, options)
         }

@@ -98,6 +98,9 @@ data class HomeLayout(
         libraryOnly = libraryOnly - key,
     ).normalized()
 
+    /** Anahtarı düzenin her yerinden (ızgara, klasör, dock, arşiv) siler. */
+    fun dropKey(key: String): HomeLayout = withoutKey(key)
+
     /** Ana ekrandaki bir öğeyi (uygulama veya klasör) [toIndex] konumuna taşır. */
     fun moveItem(id: String, toIndex: Int): HomeLayout {
         val item = items.firstOrNull { it.id == id } ?: return this
@@ -447,10 +450,12 @@ data class HomeLayout(
             apps: List<AppInfo>,
             defaultDockPkgs: List<String>,
             addNewToHome: Boolean = true,
+            /** Listede olmasa da korunacak anahtarlar (kısayol listesi henüz okunamadıysa kayıtlı kısayollar). */
+            keepKeys: Set<String> = emptySet(),
         ): HomeLayout = reconcileKeys(
             base,
-            apps.map { it.key },
-            defaultDockPkgs.mapNotNull { pkg -> apps.firstOrNull { it.componentName.packageName == pkg }?.key },
+            apps.map { it.key } + keepKeys,
+            defaultDockPkgs.mapNotNull { pkg -> apps.firstOrNull { it.componentName.packageName == pkg && !it.isShortcut }?.key },
             addNewToHome,
         )
 
@@ -477,11 +482,13 @@ data class HomeLayout(
                 }
             }
             val lib = ArrayList<String>()
-            for (k in src.libraryOnly) if (k in valid && seen.add(k)) lib += k
+            // Kısayollar arşivde durmaz (yalnızca ana ekranda): arşive düşen kısayol düzenden çıkar.
+            for (k in src.libraryOnly) if (k in valid && seen.add(k) && !k.startsWith("sc:")) lib += k
             // İlk kurulumda (kayıt yok) tüm uygulamalar ana ekrana gelir; sonra ayara göre.
             val toHome = base == null || addNewToHome
             for (k in appKeys) if (seen.add(k)) {
-                if (toHome) items += AppItem(k) else lib += k
+                // Yeni sabitlenen kısayol her zaman ana ekrana gelir (kullanıcı "Ana ekrana ekle" dedi).
+                if (toHome || k.startsWith("sc:")) items += AppItem(k) else lib += k
             }
             return HomeLayout(items, dock, lib, src.today).normalized()
         }

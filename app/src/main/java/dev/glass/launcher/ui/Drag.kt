@@ -414,7 +414,7 @@ internal fun FolderIcon(
     val pageCount = (folder.keys.size + 8) / 9
     val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
     // Klasör rozeti: içindeki uygulamaların toplam bildirim sayısı (iOS gibi).
-    val folderBadge = badgeCount(folder.keys.mapNotNull { byKey[it]?.packageName })
+    val folderBadge = badgeCount(folder.keys.mapNotNull { byKey[it]?.takeIf { a -> !a.isShortcut }?.packageName })
     Box(Modifier.size(icon)) {
     Box(
         // Gölgesiz: yarı saydam camın altındaki gölge içeriden kare gibi görünüyordu.

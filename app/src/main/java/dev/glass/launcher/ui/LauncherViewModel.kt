@@ -45,9 +45,34 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     val apps: StateFlow<List<AppInfo>> = repo.apps
 
-    val appsByKey: StateFlow<Map<String, AppInfo>> = repo.apps
-        .map { list -> list.associateBy { it.key } }
-        .stateIn(viewModelScope, eager, emptyMap())
+    /** Uygulamalar + ana ekrana sabitlenmiş kısayollar (anahtar → giriş). */
+    val appsByKey: StateFlow<Map<String, AppInfo>> = combine(repo.apps, repo.pinned) { list, pins ->
+        HashMap<String, AppInfo>(list.size + pins.size).apply {
+            list.forEach { put(it.key, it) }
+            pins.forEach { put(it.key, it) }
+        }
+    }.stateIn(viewModelScope, eager, emptyMap())
+
+    /** Düzen uzlaştırmasında geçerli sayılan girişler (uygulamalar + sabitlenmiş kısayollar). */
+    private fun entries(): List<AppInfo> = repo.apps.value + repo.pinned.value
+
+    /** Kısayol listesi güvenilir değilken (launcher varsayılan değil) kayıtlı kısayollar korunur. */
+    private fun keepShortcutKeys(b: HomeLayout?): Set<String> =
+        if (repo.pinnedReliable || b == null) emptySet() else b.homeKeys.filterTo(HashSet()) { AppInfo.isShortcutKey(it) }
+
+    /** Ana ekrandan kaldırılan kısayolları sistemde de bırakır (sabitlemeyi kaldırır). */
+    private fun unpinOrphans(next: HomeLayout) {
+        if (!repo.pinnedReliable) return
+        val home = next.homeKeys
+        repo.pinned.value.filter { it.key !in home }.forEach { repo.unpin(it) }
+    }
+
+    /** Sabitlenmiş kısayolu ana ekrandan siler. */
+    fun removeShortcut(app: AppInfo) {
+        editLayout { it.dropKey(app.key) }
+    }
+
+    fun refreshPinned() = repo.refreshPinned()
 
     val settings: StateFlow<LauncherSettings> = la.settingsStore.settings
         .stateIn(viewModelScope, eager, LauncherSettings())
@@ -64,7 +89,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             base = la.settingsStore.layoutJson.first()?.let { HomeLayout.fromJson(it) }
             val addNew = la.settingsStore.settings.map { it.addNewToHome }.distinctUntilChanged()
-            combine(repo.apps, addNew) { list, add -> list to add }.collect { (list, add) ->
+            combine(repo.apps, repo.pinned, addNew) { list, pins, add -> Triple(list, pins, add) }.collect { (list, pins, add) ->
                 if (list.isEmpty()) return@collect // liste henüz yüklenmedi: kayıtlı düzeni budama
                 // İlk kurulum: iOS 26 fabrika dizilimi (karşılıklar + türe göre klasörler).
                 if (base == null) base = IosDefaultLayout.build(la, list)
@@ -83,7 +108,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
                 meta.edit().putLong("appsSeenAt", maxOf(System.currentTimeMillis(), seenAt)).apply()
-                val next = HomeLayout.reconcile(base, list, repo.defaultDockPackages, add)
+                val next = HomeLayout.reconcile(base, list + pins, repo.defaultDockPackages, add, keepShortcutKeys(base))
                 val changed = next != b0
                 base = next
                 _layout.value = next
@@ -169,6 +194,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun launch(app: AppInfo, bounds: Rect? = null, options: Bundle? = null) {
         repo.launch(app, bounds, options)
+        if (app.isShortcut) return
         viewModelScope.launch { la.settingsStore.addRecent(app.componentName.flattenToString()) }
     }
 
@@ -182,7 +208,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Bu uygulama için canlı simge türü (ayar kapalıysa veya özel simge seçilmişse null). */
     fun liveKind(app: AppInfo, s: LauncherSettings): LiveIconKind? = when {
-        !s.liveIcons || s.customIcons.containsKey(app.key) -> null
+        !s.liveIcons || s.customIcons.containsKey(app.key) || app.isShortcut -> null
         app.packageName in repo.clockPackages -> LiveIconKind.Clock
         app.packageName in repo.calendarPackages -> LiveIconKind.Calendar
         else -> null
@@ -358,7 +384,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             items = imported.items.filter { it !is WidgetItem || it.kind != WidgetKind.System || host.info(it.appWidgetId) != null },
             today = imported.today.filter { it.kind != WidgetKind.System || host.info(it.appWidgetId) != null },
         )
-        val next = HomeLayout.reconcile(cleaned, repo.apps.value, repo.defaultDockPackages, settings.value.addNewToHome)
+        val next = HomeLayout.reconcile(cleaned, entries(), repo.defaultDockPackages, settings.value.addNewToHome, keepShortcutKeys(cleaned))
         base = next
         _layout.value = next
         la.settingsStore.saveLayout(next.toJson())
@@ -379,7 +405,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             la.settingsStore.saveLayoutBackup(cur.toJson())
             val fresh = IosDefaultLayout.build(la, list)
             val withWidgets = fresh.copy(items = fresh.items + cur.homeWidgets, today = cur.today)
-            editLayout { HomeLayout.reconcile(withWidgets, list, repo.defaultDockPackages, true) }
+            editLayout { HomeLayout.reconcile(withWidgets, entries(), repo.defaultDockPackages, true, keepShortcutKeys(cur)) }
         }
     }
 
@@ -389,7 +415,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             val json = la.settingsStore.layoutBackupJson.first() ?: return@launch
             val prev = HomeLayout.fromJson(json) ?: return@launch
             la.settingsStore.saveLayoutBackup(null)
-            editLayout { HomeLayout.reconcile(prev, repo.apps.value, repo.defaultDockPackages, settings.value.addNewToHome) }
+            editLayout { HomeLayout.reconcile(prev, entries(), repo.defaultDockPackages, settings.value.addNewToHome, keepShortcutKeys(prev)) }
         }
     }
 
@@ -402,6 +428,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         if (next == _layout.value) return
         base = next
         _layout.value = next
+        unpinOrphans(next)
         viewModelScope.launch { la.settingsStore.saveLayout(next.toJson()) }
     }
 

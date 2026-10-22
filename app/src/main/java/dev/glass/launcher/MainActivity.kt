@@ -163,6 +163,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     override fun onResume() {
         super.onResume()
         applyNavHandle()
+        // Launcher varsayılan ana ekran yapılınca kısayollar okunabilir hale gelir; ön plana her gelişte tazele.
+        vm.refreshPinned()
         runCatching { window.addOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener, metricsHandler) }
         homeHidden = false
         coveredByApp = false

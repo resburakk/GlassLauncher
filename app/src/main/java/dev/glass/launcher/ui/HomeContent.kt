@@ -738,7 +738,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
             }
             LiveIcon(live, icon, st.liveClockSeconds, dark)
         }
-        if (badge) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
+        if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
         }
         return
     }
@@ -747,7 +747,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
         Box(Modifier.fillMaxSize().glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
             bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
         }
-        if (badge) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
+        if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
     }
 }
 

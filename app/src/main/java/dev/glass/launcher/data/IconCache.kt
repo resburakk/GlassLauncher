@@ -43,15 +43,43 @@ class IconCache(private val context: Context) {
                 IconRenderer.renderCustom(custom, renderPx).also { custom.recycle() }
             } else {
                 // En yüksek çözünürlüklü simge kaynağı istenir; ekrandaki boyuta yüksek kaliteyle küçültülür (daha net).
-                val d = runCatching { app.activityInfo.getIcon(android.util.DisplayMetrics.DENSITY_XXXHIGH) }.getOrNull()
-                    ?: app.activityInfo.getIcon(0)
-                IconRenderer.render(d, renderPx, look.style, look.tint, look.fillRound)
+                val appIcon = { runCatching { app.activityInfo.getIcon(android.util.DisplayMetrics.DENSITY_XXXHIGH) }.getOrNull()
+                    ?: app.activityInfo.getIcon(0) }
+                val sc = app.shortcut
+                val scIcon = sc?.let { info ->
+                    runCatching {
+                        context.getSystemService(android.content.pm.LauncherApps::class.java)
+                            .getShortcutIconDrawable(info, android.util.DisplayMetrics.DENSITY_XXXHIGH)
+                    }.getOrNull()
+                }
+                val main = IconRenderer.render(scIcon ?: appIcon(), renderPx, look.style, look.tint, look.fillRound)
+                if (sc != null && scIcon != null) withAppBadge(main, appIcon(), renderPx, look) else main
             }
             val out = if (renderPx == sizePx) big else downscale(big, sizePx).also { if (it !== big) big.recycle() }
             out.asImageBitmap()
         }
         cache.put(k, bmp)
         return bmp
+    }
+
+    /**
+     * Kısayol simgesinin sağ alt köşesine sahibi olan uygulamanın küçük simgesi (Android'deki gibi):
+     * hangi uygulamanın kısayolu olduğu anlaşılır. Rozet ince bir halkayla simgeden ayrılır.
+     */
+    private fun withAppBadge(main: android.graphics.Bitmap, appIcon: android.graphics.drawable.Drawable, size: Int, look: IconLook): android.graphics.Bitmap {
+        val out = if (main.isMutable) main else main.copy(android.graphics.Bitmap.Config.ARGB_8888, true).also { main.recycle() }
+        val b = (size * 0.40f).toInt().coerceAtLeast(8)
+        val badge = IconRenderer.render(appIcon, b, look.style, look.tint, look.fillRound)
+        val c = android.graphics.Canvas(out)
+        val l = (size - b).toFloat(); val t = (size - b).toFloat()
+        val ring = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(90, 0, 0, 0)
+            maskFilter = android.graphics.BlurMaskFilter(b * 0.06f, android.graphics.BlurMaskFilter.Blur.NORMAL)
+        }
+        c.drawRoundRect(l, t + b * 0.03f, l + b, t + b * 1.03f, b * 0.25f, b * 0.25f, ring)
+        c.drawBitmap(badge, l, t, android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG))
+        badge.recycle()
+        return out
     }
 
     /** Seçilen görseli uygulamaya özel simge olarak kopyalar; dosya adını döndürür. */
