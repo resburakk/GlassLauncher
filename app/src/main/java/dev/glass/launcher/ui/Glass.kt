@@ -539,6 +539,8 @@ class GlassRegions {
     val shapes = HashMap<Any, Shape>()
     /** Daha yoğun bulanık alanlar (arama paneli/çubuğu): arkadaki simge lekeleri kenarsız bir ışığa dönüşür. */
     val strong = HashSet<Any>()
+    /** Basılı tutma / "+" menüleri: kendi (Ayarlar > Menü > Menü bulanıklığı) yarıçapıyla bulanır. */
+    val menu = HashSet<Any>()
     /** Alanın görünürlüğü (0..1): menü açılırken/kapanırken bulanıklık da menüyle birlikte belirir ve söner. */
     val alphas = mutableStateMapOf<Any, Float>()
 }
@@ -556,6 +558,8 @@ fun BlurBackdrop(
     alpha: (() -> Float)? = null,
     /** true: bu alanın arkası yaklaşık iki kat daha bulanık. */
     strongBlur: Boolean = false,
+    /** true: menü bulanıklığı (genel cam ayarlarından bağımsız, yazılar okunur kalsın diye güçlü). */
+    menuBlur: Boolean = false,
 ) {
     val reg = LocalGlassRegions.current ?: return
     val map = if (rootOnly) reg.rootRegions else reg.regions
@@ -574,7 +578,8 @@ fun BlurBackdrop(
     }
     if (shape != null) reg.shapes[key] = shape else reg.shapes.remove(key)
     if (strongBlur) reg.strong += key else reg.strong -= key
-    DisposableEffect(reg, key) { onDispose { map.remove(key); reg.shapes.remove(key); reg.alphas.remove(key); reg.strong.remove(key) } }
+    if (menuBlur) reg.menu += key else reg.menu -= key
+    DisposableEffect(reg, key) { onDispose { map.remove(key); reg.shapes.remove(key); reg.alphas.remove(key); reg.strong.remove(key); reg.menu.remove(key) } }
     if (alpha != null) {
         val a by rememberUpdatedState(alpha)
         // Her karede: görünürlük değiştikçe (kapanış dahil) bulanıklık ve alanı birlikte güncellenir.
@@ -618,6 +623,8 @@ fun Modifier.glassRegionBlur(
     /** Yoğun bulanık alanların (arama paneli/çubuğu) yarıçapı: cam stilinden bağımsız, arkadaki simge
      *  sıraları kenarı belli olmayan bir ışığa dönüşsün diye büyük. */
     strongRadius: Dp = 56.dp,
+    /** Menülerin bulanıklık yarıçapı (genel bulanıklık ayarından bağımsız). */
+    menuRadius: Dp = 40.dp,
 ): Modifier = composed {
     // Doğrudan platform RenderNode'u + RenderEffect bulanıklığı (Modifier.blur ile aynı yerel yol).
     val node = remember { android.graphics.RenderNode("glassRegionContent") }
@@ -642,6 +649,11 @@ fun Modifier.glassRegionBlur(
     val sr = with(LocalDensity.current) { strongRadius.toPx() }.coerceAtLeast(r * 2.2f)
     val strongEffect = remember(sr) {
         android.graphics.RenderEffect.createBlurEffect(sr, sr, android.graphics.Shader.TileMode.CLAMP)
+    }
+    val menuNode = remember { android.graphics.RenderNode("glassRegionBlurMenu") }
+    val mr = with(LocalDensity.current) { menuRadius.toPx() }.coerceAtLeast(0.5f)
+    val menuEffect = remember(mr) {
+        android.graphics.RenderEffect.createBlurEffect(mr, mr, android.graphics.Shader.TileMode.CLAMP)
     }
     this.drawWithContent {
         drawContent()
@@ -671,6 +683,13 @@ fun Modifier.glassRegionBlur(
             strongNode.beginRecording(w, h).also { it.drawRenderNode(node) }
             strongNode.endRecording()
         }
+        if (list.any { it.key in reg.menu }) {
+            menuNode.setPosition(0, 0, w, h)
+            menuNode.setRenderEffect(menuEffect)
+            menuNode.beginRecording(w, h).also { it.drawRenderNode(node) }
+            menuNode.endRecording()
+        }
+        fun blurFor(k: Any) = when (k) { in reg.menu -> menuNode; in reg.strong -> strongNode; else -> blurNode }
         drawIntoCanvas { c ->
             val nc = c.nativeCanvas
             list.forEachIndexed { i, entry ->
@@ -705,11 +724,11 @@ fun Modifier.glassRegionBlur(
                     ln.setRenderEffect(android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content"))
                     val lc = ln.beginRecording(rw + pad * 2, rh + pad * 2)
                     lc.translate(-(l - pad).toFloat(), -(t - pad).toFloat())
-                    lc.drawRenderNode(if (entry.key in reg.strong) strongNode else blurNode)
+                    lc.drawRenderNode(blurFor(entry.key))
                     ln.endRecording()
                     nc.drawRenderNode(ln)
                 } else {
-                    nc.drawRenderNode(if (entry.key in reg.strong) strongNode else blurNode)
+                    nc.drawRenderNode(blurFor(entry.key))
                 }
                 // Şeklin dışında kalan bulanık kopya yumuşak kenarla silinir.
                 path.fillType = android.graphics.Path.FillType.INVERSE_WINDING

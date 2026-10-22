@@ -585,6 +585,8 @@ private fun MenuPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         RowDivider()
         SliderRow("Cam açıklığı", pct(s.menuOpacity), s.menuOpacity, 0.1f..0.95f, default = Def.menuOpacity) { v -> onChange { it.copy(menuOpacity = v) } }
         RowDivider()
+        SliderRow("Menü bulanıklığı", if (s.menuBlur < 0.01f) "Kapalı" else pct(s.menuBlur), s.menuBlur, 0f..2f, default = Def.menuBlur) { v -> onChange { it.copy(menuBlur = v) } }
+        RowDivider()
         SliderRow("Köşe yuvarlaklığı", "${s.menuCorner.roundToInt()} pt", s.menuCorner, 10f..44f, default = Def.menuCorner) { v -> onChange { it.copy(menuCorner = v) } }
     }
     Group("Boyutlar") {

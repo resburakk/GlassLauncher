@@ -612,7 +612,7 @@ fun HomeScreen(
                 // çizim listesine hiç girmez (alt katmanlar hazır kalır; kapanırken anında geri gelir).
                 .drawWithContent { if (!settingsCovering) drawContent() }
                 // Menü/düğme alanlarına içeriğin bulanık kopyası çizilir (yalnızca kendi arkaları bulanık).
-                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, includeRoot = true)
+                .glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur, includeRoot = true)
         ) {
         // Launcher'ın kendi duvar kâğıdı (seçildiyse) sistem duvar kâğıdının üzerine çizilir.
         val wp = wallpaper
@@ -820,7 +820,7 @@ fun HomeScreen(
         ) {
             folderHolder[0]?.let { f ->
                 // Klasör katmanı da menünün arkasında bulanıklaşır (ayrı katmanda: alttaki ana ekran silinmez).
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR)) {
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
                 FolderOverlay(
                     folder = f,
                     byKey = byKey,
@@ -857,7 +857,7 @@ fun HomeScreen(
             exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = groupOrigin) + fadeOut(motion.tween(200)),
         ) {
             groupHolder[0]?.let { g ->
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR)) {
+                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
                 LibraryGroupOverlay(
                     group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
@@ -1100,21 +1100,20 @@ fun HomeScreen(
             val ink = if (settings.menuDark) Color.White else Color(0xF21C1C1E)
             val rowH = u * settings.menuRowHeight
             Box(Modifier.width(u * 230f)) {
-                BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { vis })
+                BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { vis }, menuBlur = true)
                 Column(
                     Modifier
                         .width(u * 230f)
                         .menuGlass(appShape(corner), settings.menuOpacity, settings.menuDark)
                         .pointerInput(Unit) { detectTapGestures { } }
-                        .padding(vertical = u * 6f)
                 ) {
-                    MenuRow("Widget Ekle", ink, rowH, leading = { GlyphIcon(Glyph.Widget, ink, u * 22f) }) {
+                    MenuRow("Widget Ekle", ink, rowH, padTop = u * 6f, leading = { GlyphIcon(Glyph.Widget, ink, u * 22f) }) {
                         plusMenu = false; overlay = Overlay.Widgets
                     }
                     MenuRow("Duvar Kâğıdı", ink, rowH, leading = { GlyphIcon(Glyph.Wallpaper, ink, u * 22f) }) {
                         plusMenu = false; wallpaperSheet = true
                     }
-                    MenuRow("Ayarlar", ink, rowH, leading = { GlyphIcon(Glyph.Gear, ink, u * 22f) }) {
+                    MenuRow("Ayarlar", ink, rowH, padBottom = u * 6f, leading = { GlyphIcon(Glyph.Gear, ink, u * 22f) }) {
                         plusMenu = false; openSettings()
                     }
                 }

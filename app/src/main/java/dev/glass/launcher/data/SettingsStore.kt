@@ -109,6 +109,8 @@ data class LauncherSettings(
     val menuRowHeight: Float = 48f,
     /** Menü camının açıklığı (beyaz dolgu yoğunluğu). */
     val menuOpacity: Float = 0.62f,
+    /** Basılı tutma ve "+" menülerinin arka plan bulanıklığı (genel cam bulanıklığından bağımsız): 0 … 2. */
+    val menuBlur: Float = 1f,
     val menuDark: Boolean = false,
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
@@ -261,6 +263,7 @@ data class LauncherSettings(
         menuTextSize = menuTextSize.coerceIn(13f, 22f),
         menuRowHeight = menuRowHeight.coerceIn(36f, 64f),
         menuOpacity = menuOpacity.coerceIn(0.1f, 0.95f),
+        menuBlur = menuBlur.coerceIn(0f, 2f),
         searchFieldTextSize = searchFieldTextSize.coerceIn(12f, 22f),
         searchResultTextSize = searchResultTextSize.coerceIn(12f, 22f),
         searchResultWeight = searchResultWeight.coerceIn(300f, 700f),
@@ -294,7 +297,7 @@ data class LauncherSettings(
         put("pillTextSize", pillTextSize.toDouble()); put("pillTextWeight", pillTextWeight.toDouble())
         put("menuCorner", menuCorner.toDouble()); put("menuWidth", menuWidth.toDouble())
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
-        put("menuOpacity", menuOpacity.toDouble()); put("menuDark", menuDark)
+        put("menuOpacity", menuOpacity.toDouble()); put("menuBlur", menuBlur.toDouble()); put("menuDark", menuDark)
         put("dockCorner", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
@@ -391,6 +394,7 @@ data class LauncherSettings(
                 menuTextSize = f("menuTextSize", d.menuTextSize),
                 menuRowHeight = f("menuRowHeight", d.menuRowHeight),
                 menuOpacity = f("menuOpacity", d.menuOpacity),
+                menuBlur = f("menuBlur", d.menuBlur),
                 menuDark = o.optBoolean("menuDark", d.menuDark),
                 dockCorner = f("dockCorner", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),

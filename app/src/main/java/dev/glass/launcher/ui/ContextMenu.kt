@@ -288,13 +288,14 @@ fun ContextMenuOverlay(
         val maxH = with(density) { avail.toDp() }
         val reversed = !below
 
-        val rows: List<@Composable () -> Unit> = buildList {
+        // Her satır (üst boşluk, alt boşluk) alır: ilk/son satırın basılı vurgusu menünün kenarına kadar uzansın.
+        val rows: List<@Composable (androidx.compose.ui.unit.Dp, androidx.compose.ui.unit.Dp) -> Unit> = buildList {
             shortcuts.forEach { (info, icon, kind) ->
-                add {
+                add { pt, pb ->
                     MenuRow(
                         title = info.shortLabel?.toString() ?: "",
                         color = textColor,
-                        rowH = rowH,
+                        rowH = rowH, padTop = pt, padBottom = pb,
                         leading = {
                             when {
                                 icon == null -> AppIconImage(app!!, vm, 22.dp, false, 0f, badge = false)
@@ -308,11 +309,11 @@ fun ContextMenuOverlay(
             }
             actions.forEach { a ->
                 val c = if (a.destructive) red else textColor
-                add {
+                add { pt, pb ->
                     MenuRow(
                         title = a.title,
                         color = c,
-                        rowH = rowH,
+                        rowH = rowH, padTop = pt, padBottom = pb,
                         leading = { a.glyph?.let { GlyphIcon(it, c, 20.dp) } },
                         onClick = { a.run(); if (!a.keepOpen) onClose() },
                     )
@@ -326,7 +327,7 @@ fun ContextMenuOverlay(
             modifier = Modifier.fillMaxSize(),
             content = {
                 Box(Modifier.width(menuW).heightIn(max = maxH)) {
-                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() })
+                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() }, menuBlur = true)
                     Column(
                         Modifier
                             .width(menuW)
@@ -334,9 +335,11 @@ fun ContextMenuOverlay(
                             .menuGlass(appShape(corner), glassOpacity, st.menuDark)
                             .pointerInput(Unit) { detectTapGestures { } }
                             .verticalScroll(scroll)
-                            .padding(vertical = u * 6f)
                     ) {
-                        (if (reversed) rows.asReversed() else rows).forEach { it() }
+                        val ordered = if (reversed) rows.asReversed() else rows
+                        ordered.forEachIndexed { i, r ->
+                            r(if (i == 0) u * 6f else 0.dp, if (i == ordered.lastIndex) u * 6f else 0.dp)
+                        }
                     }
                 }
             },
@@ -381,7 +384,7 @@ private fun RemoveConfirm(
     val blue = if (dark) Color(0xFF64B5FF) else Color(0xFF0A84FF)
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
         Box(Modifier.width(u * 280f)) {
-            BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner))
+            BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), menuBlur = true)
             Column(
                 Modifier
                     .width(u * 280f)
@@ -461,6 +464,9 @@ internal fun MenuRow(
     color: Color,
     rowH: androidx.compose.ui.unit.Dp,
     leading: (@Composable () -> Unit)? = null,
+    /** İlk/son satırda menünün iç boşluğu satırın içine alınır: basılı vurgu kenara (ve köşelere) kadar dolar. */
+    padTop: androidx.compose.ui.unit.Dp = 0.dp,
+    padBottom: androidx.compose.ui.unit.Dp = 0.dp,
     onClick: () -> Unit,
 ) {
     val st = LocalLauncherSettings.current
@@ -468,8 +474,9 @@ internal fun MenuRow(
     Row(
         Modifier
             .fillMaxWidth()
-            .height(rowH)
+            .height(rowH + padTop + padBottom)
             .clickable(onClick = onClick)
+            .padding(top = padTop, bottom = padBottom)
             .padding(horizontal = u * 18f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
