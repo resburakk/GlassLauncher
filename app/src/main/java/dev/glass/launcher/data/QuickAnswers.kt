@@ -147,7 +147,7 @@ object QuickAnswers {
         SettingEntry("Pil", listOf("pil", "batarya", "şarj", "güç tasarrufu"), Intent.ACTION_POWER_USAGE_SUMMARY),
         SettingEntry("Depolama", listOf("depolama", "hafıza", "alan"), Settings.ACTION_INTERNAL_STORAGE_SETTINGS),
         SettingEntry("Konum", listOf("konum", "gps"), Settings.ACTION_LOCATION_SOURCE_SETTINGS),
-        SettingEntry("Bildirimler", listOf("bildirim"), Settings.ACTION_NOTIFICATION_SETTINGS),
+        SettingEntry("Bildirimler", listOf("bildirim"), "android.settings.NOTIFICATION_SETTINGS"),
         SettingEntry("Uygulamalar", listOf("uygulamalar", "uygulama yönet"), Settings.ACTION_APPLICATION_SETTINGS),
         SettingEntry("Varsayılan uygulamalar", listOf("varsayılan", "ana ekran uygulaması", "launcher"), Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
         SettingEntry("Güvenlik ve parmak izi", listOf("güvenlik", "parmak izi", "şifre", "kilit ekranı", "yüz"), Settings.ACTION_SECURITY_SETTINGS),
