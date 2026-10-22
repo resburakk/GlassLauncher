@@ -31,6 +31,9 @@ class SettingsActivity : ComponentActivity() {
         requestHighRefresh()
         setContent {
             val s by vm.settings.collectAsStateWithLifecycle()
+            dev.glass.launcher.ui.GlassLens.edgeFrac = s.glassEdgeWidth
+            dev.glass.launcher.ui.GlassLens.lightAngle = s.glassLightAngle
+            dev.glass.launcher.ui.GlassLens.lightBack = s.glassLightBack
             SettingsScreen(
                 vm = vm, s = s, isDefaultHome = isDefault,
                 onRequestDefault = ::requestHomeRole,

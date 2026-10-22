@@ -458,8 +458,11 @@ fun HomeScreen(
         TextShadowConfig.enabled = settings.textShadow || autoShadow
         TextShadowConfig.strength = if (autoShadow) 0.3f else settings.textShadowStrength
         TextShadowConfig.spread = settings.textShadowSpread
-        GlassLens.edgeFrac = settings.glassEdgeWidth
     }
+    // Cam merceği ayarları: her değişimde hemen (kaydırıcı sürüklenirken de) uygulanır.
+    GlassLens.edgeFrac = settings.glassEdgeWidth
+    GlassLens.lightAngle = settings.glassLightAngle
+    GlassLens.lightBack = settings.glassLightBack
     // Arşiv/arama/widget sayfasının bulanık arka planı (oradaki camlar bunu büker); aşağıda hazırlanır.
     val overlayBackdropHolder = remember { mutableStateOf<dev.glass.launcher.data.Blurred?>(null) }
     CompositionLocalProvider(

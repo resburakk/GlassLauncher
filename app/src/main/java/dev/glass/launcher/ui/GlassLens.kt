@@ -25,6 +25,9 @@ uniform float soft;
 uniform float mode;
 // Camın düğüm içindeki konumu (panel kayıtları kenar bandı kadar geniş tutulur; dışarıdan bükme için).
 uniform float2 pos;
+// Işık yönü (birim vektör, dışa bakan normal ile karşılaştırılır) ve karşı kenar yansıması.
+uniform float2 light;
+uniform float back;
 
 // Şeffaf camda net görüntü çok hafif yumuşatılır (9 örnek); buzlu camda girdi zaten bulanıktır.
 half4 sampleAt(float2 p) {
@@ -80,8 +83,9 @@ half4 main(float2 coord0) {
         float2 src2 = coord0 + n * slope * strength;
         half4 c2 = sampleAt(origin + src2);
         // Yönlü parlama: ışık sol üstten; eğimin en dik yerinde ince bir çizgi (sol üst ve sağ alt kenar).
-        float lit = abs(dot(n, normalize(float2(-0.6, -0.8))));
-        float rim = pow(slope, 3.0) * (0.35 + 0.65 * lit);
+        float ld = dot(n, light);
+        float lit = pow(max(ld, 0.0), 1.6) + back * pow(max(-ld, 0.0), 1.6);
+        float rim = pow(slope, 3.0) * lit;
         c2.rgb = min(c2.rgb + half3(rim * glow * 6.0), half3(1.0));
         return c2;
     }
@@ -99,6 +103,9 @@ object GlassLens {
     @Volatile var density: Float = 3f
     /** iOS kalın kenar: bant genişliği, kısa kenarın oranı (Ayarlar > Liquid Glass > Kenar kalınlığı). */
     @Volatile var edgeFrac: Float = 0.42f
+    /** Işık yönü (derece, 0 üst, saat yönünde) ve karşı kenar yansıması (Ayarlar > Liquid Glass). */
+    @Volatile var lightAngle: Float = 315f
+    @Volatile var lightBack: Float = 0.3f
     /** Panel kayıtlarına eklenecek kenar payı (px): dışarıdan bükme için. */
     fun padPx(): Int = (48f * density).toInt()
 
@@ -121,6 +128,9 @@ object GlassLens {
         val m = minOf(w, h)
         s.setFloatUniform("mode", if (ios) 1f else 0f)
         s.setFloatUniform("pos", px, py)
+        val rad = Math.toRadians(lightAngle.toDouble())
+        s.setFloatUniform("light", kotlin.math.sin(rad).toFloat(), -kotlin.math.cos(rad).toFloat())
+        s.setFloatUniform("back", lightBack)
         if (ios) {
             // Kalın kenar: bant kısa kenarın ayarlanan oranı (en çok 44 dp), bükülme bandın ~%90'ı kadar dışarıdan.
             val edgeI = minOf(m * edgeFrac, 44f * density)

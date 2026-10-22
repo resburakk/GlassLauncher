@@ -865,6 +865,14 @@ private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((La
             onChange { it.copy(glassEdgeWidth = v) }
         }
         RowDivider()
+        SliderRow("Işık yönü", lightDirLabel(s.glassLightAngle), s.glassLightAngle, 0f..359f, default = Def.glassLightAngle) { v ->
+            onChange { it.copy(glassLightAngle = v) }
+        }
+        RowDivider()
+        SliderRow("Karşı kenar yansıması", if (s.glassLightBack < 0.01f) "Kapalı" else pct(s.glassLightBack), s.glassLightBack, 0f..1f, default = Def.glassLightBack) { v ->
+            onChange { it.copy(glassLightBack = v) }
+        }
+        RowDivider()
         SliderRow("Koyu derinlik kenarı", if (s.glassEdgeDark < 0.01f) "Kapalı" else pct(s.glassEdgeDark), s.glassEdgeDark, 0f..1f, default = Def.glassEdgeDark) { v ->
             onChange { it.copy(glassEdgeDark = v) }
         }
@@ -1323,3 +1331,11 @@ private fun SettingsScrollStats(state: androidx.compose.foundation.ScrollState) 
 }
 
 
+
+
+/** Işık açısını okunur yöne çevirir (0° üst, saat yönünde). */
+private fun lightDirLabel(a: Float): String {
+    val names = listOf("Üst", "Sağ üst", "Sağ", "Sağ alt", "Alt", "Sol alt", "Sol", "Sol üst")
+    val i = (((a + 22.5f) % 360f) / 45f).toInt().coerceIn(0, 7)
+    return "${names[i]} (${a.toInt()}°)"
+}

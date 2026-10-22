@@ -319,9 +319,9 @@ fun Modifier.liquidGlass(
         DisposableEffect(pageAnchor, holeKey) { onDispose { pageAnchor.holes.remove(holeKey) } }
     }
     val rim = if (look.dark) {
-        Brush.linearGradient(listOf(white(0.45f * s * glow), white(0.05f * s * glow), white(0.25f * s * glow)))
+        lightRim(0.45f * s * glow, 0.05f * s * glow, st.glassLightAngle, st.glassLightBack)
     } else {
-        Brush.linearGradient(listOf(white(0.80f * s * glow), white(0.10f * s * glow), white(0.50f * s * glow)))
+        lightRim(0.80f * s * glow, 0.10f * s * glow, st.glassLightAngle, st.glassLightBack)
     }
     this
         .then(
@@ -395,7 +395,8 @@ fun Modifier.liquidGlass(
                 drawRect(
                     Brush.radialGradient(
                         listOf(white((if (look.dark) 0.18f else 0.32f) * s * glow), Color.Transparent),
-                        center = Offset(size.width * 0.2f, 0f),
+                        // Işık yönüne göre kenara yakın (varsayılan sol üst: eski konum).
+                        center = lightSpot(size, st.glassLightAngle),
                         radius = size.width * 0.7f,
                     )
                 )
@@ -502,7 +503,7 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
         .iosRim(shape, rimGlow, rimWidth)
         .border(
             rimWidth / 1.2f,
-            Brush.linearGradient(listOf(white(0.65f * strength), white(0.04f * strength), white(0.35f * strength))),
+            lightRim(0.65f * strength, 0.04f * strength, GlassLens.lightAngle, GlassLens.lightBack),
             shape,
         )
 
@@ -741,7 +742,7 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
         .then(
             if (st.glassRimWidth > 0f && glow > 0f) Modifier.border(
                 st.glassRimWidth.dp,
-                Brush.verticalGradient(listOf(white(rimTop * glow), white(rimBottom * glow))),
+                lightRim(rimTop * glow, rimBottom * glow * 0.5f, st.glassLightAngle, st.glassLightBack),
                 shape,
             ) else Modifier
         )
@@ -755,12 +756,7 @@ private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
     if (glow <= 0.01f || width < 0.05.dp) this
     else this.border(
         width,
-        Brush.linearGradient(
-            0f to white(0.55f * glow),
-            0.35f to white(0.12f * glow),
-            0.7f to Color.Transparent,
-            1f to white(0.10f * glow),
-        ),
+        lightRim(0.55f * glow, 0.06f * glow, GlassLens.lightAngle, GlassLens.lightBack),
         shape,
     )
 
@@ -780,3 +776,39 @@ internal fun shapeRadiusPx(
 ): Float = (shape as? SquircleShape)?.let { with(density) { it.radius.toPx() } }
     ?.coerceAtMost(minOf(size.width, size.height) / 2f)
     ?: outlineRadius(shape.createOutline(size, dir, density))
+
+
+/**
+ * Tek yönden gelen ışığın cam kenarı: ışığa bakan kenar parlak, yanlar sönük, karşı kenar yalnızca
+ * [back] oranında (iOS'taki çapraz köşe yansıması). [angle] derece: 0 üst, 90 sağ, 180 alt, 270 sol.
+ */
+internal fun lightRim(lit: Float, mid: Float, angle: Float, back: Float): Brush =
+    LightRimBrush(lit.coerceIn(0f, 1f), mid.coerceIn(0f, 1f), (lit * back).coerceIn(0f, 1f), angle)
+
+@Immutable
+private data class LightRimBrush(val lit: Float, val mid: Float, val back: Float, val angle: Float) :
+    androidx.compose.ui.graphics.ShaderBrush() {
+    override fun createShader(size: Size): androidx.compose.ui.graphics.Shader {
+        val r = Math.toRadians(angle.toDouble())
+        val lx = kotlin.math.sin(r).toFloat()
+        val ly = -kotlin.math.cos(r).toFloat()
+        // Gradyan şeklin ışık yönündeki en uç noktasından karşı uca uzanır.
+        val ext = kotlin.math.abs(lx) * size.width / 2f + kotlin.math.abs(ly) * size.height / 2f
+        val c = Offset(size.width / 2f, size.height / 2f)
+        val d = Offset(lx * ext, ly * ext)
+        return androidx.compose.ui.graphics.LinearGradientShader(
+            from = c + d, to = c - d,
+            colors = listOf(white(lit), white((lit + mid) * 0.5f), white(mid), white(mid), white(back)),
+            colorStops = listOf(0f, 0.18f, 0.38f, 0.62f, 1f),
+        )
+    }
+}
+
+/** Speküler parlamanın merkezi: ışık yönünde kenarın biraz içi (315° → eski sol üst konum). */
+internal fun lightSpot(size: Size, angle: Float): Offset {
+    val r = Math.toRadians(angle.toDouble())
+    return Offset(
+        size.width * (0.5f + 0.42f * kotlin.math.sin(r).toFloat()),
+        size.height * (0.5f - 0.71f * kotlin.math.cos(r).toFloat()),
+    )
+}

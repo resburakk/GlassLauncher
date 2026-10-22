@@ -145,6 +145,10 @@ data class LauncherSettings(
     val glassRefraction: Float = 0.6f,
     /** iOS 26 kalın cam kenarı: kırılma bandının genişliği (kısa kenarın oranı). */
     val glassEdgeWidth: Float = 0.42f,
+    /** Cam kenar ışığının geldiği yön (derece; 0 üst, 90 sağ, 180 alt, 270 sol). */
+    val glassLightAngle: Float = 315f,
+    /** Işığın karşı kenardaki zayıf yansıması (iOS'taki çapraz köşe parlaması): 0 yok … 1 eşit. */
+    val glassLightBack: Float = 0.3f,
     /** iOS 27 tarzı koyu derinlik kenarı: 0 kapalı … 1 belirgin. */
     val glassEdgeDark: Float = 0f,
     /** Genel şeffaflık (iOS 27 / MagicOS 11 kaydırıcısı): 0 çok şeffaf … 0.5 dengeli … 1 renkli. */
@@ -222,6 +226,8 @@ data class LauncherSettings(
         searchSuggestCorner = searchSuggestCorner.coerceIn(0.05f, 0.5f),
         glassRefraction = glassRefraction.coerceIn(0f, 1f),
         glassEdgeWidth = glassEdgeWidth.coerceIn(0.15f, 0.6f),
+        glassLightAngle = ((glassLightAngle % 360f) + 360f) % 360f,
+        glassLightBack = glassLightBack.coerceIn(0f, 1f),
         glassEdgeDark = glassEdgeDark.coerceIn(0f, 1f),
         glassTint = glassTint.coerceIn(0f, 1f),
         searchSuggestLabelSize = searchSuggestLabelSize.coerceIn(8f, 18f),
@@ -293,7 +299,7 @@ data class LauncherSettings(
         put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions)
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
-        put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeWidth", glassEdgeWidth.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
+        put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeWidth", glassEdgeWidth.toDouble()); put("glassLightAngle", glassLightAngle.toDouble()); put("glassLightBack", glassLightBack.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
         put("syncSystemWallpaper", syncSystemWallpaper); put("glassStyle", glassStyle); put("panelGlassSync", panelGlassSync)
         put("searchSuggestExpanded", searchSuggestExpanded)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
@@ -402,6 +408,8 @@ data class LauncherSettings(
                 searchSuggestCorner = o.optDouble("searchSuggestCorner", d.searchSuggestCorner.toDouble()).toFloat(),
                 glassRefraction = o.optDouble("glassRefraction", d.glassRefraction.toDouble()).toFloat(),
                 glassEdgeWidth = o.optDouble("glassEdgeWidth", d.glassEdgeWidth.toDouble()).toFloat(),
+                glassLightAngle = o.optDouble("glassLightAngle", d.glassLightAngle.toDouble()).toFloat(),
+                glassLightBack = o.optDouble("glassLightBack", d.glassLightBack.toDouble()).toFloat(),
                 glassEdgeDark = o.optDouble("glassEdgeDark", d.glassEdgeDark.toDouble()).toFloat(),
                 glassTint = o.optDouble("glassTint", d.glassTint.toDouble()).toFloat(),
                 syncSystemWallpaper = o.optBoolean("syncSystemWallpaper", d.syncSystemWallpaper),
