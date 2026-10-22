@@ -1215,11 +1215,13 @@ fun HomeScreen(
 @Composable
 internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onClick: () -> Unit) {
     Box(Modifier.height(height), contentAlignment = Alignment.Center) {
-    BlurBackdrop(height / 2f, Modifier.matchParentSize())
+    // "Ara" hapı ve dock ile aynı cam: arkadaki duvar kâğıdını büker. Önceden arkasındaki ekran içeriğini
+    // bulanıklaştırıyordu; düzenleme modunda sayfa kayarken bütün içerik her karede ayrıca kaydedilip
+    // bulanıklaştırılıyor, kaydırmayı 120 Hz'in altına düşürüyordu.
     Box(
         Modifier
             .height(height)
-            .liquidGlass(CircleShape, strength, 6.dp, panel = true)
+            .liquidGlass(CircleShape, strength, 6.dp)
             .clickable(onClick = onClick)
             .padding(horizontal = 15.dp),
         contentAlignment = Alignment.Center,
