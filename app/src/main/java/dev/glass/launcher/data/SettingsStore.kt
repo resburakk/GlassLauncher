@@ -88,17 +88,17 @@ data class LauncherSettings(
     /** Uygulama arşivindeki açık klasörün köşe yuvarlaklığı (pt; iOS ≈ 34). */
     val libraryGroupCorner: Float = 34f,
     /** Tüm cam yüzeylerdeki beyaz kenar çizgisinin kalınlığı (pt; 0 = çizgi yok). */
-    val glassRimWidth: Float = 0.5f,
+    val glassRimWidth: Float = 1f,
     /** Açık klasörün (ana ekran ve arşiv) adının yazı boyutu (pt). */
     val openFolderTitleSize: Float = 25f,
     /** Cam bulanıklığının şiddeti (çarpan; 0 = bulanıklık yok, 1 = varsayılan, 2 = iki katı). */
-    val glassBlur: Float = 1f,
+    val glassBlur: Float = 0.39f,
     /** Cam parlaklığı (−1 = koyu, 0 = varsayılan, +1 = açık). */
     val glassBrightness: Float = 0f,
     /** Kenardaki ışık parlamasının gücü (çarpan; 0 = yok). */
-    val glassRimGlow: Float = 1f,
+    val glassRimGlow: Float = 0.4f,
     /** Cam dolgusunun yoğunluğu; düşük = daha saydam (çarpan). */
-    val glassOpacity: Float = 1f,
+    val glassOpacity: Float = 0f,
     /** Dock üstündeki "Ara" düğmesinin yazı boyutu (pt) ve kalınlığı (300–700). */
     val pillTextSize: Float = 12f,
     val pillTextWeight: Float = 500f,
@@ -142,9 +142,9 @@ data class LauncherSettings(
     /** Arama öneri panelinin köşesi (dock yüksekliğine oranla; dock köşesinden bağımsız). */
     val searchSuggestCorner: Float = 0.34f,
     /** Liquid Glass kenar kırılması (mercek): 0 kapalı … 1 güçlü. */
-    val glassRefraction: Float = 0.6f,
+    val glassRefraction: Float = 1f,
     /** iOS 26 kalın cam kenarı: kırılma bandının genişliği (kısa kenarın oranı). */
-    val glassEdgeWidth: Float = 0.42f,
+    val glassEdgeWidth: Float = 0.6f,
     /** Cam kenar ışığının geldiği yön (derece; 0 üst, 90 sağ, 180 alt, 270 sol). */
     val glassLightAngle: Float = 315f,
     /** Işığın karşı kenardaki zayıf yansıması (iOS'taki çapraz köşe parlaması): 0 yok … 1 eşit. */

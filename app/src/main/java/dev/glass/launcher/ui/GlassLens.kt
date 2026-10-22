@@ -102,7 +102,7 @@ object GlassLens {
     /** Ekran yoğunluğu (dp → px); uygulama açılışında ayarlanır. */
     @Volatile var density: Float = 3f
     /** iOS kalın kenar: bant genişliği, kısa kenarın oranı (Ayarlar > Liquid Glass > Kenar kalınlığı). */
-    @Volatile var edgeFrac: Float = 0.42f
+    @Volatile var edgeFrac: Float = 0.6f
     /** Işık yönü (derece, 0 üst, saat yönünde) ve karşı kenar yansıması (Ayarlar > Liquid Glass). */
     @Volatile var lightAngle: Float = 315f
     @Volatile var lightBack: Float = 0.3f
