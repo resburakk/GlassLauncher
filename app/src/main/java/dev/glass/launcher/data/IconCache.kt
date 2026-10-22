@@ -18,8 +18,8 @@ data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?
  * sayısı ve toplam bellek LRU ile sınırlıdır. Ağır iş ana thread dışında yapılır.
  */
 class IconCache(private val context: Context) {
-    // Toplam ~24 MB üst sınır (192 px simge ≈ 147 KB).
-    private val cache = object : LruCache<String, ImageBitmap>(24 * 1024 * 1024) {
+    // Toplam ~128 MB üst sınır: kalite öncelikli, bütün simgeler bellekte kalsın (yeniden üretim yok).
+    private val cache = object : LruCache<String, ImageBitmap>(128 * 1024 * 1024) {
         override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
     }
 
@@ -33,7 +33,9 @@ class IconCache(private val context: Context) {
         val bmp = withContext(Dispatchers.Default) {
             // Küçük simgeler (klasör önizlemesi vb.) de en az 192 px'te çizilip sonra küçültülür: yuvarlak simge
             // algılaması her boyutta aynı sonucu verir ve küçük simgeler daha net olur.
-            val renderPx = maxOf(sizePx, MIN_RENDER_PX)
+            // İki kat çözünürlükte üretilip yüksek kaliteyle küçültülür: koyu/renkli simgelerde sembol kenarları
+            // pürüzsüz, ince çizgiler net.
+            val renderPx = maxOf(sizePx * 2, MIN_RENDER_PX)
             val custom = look.customFile?.let { f ->
                 runCatching { BitmapFactory.decodeFile(File(iconDir, f).path) }.getOrNull()
             }
@@ -45,8 +47,7 @@ class IconCache(private val context: Context) {
                     ?: app.activityInfo.getIcon(0)
                 IconRenderer.render(d, renderPx, look.style, look.tint, look.fillRound)
             }
-            val out = if (renderPx == sizePx) big
-            else android.graphics.Bitmap.createScaledBitmap(big, sizePx, sizePx, true).also { if (it !== big) big.recycle() }
+            val out = if (renderPx == sizePx) big else downscale(big, sizePx).also { if (it !== big) big.recycle() }
             out.asImageBitmap()
         }
         cache.put(k, bmp)
@@ -72,7 +73,21 @@ class IconCache(private val context: Context) {
 
     fun clear() = cache.evictAll()
 
+    /** Yüksek kaliteli küçültme: büyük oranlarda yarıya yarıya inilir (tek adımda küçültmede ayrıntı kaybolur). */
+    private fun downscale(src: android.graphics.Bitmap, size: Int): android.graphics.Bitmap {
+        var cur = src
+        while (cur.width / 2 >= size) {
+            val next = android.graphics.Bitmap.createScaledBitmap(cur, cur.width / 2, cur.height / 2, true)
+            if (cur !== src) cur.recycle()
+            cur = next
+        }
+        if (cur.width == size) return cur
+        val out = android.graphics.Bitmap.createScaledBitmap(cur, size, size, true)
+        if (cur !== src && out !== cur) cur.recycle()
+        return out
+    }
+
     private companion object {
-        const val MIN_RENDER_PX = 192
+        const val MIN_RENDER_PX = 384
     }
 }

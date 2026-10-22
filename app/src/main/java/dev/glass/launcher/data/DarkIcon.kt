@@ -33,10 +33,18 @@ object DarkIcon {
         if (samples.size < 50) return fromFlat(orig)
         val info = analyze(samples.toIntArray())
         if (info.lum < 0.30f) return scaled(orig, 0.92f)
-        if (!info.uniform) return scaled(orig, 0.72f)
         val fg = IntArray(n * n).also { fgLayer.getPixels(it, 0, n, 0, 0, n, n) }
         val weight = FloatArray(n * n) { (fg[it] ushr 24) / 255f }
-        return compose(fg, weight, info, orig, n)
+        if (!info.uniform) {
+            // Geçişli/çok renkli zemin (Instagram gibi): ön plan katmanı ayrıysa zemin yine siyaha döner ve açık
+            // renkli sembol zeminin AYNI noktadaki rengini alır (iOS: renk geçişli sembol, siyah zemin). Ön plan
+            // bütün simgeyi kaplıyorsa (resim gibi simge) yalnızca karartılır.
+            var cover = 0
+            for (a in weight) if (a > 0.5f) cover++
+            if (cover > 0.62f * n * n) return scaled(orig, 0.72f)
+            return compose(fg, weight, info, orig, n, bgPx = bg, forceColorize = info.colorful)
+        }
+        return compose(fg, weight, info, orig, n, bgPx = if (info.colorful) bg else null)
     }
 
     /** Katmansız (eski tip) simge: zemin, kenara yakın piksellerden bulunur. */
@@ -77,7 +85,12 @@ object DarkIcon {
     }
 
     /** Koyu zemin + yeniden renklendirilmiş ön plan. [fg] ön plan renkleri, [w] ön plan ağırlığı (0..1). */
-    private fun compose(fg: IntArray, w: FloatArray, bg: Bg, orig: Bitmap, n: Int): Bitmap {
+    private fun compose(
+        fg: IntArray, w: FloatArray, bg: Bg, orig: Bitmap, n: Int,
+        /** Zeminin piksel renkleri (uyarlanabilir simge): beyaz sembol bu renkleri piksel piksel alır. */
+        bgPx: IntArray? = null,
+        forceColorize: Boolean = false,
+    ): Bitmap {
         val total = n * n
         var fgCount = 0; var darkCount = 0; var lightCount = 0
         val hsv = FloatArray(3)
@@ -91,7 +104,8 @@ object DarkIcon {
         if (fgCount < 30) return scaled(orig, 0.72f)
         // Fotoğraf gibi büyük koyu alan (kamera lensi): yalnızca karart.
         if (darkCount.toFloat() / total > 0.30f) return scaled(orig, 0.72f)
-        val colorize = bg.colorful && bg.sat > 0.30f && lightCount > 0.4f * fgCount
+        val colorize = (forceColorize || (bg.colorful && bg.sat > 0.30f)) && lightCount > 0.4f * fgCount
+        val bh = FloatArray(3)
         val invertDark = darkCount > 0.02f * fgCount
         val out = IntArray(total)
         for (y in 0 until n) {
@@ -108,7 +122,14 @@ object DarkIcon {
                     var fb = (c and 0xff).toFloat()
                     toHsv(c, hsv); val l = lum(c)
                     if (colorize && hsv[1] < 0.20f && l > 0.62f) {
-                        val rgb = fromHsv(bg.hue, min(bg.sat * 1.05f, 0.85f), (l * 0.98f).coerceIn(0f, 1f))
+                        val src = bgPx?.get(p)
+                        val rgb = if (src != null && (src ushr 24) > 120) {
+                            // Zeminin bu noktadaki rengi: canlı ve parlak tutulur (koyu zeminde okunaklı).
+                            toHsv(src, bh)
+                            fromHsv(bh[0], min(bh[1] * 1.08f, 0.92f), (max(bh[2], 0.78f) * (0.55f + 0.45f * l)).coerceIn(0f, 1f))
+                        } else {
+                            fromHsv(bg.hue, min(bg.sat * 1.05f, 0.85f), (l * 0.98f).coerceIn(0f, 1f))
+                        }
                         fr = rgb[0]; fgc = rgb[1]; fb = rgb[2]
                     } else if (invertDark && hsv[1] < 0.30f && l < 0.40f) {
                         val rgb = fromHsv(hsv[0], hsv[1] * 0.6f, (1f - hsv[2] * 0.85f).coerceIn(0f, 1f))
