@@ -121,14 +121,14 @@ import dev.glass.launcher.data.HomeLayout
 import dev.glass.launcher.data.LauncherSettings
 import kotlin.math.roundToInt
 
-enum class Overlay { None, Search, Settings, Folder, Menu, Group, Widgets, LockPrompt, Recents }
+enum class Overlay { None, Search, Settings, Folder, Menu, Group, Widgets, LockPrompt }
 
 /** İzin penceresinin hangi özellik için açıldığı. */
 enum class LockReason { Lock, Panels }
 
 /** Tüm ekranın (ve sistem duvar kâğıdının) bulanıklaştığı katmanlar; küçük menüler bu listede değildir. */
 // Ayarlar opak bir sayfa: arkası bulanıklaştırılmaz (boşuna GPU yükü, 120 Hz kaydırmayı bozuyordu).
-private val FullBlurOverlays = setOf(Overlay.Search, Overlay.Folder, Overlay.Group, Overlay.Widgets, Overlay.Recents)
+private val FullBlurOverlays = setOf(Overlay.Search, Overlay.Folder, Overlay.Group, Overlay.Widgets)
 
 /**
  * Ana ekran katmanları arasında köprü: bırakma işlemi ve sayfa geçişleri ana ekran içeriğinde
@@ -159,8 +159,6 @@ fun HomeScreen(
     openSettingsRequest: Int = 0,
     /** Ayarlardaki "Widget ekle" ile ana ekrana dönüldü: widget galerisi açılır. */
     addWidgetRequest: Int = 0,
-    /** Erişilebilirlik kısayolu: launcher'ın son kullanılanlar ekranı açılır. */
-    openRecentsRequest: Int = 0,
     /** Son uygulamalar ekranına geçiş (0..1): simgeler solar, duvar kâğıdı kalır. */
     homeHide: () -> Float = { 0f },
 ) {
@@ -296,13 +294,6 @@ fun HomeScreen(
         if (openSettingsRequest > 0) {
             closeOverlay()
             openSettings()
-        }
-    }
-    LaunchedEffect(openRecentsRequest) {
-        if (openRecentsRequest > 0) {
-            closeOverlay()
-            editMode = false
-            overlay = Overlay.Recents
         }
     }
     LaunchedEffect(addWidgetRequest) {
@@ -563,13 +554,6 @@ fun HomeScreen(
                 detectVerticalDragGestures(
                     onDragStart = { startY = it.y; startX = it.x; total = 0f },
                     onDragEnd = {
-                        // Ortadan yukarı kaydırma: launcher'ın kendi son kullanılanlar ekranı (Honor'un kendi ekranı
-                        // üçüncü taraf launcher'la yarım çalışıyor).
-                        if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f &&
-                            total < -80.dp.toPx() && startY > topZonePx
-                        ) {
-                            overlay = Overlay.Recents
-                        }
                         if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f && total > 80.dp.toPx()) {
                             // Hangi hareketin ne açacağı Ayarlar > Hareketler'den seçilir.
                             val chosen = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
@@ -806,17 +790,6 @@ fun HomeScreen(
             SearchOverlay(
                 vm, allApps, suggestions, settings.panelGlassStrength, settings.iconGlass,
                 onClose = { closeOverlay() }, visibility = { searchVis },
-            )
-        }
-        AnimatedVisibility(
-            overlay == Overlay.Recents,
-            enter = fadeIn(motion.tween(180)) + scaleIn(motion.spring(0.85f, 380f), initialScale = 1.08f),
-            exit = fadeOut(motion.tween(150)) + scaleOut(motion.tween(160), targetScale = 1.06f),
-        ) {
-            RecentsOverlay(
-                vm = vm, allApps = allApps, fallback = recents,
-                iconGlass = settings.iconGlass, strength = settings.glassStrength,
-                onClose = { closeOverlay() },
             )
         }
         AnimatedVisibility(

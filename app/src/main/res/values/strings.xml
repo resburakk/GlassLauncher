@@ -5,6 +5,6 @@
     <string name="make_default_hint">Home tuşunun bu uygulamayı açması için seçin.</string>
     <string name="settings_label">Glass Ayarları</string>
     <string name="wallpaper_import_label">Glass Launcher duvar kâğıdı</string>
-    <string name="lock_service_label">Glass Launcher – Kilit, Kontrol Merkezi ve Son Kullanılanlar</string>
-    <string name="lock_service_description">Ana ekranda boş bir yere çift dokunduğunuzda telefonu kilitler, üstten kaydırınca telefonun kendi Kontrol Merkezi\'ni açar. Launcher\'ın kendi son kullanılanlar ekranındaki kart önizlemeleri için açık olan uygulamanın ekran görüntüsünü birkaç saniyede bir alır; görüntüler yalnızca telefonda saklanır, hiçbir yere gönderilmez. Ekrandaki yazıları okumaz.</string>
+    <string name="lock_service_label">Glass Launcher – Kilit ve Kontrol Merkezi</string>
+    <string name="lock_service_description">Ana ekranda boş bir yere çift dokunduğunuzda telefonu kilitler ve üstten kaydırınca telefonun kendi Kontrol Merkezi\'ni açar. Ekran içeriğini okumaz ve hiçbir veri toplamaz.</string>
 </resources>
