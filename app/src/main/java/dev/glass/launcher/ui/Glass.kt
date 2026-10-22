@@ -274,7 +274,9 @@ fun Modifier.liquidGlass(
         bd != null || content != null -> if (clear) 0.2f else 0.55f
         else -> if (clear) 0.6f else 1f
     }
-    val softPx = if (clear && bd != null && bd === look.sharp) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
+    // Hafif yumuşatma yalnızca net kopyada; katman camlarının kopyası zaten bulanık (9 örneklik yumuşatma boşuna
+    // ekran kartı yüküydü).
+    val softPx = if (!overlay && clear && bd != null && bd === look.sharp) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
     val refr = when {
         look.noLens || look.reduced -> 0f
         clear -> (st.glassRefraction * 1.3f).coerceAtMost(1.2f)
@@ -338,7 +340,9 @@ fun Modifier.liquidGlass(
                         val outline = shape.createOutline(r.size, holeDir, holeDensity)
                         val path = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
                         pageAnchor.holes[holeKey] = GlassHole(
-                            r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = overlay,
+                            // Kayarken de tam cam (mercek + parlama): önceden sade çiziliyor, sayfa yerine oturunca
+                            // mercek birden gelip kartlar aydınlanıyordu.
+                            r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = false,
                             ios = ios && refr > 0.01f, lensRadius = (shape as? SquircleShape)?.let { with(holeDensity) { it.radius.toPx() } } ?: outlineRadius(outline),
                         )
                     }
