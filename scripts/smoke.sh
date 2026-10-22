@@ -317,6 +317,18 @@ adb shell input swipe $cx $((H*80/100)) $cx $((H*20/100)) 300; step "aşağı ka
 tap_text "Gizli ve Kilitli Uygulamalar" && { step "gizlilik sayfası" 3; shot 22b-gizlilik; }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 
+# 23) Hızlı cevaplar: hesap makinesi, birim çevirme, ayar arama
+adb shell input tap $cx $((H*81/100)); step "arama" 2
+adb shell input text "12*(3+4)"; step "hesap" 2
+shot 23a-hesap
+for i in 1 2 3 4 5 6 7 8; do adb shell input keyevent KEYCODE_DEL; done
+adb shell input text "5%20km%20mil"; step "birim" 2
+shot 23b-birim
+for i in 1 2 3 4 5 6 7 8 9 10; do adb shell input keyevent KEYCODE_DEL; done
+adb shell input text "wifi"; step "ayar arama" 2
+shot 23c-ayar
+adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri" 2
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

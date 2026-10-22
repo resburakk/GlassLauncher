@@ -239,6 +239,7 @@ fun SearchOverlay(
                             onOpenHit = { launch(it.intent) },
                             onWeb = { webSearch(query.trim()) },
                             onStore = { storeSearch(query.trim()) },
+                            onLaunch = { launch(it) },
                         )
                     }
                 }
@@ -393,8 +394,13 @@ private fun ResultsList(
     onOpenHit: (DeviceHit) -> Unit,
     onWeb: () -> Unit,
     onStore: () -> Unit,
+    onLaunch: (Intent) -> Unit,
 ) {
     val st = LocalLauncherSettings.current
+    // Hızlı cevaplar (hesap, birim çevirme, ayarlar): çevrimdışı, yazarken anında.
+    val quick = remember(query) { dev.glass.launcher.data.QuickAnswers.compute(query) }
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember(query) { mutableStateOf(false) }
     val rowSize = st.searchResultTextSize.sp
     val topSize = (st.searchResultTextSize + 1f).sp
     val rowWeight = fontWeightOf(st.searchResultWeight)
@@ -417,6 +423,28 @@ private fun ResultsList(
             },
         contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp),
     ) {
+        quick.filterIsInstance<dev.glass.launcher.data.QuickAnswer.Value>().firstOrNull()?.let { v ->
+            item {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { clip.setText(AnnotatedString(v.result.substringBefore(' ').ifEmpty { v.result })); copied = true }
+                        .padding(horizontal = 18.dp, vertical = 10.dp),
+                ) {
+                    Text(v.expression + " =", color = Color(0xB3FFFFFF), fontSize = rowSize, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(v.result, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (copied) "Kopyalandı" else "Kopyalamak için dokunun", color = Color(0x99FFFFFF), fontSize = 12.sp, fontFamily = AppFont)
+                }
+            }
+        }
+        val links = quick.filterIsInstance<dev.glass.launcher.data.QuickAnswer.SettingLink>()
+        if (links.isNotEmpty()) {
+            item { SectionHeader("Ayarlar") }
+            links.forEachIndexed { i, l ->
+                if (i > 0) item { Hairline() }
+                item { ActionRow(Glyph.Gear, l.title) { onLaunch(l.intent) } }
+            }
+        }
         apps.firstOrNull()?.let { top ->
             item { SectionHeader("En İyi Sonuç") }
             item {
