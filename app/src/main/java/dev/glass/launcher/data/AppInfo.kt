@@ -31,6 +31,8 @@ class AppInfo(
         "${ai.sourceDir}:${ai.icon}:${activityInfo.activityInfo.icon}" + (shortcut?.let { ":sc${it.lastChangedTimestamp}" } ?: "")
     }.getOrDefault("")
     val isShortcut: Boolean get() = shortcut != null
+    /** Uygulamanın kendi anahtarı (kısayolda da sahibi olan uygulamanınki): gizleme/kilit bununla tutulur. */
+    val appKey: String get() = "${componentName.flattenToString()}#${user.hashCode()}"
 
     companion object {
         /** Sabitlenmiş kısayolun düzendeki anahtarı ("sc:" ile başlar). */

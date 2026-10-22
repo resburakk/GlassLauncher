@@ -46,6 +46,7 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        dev.glass.launcher.ui.AppLock.attach(this)
         updateDefault()
     }
 

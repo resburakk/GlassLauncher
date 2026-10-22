@@ -43,18 +43,27 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = la.appRepository
     private val eager = SharingStarted.WhileSubscribed(5_000)
 
-    val apps: StateFlow<List<AppInfo>> = repo.apps
+    /** Gizli uygulamalar çıkarılmış liste: ana ekran, arşiv ve arama bunu kullanır. */
+    private val shownApps: StateFlow<List<AppInfo>> = combine(
+        repo.apps, la.settingsStore.settings.map { it.hiddenApps }.distinctUntilChanged(),
+    ) { list, hidden -> if (hidden.isEmpty()) list else list.filter { it.key !in hidden } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Uygulamalar + ana ekrana sabitlenmiş kısayollar (anahtar → giriş). */
-    val appsByKey: StateFlow<Map<String, AppInfo>> = combine(repo.apps, repo.pinned) { list, pins ->
+    val apps: StateFlow<List<AppInfo>> = shownApps
+    /** Gizliler dahil tüm uygulamalar (yalnızca Ayarlar > Gizlilik). */
+    val allApps: StateFlow<List<AppInfo>> = repo.apps
+
+    /** Uygulamalar + ana ekrana sabitlenmiş kısayollar (anahtar → giriş). Gizli uygulamanın kısayolu da gizlenir. */
+    val appsByKey: StateFlow<Map<String, AppInfo>> = combine(shownApps, repo.pinned) { list, pins ->
         HashMap<String, AppInfo>(list.size + pins.size).apply {
             list.forEach { put(it.key, it) }
-            pins.forEach { put(it.key, it) }
+            val shown = list.mapTo(HashSet()) { it.appKey }
+            pins.forEach { if (it.appKey in shown) put(it.key, it) }
         }
     }.stateIn(viewModelScope, eager, emptyMap())
 
     /** Düzen uzlaştırmasında geçerli sayılan girişler (uygulamalar + sabitlenmiş kısayollar). */
-    private fun entries(): List<AppInfo> = repo.apps.value + repo.pinned.value
+    private fun entries(): List<AppInfo> = shownApps.value + repo.pinned.value
 
     /** Kısayol listesi güvenilir değilken (launcher varsayılan değil) kayıtlı kısayollar korunur. */
     private fun keepShortcutKeys(b: HomeLayout?): Set<String> =
@@ -74,6 +83,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     fun refreshPinned() = repo.refreshPinned()
 
+    // --- Gizleme ve kilit ---
+
+    fun setHidden(app: AppInfo, hidden: Boolean) = updateSettings { s ->
+        s.copy(hiddenApps = if (hidden) s.hiddenApps + app.appKey else s.hiddenApps - app.appKey)
+    }
+
+    fun setLocked(app: AppInfo, locked: Boolean) = updateSettings { s ->
+        s.copy(lockedApps = if (locked) s.lockedApps + app.appKey else s.lockedApps - app.appKey)
+    }
+
+    /** Gizli uygulamayı açar (Ayarlar > Gizlilik içinden; kimlik zaten doğrulandı). */
+    fun launchUnlocked(app: AppInfo) {
+        AppLock.markUnlocked(app.appKey)
+        doLaunch(app, null, null)
+    }
+
     val settings: StateFlow<LauncherSettings> = la.settingsStore.settings
         .stateIn(viewModelScope, eager, LauncherSettings())
 
@@ -89,7 +114,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             base = la.settingsStore.layoutJson.first()?.let { HomeLayout.fromJson(it) }
             val addNew = la.settingsStore.settings.map { it.addNewToHome }.distinctUntilChanged()
-            combine(repo.apps, repo.pinned, addNew) { list, pins, add -> Triple(list, pins, add) }.collect { (list, pins, add) ->
+            combine(shownApps, repo.pinned, addNew) { list, pins, add -> Triple(list, pins, add) }.collect { (list, pins, add) ->
                 if (list.isEmpty()) return@collect // liste henüz yüklenmedi: kayıtlı düzeni budama
                 // İlk kurulum: iOS 26 fabrika dizilimi (karşılıklar + türe göre klasörler).
                 if (base == null) base = IosDefaultLayout.build(la, list)
@@ -118,7 +143,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    val recentApps: StateFlow<List<AppInfo>> = combine(repo.apps, settings) { all, s ->
+    val recentApps: StateFlow<List<AppInfo>> = combine(shownApps, settings) { all, s ->
         s.recents.mapNotNull { r -> all.firstOrNull { it.componentName.flattenToString() == r } }
     }.stateIn(viewModelScope, eager, emptyList())
 
@@ -126,7 +151,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      * Uygulama Arşivi grupları: Öneriler (son kullanılanlar), Son Eklenenler, ardından kategoriler.
      * Boş kategoriler gösterilmez.
      */
-    val libraryGroups: StateFlow<List<LibraryGroup>> = combine(repo.apps, recentApps) { all, recent ->
+    val libraryGroups: StateFlow<List<LibraryGroup>> = combine(shownApps, recentApps) { all, recent ->
         val groups = ArrayList<LibraryGroup>()
         if (recent.isNotEmpty()) groups += LibraryGroup("Öneriler", recent)
         val newest = all.filter { it.installTime > 0 }.sortedByDescending { it.installTime }.take(8)
@@ -193,6 +218,18 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun launch(app: AppInfo, bounds: Rect? = null, options: Bundle? = null) {
+        // Kilitli uygulama: önce parmak izi / yüz / ekran kilidi (kısayolu da sahibi olan uygulamaya göre).
+        if (app.appKey in settings.value.lockedApps && !AppLock.recentlyUnlocked(app.appKey)) {
+            AppLock.authenticate("${app.label} kilitli", "Açmak için kimliğinizi doğrulayın") {
+                AppLock.markUnlocked(app.appKey)
+                doLaunch(app, bounds, options)
+            }
+            return
+        }
+        doLaunch(app, bounds, options)
+    }
+
+    private fun doLaunch(app: AppInfo, bounds: Rect?, options: Bundle?) {
         repo.launch(app, bounds, options)
         if (app.isShortcut) return
         viewModelScope.launch { la.settingsStore.addRecent(app.componentName.flattenToString()) }
@@ -328,7 +365,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Yeni klasör adı: uygulamaların hepsi aynı türdeyse o türün adı (ör. "Sosyal"), değilse "Klasör". */
     fun folderNameFor(keys: List<String>): String {
-        val cats = keys.mapNotNull { k -> repo.apps.value.firstOrNull { it.key == k }?.category }.distinct()
+        val cats = keys.mapNotNull { k -> shownApps.value.firstOrNull { it.key == k }?.category }.distinct()
         return cats.singleOrNull()?.takeIf { it != AppCategory.Other }?.title ?: "Klasör"
     }
 
@@ -398,7 +435,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Mevcut düzeni yedekleyip iOS 26 fabrika dizilimini uygular. Widget'lar korunur (en sona eklenir). */
     fun applyIosLayout() {
-        val list = repo.apps.value
+        val list = shownApps.value
         if (list.isEmpty()) return
         val cur = _layout.value
         viewModelScope.launch {

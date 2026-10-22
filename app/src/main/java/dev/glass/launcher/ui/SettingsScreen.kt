@@ -73,6 +73,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -144,6 +145,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Gestures("Hareketler", Glyph.Grid, Color(0xFF30D158)),
     Widgets("Widget'lar", Glyph.Widget, Color(0xFFFF375F)),
     Library("Uygulama Arşivi", Glyph.Grid, Color(0xFFBF5AF2)),
+    Privacy("Gizli ve Kilitli Uygulamalar", Glyph.Lock, Color(0xFF5856D6)),
     Backup("Yedekleme ve Geri Yükleme", Glyph.Folder, Color(0xFF8E8E93)),
     Performance("Performans", Glyph.Info, Color(0xFFFF453A)),
     About("Hakkında", Glyph.Info, Color(0xFF636366)),
@@ -242,7 +244,11 @@ fun SettingsScreen(
                         null -> {
                             LayoutOrderGroup(vm)
                             GlassMasterGroup(s, onChange)
-                            RootPage(isDefaultHome, onRequestDefault) { page = it.name }
+                            RootPage(isDefaultHome, onRequestDefault) { pg ->
+                                // Gizli uygulamalar listesi kimlik doğrulamasıyla açılır.
+                                if (pg == SettingsPage.Privacy) AppLock.authenticate(pg.title) { page = pg.name }
+                                else page = pg.name
+                            }
                             SettingsThemeGroup(s, onChange)
                         }
                         SettingsPage.Home -> HomePage(s, onChange)
@@ -258,6 +264,7 @@ fun SettingsScreen(
                         SettingsPage.Gestures -> GesturesPage(s, onChange)
                         SettingsPage.Widgets -> WidgetsPage(s, onChange, onAddWidget)
                         SettingsPage.Library -> LibraryPageSettings(s, onChange)
+                        SettingsPage.Privacy -> PrivacyPage(vm, s)
                         SettingsPage.Backup -> BackupPage(vm)
                         SettingsPage.Performance -> PerformancePage(s, onChange)
                         SettingsPage.About -> AboutPage()
@@ -415,7 +422,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
     val groups = listOf(
         listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders, SettingsPage.Fonts),
         listOf(SettingsPage.Glass, SettingsPage.Menu, SettingsPage.Search, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
-        listOf(SettingsPage.Widgets, SettingsPage.Library),
+        listOf(SettingsPage.Widgets, SettingsPage.Library, SettingsPage.Privacy),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
     )
     groups.forEach { g ->
@@ -1344,4 +1351,74 @@ private fun lightDirLabel(a: Float): String {
     val names = listOf("Üst", "Sağ üst", "Sağ", "Sağ alt", "Alt", "Sol alt", "Sol", "Sol üst")
     val i = (((a + 22.5f) % 360f) / 45f).toInt().coerceIn(0, 7)
     return "${names[i]} (${a.toInt()}°)"
+}
+
+
+/**
+ * Gizli ve kilitli uygulamalar. Gizli uygulama ana ekran, arşiv ve aramada görünmez; buradan açılır.
+ * Kilitli uygulama launcher'dan açılırken parmak izi / yüz / ekran kilidi ister.
+ */
+@Composable
+private fun PrivacyPage(vm: LauncherViewModel, s: LauncherSettings) {
+    val all by vm.allApps.collectAsStateWithLifecycle()
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val secure = remember { AppLock.deviceSecure(ctx as? android.app.Activity) }
+    if (!secure) {
+        Group(null) {
+            TextBlock("Telefonunuzda ekran kilidi (PIN, desen veya şifre) yok. Kilit ve gizli uygulama koruması için önce telefon ayarlarından ekran kilidi oluşturun.")
+        }
+    }
+    val hidden = all.filter { it.key in s.hiddenApps }
+    if (hidden.isNotEmpty()) {
+        Group("Gizli uygulamalar") {
+            hidden.forEachIndexed { i, app ->
+                PrivacyAppRow(vm, app, s, openable = true)
+                if (i < hidden.lastIndex) RowDivider(inset = 60.dp)
+            }
+        }
+        Footer("Açmak için uygulamaya dokunun. Gizli uygulamalar ana ekranda, arşivde ve aramada görünmez.")
+    }
+    Group("Tüm uygulamalar") {
+        all.forEachIndexed { i, app ->
+            PrivacyAppRow(vm, app, s, openable = false)
+            if (i < all.lastIndex) RowDivider(inset = 60.dp)
+        }
+    }
+    Footer(
+        "Kilitli uygulamalar launcher'dan açılırken telefonun parmak izi, yüz tanıma veya ekran kilidi sorulur. " +
+            "Bildirimden ya da son kullanılanlardan açılışı yalnızca telefonun kendi Uygulama Kilidi engelleyebilir."
+    )
+}
+
+@Composable
+private fun PrivacyAppRow(vm: LauncherViewModel, app: dev.glass.launcher.data.AppInfo, s: LauncherSettings, openable: Boolean) {
+    val isHidden = app.key in s.hiddenApps
+    val isLocked = app.appKey in s.lockedApps
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(if (openable) Modifier.clickable { vm.launchUnlocked(app) } else Modifier)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppIconImage(app, vm, 32.dp, false, 0f, badge = false)
+        Spacer(Modifier.width(12.dp))
+        Text(app.label, color = Fg, fontSize = 16.sp, maxLines = 1, modifier = Modifier.weight(1f))
+        PrivacyChip("Gizli", isHidden) { vm.setHidden(app, !isHidden) }
+        Spacer(Modifier.width(6.dp))
+        PrivacyChip("Kilitli", isLocked) { vm.setLocked(app, !isLocked) }
+    }
+}
+
+@Composable
+private fun PrivacyChip(text: String, on: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (on) Blue else LocalSettingsPalette.current.chip)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 6.dp),
+    ) {
+        Text(text, color = if (on) Color.White else Fg, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+    }
 }

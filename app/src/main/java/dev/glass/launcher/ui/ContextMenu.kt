@@ -205,6 +205,11 @@ fun ContextMenuOverlay(
                 val keep = app.key in menuSettings.darkOriginalApps
                 add(MenuAction(if (keep) "Koyu Modda Koyulaştır" else "Koyu Modda Orijinal Kalsın", Glyph.Pencil) { vm.toggleDarkOriginal(app) })
             }
+            val locked = app.appKey in menuSettings.lockedApps
+            add(MenuAction(if (locked) "Kilidi Kaldır" else "Uygulamayı Kilitle", Glyph.Lock) {
+                if (locked) AppLock.authenticate("Kilidi kaldır", app.label) { vm.setLocked(app, false) } else vm.setLocked(app, true)
+            })
+            add(MenuAction("Uygulamayı Gizle", Glyph.Hide) { vm.setHidden(app, true) })
             add(MenuAction("Uygulama Bilgisi", Glyph.Info) { vm.openAppInfo(app) })
             when (req.place) {
                 CellPlace.Library -> {

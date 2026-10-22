@@ -165,6 +165,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         applyNavHandle()
         // Launcher varsayılan ana ekran yapılınca kısayollar okunabilir hale gelir; ön plana her gelişte tazele.
         vm.refreshPinned()
+        dev.glass.launcher.ui.AppLock.attach(this)
         runCatching { window.addOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener, metricsHandler) }
         homeHidden = false
         coveredByApp = false

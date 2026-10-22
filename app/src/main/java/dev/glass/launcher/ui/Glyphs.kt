@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 /** Özgün, basit çizgi simgeler (Apple simgeleri kullanılmaz). */
-enum class Glyph { Edit, Info, Minus, Trash, Plus, Folder, Pencil, Grid, Search, Close, Check, Widget, Wallpaper, Mic, Person, Message, Doc, Globe, Bag, Gear }
+enum class Glyph { Edit, Info, Minus, Trash, Plus, Folder, Pencil, Grid, Search, Close, Check, Widget, Wallpaper, Mic, Person, Message, Doc, Globe, Bag, Gear, Lock, Hide }
 
 @Composable
 fun GlyphIcon(glyph: Glyph, color: Color, size: Dp = 18.dp) {
@@ -30,6 +30,29 @@ fun DrawScope.drawGlyph(glyph: Glyph, color: Color) {
     val stroke = Stroke(width = w, cap = StrokeCap.Round, join = StrokeJoin.Round)
     val c = Offset(s / 2f, s / 2f)
     when (glyph) {
+        Glyph.Lock -> {
+            // Asma kilit: altta yuvarlak gövde, üstte yay.
+            val bw = s * 0.62f; val bh = s * 0.42f
+            val left = (s - bw) / 2f; val top = s * 0.46f
+            drawRoundRect(color, Offset(left, top), Size(bw, bh), CornerRadius(s * 0.09f), style = stroke)
+            val r = s * 0.19f
+            drawArc(color, 180f, 180f, false, Offset(c.x - r, s * 0.16f), Size(r * 2, r * 2), style = stroke)
+            drawLine(color, Offset(c.x - r, s * 0.16f + r), Offset(c.x - r, top), w, StrokeCap.Round)
+            drawLine(color, Offset(c.x + r, s * 0.16f + r), Offset(c.x + r, top), w, StrokeCap.Round)
+            drawCircle(color, w * 0.9f, Offset(c.x, top + bh * 0.48f))
+        }
+        Glyph.Hide -> {
+            // Üstü çizili göz.
+            val p = androidx.compose.ui.graphics.Path().apply {
+                moveTo(s * 0.08f, c.y)
+                quadraticTo(c.x, s * 0.12f, s * 0.92f, c.y)
+                quadraticTo(c.x, s * 0.88f, s * 0.08f, c.y)
+                close()
+            }
+            drawPath(p, color, style = stroke)
+            drawCircle(color, s * 0.12f, c, style = stroke)
+            drawLine(color, Offset(s * 0.18f, s * 0.82f), Offset(s * 0.82f, s * 0.18f), w, StrokeCap.Round)
+        }
         Glyph.Edit, Glyph.Grid -> {
             val cell = s * 0.32f
             val gap = s * 0.12f
