@@ -1,5 +1,9 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.unit.offset
+
+import androidx.compose.ui.layout.layout
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.clickable
@@ -362,10 +366,7 @@ internal fun DraggableCell(
                 }
                 // Düzenleme modu: simge + etiket + yazı gölgesi bir kez kendi katmanına çizilir, sallanma yalnızca bu hazır
                 // görüntüyü döndürür (açı her karede değişince gölgeler her karede yeniden hesaplanıyor, 60 Hz'e düşüyordu).
-                .graphicsLayer {
-                    compositingStrategy = if (edit) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                    else androidx.compose.ui.graphics.CompositingStrategy.Auto
-                }
+                .cachedLayer(edit)
                 .clickable(interactionSource = interaction, indication = null) {
                     onClick(target.iconRect)
                 },
@@ -480,9 +481,29 @@ internal fun WidgetCell(
                 alpha = if (drag.key == id) 0f else 1f
                 rotationZ = if (edit) jiggle.value * 0.5f else 0f
             }
-            .graphicsLayer {
-                compositingStrategy = if (edit) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
-                else androidx.compose.ui.graphics.CompositingStrategy.Auto
-            }
+            .cachedLayer(edit)
     ) { content() }
 }
+
+
+/**
+ * [on] iken içerik kendi katmanına bir kez çizilir (döndürme/ölçek bu hazır görüntüye uygulanır). Katman, içeriğin
+ * çevresinde [margin] kadar taşma payıyla açılır: yazı gölgeleri ve simgeden taşan rozetler kesilmez. Yerleşim
+ * değişmez (dışarıya özgün boyut bildirilir).
+ */
+private fun Modifier.cachedLayer(on: Boolean, margin: androidx.compose.ui.unit.Dp = 18.dp): Modifier =
+    if (!on) this else this
+        .layout { m, c ->
+            // Dışarıya özgün boyut; içteki geniş katman taşma payı kadar sola/yukarı kaydırılır.
+            val mp = margin.roundToPx()
+            val p = m.measure(c.offset(mp * 2, mp * 2))
+            val w = (p.width - mp * 2).coerceAtLeast(0); val h = (p.height - mp * 2).coerceAtLeast(0)
+            layout(w, h) { p.place(-mp, -mp) }
+        }
+        .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+        .layout { m, c ->
+            // Katman içeriğin her yanında taşma payı kadar geniş.
+            val mp = margin.roundToPx()
+            val p = m.measure(c.offset(-mp * 2, -mp * 2))
+            layout(p.width + mp * 2, p.height + mp * 2) { p.place(mp, mp) }
+        }
