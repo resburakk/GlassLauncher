@@ -324,8 +324,11 @@ fun Modifier.liquidGlass(
                 // Sayfa içindeyse konum sayfaya göre (kayarken değişmez → yeniden çizim yok); değilse köke göre.
                 val pc = pageAnchor?.coords
                 lastCoords[0] = c
-                if (!(overlay && GlassMotion.moving)) {
-                    origin = if (pc != null && pc.isAttached) pageAnchor.rest + pc.localPositionOf(c, Offset.Zero) else c.positionInRoot()
+                val inPageNow = pc != null && pc.isAttached
+                // Sayfa içindeki cam (arşiv kartları) konumunu hep izler: kayarken onu alt katman çizer, devir teslim
+                // aynı karede olur. Yalnızca sayfa dışındaki katman camları hareket sırasında konum izlemez.
+                if (inPageNow || !(overlay && GlassMotion.moving)) {
+                    origin = if (inPageNow) pageAnchor!!.rest + pc!!.localPositionOf(c, Offset.Zero) else c.positionInRoot()
                 }
                 inPage = pc != null && pc.isAttached
                 if (inPage && pageAnchor != null && pc != null) {
@@ -362,7 +365,9 @@ fun Modifier.liquidGlass(
                         // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden (az sayıda cam, ucuz).
                         drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
-                    } else if (!(overlay && GlassMotion.moving)) {
+                    } else if (inPage || !(overlay && GlassMotion.moving)) {
+                        // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
+                        // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
                         drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
                     }
