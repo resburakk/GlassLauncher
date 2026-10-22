@@ -390,7 +390,19 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     /** Widget sayfası açıkken eklenen widget'lar oraya gider (HomeScreen günceller). */
     @Volatile var todayOpen: Boolean = false
 
-    fun addWidget(w: WidgetItem) = editLayout { if (todayOpen) it.addTodayWidget(w) else it.addWidget(w, currentPageStart) }
+    /** "Yığına Widget Ekle" seçildi: sonraki eklenen widget bu yığına girer (3 dakika geçerli). */
+    private var stackTarget: Pair<String, Long>? = null
+    fun beginAddToStack(widgetId: String) { stackTarget = widgetId to android.os.SystemClock.elapsedRealtime() }
+
+    fun addWidget(w: WidgetItem) {
+        val t = stackTarget
+        stackTarget = null
+        if (t != null && android.os.SystemClock.elapsedRealtime() - t.second < 180_000L && _layout.value.widgets.any { it.id == t.first }) {
+            editLayout { it.addToStack(t.first, w) }
+            return
+        }
+        editLayout { if (todayOpen) it.addTodayWidget(w) else it.addWidget(w, currentPageStart) }
+    }
 
     /** Yeni klasör adı: uygulamaların hepsi aynı türdeyse o türün adı (ör. "Sosyal"), değilse "Klasör". */
     fun folderNameFor(keys: List<String>): String {
@@ -402,7 +414,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun deletePage(ids: List<String>) {
         if (ids.isEmpty()) return
         val set = ids.toSet()
-        _layout.value.widgets.filter { it.id in set }.forEach { w ->
+        _layout.value.widgets.filter { it.id in set || _layout.value.homeWidgets.any { h -> h.id in set && h.stack.any { s -> s.id == it.id } } }.forEach { w ->
             if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
             if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
         }
@@ -410,8 +422,11 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun removeWidget(w: WidgetItem) {
-        if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
-        if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
+        // Yığın kaldırılırsa içindeki bütün widget'lar da gider.
+        (listOf(w) + w.stack).forEach { x ->
+            if (x.kind == WidgetKind.System && x.appWidgetId >= 0) la.widgetHost.delete(x.appWidgetId)
+            if (x.kind == WidgetKind.Photo && x.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(x.data)
+        }
         editLayout { it.removeItem(w.id) }
     }
 

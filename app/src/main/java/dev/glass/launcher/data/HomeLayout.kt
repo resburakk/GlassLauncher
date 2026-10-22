@@ -40,6 +40,8 @@ data class WidgetItem(
     val spanY: Int,
     val appWidgetId: Int = -1,
     val data: String = "",
+    /** Widget yığını (iOS Akıllı Yığın): aynı yerde, dikey kaydırarak geçilen diğer widget'lar. */
+    val stack: List<WidgetItem> = emptyList(),
 ) : HomeItem
 
 /**
@@ -336,11 +338,26 @@ data class HomeLayout(
         return copy(items = list)
     }
 
-    fun removeItem(id: String): HomeLayout = copy(items = items.filter { it.id != id }, today = today.filter { it.id != id })
+    fun removeItem(id: String): HomeLayout = copy(
+        items = items.filter { it.id != id }.map { if (it is WidgetItem && it.stack.any { s -> s.id == id }) it.copy(stack = it.stack.filter { s -> s.id != id }) else it },
+        today = today.filter { it.id != id }.map { if (it.stack.any { s -> s.id == id }) it.copy(stack = it.stack.filter { s -> s.id != id }) else it },
+    )
+
+    /** [targetId] widget'ının yığınına [w] eklenir (yığındakiler aynı boyutta). */
+    fun addToStack(targetId: String, w: WidgetItem): HomeLayout {
+        fun f(t: WidgetItem) = if (t.id == targetId) t.copy(stack = t.stack + w.copy(spanX = t.spanX, spanY = t.spanY, stack = emptyList())) else t
+        return copy(items = items.map { if (it is WidgetItem) f(it) else it }, today = today.map { f(it) })
+    }
+
+    /** Yığını dağıtır: yığındaki widget'lar hemen arkasına ayrı widget'lar olarak yerleşir. */
+    fun unstack(targetId: String): HomeLayout = copy(
+        items = items.flatMap { if (it is WidgetItem && it.id == targetId) listOf(it.copy(stack = emptyList())) + it.stack else listOf(it) },
+        today = today.flatMap { if (it.id == targetId) listOf(it.copy(stack = emptyList())) + it.stack else listOf(it) },
+    )
 
     fun resizeWidget(id: String, spanX: Int, spanY: Int): HomeLayout = copy(
-        items = items.map { if (it is WidgetItem && it.id == id) it.copy(spanX = spanX, spanY = spanY) else it },
-        today = today.map { if (it.id == id) it.copy(spanX = spanX, spanY = spanY) else it },
+        items = items.map { if (it is WidgetItem && it.id == id) it.copy(spanX = spanX, spanY = spanY, stack = it.stack.map { s -> s.copy(spanX = spanX, spanY = spanY) }) else it },
+        today = today.map { if (it.id == id) it.copy(spanX = spanX, spanY = spanY, stack = it.stack.map { s -> s.copy(spanX = spanX, spanY = spanY) }) else it },
     )
 
     fun setWidgetData(id: String, data: String): HomeLayout = copy(
@@ -363,7 +380,7 @@ data class HomeLayout(
     val homeWidgets: List<WidgetItem> get() = items.filterIsInstance<WidgetItem>()
 
     /** Tüm widget'lar (ana ekran + widget sayfası). */
-    val widgets: List<WidgetItem> get() = homeWidgets + today
+    val widgets: List<WidgetItem> get() = (homeWidgets + today).flatMap { listOf(it) + it.stack }
 
     fun toJson(): String = toJsonObject().toString()
 
@@ -391,6 +408,7 @@ data class HomeLayout(
     private fun widgetJson(item: WidgetItem): JSONObject = JSONObject().put("t", "w").put("id", item.id)
         .put("k", item.kind.code).put("sx", item.spanX).put("sy", item.spanY)
         .put("aw", item.appWidgetId).put("d", item.data)
+        .also { o -> if (item.stack.isNotEmpty()) o.put("st", JSONArray().also { a -> item.stack.forEach { a.put(widgetJson(it)) } }) }
 
     companion object {
         fun fromJson(json: String): HomeLayout? = try {
@@ -431,13 +449,14 @@ data class HomeLayout(
             null
         }
 
-        private fun widgetFrom(j: JSONObject) = WidgetItem(
+        private fun widgetFrom(j: JSONObject): WidgetItem = WidgetItem(
             id = j.optString("id").ifEmpty { UUID.randomUUID().toString() },
             kind = WidgetKind.of(j.optString("k")),
             spanX = j.optInt("sx", 2).coerceIn(1, 6),
             spanY = j.optInt("sy", 2).coerceIn(1, 6),
             appWidgetId = j.optInt("aw", -1),
             data = j.optString("d"),
+            stack = j.optJSONArray("st")?.let { a -> List(a.length()) { widgetFrom(a.getJSONObject(it)) } } ?: emptyList(),
         )
 
         /**

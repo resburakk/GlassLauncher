@@ -145,6 +145,8 @@ fun ContextMenuOverlay(
     onResizeWidget: (Span) -> Unit,
     onEditWidget: (() -> Unit)?,
     onRemoveWidget: () -> Unit,
+    /** Widget yığınına başka bir widget eklemek için seçiciyi açar. */
+    onAddToStack: (() -> Unit)? = null,
     onClose: () -> Unit,
     /** Klasörün içinden açıldıysa: uygulamayı klasörden çıkarır. */
     onRemoveFromFolder: () -> Unit = {},
@@ -190,7 +192,9 @@ fun ContextMenuOverlay(
                 }
             }
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
-            add(MenuAction("Widget'ı Kaldır", Glyph.Minus, destructive = true) { onRemoveWidget() })
+            onAddToStack?.let { add(MenuAction("Yığına Widget Ekle", Glyph.Plus) { it() }) }
+            if (widget.stack.isNotEmpty()) add(MenuAction("Yığını Dağıt", Glyph.Grid) { vm.editLayout { l -> l.unstack(widget.id) } })
+            add(MenuAction(if (widget.stack.isNotEmpty()) "Yığını Kaldır" else "Widget'ı Kaldır", Glyph.Minus, destructive = true) { onRemoveWidget() })
         } else if (app != null && app.isShortcut) {
             // Sabitlenmiş kısayol (ör. Chrome "Ana ekrana ekle"): silmek yalnızca kısayolu kaldırır, uygulama kalır.
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })

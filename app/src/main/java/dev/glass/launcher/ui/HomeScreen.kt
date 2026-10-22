@@ -960,6 +960,7 @@ fun HomeScreen(
                         else -> null
                     },
                     onRemoveWidget = { widget?.let { vm.removeWidget(it) } },
+                    onAddToStack = widget?.let { w -> { vm.beginAddToStack(w.id); overlay = Overlay.Widgets } },
                     onClose = { if (overlay == Overlay.Menu) closeOverlay() },
                 )
             }

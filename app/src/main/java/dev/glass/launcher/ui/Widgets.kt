@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -87,6 +88,7 @@ private fun rememberNow(everySecond: Boolean): LocalDateTime {
 /** Bir widget'ın içeriği. Dış çerçeve (cam, köşe) burada çizilir. */
 @Composable
 fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, strength: Float) {
+    if (w.stack.isNotEmpty()) { WidgetStack(w, vm, width, height, strength); return }
     val shape = RoundedCornerShape(widgetCorner(width))
     when (w.kind) {
         WidgetKind.System -> SystemWidget(w, vm, width, height)
@@ -339,6 +341,42 @@ private fun PhotoWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height:
                 "Fotoğraf seçmek için basılı tutun", color = Color(0xCCFFFFFF), fontSize = 12.sp,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+
+/**
+ * Widget yığını (iOS Akıllı Yığın): widget'lar aynı yerde üst üste; dikey kaydırarak geçilir, sağ kenarda
+ * hangi widget'ta olunduğunu gösteren noktalar kısa süre görünür.
+ */
+@Composable
+private fun WidgetStack(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, strength: Float) {
+    val pages = remember(w) { listOf(w.copy(stack = emptyList())) + w.stack }
+    val state = androidx.compose.foundation.pager.rememberPagerState { pages.size }
+    var showDots by remember { androidx.compose.runtime.mutableStateOf(true) }
+    LaunchedEffect(state.currentPage, state.isScrollInProgress) {
+        showDots = true
+        if (!state.isScrollInProgress) { delay(1800); showDots = false }
+    }
+    val dotsAlpha by androidx.compose.animation.core.animateFloatAsState(if (showDots) 1f else 0f, label = "stackDots")
+    Box(Modifier.size(width, height)) {
+        androidx.compose.foundation.pager.VerticalPager(
+            state = state,
+            modifier = Modifier.size(width, height),
+            beyondViewportPageCount = 1,
+            key = { pages[it].id },
+        ) { i -> WidgetBody(pages[i], vm, width, height, strength) }
+        androidx.compose.foundation.layout.Column(
+            Modifier.align(Alignment.CenterEnd).offset(x = 10.dp).graphicsLayer { alpha = dotsAlpha },
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(4.dp),
+        ) {
+            pages.indices.forEach { i ->
+                Box(
+                    Modifier.size(5.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(if (i == state.currentPage) Color.White else Color(0x66FFFFFF))
+                )
+            }
         }
     }
 }
