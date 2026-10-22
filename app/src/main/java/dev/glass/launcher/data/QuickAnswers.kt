@@ -36,7 +36,9 @@ object QuickAnswers {
     // ---------- Hesap makinesi ----------
 
     private fun calc(q: String): QuickAnswer? {
+        // Yazarken sonda kalan işlem işareti yok sayılır ("12*7+" → 84): sonuç yazdıkça görünür.
         val s = q.replace('×', '*').replace('÷', '/').replace('x', '*').replace('X', '*').replace(" ", "").replace(',', '.')
+            .trimEnd('+', '-', '*', '/', '^')
         // En az bir işlem ve yalnızca sayı/işlem karakterleri (tek sayı "5" hesap sayılmaz).
         if (!s.matches(Regex("[0-9.+\\-*/^%()]+"))) return null
         if (!s.any { it in "+-*/^%" } || !s.any { it.isDigit() }) return null
