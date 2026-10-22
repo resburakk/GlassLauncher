@@ -360,6 +360,12 @@ internal fun DraggableCell(
                     scaleY = scale
                     rotationZ = if (edit) jiggle.value * sign else 0f
                 }
+                // Düzenleme modu: simge + etiket + yazı gölgesi bir kez kendi katmanına çizilir, sallanma yalnızca bu hazır
+                // görüntüyü döndürür (açı her karede değişince gölgeler her karede yeniden hesaplanıyor, 60 Hz'e düşüyordu).
+                .graphicsLayer {
+                    compositingStrategy = if (edit) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    else androidx.compose.ui.graphics.CompositingStrategy.Auto
+                }
                 .clickable(interactionSource = interaction, indication = null) {
                     onClick(target.iconRect)
                 },
@@ -473,6 +479,10 @@ internal fun WidgetCell(
             .graphicsLayer {
                 alpha = if (drag.key == id) 0f else 1f
                 rotationZ = if (edit) jiggle.value * 0.5f else 0f
+            }
+            .graphicsLayer {
+                compositingStrategy = if (edit) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                else androidx.compose.ui.graphics.CompositingStrategy.Auto
             }
     ) { content() }
 }
