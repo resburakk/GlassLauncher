@@ -118,7 +118,7 @@ private val GlassBuiltins = listOf(
 /**
  * iOS 26 gibi Liquid Glass widget galerisi: alttan açılan cam panel, arama ve uygulamalara göre liste.
  * Bir uygulamaya dokununca widget'ları, gerçek ön izleme görselleriyle, boyut boyut kaydırılan kartlarda
- * gösterilir; "Widget Ekle" ile eklenir. Sistem (Honor vb.) widget'ları olduğu gibi kullanılır.
+ * gösterilir; "Widget Ekle" ile eklenir. Telefonun widget'ları cam görünümde gösterilir; cama uymayanlar listelenmez.
  * Launcher'ın kendi widget'ları en altta "Glass" bölümündedir.
  */
 @Composable

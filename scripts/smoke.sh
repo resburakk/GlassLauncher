@@ -371,7 +371,8 @@ add_sys() {
   adb shell uiautomator dump /sdcard/ui2.xml 2>&1 | head -2 | while IFS= read -r l; do echo "::notice::DUMP $l"; done
   adb shell cat /sdcard/ui2.xml 2>/dev/null | tr '>' '\n' | grep -oE 'text="[^"]{1,40}' | head -12 | tr '\n' ' ' | sed 's/^/::notice::METIN /'; echo
   adb shell run-as dev.glass.launcher cat shared_prefs/widget_glass.xml 2>&1 | grep -oE 'name="c:[^"@]+@[0-9]*" value="[a-z]+"' | sed 's/name="c://; s/@[0-9]*" value=/ /' | head -25 | while IFS= read -r l; do echo "::notice::WIDGET $l"; done
-  tap_text "$1" && { step "$1" 3; adb shell input swipe $((W*80/100)) $((H*45/100)) $((W*20/100)) $((H*45/100)) 300; step "sonraki widget" 2; shot 26h-cam-onizleme; tap_text "Widget Ekle"; step "eklendi" 4; }
+  # Galeride cam sürekli çizildiğinden ekran dökümü bazen alınamıyor: Clock satırının yerine dokunulur (alfabetik 3. satır).
+  { tap_text "$1" || adb shell input tap $cx $((H*415/1000)); } && { step "$1" 3; shot 26i-clock-detay; adb shell input swipe $((W*80/100)) $((H*45/100)) $((W*20/100)) $((H*45/100)) 300; step "sonraki widget" 2; shot 26h-cam-onizleme; { tap_text "Widget Ekle" || adb shell input tap $cx $((H*90/100)); }; step "eklendi" 4; }
   adb shell input keyevent KEYCODE_BACK; step "geri" 1
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
 }
