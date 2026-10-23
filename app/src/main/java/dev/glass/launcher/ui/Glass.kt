@@ -327,8 +327,14 @@ fun Modifier.liquidGlass(
     this
         .then(if (look.reduced) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
         .then(
-            if (look.reduced || elevation == 0.dp) Modifier
-            else Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
+            when {
+                look.reduced || elevation == 0.dp -> Modifier
+                // Sayfa içindeki cam (widget, klasör): sistem gölgesi saydam camın İÇİNDEN de görünür. Sayfa dururken
+                // cam arkasını kendisi çizdiği için örtülüyordu; kayarken arka planı alt katman çizdiğinden gölge
+                // camın içinde koyu bir kare olarak beliriyordu. Bunun yerine yalnızca camın DIŞINA düşen yumuşak gölge.
+                pageAnchor != null -> Modifier.outsideShadow(shape, elevation)
+                else -> Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
+            }
         )
         .then(
             if (bd != null) Modifier.onGloballyPositioned { c ->
@@ -867,5 +873,32 @@ fun Modifier.accentTint(amount: Float, fill: Float = 1f): Modifier = composed {
     else {
         val c = Color(LocalAccent.current)
         this.background(Brush.verticalGradient(listOf(c.copy(alpha = 0.22f * amount * fill.coerceIn(0.4f, 1f)), c.copy(alpha = 0.12f * amount * fill.coerceIn(0.4f, 1f)))))
+    }
+}
+
+
+/**
+ * Yalnızca şeklin dışına düşen yumuşak gölge (iOS widget gölgesi gibi, hafif aşağıda). Saydam camın içinde
+ * koyuluk bırakmaz. Bulanık yol bir kez hazırlanır; her karede yalnızca çizilir.
+ */
+fun Modifier.outsideShadow(shape: Shape, elevation: Dp): Modifier = this.drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val path = Path().apply { addOutline(outline) }
+    val blur = elevation.toPx() * 0.9f
+    val dy = elevation.toPx() * 0.35f
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.argb(46, 0, 0, 0)
+        if (blur > 0.5f) maskFilter = android.graphics.BlurMaskFilter(blur, android.graphics.BlurMaskFilter.Blur.NORMAL)
+    }
+    val ap = path.asAndroidPath()
+    onDrawBehind {
+        clipPath(path, androidx.compose.ui.graphics.ClipOp.Difference) {
+            drawIntoCanvas { c ->
+                c.nativeCanvas.save()
+                c.nativeCanvas.translate(0f, dy)
+                c.nativeCanvas.drawPath(ap, paint)
+                c.nativeCanvas.restore()
+            }
+        }
     }
 }
