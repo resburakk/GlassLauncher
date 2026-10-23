@@ -345,6 +345,13 @@ adb shell wm dismiss-keyguard; sleep 0.25; shot 24a-acilis-1
 sleep 0.2; shot 24b-acilis-2
 step "açıldı" 2; shot 24c-acilis-son
 
+# 25) Düzenleme: Sayfaları Düzenle ve Özelleştir paneli
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
+tap_text "Sayfalar" && { step "sayfalar" 3; shot 25a-sayfalari-duzenle; tap_text "Bitti"; step "kapat" 2; }
+tap_text "+" && { step "artı menü" 2; tap_text "Özelleştir" && { step "özelleştir" 3; shot 25b-ozellestir; adb shell input keyevent KEYCODE_BACK; step "geri" 1; }; }
+adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

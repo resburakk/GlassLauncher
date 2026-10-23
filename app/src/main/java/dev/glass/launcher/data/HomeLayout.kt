@@ -31,7 +31,8 @@ enum class WidgetKind(val code: String, val title: String) {
     Calendar("calendar", "Takvim"),
     Battery("battery", "Pil"),
     Photo("photo", "Fotoğraf"),
-    Weather("weather", "Hava Durumu");
+    Weather("weather", "Hava Durumu"),
+    GlassClock("glassclock", "Cam Saat");
 
     companion object {
         fun of(code: String) = entries.firstOrNull { it.code == code } ?: System

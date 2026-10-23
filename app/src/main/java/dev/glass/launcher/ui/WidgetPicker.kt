@@ -112,6 +112,7 @@ private val GlassBuiltins = listOf(
     Triple("b:bat", "Pil", WidgetKind.Battery),
     Triple("b:photo", "Fotoğraf", WidgetKind.Photo),
     Triple("b:weather", "Hava Durumu", WidgetKind.Weather),
+    Triple("b:glassclock", "Cam Saat", WidgetKind.GlassClock),
 )
 
 /**
@@ -438,6 +439,7 @@ private fun BuiltinPreview(kind: WidgetKind, w: Dp) {
         WidgetKind.Battery -> Text("%85", color = Color(0xFF30D158), fontSize = big, fontWeight = FontWeight.Bold)
         WidgetKind.Photo -> GlyphIcon(Glyph.Wallpaper, Color.White, w * 0.3f)
         WidgetKind.Weather -> SkyGlyph(dev.glass.launcher.data.Sky.PartlyCloudy, true, w * 0.4f)
+        WidgetKind.GlassClock -> Text("9:41", color = Color.White.copy(alpha = 0.85f), fontSize = big * 1.3f, fontWeight = FontWeight.Bold)
         else -> GlyphIcon(Glyph.Widget, Color.White, w * 0.3f)
     }
 }
