@@ -311,6 +311,14 @@ tap_text "Simgeler" && { step "simgeler sayfası" 2
   adb shell input keyevent KEYCODE_HOME; step "ana ekran" 4
   shot 22a-seffaf-simgeler
   adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 3
+  tap_text "Renkli" && step "renkli simge" 2
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 4
+  shot 22c-renkli-simgeler
+  adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 3
+  tap_text "Açık" && step "açık simge" 2
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 4
+  shot 22d-acik-simgeler
+  adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 3
   tap_text "Orijinal"; step "orijinal simge" 2
   adb shell input keyevent KEYCODE_BACK; step "geri" 2; }
 adb shell input swipe $cx $((H*80/100)) $cx $((H*20/100)) 300; step "aşağı kaydır" 2
@@ -328,6 +336,14 @@ for i in 1 2 3 4 5 6 7 8 9 10; do adb shell input keyevent KEYCODE_DEL; done
 adb shell input text "wifi"; step "ayar arama" 2
 shot 23c-ayar
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri" 2
+
+# 24) Kilit açılışı animasyonu: ekranı kapat-aç, açılırken kareler
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input keyevent KEYCODE_SLEEP; step "ekran kapalı" 2
+adb shell input keyevent KEYCODE_WAKEUP; sleep 0.5
+adb shell wm dismiss-keyguard; sleep 0.25; shot 24a-acilis-1
+sleep 0.2; shot 24b-acilis-2
+step "açıldı" 2; shot 24c-acilis-son
 
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
