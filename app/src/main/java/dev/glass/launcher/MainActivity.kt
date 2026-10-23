@@ -84,6 +84,20 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                 if (s.hideNavHandle != hideNavHandle) { hideNavHandle = s.hideNavHandle; applyNavHandle() }
             }
         }
+        // iOS kilit açılışı: ekran kapanınca simgeler gizlenir, kilit açılınca yerine oturarak belirir.
+        runCatching {
+            registerReceiver(object : android.content.BroadcastReceiver() {
+                override fun onReceive(c: android.content.Context?, i: Intent?) {
+                    if (!vm.settings.value.unlockAnimation) return
+                    when (i?.action) {
+                        Intent.ACTION_SCREEN_OFF -> dev.glass.launcher.ui.UnlockAnim.hide()
+                        Intent.ACTION_USER_PRESENT -> dev.glass.launcher.ui.UnlockAnim.play()
+                    }
+                }
+            }, android.content.IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF); addAction(Intent.ACTION_USER_PRESENT)
+            })
+        }
         enableEdgeToEdge()
         requestHighestRefreshRate()
         updateDefault()
@@ -167,6 +181,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         // Launcher varsayılan ana ekran yapılınca kısayollar okunabilir hale gelir; ön plana her gelişte tazele.
         vm.refreshPinned()
         dev.glass.launcher.ui.AppLock.attach(this)
+        // Kilit yoksa (veya USER_PRESENT kaçtıysa) simgeler gizli kalmasın.
+        if (getSystemService(android.app.KeyguardManager::class.java)?.isKeyguardLocked != true) dev.glass.launcher.ui.UnlockAnim.play()
         runCatching { window.addOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener, metricsHandler) }
         homeHidden = false
         coveredByApp = false

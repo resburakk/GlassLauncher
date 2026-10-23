@@ -985,6 +985,10 @@ private fun AnimationsPage(s: LauncherSettings, onChange: ((LauncherSettings) ->
         ToggleRow("Simgeden açılış ve simgeye kapanış", s.appTransitions, default = Def.appTransitions) { v ->
             onChange { it.copy(appTransitions = v) }
         }
+        RowDivider()
+        ToggleRow("Kilit açılınca simgeler belirsin", s.unlockAnimation, default = Def.unlockAnimation) { v ->
+            onChange { it.copy(unlockAnimation = v) }
+        }
     }
     Footer(
         "Açıkken uygulama dokunduğun simgenin yerinden büyüyerek açılır, ana ekrana dönünce simgesinin yerine " +

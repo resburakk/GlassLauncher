@@ -713,6 +713,13 @@ fun HomeScreen(
             }
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
+        val unlockAnim = remember { androidx.compose.animation.core.Animatable(1f) }
+        LaunchedEffect(Unit) {
+            UnlockAnim.events.collect { hide ->
+                if (hide) unlockAnim.snapTo(0f)
+                else unlockAnim.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.86f, stiffness = 260f))
+            }
+        }
         Box(
             Modifier.fillMaxSize()
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
@@ -725,6 +732,9 @@ fun HomeScreen(
                     // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
                     val h = homeHide()
                     if (h > 0f) { k *= 1f - 0.06f * h; alpha = 1f - h }
+                    // Kilit açılışı (iOS): simgeler %15 büyükten yerine oturur, saydamdan belirir.
+                    val un = unlockAnim.value
+                    if (un < 1f) { k *= 1f + 0.15f * (1f - un); alpha *= un.coerceIn(0f, 1f) }
                     scaleX = k; scaleY = k
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width
