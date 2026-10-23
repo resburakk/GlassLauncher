@@ -362,6 +362,26 @@ tap_text "Sayfalar" && { step "sayfalar" 3; shot 25a-sayfalari-duzenle; tap_text
 tap_text "+" && { step "artı menü" 2; tap_text "Özelleştir" && { step "özelleştir" 3; shot 25b-ozellestir; adb shell input keyevent KEYCODE_BACK; step "geri" 1; }; }
 adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 
+# 26) Kendi widget'larımız (Takvim, Hava Durumu) ve sayfa kayarken cam: parmak ekrandayken kareler
+add_builtin() {
+  adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
+  tap_text "+"; step "artı" 2
+  tap_text "Widget Ekle"; step "galeri" 5
+  tap_text "Glass Launcher" && { step "kendi widgetlarımız" 3; tap_text "$1" && step "$1" 3; tap_text "Widget Ekle"; step "eklendi" 3; }
+  adb shell input keyevent KEYCODE_BACK; step "geri" 1
+  adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
+}
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+add_builtin "Takvim"
+add_builtin "Hava Durumu"
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+shot 26a-widgetlar
+adb shell input motionevent DOWN $((W*80/100)) $((H*55/100)); sleep 0.1
+for f in 1 2 3 4 5 6; do adb shell input motionevent MOVE $((W*80/100 - W*f/20)) $((H*55/100)); sleep 0.05; done
+sleep 0.3; shot 26b-widget-kayarken
+adb shell input motionevent MOVE $((W*80/100)) $((H*55/100)); adb shell input motionevent UP $((W*80/100)) $((H*55/100)); step "bırak" 2
+shot 26c-widget-durunca
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
