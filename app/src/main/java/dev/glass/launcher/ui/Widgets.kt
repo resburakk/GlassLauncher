@@ -390,3 +390,27 @@ private fun WidgetStack(w: WidgetItem, vm: LauncherViewModel, width: Dp, height:
         }
     }
 }
+
+
+/**
+ * Widget'ın altındaki ad (iOS gibi uygulamanın adı): launcher widget'larında ilgili uygulama, telefon
+ * widget'larında widget'ı sağlayan uygulamanın adı.
+ */
+@Composable
+fun rememberWidgetCaption(w: WidgetItem, vm: LauncherViewModel): String {
+    val ctx = LocalContext.current
+    return remember(w.kind, w.appWidgetId) {
+        when (w.kind) {
+            WidgetKind.DigitalClock, WidgetKind.AnalogClock, WidgetKind.GlassClock -> "Saat"
+            WidgetKind.Calendar -> "Takvim"
+            WidgetKind.Battery -> "Pil"
+            WidgetKind.Photo -> "Fotoğraf"
+            WidgetKind.Weather -> "Hava Durumu"
+            WidgetKind.System -> runCatching {
+                val info = vm.widgetHost.info(w.appWidgetId)
+                val pm = ctx.packageManager
+                info?.provider?.packageName?.let { pm.getApplicationLabel(pm.getApplicationInfo(it, 0)).toString() }
+            }.getOrNull() ?: "Widget"
+        }
+    }
+}

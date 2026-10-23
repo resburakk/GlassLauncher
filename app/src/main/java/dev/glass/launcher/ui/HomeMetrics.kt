@@ -62,7 +62,11 @@ data class HomeMetrics(
 
     /** [spanX]×[spanY] hücrelik widget'ın boyutu (simge kenarları + iOS taşma payı). */
     fun widgetWidth(spanX: Int): Dp = pitchX * (spanX - 1) + icon + widgetBleed * 2f
-    fun widgetHeight(spanY: Int): Dp = pitchY * (spanY - 1) + icon + widgetBleed * 2f
+    /**
+     * Yükseklik yatay adımla hesaplanır: iOS'ta küçük widget tam karedir, büyük widget iki küçük + bir boşluk
+     * kadardır. Satırlar daha seyrek olduğundan kalan yer widget'ın altındaki ada kalır (iOS gibi).
+     */
+    fun widgetHeight(spanY: Int): Dp = pitchX * (spanY - 1) + icon + widgetBleed * 2f
 
     companion object {
         /** Referans ekran genişliği (pt). */
@@ -104,8 +108,8 @@ data class HomeMetrics(
             val dockPitch = max((innerW - dockInset * 2f - dockIcon) / 3f, dockIcon + 2.dp)
             // Simge hücrenin sol kenarında durur: ilk simgenin sol kenarı = dockInset (son simgenin sağı da öyle).
             val dockInnerStart = dockInset
-            // Eş merkezli köşe: simge köşesi + simgenin kenara uzaklığı.
-            val dockCornerR = if (s.dockCorner < 0f) dockIcon * s.iconCorner + dockInset else dockH * s.dockCorner
+            // iOS 26 ekran görüntüsünden ölçüldü: dock köşesi yüksekliğin %37,8'i (ayardan değiştirilebilir).
+            val dockCornerR = dockH * (if (s.dockCorner < 0f) 0.378f else s.dockCorner)
 
             // Arama hapı ve satır sayısı: hap, simge dizisinin altı ile dock arasında simetrik durur.
             val pillW = u * 77f * s.pillScale

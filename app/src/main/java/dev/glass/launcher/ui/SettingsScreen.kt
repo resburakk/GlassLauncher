@@ -818,9 +818,9 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         RowDivider()
         SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f, default = Def.dockBottom) { v -> onChange { it.copy(dockBottom = v) } }
         RowDivider()
-        // Varsayılan (negatif): iOS gibi simgeyle eş merkezli köşe; kaydırıcı ~%35'te gösterilir.
-        val dockC = if (s.dockCorner < 0f) 0.35f else s.dockCorner
-        SliderRow("Köşe yuvarlaklığı", if (s.dockCorner < 0f) "iOS" else pct(dockC / 0.5f), dockC, 0.08f..0.5f, default = 0.35f) { v -> onChange { it.copy(dockCorner = v) } }
+        // Varsayılan (negatif): iOS 26 ölçüsü (%37,8).
+        val dockC = if (s.dockCorner < 0f) 0.378f else s.dockCorner
+        SliderRow("Köşe yuvarlaklığı", if (s.dockCorner < 0f) "iOS" else pct(dockC / 0.5f), dockC, 0.08f..0.5f, default = 0.378f) { v -> onChange { it.copy(dockCorner = v) } }
     }
     Group("Arama düğmesi") {
         SliderRow("Boyut", pct(s.pillScale), s.pillScale, 0.7f..1.5f, default = Def.pillScale) { v -> onChange { it.copy(pillScale = v) } }

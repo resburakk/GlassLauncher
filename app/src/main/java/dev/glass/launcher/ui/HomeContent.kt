@@ -90,6 +90,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import dev.glass.launcher.R
 import dev.glass.launcher.data.AppInfo
 import dev.glass.launcher.data.AppItem
@@ -588,8 +589,8 @@ internal fun HomeContent(
                             is WidgetItem -> {
                                 val w = m.widgetWidth(pl.spanX)
                                 val h = m.widgetHeight(pl.spanY)
-                                // iOS: widget simge kenarlarından biraz taşar (bkz. HomeMetrics.widgetBleed).
-                                Box(Modifier.offset(-m.widgetBleed, -m.widgetBleed)) {
+                                // iOS: widget simge kenarlarından biraz taşar (bkz. HomeMetrics.widgetBleed); altında uygulama adı.
+                                Column(Modifier.offset(-m.widgetBleed, -m.widgetBleed)) {
                                 WidgetCell(
                                     id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = pageJiggle,
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },
@@ -597,6 +598,17 @@ internal fun HomeContent(
                                     // Sistem widget'ları ve yığınlar dokunuşu kendileri yönetir.
                                     onClick = if (item.kind != WidgetKind.System && item.stack.isEmpty()) { r -> vm.openWidget(item, view, r) } else null,
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
+                                if (settings.showLabels) {
+                                    val caption = rememberWidgetCaption(item, vm)
+                                    Text(
+                                        caption,
+                                        style = CellLabelStyle.copy(fontSize = (settings.labelSize * m.pt.value).sp, fontWeight = fontWeightOf(settings.labelWeight)),
+                                        maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.width(w).padding(top = m.pt * settings.labelGap, start = 2.dp, end = 2.dp)
+                                            .graphicsLayer { alpha = if (drag.key == item.id) 0f else 1f }
+                                            .then(Modifier.clearAndSetSemantics { }),
+                                    )
+                                }
                                 }
                             }
                             is PageBreak -> Unit // görünmez sayfa sonu

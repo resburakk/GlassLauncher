@@ -77,8 +77,7 @@ data class LauncherSettings(
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
     val dockBottom: Float = 15f,
     /**
-     * Dock köşe yuvarlaklığı (yüksekliğe oran; 0.5 = hap şekli). Negatif: iOS 26 gibi simgeyle eş merkezli
-     * (dock köşesi = simge köşesi + simgenin dock kenarına uzaklığı).
+     * Dock köşe yuvarlaklığı (yüksekliğe oran; 0.5 = hap şekli). Negatif: iOS 26 ölçüsü (%37,8).
      */
     val dockCorner: Float = -1f,
     /** Arama düğmesi boyut çarpanı. */
