@@ -214,12 +214,22 @@ object DarkIcon {
             if (hsv[1] < 0.30f && l < 0.40f) darkCount++
             if (hsv[1] < 0.20f && l > 0.62f) lightCount++
         }
-        if (fgCount < 30) return scaled(orig, 0.72f)
+        // Zemin çıkarılınca geriye neredeyse hiçbir şey kalmıyorsa (World Mobil gibi tamamı tek renk karakter)
+        // simge yanlış ayrışmıştır: orijinali korunur, hafifçe koyulaştırılır.
+        var wsum = 0f
+        for (a in w) wsum += a
+        if (fgCount < 30 || wsum < 0.05f * total) return scaled(orig, 0.86f)
         // Fotoğraf gibi büyük koyu alan (kamera lensi): yalnızca karart.
         if (darkCount.toFloat() / total > 0.30f) return scaled(orig, 0.72f)
-        val colorize = (forceColorize || (bg.colorful && bg.sat > 0.30f)) && lightCount > 0.4f * fgCount
+        // Büyük beyaz şerit/plaka (idefix, Trendyol gibi): ince bir sembol değil tasarımın parçası. Zemin rengiyle
+        // boyanırsa tasarım bozulur; orijinal görünüm korunur, hafifçe koyulaştırılır.
+        val colorizeWanted = (forceColorize || (bg.colorful && bg.sat > 0.30f)) && lightCount > 0.4f * fgCount
+        if (colorizeWanted && lightCount > 0.30f * total) return scaled(orig, 0.86f)
+        val colorize = colorizeWanted
         val bh = FloatArray(3)
-        val invertDark = darkCount > 0.02f * fgCount
+        // Koyu sembolleri açığa çevirmek yalnızca ince yazı/çizgilerde (Arrows'taki oklar). Büyük koyu dolgu
+        // (Trendyol'un siyah şeridi) çevrilmez; beyaza dönüp tasarımı bozuyordu.
+        val invertDark = darkCount > 0.02f * fgCount && darkCount < 0.10f * total
         val out = IntArray(total)
         for (y in 0 until n) {
             val t = y / (n - 1f)
