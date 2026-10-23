@@ -197,6 +197,26 @@ object DarkIcon {
         return compose(px, weight, info, orig, n, bgPx = field, forceColorize = true)
     }
 
+    /** Açık renkli ön plan, simgeyi bir kenardan öbür kenara kesen bir şerit mi (idefix'teki beyaz bant)? */
+    private fun lightBand(fg: IntArray, w: FloatArray, n: Int): Boolean {
+        val hsv = FloatArray(3)
+        fun light(p: Int): Boolean {
+            if (w[p] < 0.5f) return false
+            val c = fg[p]; toHsv(c, hsv)
+            return hsv[1] < 0.20f && lum(c) > 0.62f
+        }
+        val e = (n * 0.06f).toInt().coerceAtLeast(1)
+        var rows = 0
+        for (y in (n * 0.15f).toInt() until (n * 0.85f).toInt()) {
+            if (light(y * n + e) && light(y * n + n - 1 - e)) rows++
+        }
+        var cols = 0
+        for (x in (n * 0.15f).toInt() until (n * 0.85f).toInt()) {
+            if (light(e * n + x) && light((n - 1 - e) * n + x)) cols++
+        }
+        return rows > n * 0.08f || cols > n * 0.08f
+    }
+
     /** Koyu zemin + yeniden renklendirilmiş ön plan. [fg] ön plan renkleri, [w] ön plan ağırlığı (0..1). */
     private fun compose(
         fg: IntArray, w: FloatArray, bg: Bg, orig: Bitmap, n: Int,
@@ -224,7 +244,7 @@ object DarkIcon {
         // Büyük beyaz şerit/plaka (idefix, Trendyol gibi): ince bir sembol değil tasarımın parçası. Zemin rengiyle
         // boyanırsa tasarım bozulur; orijinal görünüm korunur, hafifçe koyulaştırılır.
         val colorizeWanted = (forceColorize || (bg.colorful && bg.sat > 0.30f)) && lightCount > 0.4f * fgCount
-        if (colorizeWanted && lightCount > 0.30f * total) return scaled(orig, 0.86f)
+        if (colorizeWanted && (lightCount > 0.30f * total || lightBand(fg, w, n))) return scaled(orig, 0.86f)
         val colorize = colorizeWanted
         val bh = FloatArray(3)
         // Koyu sembolleri açığa çevirmek yalnızca ince yazı/çizgilerde (Arrows'taki oklar). Büyük koyu dolgu
