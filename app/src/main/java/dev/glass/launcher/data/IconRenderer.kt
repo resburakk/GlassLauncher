@@ -43,6 +43,11 @@ object IconRenderer {
         // etrafında çerçeve kalmaz. Monokrom katmanı olan simgeler Renkli'de kendi tek renk çizimini kullanır.
         if (style == IconStyle.Light || style == IconStyle.Tinted) {
             val a = d as? AdaptiveIconDrawable
+            // Tasarımı zemin katmanında olan simgeler (Chrome: renkli logo zeminde): Açık'ta zemin değiştirilirse
+            // simge boş kalır; orijinali kullanılır.
+            if (style == IconStyle.Light && a != null && !plated(a, size) && bgCarriesDesign(a)) {
+                return render(d, size, IconStyle.Original, tint, fillRound)
+            }
             val usable = a != null && !plated(a, size) && (style == IconStyle.Light || a.monochrome != null)
             // Zemini tek renk olmayan simgelerde (Chrome gibi renkli, tam dolu) sembol ayrıştırılamaz: normal yol.
             if (!usable) fromDarkGlyph(renderDark(d, size, tint, fillRound), style, tint)?.let { return it }
@@ -174,6 +179,30 @@ object IconRenderer {
         out.setPixels(px, 0, w, 0, 0, w, h)
         dark.recycle()
         return out
+    }
+
+    /** Zemin katmanı çok renkli mi (tasarımın kendisi zeminde)? Düz/tek ton geçişli zeminlerde false. */
+    private fun bgCarriesDesign(a: AdaptiveIconDrawable): Boolean {
+        val bg = a.background ?: return false
+        val n = 64
+        val inset = (n * 0.25f).toInt()
+        val b = createBitmap(n, n)
+        bg.bounds = Rect(-inset, -inset, n + inset, n + inset)
+        bg.draw(Canvas(b))
+        val px = IntArray(n * n).also { b.getPixels(it, 0, n, 0, 0, n, n) }
+        b.recycle()
+        val hsv = FloatArray(3)
+        val hues = ArrayList<Float>()
+        for (p in px) {
+            if ((p ushr 24) < 200) continue
+            Color.colorToHSV(p, hsv)
+            if (hsv[1] > 0.35f && hsv[2] > 0.25f) hues += hsv[0]
+        }
+        if (hues.size < px.size * 0.2f) return false
+        // Renkli piksellerin tonları geniş bir aralığa yayılıyorsa (ör. kırmızı + yeşil + sarı) tasarım zemindedir.
+        val bins = IntArray(12)
+        hues.forEach { bins[(it / 30f).toInt().coerceIn(0, 11)]++ }
+        return bins.count { it > hues.size * 0.08f } >= 3
     }
 
     /** Ön plan katmanı simgenin yarısından fazlasını kaplıyor mu (zemin plakası ön planın içinde)? */
