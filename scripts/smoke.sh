@@ -345,6 +345,16 @@ adb shell wm dismiss-keyguard; sleep 0.25; shot 24a-acilis-1
 sleep 0.2; shot 24b-acilis-2
 step "açıldı" 2; shot 24c-acilis-son
 
+# 24b) Serbest yerleşim: ilk simgeyi sayfanın alt sağındaki boş hücreye sürükle (önüne boşluk eklenmeli)
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+tx=$((W*85/100)); ty=$((H*60/100))
+adb shell input motionevent DOWN $ix $iy; sleep 0.8
+for f in 1 2 3 4 5 6 7 8 9 10; do adb shell input motionevent MOVE $((ix + (tx-ix)*f/10)) $((iy + (ty-iy)*f/10)); sleep 0.08; done
+sleep 0.8
+adb shell input motionevent UP $tx $ty; step "boş hücreye bırak" 2
+adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
+shot 24d-serbest-yerlesim
+
 # 25) Düzenleme: Sayfaları Düzenle ve Özelleştir paneli
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
