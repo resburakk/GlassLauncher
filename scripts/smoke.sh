@@ -367,6 +367,8 @@ add_builtin() {
   adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
   tap_text "+"; step "artı" 2
   tap_text "Widget Ekle"; step "galeri" 5
+  # Kendi widget'larımız listenin en altında: liste sona kaydırılır.
+  for k in 1 2 3 4; do adb shell input swipe $cx $((H*80/100)) $cx $((H*25/100)) 200; sleep 0.4; done; sleep 1
   tap_text "Glass Launcher" && { step "kendi widgetlarımız" 3; tap_text "$1" && step "$1" 3; tap_text "Widget Ekle"; step "eklendi" 3; }
   adb shell input keyevent KEYCODE_BACK; step "geri" 1
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
