@@ -91,7 +91,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
     if (w.stack.isNotEmpty()) { WidgetStack(w, vm, width, height, strength); return }
     val shape = RoundedCornerShape(widgetCorner(width))
     when (w.kind) {
-        WidgetKind.System -> SystemWidget(w, vm, width, height)
+        WidgetKind.System -> SystemWidget(w, vm, width, height, strength)
         // Cam saat zeminsizdir (iOS kilit ekranı saati gibi): rakamların kendisi cam.
         WidgetKind.GlassClock -> GlassClockWidget(w, width, height)
         WidgetKind.Photo -> Box(Modifier.size(width, height).clip(shape).background(Color(0x33000000))) {
@@ -113,12 +113,14 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
 }
 
 /**
- * Sistem widget'ı (Honor vb.) olduğu gibi gösterilir: kırpma, cam veya arka plan eklenmez. Widget'a
- * kapladığı alanın gerçek boyutu bildirilir; alan widget'ın en küçük boyutundan darsa widget o boyutta
- * çizilip orantılı küçültülür (en-boy oranı korunur, sıkışma ve kesilme olmaz).
+ * Sistem widget'ı (Honor vb.). Cam görünüm açıksa (varsayılan) widget'ın kendi kartı kaldırılır, altına
+ * launcher'ın sıvı camı çizilir ve yazılar camın üstünde okunur hale getirilir ([GlassWidgetHostView]).
+ * Cama uymayan widget'lar ve "Orijinal Görünüm" seçilenler olduğu gibi gösterilir.
+ * Widget'a kapladığı alanın gerçek boyutu bildirilir; alan widget'ın en küçük boyutundan darsa widget o
+ * boyutta çizilip orantılı küçültülür (en-boy oranı korunur, sıkışma ve kesilme olmaz).
  */
 @Composable
-private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp) {
+private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, strength: Float) {
     val host = vm.widgetHost
     val density = androidx.compose.ui.platform.LocalDensity.current.density
     val info = remember(w.appWidgetId) { host.info(w.appWidgetId) }
@@ -126,15 +128,28 @@ private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height
     LaunchedEffect(w.appWidgetId, lw, lh) {
         host.updateSize(w.appWidgetId, lw.value, lh.value)
     }
-    Box(Modifier.size(width, height), contentAlignment = Alignment.Center) {
+    val settings = LocalLauncherSettings.current
+    @Suppress("UNUSED_VARIABLE") val ver = host.version.intValue
+    val wantGlass = settings.glassSystemWidgets && !host.isOriginal(w.appWidgetId)
+    var hv by remember(w.appWidgetId) { mutableStateOf<dev.glass.launcher.widget.GlassWidgetHostView?>(null) }
+    val glass = wantGlass && (hv?.compatible?.value ?: false)
+    val shape = RoundedCornerShape(widgetCorner(width))
+    Box(
+        Modifier.size(width, height)
+            .then(if (glass) Modifier.liquidGlass(shape, strength, 8.dp).background(Color(0x26000000)).clip(shape) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
         AndroidView(
             factory = { ctx ->
-                host.view(w.appWidgetId) ?: TextView(ctx).apply {
+                host.view(w.appWidgetId)?.also { v ->
+                    (v as? dev.glass.launcher.widget.GlassWidgetHostView)?.let { g -> g.glass = wantGlass; hv = g }
+                } ?: TextView(ctx).apply {
                     text = "Widget yüklenemedi"
                     setTextColor(android.graphics.Color.WHITE)
                     textAlignment = android.view.View.TEXT_ALIGNMENT_CENTER
                 }
             },
+            update = { v -> (v as? dev.glass.launcher.widget.GlassWidgetHostView)?.glass = wantGlass },
             modifier = Modifier
                 .requiredSize(lw, lh)
                 .graphicsLayer { scaleX = scale; scaleY = scale },

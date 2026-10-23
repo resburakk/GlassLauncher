@@ -362,20 +362,18 @@ tap_text "Sayfalar" && { step "sayfalar" 3; shot 25a-sayfalari-duzenle; tap_text
 tap_text "+" && { step "artı menü" 2; tap_text "Özelleştir" && { step "özelleştir" 3; shot 25b-ozellestir; adb shell input keyevent KEYCODE_BACK; step "geri" 1; }; }
 adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 
-# 26) Kendi widget'larımız (Takvim, Hava Durumu) ve sayfa kayarken cam: parmak ekrandayken kareler
-add_builtin() {
+# 26) Telefonun widget'ları cam görünümde (Clock) ve sayfa kayarken cam: parmak ekrandayken kareler
+add_sys() {
   adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
   tap_text "+"; step "artı" 2
-  tap_text "Widget Ekle"; step "galeri" 5
-  # Kendi widget'larımız listenin en altında: liste sona kaydırılır.
-  for k in 1 2 3 4; do adb shell input swipe $cx $((H*80/100)) $cx $((H*25/100)) 200; sleep 0.4; done; sleep 1
-  tap_text "Glass Launcher" && { step "kendi widgetlarımız" 3; tap_text "$1" && step "$1" 3; tap_text "Widget Ekle"; step "eklendi" 3; }
+  tap_text "Widget Ekle"; step "galeri" 8
+  shot 26g-galeri-cam
+  tap_text "$1" && { step "$1" 3; adb shell input swipe $((W*80/100)) $((H*45/100)) $((W*20/100)) $((H*45/100)) 300; step "sonraki widget" 2; shot 26h-cam-onizleme; tap_text "Widget Ekle"; step "eklendi" 4; }
   adb shell input keyevent KEYCODE_BACK; step "geri" 1
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
 }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
-add_builtin "Takvim"
-add_builtin "Hava Durumu"
+add_sys "Clock"
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 26a-widgetlar
 adb shell input motionevent DOWN $((W*80/100)) $((H*55/100)); sleep 0.1

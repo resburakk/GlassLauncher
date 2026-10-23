@@ -130,14 +130,19 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var openApp by remember { mutableStateOf<String?>(null) }
 
-    val cacheKey = hm?.let { "${it.columns}x${it.rows}" }
+    val st = LocalLauncherSettings.current
+    val cacheKey = hm?.let { "${it.columns}x${it.rows}/${st.glassSystemWidgets}/${st.showGlassWidgets}" }
     val apps by produceState(vm.widgetGalleryCache?.takeIf { it.first == cacheKey }?.second, hm) {
         val m = hm ?: return@produceState
         if (value != null) return@produceState // önceden yüklendi: anında açılır
         val pm = ctx.packageManager
         val iconPx = (48 * density).toInt()
         value = withContext(Dispatchers.Default) {
-            val system = vm.widgetHost.providers()
+            // Cam görünümde: cama uymayan (yazısız, hazır resim çizen ya da oluşturulamayan) widget'lar gizlenir.
+            val all = vm.widgetHost.providers()
+            val usable = if (st.glassSystemWidgets) all.filter { vm.widgetHost.isCompatible(it) } else all
+            vm.widgetHiddenCount = all.size - usable.size
+            val system = usable
                 .groupBy { it.provider.packageName to it.profile }
                 .map { (k, infos) ->
                     val (pkg, profile) = k
@@ -160,7 +165,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                 .sortedBy { AppCategorizer.normalize(it.name) }
             val glass = GalleryApp(
                 key = "glass", name = "Glass Launcher", icon = null, isGlass = true,
-                widgets = GlassBuiltins.map { (k, t, kind) ->
+                widgets = GlassBuiltins.filter { st.showGlassWidgets || it.third == WidgetKind.GlassClock }.map { (k, t, kind) ->
                     GalleryWidget(
                         k, t, null, kind,
                         if (kind == WidgetKind.Photo) listOf(Span(2, 2), Span(4, 2), Span(4, 4))
@@ -214,7 +219,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                 ) { appKey ->
                     val app = list?.firstOrNull { it.key == appKey }
                     if (app == null) {
-                        GalleryList(list, query, { query = it }, onOpen = { openApp = it }, onClose = onClose)
+                        GalleryList(list, vm.widgetHiddenCount, query, { query = it }, onOpen = { openApp = it }, onClose = onClose)
                     } else {
                         GalleryDetail(app, hm, onBack = { openApp = null }, onAdd = ::add)
                     }
@@ -227,6 +232,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
 @Composable
 private fun GalleryList(
     apps: List<GalleryApp>?,
+    hiddenCount: Int,
     query: String,
     onQuery: (String) -> Unit,
     onOpen: (String) -> Unit,
@@ -299,6 +305,15 @@ private fun GalleryList(
                         )
                     }
                     Text("›", color = Color.White.copy(alpha = 0.4f), fontSize = 22.sp)
+                }
+            }
+            if (hiddenCount > 0 && q.isEmpty()) {
+                item(key = "hidden") {
+                    Text(
+                        "Cam görünüme uymayan $hiddenCount widget gösterilmiyor.",
+                        color = Color.White.copy(alpha = 0.45f), fontSize = 12.sp,
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp, start = 6.dp, end = 6.dp),
+                    )
                 }
             }
         }
@@ -392,6 +407,7 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
     }
     val info = w.info
     val density = LocalDensity.current.density
+    val glassPreview = LocalLauncherSettings.current.glassSystemWidgets
     Box(
         Modifier.size(cw, ch).clip(RoundedCornerShape(corner)).background(Color.White.copy(alpha = 0.10f))
             .border(0.8.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(corner)),
@@ -410,7 +426,7 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
                             override fun onInterceptTouchEvent(ev: android.view.MotionEvent?) = true
                             override fun onTouchEvent(event: android.view.MotionEvent?) = false
                         }.apply {
-                            val hv = android.appwidget.AppWidgetHostView(c)
+                            val hv = dev.glass.launcher.widget.GlassWidgetHostView(c).apply { glass = glassPreview }
                             runCatching {
                                 hv.setAppWidget(-1, info)
                                 hv.updateAppWidget(android.widget.RemoteViews(info.provider.packageName, info.previewLayout))

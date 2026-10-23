@@ -1056,6 +1056,16 @@ private fun WidgetsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
     Group(null) {
         NavRow("Widget ekle", Glyph.Plus, Color(0xFFFF375F)) { onAddWidget() }
     }
+    Group("Görünüm") {
+        ToggleRow("Telefon widget'ları cam görünümde", s.glassSystemWidgets, default = Def.glassSystemWidgets) { v -> onChange { it.copy(glassSystemWidgets = v) } }
+        RowDivider()
+        ToggleRow("Launcher widget'larını listede göster", s.showGlassWidgets, default = Def.showGlassWidgets) { v -> onChange { it.copy(showGlassWidgets = v) } }
+    }
+    Footer(
+        "Cam görünümde widget'ın kendi kartı kaldırılır, yerine cam zemin gelir; yazılar camın üstünde okunur olur. " +
+            "Cama uymayan (içeriğini hazır resim olarak çizen) widget'lar listede gösterilmez. Tek bir widget'ı orijinal " +
+            "haline döndürmek için basılı tutup \"Orijinal Görünüm\"ü seçin."
+    )
     Group("Widget sayfası") {
         ToggleRow("Widget sayfası (ilk sayfanın solunda)", s.showToday, default = Def.showToday) { v -> onChange { it.copy(showToday = v) } }
     }
