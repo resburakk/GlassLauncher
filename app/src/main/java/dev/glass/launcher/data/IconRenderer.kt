@@ -44,7 +44,8 @@ object IconRenderer {
         if (style == IconStyle.Light || style == IconStyle.Tinted) {
             val a = d as? AdaptiveIconDrawable
             val usable = a != null && !plated(a, size) && (style == IconStyle.Light || a.monochrome != null)
-            if (!usable) return fromDarkGlyph(renderDark(d, size, tint, fillRound), style, tint)
+            // Zemini tek renk olmayan simgelerde (Chrome gibi renkli, tam dolu) sembol ayrıştırılamaz: normal yol.
+            if (!usable) fromDarkGlyph(renderDark(d, size, tint, fillRound), style, tint)?.let { return it }
         }
         val out = createBitmap(size, size)
         val c = Canvas(out)
@@ -193,7 +194,7 @@ object IconRenderer {
      * alınır. Renkli: koyu zeminde tek renk (parlaklık gölgelendirmesi korunur). Açık: açık zeminde sembolün
      * kendi renkleri (beyaz semboller okunabilsin diye koyu griye çekilir).
      */
-    private fun fromDarkGlyph(dark: Bitmap, style: IconStyle, tint: Int): Bitmap {
+    private fun fromDarkGlyph(dark: Bitmap, style: IconStyle, tint: Int): Bitmap? {
         val w = dark.width; val h = dark.height
         val px = IntArray(w * h)
         dark.getPixels(px, 0, w, 0, 0, w, h)
@@ -202,6 +203,9 @@ object IconRenderer {
         val br = pts.sumOf { Color.red(it) } / 4f
         val bgG = pts.sumOf { Color.green(it) } / 4f
         val bb = pts.sumOf { Color.blue(it) } / 4f
+        // Köşeler birbirinden belirgin farklıysa zemin tek renk değil: ayrıştırma yapılmaz.
+        val spread = pts.maxOf { p -> maxOf(kotlin.math.abs(Color.red(p) - br), kotlin.math.abs(Color.green(p) - bgG), kotlin.math.abs(Color.blue(p) - bb)) }
+        if (spread > 30f) { dark.recycle(); return null }
         val out = createBitmap(w, h)
         val c = Canvas(out)
         drawBackdrop(c, w, style)
