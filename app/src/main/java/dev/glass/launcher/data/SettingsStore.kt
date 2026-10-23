@@ -149,6 +149,8 @@ data class LauncherSettings(
     val appTransitions: Boolean = false,
     /** Kilit açılınca simgeler iOS gibi büyükten yerine oturarak belirir. */
     val unlockAnimation: Boolean = true,
+    /** Cam yüzeylere duvar kâğıdının vurgu renginden hafif ton (0 kapalı … 1 belirgin). */
+    val glassAccent: Float = 0f,
     /** Arama öneri panelinin köşesi (dock yüksekliğine oranla; dock köşesinden bağımsız). */
     val searchSuggestCorner: Float = 0.34f,
     /** Liquid Glass kenar kırılması (mercek): 0 kapalı … 1 güçlü. */
@@ -310,7 +312,7 @@ data class LauncherSettings(
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
-        put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation", unlockAnimation)
+        put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation", unlockAnimation); put("glassAccent", glassAccent.toDouble())
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeWidth", glassEdgeWidth.toDouble()); put("glassLightAngle", glassLightAngle.toDouble()); put("glassLightBack", glassLightBack.toDouble()); put("glassContactShadow", glassContactShadow.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
@@ -424,6 +426,7 @@ data class LauncherSettings(
                 liveIconTheme = o.optString("liveIconTheme", d.liveIconTheme),
                 appTransitions = o.optBoolean("appTransitions2", d.appTransitions),
                 unlockAnimation = o.optBoolean("unlockAnimation", d.unlockAnimation),
+                glassAccent = o.optDouble("glassAccent", d.glassAccent.toDouble()).toFloat(),
                 searchSuggestCorner = o.optDouble("searchSuggestCorner", d.searchSuggestCorner.toDouble()).toFloat(),
                 glassRefraction = o.optDouble("glassRefraction", d.glassRefraction.toDouble()).toFloat(),
                 glassEdgeWidth = o.optDouble("glassEdgeWidth", d.glassEdgeWidth.toDouble()).toFloat(),

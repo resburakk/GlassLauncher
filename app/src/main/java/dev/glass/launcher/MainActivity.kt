@@ -411,6 +411,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     private var wallpaperDarkText = false
 
     private fun applyBarTone(colors: WallpaperColors?) {
+        dev.glass.launcher.ui.WallpaperAccent.update(colors)
         wallpaperDarkText = colors != null &&
             (colors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
         applyCurrentBarTone()

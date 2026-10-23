@@ -466,7 +466,9 @@ fun HomeScreen(
     GlassLens.contactShadow = settings.glassContactShadow
     // Arşiv/arama/widget sayfasının bulanık arka planı (oradaki camlar bunu büker); aşağıda hazırlanır.
     val overlayBackdropHolder = remember { mutableStateOf<dev.glass.launcher.data.Blurred?>(null) }
+    val accent by WallpaperAccent.color.collectAsStateWithLifecycle()
     CompositionLocalProvider(
+        LocalAccent provides accent,
         LocalLauncherSettings provides settings,
         LocalOverlayBackdrop provides overlayBackdropHolder.value,
         LocalMotion provides motion,

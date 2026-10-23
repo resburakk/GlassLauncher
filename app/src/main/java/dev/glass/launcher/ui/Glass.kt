@@ -388,6 +388,7 @@ fun Modifier.liquidGlass(
         )
 
         .background(base)
+        .accentTint(st.glassAccent, fill)
         .glassBrightness(st.glassBrightness)
         .then(
             if (look.reduced) Modifier
@@ -759,6 +760,7 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
         .smoothClip(shape)
         .reducedBackdrop()
         .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
+        .accentTint(st.glassAccent)
         .glassBrightness(st.glassBrightness)
         .darkEdge(shape, st.glassEdgeDark, (st.glassRimWidth + 1.6f).dp)
         .then(
@@ -857,3 +859,13 @@ fun Modifier.contactShadow(shape: Shape, amount: Float): Modifier =
             }
         }
     }
+
+
+/** Duvar kâğıdı vurgu renginden hafif cam tonu (Ayarlar > Liquid Glass > Duvar kâğıdı rengi). */
+fun Modifier.accentTint(amount: Float, fill: Float = 1f): Modifier = composed {
+    if (amount <= 0.01f) this
+    else {
+        val c = Color(LocalAccent.current)
+        this.background(Brush.verticalGradient(listOf(c.copy(alpha = 0.22f * amount * fill.coerceIn(0.4f, 1f)), c.copy(alpha = 0.12f * amount * fill.coerceIn(0.4f, 1f)))))
+    }
+}

@@ -475,6 +475,7 @@ internal fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opaci
         // Düşük güçte arkası hazır bulanık kopya (gerçek zamanlı bulanıklık kapalıyken menü okunur kalsın).
         .reducedBackdrop()
         .background(fill)
+        .accentTint(st.glassAccent)
         .glassBrightness(st.glassBrightness)
         .then(
             if (st.glassRimWidth > 0f && st.glassRimGlow > 0f) Modifier.border(

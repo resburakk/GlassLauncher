@@ -83,6 +83,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -731,6 +732,16 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
         if (s.iconStyle == IconStyle.Tinted || s.iconStyleDark == IconStyle.Tinted) {
             RowDivider()
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                // Otomatik: duvar kâğıdının vurgu rengi (Material You gibi), duvar kâğıdı değişince kendiliğinden.
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(Brush.sweepGradient(listOf(Color(0xFFFF375F), Color(0xFFFFD60A), Color(0xFF30D158), Color(0xFF0A84FF), Color(0xFFBF5AF2), Color(0xFFFF375F))))
+                        .then(if (s.tintColor == 0) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                        .clickable { onChange { it.copy(tintColor = 0) } },
+                    contentAlignment = Alignment.Center,
+                ) { Text("A", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                 TintPalette.forEach { c ->
                     Box(
                         Modifier
@@ -897,6 +908,10 @@ private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((La
         RowDivider()
         SliderRow("Karşı kenar yansıması", if (s.glassLightBack < 0.01f) "Kapalı" else pct(s.glassLightBack), s.glassLightBack, 0f..1f, default = Def.glassLightBack) { v ->
             onChange { it.copy(glassLightBack = v) }
+        }
+        RowDivider()
+        SliderRow("Duvar kâğıdı rengi", if (s.glassAccent < 0.01f) "Kapalı" else pct(s.glassAccent), s.glassAccent, 0f..1f, default = Def.glassAccent) { v ->
+            onChange { it.copy(glassAccent = v) }
         }
         RowDivider()
         SliderRow("Alt temas gölgesi", if (s.glassContactShadow < 0.01f) "Kapalı" else pct(s.glassContactShadow), s.glassContactShadow, 0f..1f, default = Def.glassContactShadow) { v ->
