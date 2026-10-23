@@ -102,8 +102,8 @@ data class HomeMetrics(
             val innerW = width - dockMarginX * 2f
             // Simgeler yanlardan da üst/alt kadar içeride, aralarındaki boşluk eşit (iOS gibi).
             val dockPitch = max((innerW - dockInset * 2f - dockIcon) / 3f, dockIcon + 2.dp)
-            // Hücre genişliği adım kadardır, simge hücrenin ortasındadır: ilk simgenin sol kenarı = dockInset.
-            val dockInnerStart = dockInset - (dockPitch - dockIcon) / 2f
+            // Simge hücrenin sol kenarında durur: ilk simgenin sol kenarı = dockInset (son simgenin sağı da öyle).
+            val dockInnerStart = dockInset
             // Eş merkezli köşe: simge köşesi + simgenin kenara uzaklığı.
             val dockCornerR = if (s.dockCorner < 0f) dockIcon * s.iconCorner + dockInset else dockH * s.dockCorner
 
