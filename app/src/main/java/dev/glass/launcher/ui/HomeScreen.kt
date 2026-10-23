@@ -1011,11 +1011,13 @@ fun HomeScreen(
         // yayla açılır; arkaları yalnızca kendileri bulanık cam.
         val btnH = 30.dp
         val btnY = homeMetrics?.let { (statusTopDp + it.firstTop) / 2f - btnH / 2f } ?: (statusTopDp + 8.dp)
-        val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet
-        var plusMenu by remember { mutableStateOf(false) }
-        LaunchedEffect(showEditBar) { if (!showEditBar) plusMenu = false }
         var pagesEditor by remember { mutableStateOf(false) }
         var customizeSheet by remember { mutableStateOf(false) }
+        LaunchedEffect(editMode) { if (!editMode) { pagesEditor = false; customizeSheet = false } }
+        // Sayfaları Düzenle / Özelleştir açıkken düzenleme düğmeleri gizlenir (üstlerine binmesin).
+        val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet && !pagesEditor && !customizeSheet
+        var plusMenu by remember { mutableStateOf(false) }
+        LaunchedEffect(showEditBar) { if (!showEditBar) plusMenu = false }
         // "Seç" / "Bu Sayfayı Sil": düzenleme modunda "Ara" düğmesinin YERİNDE (Ara düğmesi o sırada gizlenir).
         var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }
         // Arşive geçiş oranı ekrana yansıyan bir değerden okunur (bridge.onLibrary düz değişken olduğu için arşive
