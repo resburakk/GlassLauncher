@@ -31,7 +31,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /** Canlı çizilen sistem simgeleri (iOS'taki gibi). */
-enum class LiveIconKind { Clock, Calendar }
+enum class LiveIconKind { Clock, Calendar, Weather }
 
 private val TR_DAYS = arrayOf("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt")
 
@@ -82,6 +82,7 @@ fun LiveIcon(kind: LiveIconKind, size: Dp, seconds: Boolean, dark: Boolean = fal
     when (kind) {
         LiveIconKind.Clock -> LiveClock(seconds && size >= 30.dp, p)
         LiveIconKind.Calendar -> LiveCalendar(p)
+        LiveIconKind.Weather -> WeatherLiveIcon()
     }
 }
 

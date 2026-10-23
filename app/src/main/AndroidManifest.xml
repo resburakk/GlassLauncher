@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
     <!-- Uygulama kilidi ve gizli uygulamalar: telefonun parmak izi / yüz / ekran kilidi penceresi (veri launcher'a gelmez). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Hava durumu widget'ı ve canlı simge: Open-Meteo'dan veri (yalnızca yaklaşık konum koordinatı gönderilir). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Android 15+ Özel Alan: varsayılan ana ekran uygulaması gizli profili listeleyebilsin (yalnızca Ayarlar içinde gösterilir). -->
     <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
     <!-- Arama: yalnızca kullanıcı izin verirse kişiler, mesajlar ve dosyalar cihazda, çevrimdışı aranır. -->

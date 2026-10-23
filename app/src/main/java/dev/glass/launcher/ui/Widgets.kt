@@ -103,6 +103,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                 WidgetKind.AnalogClock -> AnalogClockWidget(w)
                 WidgetKind.Calendar -> CalendarWidget(w)
                 WidgetKind.Battery -> BatteryWidget(w)
+                WidgetKind.Weather -> WeatherWidget(w)
                 else -> Unit
             }
         }

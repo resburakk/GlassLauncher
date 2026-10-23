@@ -786,6 +786,8 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
     }
     Group("Canlı simgeler") {
         ToggleRow("Canlı saat ve takvim simgeleri", s.liveIcons, default = Def.liveIcons) { v -> onChange { it.copy(liveIcons = v) } }
+        RowDivider()
+        ToggleRow("Hava durumu simgesinde sıcaklık", s.weatherIcon, default = Def.weatherIcon) { v -> onChange { it.copy(weatherIcon = v) } }
         if (s.liveIcons) {
             RowDivider()
             ToggleRow("Saatte saniye ibresi", s.liveClockSeconds, default = Def.liveClockSeconds) { v -> onChange { it.copy(liveClockSeconds = v) } }

@@ -277,6 +277,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         !s.liveIcons || s.customIcons.containsKey(app.key) || app.isShortcut -> null
         app.packageName in repo.clockPackages -> LiveIconKind.Clock
         app.packageName in repo.calendarPackages -> LiveIconKind.Calendar
+        // Hava durumu uygulaması: simgede o anki sıcaklık ve gökyüzü (veri varsa).
+        s.weatherIcon && (app.packageName.contains("weather", true) || app.label.contains("hava durumu", true) || app.label.contains("weather", true)) -> LiveIconKind.Weather
         else -> null
     }
 
