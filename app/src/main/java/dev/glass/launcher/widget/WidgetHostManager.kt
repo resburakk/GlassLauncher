@@ -51,7 +51,18 @@ class WidgetHostManager(private val context: Context) {
      * Widget cam görünüme uygun mu? Sonuç uygulama sürümüyle birlikte saklanır; uygulama güncellenince
      * yeniden incelenir. Ana iş parçacığında çağrılmamalı.
      */
+    /** Bu widget'ın kodu launcher içinde hata verdi mi? [mainOnly]: ana ekranı çökertenler. */
+    fun crashed(info: AppWidgetProviderInfo, mainOnly: Boolean = false): Boolean {
+        val pkg = info.provider.packageName
+        val keys = if (mainOnly) listOf("crashMain") else listOf("crash", "crashMain")
+        val classes = keys.flatMap { prefs.getStringSet(it, emptySet())!! }
+        // Sınıf adı genelde paketle başlar (com.hihonor.calendar.widget… ↔ com.hihonor.calendar); ilk iki parça da eşlenir.
+        val root = pkg.split('.').take(2).joinToString(".") + "."
+        return classes.any { it.startsWith("$pkg.") || (it.startsWith(root) && pkg.substringAfterLast('.').let { last -> it.contains(".$last.") }) }
+    }
+
     fun isCompatible(info: AppWidgetProviderInfo): Boolean {
+        if (crashed(info)) return false
         val k = "c:" + providerKey(info)
         if (prefs.contains(k)) return prefs.getBoolean(k, true)
         val ok = runCatching {
@@ -101,6 +112,8 @@ class WidgetHostManager(private val context: Context) {
             return v
         }
         val info = info(id) ?: return null
+        // Ana iş parçacığında launcher'ı çökertmiş widget yeniden çalıştırılmaz (çökme döngüsü olmasın).
+        if (crashed(info, mainOnly = true)) return null
         val v = runCatching { host.createView(context, id, info) }.getOrNull() ?: return null
         (v as? GlassWidgetHostView)?.onIncompatible = { markIncompatible(it) }
         views[id] = v

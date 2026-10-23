@@ -15,6 +15,10 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Android 15+ Özel Alan: varsayılan ana ekran uygulaması gizli profili listeleyebilsin (yalnızca Ayarlar içinde gösterilir). -->
     <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
+    <!-- Honor Takvim widget'ı kendi kodunu launcher içinde çalıştırır ve bu izinleri ister (yalnızca Honor verirse geçerli). -->
+    <uses-permission android:name="com.android.calendar.hihonor.permission.CALENDAR_RECESS" />
+    <uses-permission android:name="com.hihonor.calendar.permission.WRITE_CALENDAR_RECESS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
     <!-- Arama: yalnızca kullanıcı izin verirse kişiler, mesajlar ve dosyalar cihazda, çevrimdışı aranır. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
     <uses-permission android:name="android.permission.READ_SMS" />

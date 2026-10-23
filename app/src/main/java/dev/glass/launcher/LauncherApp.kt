@@ -59,6 +59,21 @@ class LauncherApp : Application(), androidx.lifecycle.ViewModelStoreOwner {
     private fun installCrashRecorder() {
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
+            // Başka bir uygulamanın widget kodu (ör. Honor Takvim'in kendi görünümü) bu süreçte çalışır.
+            // O kod arka plandaki kendi iş parçacığında hata verirse launcher çökmez: hata kaydedilir,
+            // widget cama/launcher'a uyumsuz sayılır (galeride gizlenir).
+            val foreign = foreignWidgetClass(e)
+            if (foreign != null) {
+                val main = t === android.os.Looper.getMainLooper().thread
+                runCatching {
+                    val p = getSharedPreferences("widget_glass", MODE_PRIVATE)
+                    val set = p.getStringSet(if (main) "crashMain" else "crash", emptySet())!!.toMutableSet()
+                    set.add(foreign)
+                    p.edit().putStringSet(if (main) "crashMain" else "crash", set).commit()
+                }
+                Log.w("GlassDiag", "widget kodu hata verdi (${t.name}): $foreign", e)
+                if (!main) return@setDefaultUncaughtExceptionHandler
+            }
             runCatching {
                 File(filesDir, CRASH_FILE).writeText(
                     "Glass Launcher ${BuildConfig.VERSION_NAME} — Android ${Build.VERSION.RELEASE} (${Build.MANUFACTURER} ${Build.MODEL})\n\n" +
@@ -67,6 +82,17 @@ class LauncherApp : Application(), androidx.lifecycle.ViewModelStoreOwner {
             }
             previous?.uncaughtException(t, e)
         }
+    }
+
+    /** Hatanın kaynağı başka bir uygulamanın (widget) sınıfı mı? Öyleyse o sınıfın adı. */
+    private fun foreignWidgetClass(e: Throwable): String? {
+        val own = listOf("android.", "java.", "javax.", "kotlin", "dalvik.", "libcore.", "sun.", "androidx.", "com.android.internal.", "com.android.server.", "dev.glass.", "org.json.", "jdk.")
+        var c: Throwable? = e
+        while (c != null) {
+            c.stackTrace.firstOrNull { f -> own.none { f.className.startsWith(it) } }?.let { return it.className }
+            c = c.cause
+        }
+        return null
     }
 
     fun takeLastCrash(): String? {
