@@ -54,9 +54,15 @@ data class HomeMetrics(
 ) {
     val perPage: Int get() = columns * rows
 
-    /** [spanX]×[spanY] hücrelik widget'ın boyutu (iOS'taki gibi simge kenarlarına hizalı). */
-    fun widgetWidth(spanX: Int): Dp = pitchX * (spanX - 1) + icon
-    fun widgetHeight(spanY: Int): Dp = pitchY * (spanY - 1) + icon
+    /**
+     * iOS 26'da widget simge sütunlarının dış kenarından her yanda simgenin ~%5,5'i kadar taşar (iki widget
+     * arasındaki boşluk simgeler arasındakinden dardır). Widget bu kadar sola/yukarı kaydırılarak çizilir.
+     */
+    val widgetBleed: Dp get() = icon * 0.055f
+
+    /** [spanX]×[spanY] hücrelik widget'ın boyutu (simge kenarları + iOS taşma payı). */
+    fun widgetWidth(spanX: Int): Dp = pitchX * (spanX - 1) + icon + widgetBleed * 2f
+    fun widgetHeight(spanY: Int): Dp = pitchY * (spanY - 1) + icon + widgetBleed * 2f
 
     companion object {
         /** Referans ekran genişliği (pt). */
@@ -85,15 +91,21 @@ data class HomeMetrics(
             val firstTop = max(u * 90f, statusTop + u * 12f)
 
             // Dock (her zaman 4 simge; ızgara sütunlarından bağımsız)
-            val dockH = u * 98f * s.dockHeight
+            // iOS 26 dock: simge dock kenarına her yandan eşit uzaklıkta (simgenin ~%31'i); yükseklik buna göre.
+            val dockIcon = (u * 65f * s.iconScale).coerceAtMost(u * 90f * 0.96f)
+            val dockH = dockIcon * 1.62f * s.dockHeight
+            val dockInset = (dockH - dockIcon) / 2f
             val dockMarginX = (u * 16.5f + width * (1f - s.dockWidth) * 0.5f).coerceAtLeast(4.dp)
             // Üç tuşlu gezintide dock tuş çubuğunun üstüne binmez: çubuğun üstünde küçük bir boşlukla durur.
             val dockBottom = if (navButtons > 0.dp) max(u * s.dockBottom, navButtons + u * 8f) else u * s.dockBottom
             val dockTop = height - dockBottom - dockH
             val innerW = width - dockMarginX * 2f
-            val dockIcon = (u * 65f * s.iconScale).coerceAtMost(min(u * 90f * 0.96f, dockH * 0.8f))
-            val dockPitch = min(u * 90f, (innerW * 0.94f - dockIcon) / 3f)
-            val dockInnerStart = (innerW - dockIcon - dockPitch * 3f) / 2f
+            // Simgeler yanlardan da üst/alt kadar içeride, aralarındaki boşluk eşit (iOS gibi).
+            val dockPitch = max((innerW - dockInset * 2f - dockIcon) / 3f, dockIcon + 2.dp)
+            // Hücre genişliği adım kadardır, simge hücrenin ortasındadır: ilk simgenin sol kenarı = dockInset.
+            val dockInnerStart = dockInset - (dockPitch - dockIcon) / 2f
+            // Eş merkezli köşe: simge köşesi + simgenin kenara uzaklığı.
+            val dockCornerR = if (s.dockCorner < 0f) dockIcon * s.iconCorner + dockInset else dockH * s.dockCorner
 
             // Arama hapı ve satır sayısı: hap, simge dizisinin altı ile dock arasında simetrik durur.
             val pillW = u * 77f * s.pillScale
@@ -107,7 +119,7 @@ data class HomeMetrics(
 
             return HomeMetrics(
                 u, cols, rows, icon, pitchX, pitchY, marginX, firstTop, gridBottom,
-                dockH, dockMarginX, dockTop, dockIcon, dockPitch, dockInnerStart, dockH * s.dockCorner,
+                dockH, dockMarginX, dockTop, dockIcon, dockPitch, dockInnerStart, dockCornerR,
                 pillW, pillH, pillCenterY,
             )
         }

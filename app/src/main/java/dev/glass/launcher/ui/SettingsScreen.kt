@@ -766,7 +766,7 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             "Renkli: simge tek renk çizilir."
     )
     Group("Şekil") {
-        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.2237f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
+        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.254f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
             onChange { it.copy(iconCorner = v) }
         }
         RowDivider()
@@ -818,7 +818,9 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         RowDivider()
         SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f, default = Def.dockBottom) { v -> onChange { it.copy(dockBottom = v) } }
         RowDivider()
-        SliderRow("Köşe yuvarlaklığı", pct(s.dockCorner / 0.5f), s.dockCorner, 0.08f..0.5f, default = Def.dockCorner) { v -> onChange { it.copy(dockCorner = v) } }
+        // Varsayılan (negatif): iOS gibi simgeyle eş merkezli köşe; kaydırıcı ~%35'te gösterilir.
+        val dockC = if (s.dockCorner < 0f) 0.35f else s.dockCorner
+        SliderRow("Köşe yuvarlaklığı", if (s.dockCorner < 0f) "iOS" else pct(dockC / 0.5f), dockC, 0.08f..0.5f, default = 0.35f) { v -> onChange { it.copy(dockCorner = v) } }
     }
     Group("Arama düğmesi") {
         SliderRow("Boyut", pct(s.pillScale), s.pillScale, 0.7f..1.5f, default = Def.pillScale) { v -> onChange { it.copy(pillScale = v) } }

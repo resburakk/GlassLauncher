@@ -69,11 +69,11 @@ private val TR = Locale("tr", "TR")
 private val Red = Color(0xFFFF453A)
 
 /**
- * iOS widget köşe yarıçapı: küçük (2×2) widget genişliğinin %13,5'i (iPhone'da ~22 pt). iOS'ta olduğu gibi
- * küçük, orta ve büyük widget'ta aynıdır.
+ * iOS 26 widget köşe yarıçapı: küçük (2×2) widget genişliğinin %17'si (ekran görüntüsünden ölçüldü; %60
+ * yumuşaklıklı sürekli köşeyle). iOS'ta olduğu gibi küçük, orta ve büyük widget'ta aynıdır.
  */
 @Composable
-fun widgetCorner(): Dp = LocalHomeMetrics.current?.let { it.widgetWidth(2) * 0.135f } ?: 22.dp
+fun widgetCorner(): Dp = LocalHomeMetrics.current?.let { it.widgetWidth(2) * 0.17f } ?: 27.dp
 
 /** iOS widget şekli: sürekli köşe (squircle, %60 yumuşaklık), simgelerle aynı köşe eğrisi. */
 fun widgetShape(radius: Dp): androidx.compose.ui.graphics.Shape = SquircleShape(radius, 0.6f)
@@ -105,7 +105,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
             PhotoWidget(w, vm, width, height)
         }
         else -> Box(
-            Modifier.size(width, height).liquidGlass(shape, strength, 8.dp).background(Color(0x26000000)),
+            Modifier.size(width, height).liquidGlass(shape, strength, 0.dp).background(Color(0x26000000)),
         ) {
             when (w.kind) {
                 WidgetKind.DigitalClock -> DigitalClockWidget(w)

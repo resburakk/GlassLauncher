@@ -588,6 +588,8 @@ internal fun HomeContent(
                             is WidgetItem -> {
                                 val w = m.widgetWidth(pl.spanX)
                                 val h = m.widgetHeight(pl.spanY)
+                                // iOS: widget simge kenarlarından biraz taşar (bkz. HomeMetrics.widgetBleed).
+                                Box(Modifier.offset(-m.widgetBleed, -m.widgetBleed)) {
                                 WidgetCell(
                                     id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = pageJiggle,
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },
@@ -595,6 +597,7 @@ internal fun HomeContent(
                                     // Sistem widget'ları ve yığınlar dokunuşu kendileri yönetir.
                                     onClick = if (item.kind != WidgetKind.System && item.stack.isEmpty()) { r -> vm.openWidget(item, view, r) } else null,
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
+                                }
                             }
                             is PageBreak -> Unit // görünmez sayfa sonu
                             is dev.glass.launcher.data.GapItem -> Unit // görünmez boş hücre
