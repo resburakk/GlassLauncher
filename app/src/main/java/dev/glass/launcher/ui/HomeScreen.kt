@@ -718,8 +718,10 @@ fun HomeScreen(
         val unlockAnim = remember { androidx.compose.animation.core.Animatable(1f) }
         LaunchedEffect(Unit) {
             UnlockAnim.events.collect { hide ->
-                if (hide) unlockAnim.snapTo(0f)
-                else unlockAnim.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.86f, stiffness = 260f))
+                if (hide) { unlockAnim.snapTo(0f); UnlockAnim.progress.floatValue = 0f }
+                else unlockAnim.animateTo(1f, androidx.compose.animation.core.tween(620, easing = androidx.compose.animation.core.CubicBezierEasing(0.16f, 1f, 0.3f, 1f))) {
+                    UnlockAnim.progress.floatValue = value
+                }
             }
         }
         Box(
@@ -734,9 +736,10 @@ fun HomeScreen(
                     // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
                     val h = homeHide()
                     if (h > 0f) { k *= 1f - 0.06f * h; alpha = 1f - h }
-                    // Kilit açılışı (iOS): simgeler %15 büyükten yerine oturur, saydamdan belirir.
+                    // Kilit açılışı (iOS): simgeler hücre hücre gelir (bkz. UnlockAnim.cellTransform); burada yalnızca
+                    // arama hapı gibi hücre dışı öğeler için hafif bir belirme.
                     val un = unlockAnim.value
-                    if (un < 1f) { k *= 1f + 0.15f * (1f - un); alpha *= un.coerceIn(0f, 1f) }
+                    if (un < 1f) alpha *= (0.4f + 0.6f * un).coerceIn(0f, 1f)
                     scaleX = k; scaleY = k
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width

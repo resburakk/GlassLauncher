@@ -35,6 +35,14 @@ object DarkIcon {
         if (info.lum < 0.30f) return scaled(orig, 0.92f)
         val fg = IntArray(n * n).also { fgLayer.getPixels(it, 0, n, 0, 0, n, n) }
         val weight = FloatArray(n * n) { (fg[it] ushr 24) / 255f }
+        // Ön plan katmanı simgenin çoğunu kaplıyorsa (Honor/MagicOS: zemin plakası ön planın içinde) katmanlar
+        // ayrı değerlendirilemez: plaka sembol sanılır ve koyu zeminde açık bir kare (çerçeve) kalırdı. Birleşik
+        // simgeden zemin kenardan bulunur.
+        run {
+            var cover0 = 0
+            for (a in weight) if (a > 0.5f) cover0++
+            if (cover0 > 0.5f * n * n) return fromFlat(orig)
+        }
         if (!info.uniform) {
             // Geçişli/çok renkli zemin (Instagram gibi): ön plan katmanı ayrıysa zemin yine siyaha döner ve açık
             // renkli sembol zeminin AYNI noktadaki rengini alır (iOS: renk geçişli sembol, siyah zemin). Ön plan

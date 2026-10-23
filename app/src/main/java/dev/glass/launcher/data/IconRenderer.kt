@@ -38,6 +38,14 @@ object IconRenderer {
     fun render(d: Drawable, size: Int, style: IconStyle, tint: Int, fillRound: Boolean = true): Bitmap {
         if (style == IconStyle.Dark) return renderDark(d, size, tint, fillRound)
         if (style == IconStyle.Clear) return renderClear(d, size, tint, fillRound)
+        // Açık ve Renkli: katmanları ayrı ayrı kullanılamayan simgeler (eski tip, ya da zemin plakası ön planın
+        // içinde olan Honor/MagicOS simgeleri) koyu simge yönteminden türetilir: sembol tam kareye yerleşir,
+        // etrafında çerçeve kalmaz. Monokrom katmanı olan simgeler Renkli'de kendi tek renk çizimini kullanır.
+        if (style == IconStyle.Light || style == IconStyle.Tinted) {
+            val a = d as? AdaptiveIconDrawable
+            val usable = a != null && !plated(a, size) && (style == IconStyle.Light || a.monochrome != null)
+            if (!usable) return fromDarkGlyph(renderDark(d, size, tint, fillRound), style, tint)
+        }
         val out = createBitmap(size, size)
         val c = Canvas(out)
         if (d is AdaptiveIconDrawable) {
@@ -163,6 +171,69 @@ object IconRenderer {
         }
         val out = createBitmap(w, h)
         out.setPixels(px, 0, w, 0, 0, w, h)
+        dark.recycle()
+        return out
+    }
+
+    /** Ön plan katmanı simgenin yarısından fazlasını kaplıyor mu (zemin plakası ön planın içinde)? */
+    private fun plated(a: AdaptiveIconDrawable, size: Int): Boolean {
+        val fg = a.foreground ?: return false
+        val n = 96
+        val inset = (n * 0.25f).toInt()
+        val b = createBitmap(n, n)
+        fg.bounds = Rect(-inset, -inset, n + inset, n + inset)
+        fg.draw(Canvas(b))
+        val px = IntArray(n * n).also { b.getPixels(it, 0, n, 0, 0, n, n) }
+        b.recycle()
+        return px.count { (it ushr 24) > 128 } > n * n * 0.5f
+    }
+
+    /**
+     * Koyu simgeden Açık / Renkli simge: koyu zeminden ayrılan sembol pikselleri, zemine uzaklıkları kadar opak
+     * alınır. Renkli: koyu zeminde tek renk (parlaklık gölgelendirmesi korunur). Açık: açık zeminde sembolün
+     * kendi renkleri (beyaz semboller okunabilsin diye koyu griye çekilir).
+     */
+    private fun fromDarkGlyph(dark: Bitmap, style: IconStyle, tint: Int): Bitmap {
+        val w = dark.width; val h = dark.height
+        val px = IntArray(w * h)
+        dark.getPixels(px, 0, w, 0, 0, w, h)
+        val m = (w * 0.10f).toInt().coerceAtLeast(1)
+        val pts = intArrayOf(px[m * w + m], px[m * w + (w - 1 - m)], px[(h - 1 - m) * w + m], px[(h - 1 - m) * w + (w - 1 - m)])
+        val br = pts.sumOf { Color.red(it) } / 4f
+        val bgG = pts.sumOf { Color.green(it) } / 4f
+        val bb = pts.sumOf { Color.blue(it) } / 4f
+        val out = createBitmap(w, h)
+        val c = Canvas(out)
+        drawBackdrop(c, w, style)
+        val back = IntArray(w * h)
+        out.getPixels(back, 0, w, 0, 0, w, h)
+        val tr = Color.red(tint); val tg = Color.green(tint); val tb = Color.blue(tint)
+        for (i in px.indices) {
+            val p = px[i]
+            val a0 = (p ushr 24) / 255f
+            if (a0 <= 0f) continue
+            val r = Color.red(p); val g = Color.green(p); val b = Color.blue(p)
+            val dist = maxOf(kotlin.math.abs(r - br), kotlin.math.abs(g - bgG), kotlin.math.abs(b - bb)) / 255f
+            val t = ((dist - 0.05f) / 0.28f).coerceIn(0f, 1f)
+            val a = t * t * (3f - 2f * t) * a0
+            if (a <= 0.004f) continue
+            val lum = (0.299f * r + 0.587f * g + 0.114f * b) / 255f
+            var cr: Float; var cg: Float; var cb: Float
+            if (style == IconStyle.Tinted) {
+                val k = 0.45f + 0.55f * lum
+                cr = tr * k; cg = tg * k; cb = tb * k
+            } else {
+                if (lum > 0.80f) { cr = 58f; cg = 58f; cb = 60f } else { cr = r.toFloat(); cg = g.toFloat(); cb = b.toFloat() }
+            }
+            val q = back[i]
+            back[i] = Color.argb(
+                255,
+                (Color.red(q) * (1 - a) + cr * a).toInt().coerceIn(0, 255),
+                (Color.green(q) * (1 - a) + cg * a).toInt().coerceIn(0, 255),
+                (Color.blue(q) * (1 - a) + cb * a).toInt().coerceIn(0, 255),
+            )
+        }
+        out.setPixels(back, 0, w, 0, 0, w, h)
         dark.recycle()
         return out
     }

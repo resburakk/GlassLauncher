@@ -321,6 +321,8 @@ internal fun DraggableCell(
     val cellHPx = with(density) { cellHeight.toPx() }
 
     val target = remember(id) { DragTarget(id) }
+    val win = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val screenW = win.width.toFloat(); val screenH = win.height.toFloat()
     target.itemId = itemId
     target.place = place
     target.layer = layer
@@ -366,6 +368,13 @@ internal fun DraggableCell(
                     scaleX = scale
                     scaleY = scale
                     rotationZ = if (edit) jiggle.value * sign else 0f
+                    // Kilit açılışı: her simge kendi konumundan (dışarıdan, büyük) yerine gelir.
+                    val r = target.cellRect
+                    UnlockAnim.cellTransform(r.center.x, r.center.y, screenW, screenH, place == CellPlace.Dock)?.let { t ->
+                        translationX = t[0]; translationY = t[1]
+                        scaleX = scale * t[2]; scaleY = scale * t[2]
+                        alpha *= t[3]
+                    }
                 }
                 // Düzenleme modu: simge + etiket + yazı gölgesi bir kez kendi katmanına çizilir, sallanma yalnızca bu hazır
                 // görüntüyü döndürür (açı her karede değişince gölgeler her karede yeniden hesaplanıyor, 60 Hz'e düşüyordu).
@@ -468,6 +477,8 @@ internal fun WidgetCell(
     val wPx = with(density) { width.toPx() }
     val hPx = with(density) { height.toPx() }
     val target = remember(id) { DragTarget(id) }
+    val win = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
+    val screenW = win.width.toFloat(); val screenH = win.height.toFloat()
     target.itemId = id
     target.place = CellPlace.Grid
     target.layer = DragLayer.Home
@@ -491,6 +502,10 @@ internal fun WidgetCell(
             .graphicsLayer {
                 alpha = if (drag.key == id) 0f else 1f
                 rotationZ = if (edit) jiggle.value * 0.5f else 0f
+                val r = target.cellRect
+                UnlockAnim.cellTransform(r.center.x, r.center.y, screenW, screenH, false)?.let { t ->
+                    translationX = t[0]; translationY = t[1]; scaleX = t[2]; scaleY = t[2]; alpha *= t[3]
+                }
             }
             .cachedLayer(edit)
             .semantics { contentDescription = widgetLabel }

@@ -732,13 +732,25 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     val rimW = st.iconRimWidth.dp * (icon / 60.dp).coerceAtMost(1f)
     if (live != null) {
         Box(Modifier.size(icon)) {
-        Box(Modifier.fillMaxSize().glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)) {
-            val dark = when (st.liveIconTheme) {
-                "light" -> false
-                "dark" -> true
-                else -> androidx.compose.foundation.isSystemInDarkTheme()
+        // Canlı simge seçili simge görünümüne uyar (Otomatik); ayardan sabit açık/koyu da seçilebilir.
+        val liveLook = when (st.liveIconTheme) {
+            "light" -> LiveLook.Light
+            "dark" -> LiveLook.Dark
+            else -> when (look.style) {
+                dev.glass.launcher.data.IconStyle.Dark -> LiveLook.Dark
+                dev.glass.launcher.data.IconStyle.Tinted -> LiveLook.Tinted
+                dev.glass.launcher.data.IconStyle.Clear -> LiveLook.Clear
+                else -> LiveLook.Light
             }
-            LiveIcon(live, icon, st.liveClockSeconds, dark)
+        }
+        val liveShape = appShape(icon * st.iconCorner)
+        Box(
+            Modifier.fillMaxSize().then(
+                if (liveLook == LiveLook.Clear) Modifier.liquidGlass(liveShape, strength * 0.8f, 0.dp, frosted = true, ios = true)
+                else Modifier.glassIcon(liveShape, glass, strength, st.iconRimGlow, rimW)
+            )
+        ) {
+            LiveIcon(live, icon, st.liveClockSeconds, liveLook, Color(look.tint))
         }
         if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
         }

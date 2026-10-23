@@ -803,7 +803,7 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             }
         }
     }
-    Footer("Saat simgesinin ibreleri gerçek saati gösterir, Takvim simgesi her gün bugünün tarihini gösterir. Görünüm \"Otomatik\"te telefonun açık/koyu moduna uyar. Simgesi elle değiştirilmiş uygulamalarda kullanılmaz.")
+    Footer("Saat simgesinin ibreleri gerçek saati gösterir, Takvim simgesi her gün bugünün tarihini gösterir. Görünüm \"Otomatik\"te seçili simge görünümüne (açık, koyu, renkli, şeffaf) uyar. Simgesi elle değiştirilmiş uygulamalarda kullanılmaz.")
     Footer("Tek bir uygulamanın simgesini değiştirmek için simgesine basılı tutup \"Simgeyi Değiştir\"i seçin.")
 }
 

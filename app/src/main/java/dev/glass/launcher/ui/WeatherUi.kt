@@ -66,17 +66,24 @@ private fun rememberWeather(): WeatherNow? {
 
 /** Gökyüzü simgesi (güneş, ay, bulut, yağmur, kar, şimşek, sis): vektörel, her boyutta net. */
 @Composable
-fun SkyGlyph(sky: Sky, day: Boolean, size: Dp) {
-    Canvas(Modifier.size(size)) { drawSky(sky, day) }
+fun SkyGlyph(sky: Sky, day: Boolean, size: Dp, mono: Color? = null) {
+    Canvas(Modifier.size(size)) { drawSky(sky, day, mono) }
 }
 
-private val Sun = Color(0xFFFFD23F)
-private val CloudC = Color(0xFFF2F4F8)
-private val CloudShade = Color(0xFFC9D1DC)
-private val RainC = Color(0xFF5AC8FA)
+private val SunBase = Color(0xFFFFD23F)
+private val CloudBase = Color(0xFFF2F4F8)
+private val ShadeBase = Color(0xFFC9D1DC)
+private val RainBase = Color(0xFF5AC8FA)
 
-fun DrawScope.drawSky(sky: Sky, day: Boolean) {
+fun DrawScope.drawSky(sky: Sky, day: Boolean, mono: Color? = null) {
     val s = size.minDimension
+    // Tek renk (renkli / şeffaf simge): bütün parçalar aynı renk, katman farkı saydamlıkla.
+    val Sun = mono ?: SunBase
+    val CloudC = mono ?: CloudBase
+    val CloudShade = mono?.copy(alpha = mono.alpha * 0.6f) ?: ShadeBase
+    val RainC = mono ?: RainBase
+    val White = mono ?: Color.White
+    val Moon = mono ?: Color(0xFFF5F3CE)
     fun sun(cx: Float, cy: Float, r: Float) {
         if (day) {
             for (i in 0 until 8) {
@@ -94,7 +101,7 @@ fun DrawScope.drawSky(sky: Sky, day: Boolean) {
                 addOval(androidx.compose.ui.geometry.Rect(cx - r * 0.35f, cy - r * 1.2f, cx + r * 1.65f, cy + r * 0.8f))
             }
             val moon = Path().apply { op(p, cut, androidx.compose.ui.graphics.PathOperation.Difference) }
-            drawPath(moon, Color(0xFFF5F3CE))
+            drawPath(moon, Moon)
         }
     }
     fun cloud(cx: Float, cy: Float, w: Float, color: Color) {
@@ -121,7 +128,7 @@ fun DrawScope.drawSky(sky: Sky, day: Boolean) {
         }
         Sky.Snow -> {
             cloud(s * 0.5f, s * 0.4f, s * 0.7f, CloudC)
-            for (i in 0 until 3) drawCircle(Color.White, s * 0.04f, Offset(s * (0.34f + i * 0.16f), s * (0.72f + (i % 2) * 0.08f)))
+            for (i in 0 until 3) drawCircle(White, s * 0.04f, Offset(s * (0.34f + i * 0.16f), s * (0.72f + (i % 2) * 0.08f)))
         }
         Sky.Storm -> {
             cloud(s * 0.5f, s * 0.38f, s * 0.7f, CloudShade)
@@ -233,23 +240,39 @@ fun WeatherWidget(w: WidgetItem) {
     }
 }
 
-/** Hava durumu uygulamasının canlı simgesi: gökyüzü degradesi, gökyüzü simgesi ve o anki sıcaklık. */
+/**
+ * Hava durumu uygulamasının canlı simgesi: gökyüzü simgesi ve o anki sıcaklık. Zemin seçili simge görünümüne
+ * uyar (açık: gündüz/gece degradesi, koyu: koyu degrade, renkli: koyu zemin + tek renk, şeffaf: zeminsiz).
+ */
 @Composable
-fun WeatherLiveIcon() {
+fun WeatherLiveIcon(look: LiveLook = LiveLook.Light, tint: Color = Color(0xFF64D2FF)) {
     val data = rememberWeather()
     val day = data?.day ?: true
-    val bg = if (day) listOf(Color(0xFF2E7BD6), Color(0xFF6CB4F2)) else listOf(Color(0xFF0B1636), Color(0xFF2A3F78))
+    val bg: Brush? = when (look) {
+        LiveLook.Light -> Brush.verticalGradient(if (day) listOf(Color(0xFF2E7BD6), Color(0xFF6CB4F2)) else listOf(Color(0xFF0B1636), Color(0xFF2A3F78)))
+        LiveLook.Dark -> Brush.verticalGradient(listOf(Color(0xFF1E2A44), Color(0xFF0C1120)))
+        LiveLook.Tinted -> Brush.verticalGradient(listOf(Color(0xFF2C2C2E), Color(0xFF0A0A0C)))
+        LiveLook.Clear -> null
+    }
+    val mono: Color? = when (look) {
+        LiveLook.Tinted -> tint
+        LiveLook.Clear -> Color(0xF2FFFFFF)
+        else -> null
+    }
     androidx.compose.foundation.layout.BoxWithConstraints(
-        Modifier.fillMaxSize().background(Brush.verticalGradient(bg)),
+        Modifier.fillMaxSize().then(if (bg != null) Modifier.background(bg) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
         val s = maxWidth
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            SkyGlyph(data?.sky ?: Sky.PartlyCloudy, day, s * 0.46f)
-            if (data != null) {
+        if (data == null) {
+            // Veri yokken (konum izni / ilk yükleme) simge kutuyu doldurur.
+            SkyGlyph(Sky.PartlyCloudy, day, s * 0.78f, mono)
+        } else {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SkyGlyph(data.sky, day, s * 0.56f, mono)
                 Text(
-                    "${data.temp}°", color = Color.White, fontFamily = AppFont, fontWeight = FontWeight.SemiBold,
-                    fontSize = (s.value * 0.24f).sp, lineHeight = (s.value * 0.26f).sp,
+                    "${data.temp}°", color = mono ?: Color.White, fontFamily = AppFont, fontWeight = FontWeight.SemiBold,
+                    fontSize = (s.value * 0.25f).sp, lineHeight = (s.value * 0.26f).sp,
                 )
             }
         }

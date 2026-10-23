@@ -75,14 +75,31 @@ private val DarkPalette = LivePalette(
     clockBg = Color(0xFF1C1C1E), clockInk = Color.White, clockRed = Color(0xFFFF5C5C),
 )
 
-/** [dark]: koyu mod renkleri (telefonun teması ya da ayardaki sabit seçim). */
+/** Canlı simgenin görünümü: seçili simge görünümüyle aynı (açık, koyu, renkli, şeffaf). */
+enum class LiveLook { Light, Dark, Tinted, Clear }
+
+/**
+ * [look]: simgelerin seçili görünümüne uyar. Renkli: koyu zeminde tek renk ([tint]); Şeffaf: zemin yok (arkası
+ * cam), beyazımsı çizgiler.
+ */
 @Composable
-fun LiveIcon(kind: LiveIconKind, size: Dp, seconds: Boolean, dark: Boolean = false) {
-    val p = if (dark) DarkPalette else LightPalette
+fun LiveIcon(kind: LiveIconKind, size: Dp, seconds: Boolean, look: LiveLook = LiveLook.Light, tint: Color = Color(0xFF64D2FF)) {
+    val p = when (look) {
+        LiveLook.Light -> LightPalette
+        LiveLook.Dark -> DarkPalette
+        LiveLook.Tinted -> LivePalette(
+            calBg = Color(0xFF141416), calRed = tint, calInk = tint,
+            clockBg = Color(0xFF141416), clockInk = tint, clockRed = tint,
+        )
+        LiveLook.Clear -> LivePalette(
+            calBg = Color.Transparent, calRed = Color(0xF2FFFFFF), calInk = Color(0xF2FFFFFF),
+            clockBg = Color.Transparent, clockInk = Color(0xF2FFFFFF), clockRed = Color(0xB3FFFFFF),
+        )
+    }
     when (kind) {
         LiveIconKind.Clock -> LiveClock(seconds && size >= 30.dp, p)
         LiveIconKind.Calendar -> LiveCalendar(p)
-        LiveIconKind.Weather -> WeatherLiveIcon()
+        LiveIconKind.Weather -> WeatherLiveIcon(look, tint)
     }
 }
 
