@@ -444,6 +444,10 @@ private fun HomePage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         ChoiceRow("En çok satır", listOf(5, 6, 7), s.rows) { v -> onChange { it.copy(rows = v) } }
     }
     Footer("Satır sayısı ekran yüksekliğine göre gerekirse azaltılır.")
+    Group(null) {
+        ToggleRow("Ana ekranı yan çevirince döndür", s.allowRotation, default = Def.allowRotation) { v -> onChange { it.copy(allowRotation = v) } }
+    }
+    Footer("Kapalıyken ana ekran iOS'taki gibi hep dikey kalır (uygulamalar yine döner).")
     Group("Aralıklar") {
         SliderRow("Yatay aralık", pct(s.hSpacing), s.hSpacing, 0.8f..1.3f, default = Def.hSpacing) { v -> onChange { it.copy(hSpacing = v) } }
         RowDivider()
@@ -1116,8 +1120,9 @@ private fun BackupPage(vm: LauncherViewModel) {
     }
     status?.let { Footer(it) }
     Footer(
-        "Yedekte yerleşim (sayfalar, klasörler, dock, widget'lar) ve tüm ayarlar bulunur. Özel simge ve fotoğraf " +
-            "görselleri ile başka bir cihaza ait sistem widget'ları yedeğe dahil edilemez; geri yüklemede atlanır."
+        "Yedekte yerleşim (sayfalar, klasörler, dock, widget'lar), tüm ayarlar, özel simgeler, widget fotoğrafları ve " +
+            "launcher duvar kâğıdı bulunur. Sistem widget'ları (ör. Honor saat widget'ı) cihaza bağlı olduğu için yeni " +
+            "telefonda yeniden eklenmelidir; geri yüklemede atlanır."
     )
 }
 

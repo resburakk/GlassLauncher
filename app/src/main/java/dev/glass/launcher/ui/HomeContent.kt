@@ -96,6 +96,7 @@ import dev.glass.launcher.data.AppItem
 import dev.glass.launcher.data.FolderItem
 import dev.glass.launcher.data.GridPacker
 import dev.glass.launcher.data.WidgetItem
+import dev.glass.launcher.data.WidgetKind
 import dev.glass.launcher.data.PageBreak
 import dev.glass.launcher.data.HomeLayout
 import dev.glass.launcher.data.LauncherSettings
@@ -583,6 +584,7 @@ internal fun HomeContent(
                                 WidgetCell(
                                     id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = pageJiggle,
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },
+                                    widgetLabel = if (item.stack.isNotEmpty()) "Widget yığını, ${item.stack.size + 1} widget" else if (item.kind == WidgetKind.System) "Widget" else "${item.kind.title} widget'ı",
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
                             }
                             is PageBreak -> Unit // görünmez sayfa sonu
@@ -752,7 +754,8 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
                 else Modifier.glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)
             )
         ) {
-            bmp?.let { Image(it, contentDescription = app.label, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
+            // Ekran okuyucu adı hücreden okur (etiket ya da hücrenin açıklaması); simge ayrıca okunmaz.
+            bmp?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
         }
         if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
     }

@@ -1,5 +1,8 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.offset
 
 import androidx.compose.ui.layout.layout
@@ -367,7 +370,13 @@ internal fun DraggableCell(
                 // Düzenleme modu: simge + etiket + yazı gölgesi bir kez kendi katmanına çizilir, sallanma yalnızca bu hazır
                 // görüntüyü döndürür (açı her karede değişince gölgeler her karede yeniden hesaplanıyor, 60 Hz'e düşüyordu).
                 .cachedLayer(edit)
-                .clickable(interactionSource = interaction, indication = null) {
+                // Ekran okuyucu (TalkBack): ad her zaman okunur (etiket gizliyse de), klasör olduğu söylenir.
+                .semantics(mergeDescendants = true) {
+                    if (!showLabel) contentDescription = label
+                    if (!isApp) stateDescription = "Klasör"
+                    if (selected != null) stateDescription = if (selected) "Seçili" else "Seçili değil"
+                }
+                .clickable(interactionSource = interaction, indication = null, onClickLabel = if (isApp) "Aç" else "Klasörü aç") {
                     onClick(target.iconRect)
                 },
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -451,6 +460,8 @@ internal fun WidgetCell(
     edit: Boolean,
     jiggle: State<Float>,
     onDrop: (Offset, String?) -> Unit,
+    /** Ekran okuyucunun okuyacağı ad (ör. "Hava Durumu widget'ı"). */
+    widgetLabel: String = "Widget",
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -482,6 +493,7 @@ internal fun WidgetCell(
                 rotationZ = if (edit) jiggle.value * 0.5f else 0f
             }
             .cachedLayer(edit)
+            .semantics { contentDescription = widgetLabel }
     ) { content() }
 }
 

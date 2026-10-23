@@ -82,6 +82,10 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         lifecycleScope.launch {
             vm.settings.collect { s ->
                 if (s.hideNavHandle != hideNavHandle) { hideNavHandle = s.hideNavHandle; applyNavHandle() }
+                // Ana ekran yönü: kapalıyken hep dikey (iOS gibi), açıkken telefonun otomatik döndürmesine uyar.
+                val want = if (s.allowRotation) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                if (requestedOrientation != want) requestedOrientation = want
             }
         }
         // iOS kilit açılışı: ekran kapanınca simgeler gizlenir, kilit açılınca yerine oturarak belirir.

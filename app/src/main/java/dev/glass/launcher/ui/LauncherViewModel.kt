@@ -473,6 +473,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         base = next
         _layout.value = next
         la.settingsStore.saveLayout(next.toJson())
+        // Yedekten gelen simge ve duvar kâğıdı dosyaları hemen görünsün.
+        la.iconCache.clear()
+        reloadWallpaper()
         return true
     }
 

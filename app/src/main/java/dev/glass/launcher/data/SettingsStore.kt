@@ -149,6 +149,8 @@ data class LauncherSettings(
     val appTransitions: Boolean = false,
     /** Kilit açılınca simgeler iOS gibi büyükten yerine oturarak belirir. */
     val unlockAnimation: Boolean = true,
+    /** Ana ekran telefon yan çevrilince dönsün mü (kapalı: iOS'taki gibi hep dikey). */
+    val allowRotation: Boolean = false,
     /** Hava durumu uygulamasının simgesinde canlı sıcaklık. */
     val weatherIcon: Boolean = true,
     /** Cam yüzeylere duvar kâğıdının vurgu renginden hafif ton (0 kapalı … 1 belirgin). */
@@ -314,7 +316,7 @@ data class LauncherSettings(
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
-        put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation", unlockAnimation); put("weatherIcon", weatherIcon); put("glassAccent", glassAccent.toDouble())
+        put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation", unlockAnimation); put("allowRotation", allowRotation); put("weatherIcon", weatherIcon); put("glassAccent", glassAccent.toDouble())
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeWidth", glassEdgeWidth.toDouble()); put("glassLightAngle", glassLightAngle.toDouble()); put("glassLightBack", glassLightBack.toDouble()); put("glassContactShadow", glassContactShadow.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
@@ -428,6 +430,7 @@ data class LauncherSettings(
                 liveIconTheme = o.optString("liveIconTheme", d.liveIconTheme),
                 appTransitions = o.optBoolean("appTransitions2", d.appTransitions),
                 unlockAnimation = o.optBoolean("unlockAnimation", d.unlockAnimation),
+                allowRotation = o.optBoolean("allowRotation", d.allowRotation),
                 weatherIcon = o.optBoolean("weatherIcon", d.weatherIcon),
                 glassAccent = o.optDouble("glassAccent", d.glassAccent.toDouble()).toFloat(),
                 searchSuggestCorner = o.optDouble("searchSuggestCorner", d.searchSuggestCorner.toDouble()).toFloat(),
@@ -545,7 +548,37 @@ class SettingsStore(private val context: Context) {
         .put("format", 1)
         .put("settings", current.toJson())
         .put("layout", layout.toJsonObject())
+        .put("files", backupFiles())
         .toString(2)
+
+    /** Yedeğe gömülen dosyalar: özel simgeler, widget fotoğrafları ve launcher duvar kâğıdı (base64). */
+    private fun backupFiles(): JSONObject {
+        val o = JSONObject()
+        val root = context.filesDir
+        val list = buildList {
+            listOf("icons", "photos").forEach { d -> java.io.File(root, d).listFiles()?.filter { it.isFile }?.forEach { add("$d/${it.name}") } }
+            if (java.io.File(root, "wallpaper.img").isFile) add("wallpaper.img")
+        }
+        list.forEach { rel ->
+            runCatching { o.put(rel, android.util.Base64.encodeToString(java.io.File(root, rel).readBytes(), android.util.Base64.NO_WRAP)) }
+        }
+        return o
+    }
+
+    private fun restoreFiles(o: JSONObject?) {
+        o ?: return
+        val root = context.filesDir.canonicalFile
+        o.keys().forEach { rel ->
+            runCatching {
+                val f = java.io.File(root, rel).canonicalFile
+                // Yalnızca beklenen klasörlere yazılır (yedek dosyası başka yere yazdıramaz).
+                if (!f.path.startsWith(root.path + java.io.File.separator)) return@runCatching
+                if (!(rel.startsWith("icons/") || rel.startsWith("photos/") || rel == "wallpaper.img")) return@runCatching
+                f.parentFile?.mkdirs()
+                f.writeBytes(android.util.Base64.decode(o.getString(rel), android.util.Base64.NO_WRAP))
+            }
+        }
+    }
 
     /** Geri yükleme: geçersiz belge için null döner; geçerliyse ayarları yazar ve yerleşimi döndürür. */
     suspend fun importJson(json: String): HomeLayout? {
@@ -553,6 +586,7 @@ class SettingsStore(private val context: Context) {
         if (o.optString("app") != "GlassLauncher") return null
         val layout = o.optJSONObject("layout")?.let { HomeLayout.fromJsonObject(it) } ?: return null
         val s = o.optJSONObject("settings")?.let { LauncherSettings.fromJson(it) } ?: LauncherSettings()
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { restoreFiles(o.optJSONObject("files")) }
         context.dataStore.edit {
             it[Keys.settings] = s.toJson().toString()
             it[Keys.layout] = layout.toJson()
