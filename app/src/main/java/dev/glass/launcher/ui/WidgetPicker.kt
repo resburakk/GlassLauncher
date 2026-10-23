@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -119,7 +120,7 @@ private val GlassBuiltins = listOf(
  * iOS 26 gibi Liquid Glass widget galerisi: alttan açılan cam panel, arama ve uygulamalara göre liste.
  * Bir uygulamaya dokununca widget'ları, gerçek ön izleme görselleriyle, boyut boyut kaydırılan kartlarda
  * gösterilir; "Widget Ekle" ile eklenir. Sistem (Honor vb.) widget'ları olduğu gibi kullanılır.
- * Launcher'ın kendi widget'ları en altta "Glass" bölümündedir.
+ * Liste iki başlıktadır: önce launcher'ın kendi Liquid Glass widget'ları, sonra telefonun widget'ları.
  */
 @Composable
 fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
@@ -158,17 +159,20 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                     )
                 }
                 .sortedBy { AppCategorizer.normalize(it.name) }
-            val glass = GalleryApp(
-                key = "glass", name = "Glass Launcher", icon = null, isGlass = true,
-                widgets = GlassBuiltins.map { (k, t, kind) ->
-                    GalleryWidget(
-                        k, t, null, kind,
-                        if (kind == WidgetKind.Photo) listOf(Span(2, 2), Span(4, 2), Span(4, 4))
-                        else WidgetSize.entries.map { Span(it.spanX, it.spanY) }.filter { it.x <= m.columns && it.y <= m.rows },
-                    )
-                },
-            )
-            system + glass
+            // Launcher'ın kendi (Liquid Glass) widget'ları: her biri ayrı satır, listenin başında kendi başlığı altında.
+            val glass = GlassBuiltins.map { (k, t, kind) ->
+                GalleryApp(
+                    key = "glass:$k", name = t, icon = null, isGlass = true,
+                    widgets = listOf(
+                        GalleryWidget(
+                            k, t, null, kind,
+                            if (kind == WidgetKind.Photo) listOf(Span(2, 2), Span(4, 2), Span(4, 4))
+                            else WidgetSize.entries.map { Span(it.spanX, it.spanY) }.filter { it.x <= m.columns && it.y <= m.rows },
+                        )
+                    ),
+                )
+            }
+            glass + system
         }.also { vm.widgetGalleryCache = cacheKey!! to it }
     }
 
@@ -272,11 +276,13 @@ private fun GalleryList(
             AppCategorizer.normalize(a.name).contains(q) || a.widgets.any { AppCategorizer.normalize(it.title).contains(q) }
         }
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-            items(shown, key = { it.key }) { a ->
-                if (a.isGlass) {
+            itemsIndexed(shown, key = { _, it -> it.key }) { i, a ->
+                // Başlıklar: önce Glass Launcher widget'ları, sonra telefonun (diğer uygulamaların) widget'ları.
+                if (i == 0 || shown[i - 1].isGlass != a.isGlass) {
                     Text(
-                        "GLASS", color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 6.dp, top = 18.dp, bottom = 6.dp),
+                        if (a.isGlass) "GLASS LAUNCHER WIDGET'LARI" else "TELEFON WIDGET'LARI",
+                        color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 6.dp, top = if (i == 0) 4.dp else 18.dp, bottom = 6.dp),
                     )
                 }
                 Row(
@@ -294,7 +300,11 @@ private fun GalleryList(
                     Column(Modifier.weight(1f)) {
                         Text(a.name, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            if (a.widgets.size == 1) a.widgets[0].title else "${a.widgets.size} widget",
+                            when {
+                                a.isGlass -> "Liquid Glass · ${a.widgets[0].sizes.size} boyut"
+                                a.widgets.size == 1 -> a.widgets[0].title
+                                else -> "${a.widgets.size} widget"
+                            },
                             color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
