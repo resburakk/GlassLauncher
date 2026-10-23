@@ -84,6 +84,34 @@ object GridPacker {
         return true
     }
 
+    /**
+     * Öğeyi hedef hücreye getirmek için önüne boşluk ekler (bkz. [HomeLayout.placeAt]). Öğe hedefin ardındaysa ya da
+     * başka sayfadaysa dokunulmaz. Öğenin hemen arkasında bir boşluk varsa (boşluğun yerine bırakıldı) kaldırılır.
+     */
+    fun withGaps(
+        items0: List<HomeItem>, id: String, page: Int, row: Int, col: Int, columns: Int, rows: Int,
+        visible: (HomeItem) -> Boolean, newGap: () -> HomeItem,
+    ): List<HomeItem> {
+        var items = items0
+        val target = row * columns + col
+        for (guard in 0 until rows * columns) {
+            val pl = pack(items, columns, rows) { visible(it) }
+            val p = pl.firstOrNull { it.item.id == id } ?: return items
+            if (p.page != page) break
+            val cur = p.row * columns + p.col
+            if (cur >= target) break
+            val idx = items.indexOfFirst { it.id == id }
+            if (idx < 0) return items
+            items = items.toMutableList().apply { add(idx, newGap()) }
+        }
+        // Boşluğun yerine bırakıldı: arkadaki boşluk kaldırılır, sonraki simgeler yerinde kalır.
+        val i = items.indexOfFirst { it.id == id }
+        if (i >= 0 && i + 1 < items.size && items[i + 1] is GapItem) {
+            items = items.toMutableList().apply { removeAt(i + 1) }
+        }
+        return items
+    }
+
     fun pageCount(placements: List<Placement>): Int =
         (placements.filter { it.item !is PageBreak }.maxOfOrNull { it.page } ?: 0) + 1
 

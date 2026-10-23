@@ -1,6 +1,7 @@
 package dev.glass.launcher.ui
 
 import dev.glass.launcher.data.LaunchStats
+import dev.glass.launcher.data.HomeItem
 
 import android.app.Application
 import android.content.pm.ShortcutInfo
@@ -423,6 +424,22 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
         }
         editLayout { it.removeItems(set) }
+    }
+
+    /**
+     * Sayfaları Düzenle sonucu: [pages] (öğeler, gizli mi) yeni sıra; [deleted] silinen sayfaların öğeleri.
+     * Silinen sayfadaki uygulama ve klasörler arşive geçer, widget'lar kaldırılır.
+     */
+    fun applyPages(pages: List<Pair<List<HomeItem>, Boolean>>, deleted: List<HomeItem>) {
+        deleted.filterIsInstance<WidgetItem>().flatMap { listOf(it) + it.stack }.forEach { w ->
+            if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
+            if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
+        }
+        val keys = deleted.flatMap { when (it) { is dev.glass.launcher.data.AppItem -> listOf(it.key); is dev.glass.launcher.data.FolderItem -> it.keys; else -> emptyList() } }
+        editLayout { l ->
+            val n = l.withPages(pages)
+            n.copy(libraryOnly = (n.libraryOnly + keys.filter { !AppInfo.isShortcutKey(it) }).distinct())
+        }
     }
 
     fun removeWidget(w: WidgetItem) {

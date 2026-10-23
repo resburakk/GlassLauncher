@@ -151,7 +151,8 @@ internal fun HomeContent(
         val items = layout.items
         // Uygulamalar 1×1, widget'lar N×M hücre: sayfalara yerleştir.
         // Görünmeyen öğeler (kaldırılmış/erişilemeyen uygulama) sayfa tutmaz: boş sayfalar otomatik silinir.
-        val visible: (HomeItem) -> Boolean = { it !is AppItem || byKey.containsKey(it.key) }
+        // Görünmez boşluklar (GapItem) sayfayı "dolu" saymaz: yalnızca boşluk kalan sayfa silinir.
+        val visible: (HomeItem) -> Boolean = { it !is dev.glass.launcher.data.GapItem && (it !is AppItem || byKey.containsKey(it.key)) }
         val placements = remember(items, m.columns, m.rows, byKey) { GridPacker.pack(items, m.columns, m.rows, visible) }
         val pageTotal = if (items.isEmpty()) 1 else GridPacker.pageCount(placements)
         // Yalnızca parmak gerçekten kaydırılınca sürükleme sayılır: uzun basıp menü açmak (ör. arşivde) sona boş
@@ -238,7 +239,11 @@ internal fun HomeContent(
                 preview = without + PageBreak("onizleme-yeni-sayfa") + dragged
                 return@LaunchedEffect
             }
-            preview = without.toMutableList().apply { add(idx.coerceIn(0, size), dragged) }
+            var gapN = 0
+            preview = GridPacker.withGaps(
+                without.toMutableList().apply { add(idx.coerceIn(0, size), dragged) },
+                dragged.id, cell.page, cell.row, cell.col, m.columns, m.rows, visible,
+            ) { dev.glass.launcher.data.GapItem("onizleme-bosluk-${gapN++}") }
         }
         val shownItems = preview ?: items
         val shownPlacements = remember(shownItems, m.columns, m.rows, byKey) { GridPacker.pack(shownItems, m.columns, m.rows, visible) }
@@ -418,8 +423,10 @@ internal fun HomeContent(
             val idx = GridPacker.insertionIndex(
                 GridPacker.pack(without, m.columns, m.rows, visible), pagerState.currentPage, row, col, m.columns,
             )
-            if (topLevel) vm.editLayout { it.moveItem(id, idx) }
-            else vm.editLayout { it.moveAppToGrid(id, idx) } // dock, klasör veya arşivden
+            val page = pagerState.currentPage
+            // Boş bir hücreye bırakıldıysa öğe tam oraya yerleşir (önüne görünmez boşluklar eklenir, iOS 18+ gibi).
+            if (topLevel) vm.editLayout { it.moveItem(id, idx).placeAt(id, page, row, col, m.columns, m.rows, visible) }
+            else vm.editLayout { it.moveAppToGrid(id, idx).placeAt(id, page, row, col, m.columns, m.rows, visible) } // dock, klasör veya arşivden
         }
 
         SideEffect {
@@ -588,6 +595,7 @@ internal fun HomeContent(
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
                             }
                             is PageBreak -> Unit // görünmez sayfa sonu
+                            is dev.glass.launcher.data.GapItem -> Unit // görünmez boş hücre
                         }
                     }
                   }
@@ -747,6 +755,10 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
         Box(
             Modifier.fillMaxSize().then(
                 if (liveLook == LiveLook.Clear) Modifier.liquidGlass(liveShape, strength * 0.8f, 0.dp, frosted = true, ios = true)
+                    .background(
+                        if (when (st.clearTone) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }) Color(0x61000000)
+                        else Color(0x38FFFFFF)
+                    )
                 else Modifier.glassIcon(liveShape, glass, strength, st.iconRimGlow, rimW)
             )
         ) {
@@ -762,7 +774,16 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     Box(Modifier.size(icon)) {
         Box(
             Modifier.fillMaxSize().then(
-                if (clear) Modifier.liquidGlass(appShape(icon * st.iconCorner), strength * 0.8f, 0.dp, frosted = true, ios = true)
+                if (clear) {
+                    // Şeffaf cam tonu (iOS 26): açık cam hafif beyaz, koyu cam hafif siyah tülle.
+                    val darkGlass = when (st.clearTone) {
+                        "dark" -> true
+                        "light" -> false
+                        else -> androidx.compose.foundation.isSystemInDarkTheme()
+                    }
+                    Modifier.liquidGlass(appShape(icon * st.iconCorner), strength * 0.8f, 0.dp, frosted = true, ios = true)
+                        .background(if (darkGlass) Color(0x61000000) else Color(0x38FFFFFF))
+                }
                 else Modifier.glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)
             )
         ) {

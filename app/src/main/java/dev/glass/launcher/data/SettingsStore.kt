@@ -149,6 +149,8 @@ data class LauncherSettings(
     val appTransitions: Boolean = false,
     /** Kilit açılınca simgeler iOS gibi büyükten yerine oturarak belirir. */
     val unlockAnimation: Boolean = true,
+    /** Şeffaf simgelerin camı: "light" açık cam, "dark" koyu cam, "auto" telefonun moduna göre (iOS 26). */
+    val clearTone: String = "auto",
     /** Ana ekran telefon yan çevrilince dönsün mü (kapalı: iOS'taki gibi hep dikey). */
     val allowRotation: Boolean = false,
     /** Hava durumu uygulamasının simgesinde canlı sıcaklık. */
@@ -316,7 +318,7 @@ data class LauncherSettings(
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
-        put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation", unlockAnimation); put("allowRotation", allowRotation); put("weatherIcon", weatherIcon); put("glassAccent", glassAccent.toDouble())
+        put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation", unlockAnimation); put("clearTone", clearTone); put("allowRotation", allowRotation); put("weatherIcon", weatherIcon); put("glassAccent", glassAccent.toDouble())
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeWidth", glassEdgeWidth.toDouble()); put("glassLightAngle", glassLightAngle.toDouble()); put("glassLightBack", glassLightBack.toDouble()); put("glassContactShadow", glassContactShadow.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
@@ -430,6 +432,7 @@ data class LauncherSettings(
                 liveIconTheme = o.optString("liveIconTheme", d.liveIconTheme),
                 appTransitions = o.optBoolean("appTransitions2", d.appTransitions),
                 unlockAnimation = o.optBoolean("unlockAnimation", d.unlockAnimation),
+                clearTone = o.optString("clearTone", d.clearTone),
                 allowRotation = o.optBoolean("allowRotation", d.allowRotation),
                 weatherIcon = o.optBoolean("weatherIcon", d.weatherIcon),
                 glassAccent = o.optDouble("glassAccent", d.glassAccent.toDouble()).toFloat(),

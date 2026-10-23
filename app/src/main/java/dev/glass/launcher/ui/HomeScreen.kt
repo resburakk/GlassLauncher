@@ -1014,6 +1014,8 @@ fun HomeScreen(
         val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet
         var plusMenu by remember { mutableStateOf(false) }
         LaunchedEffect(showEditBar) { if (!showEditBar) plusMenu = false }
+        var pagesEditor by remember { mutableStateOf(false) }
+        var customizeSheet by remember { mutableStateOf(false) }
         // "Seç" / "Bu Sayfayı Sil": düzenleme modunda "Ara" düğmesinin YERİNDE (Ara düğmesi o sırada gizlenir).
         var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }
         // Arşive geçiş oranı ekrana yansıyan bir değerden okunur (bridge.onLibrary düz değişken olduğu için arşive
@@ -1036,9 +1038,8 @@ fun HomeScreen(
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GlassButton("Seç", settings.glassStrength, hm.pillH) { selection.start() }
-                    if (canDeletePage) {
-                        GlassButton("Bu Sayfayı Sil", settings.glassStrength, hm.pillH) { confirmDeletePage = bridge.currentPageIds }
-                    }
+                    // iOS gibi: sayfalar önizlemelerle düzenlenir (gizle/göster, sırala, gizliyi sil).
+                    GlassButton("Sayfalar", settings.glassStrength, hm.pillH) { pagesEditor = true }
                 }
             }
         }
@@ -1128,6 +1129,9 @@ fun HomeScreen(
                     MenuRow("Widget Ekle", ink, rowH, padTop = u * 6f, leading = { GlyphIcon(Glyph.Widget, ink, u * 22f) }) {
                         plusMenu = false; overlay = Overlay.Widgets
                     }
+                    MenuRow("Özelleştir", ink, rowH, leading = { GlyphIcon(Glyph.Edit, ink, u * 22f) }) {
+                        plusMenu = false; customizeSheet = true
+                    }
                     MenuRow("Duvar Kâğıdı", ink, rowH, leading = { GlyphIcon(Glyph.Wallpaper, ink, u * 22f) }) {
                         plusMenu = false; wallpaperSheet = true
                     }
@@ -1145,6 +1149,24 @@ fun HomeScreen(
         ) {
             GlassButton("Bitti", settings.glassStrength, btnH) { editMode = false }
         }
+        // Sayfaları Düzenle (iOS): önizlemeler, gizle/göster, sırala.
+        homeMetrics?.let { hm ->
+            androidx.compose.animation.AnimatedVisibility(
+                pagesEditor && editMode,
+                enter = fadeIn(motion.tween(180)) + scaleIn(motion.bouncy(), initialScale = 0.92f),
+                exit = fadeOut(motion.tween(150)) + scaleOut(motion.tween(150), targetScale = 0.94f),
+            ) {
+                PagesEditor(vm, layout, byKey, hm.columns, hm.rows, settings.glassStrength) { pagesEditor = false }
+            }
+        }
+        // Özelleştir paneli (iOS): simge görünümü, boyutu ve rengi anında.
+        CustomizeSheet(
+            visible = customizeSheet && editMode,
+            settings = settings,
+            strength = settings.glassStrength,
+            onChange = { f -> vm.updateSettings(f) },
+            onClose = { customizeSheet = false },
+        )
         }
 
         // Duvar kâğıdı paneli (düzenleme modunda "Duvar Kâğıdı" ile alttan açılır)

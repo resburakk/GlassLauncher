@@ -14,6 +14,15 @@ data class FolderItem(override val id: String, val name: String, val keys: List<
  */
 data class PageBreak(override val id: String) : HomeItem
 
+/**
+ * Görünmez boş hücre (iOS 18+ gibi simgeyi istediğin yere koymak): ızgarada bir hücre kaplar, çizilmez,
+ * sürüklenemez. Simge boş bir hücreye bırakılınca önüne gerektiği kadar eklenir.
+ */
+data class GapItem(override val id: String) : HomeItem
+
+/** Gizlenmiş ana ekran sayfası (iOS "Sayfaları Düzenle"): [pos] tüm sayfalar içindeki sırası. */
+data class HiddenPage(val pos: Int, val items: List<HomeItem>)
+
 /** Widget türleri: sistem (AppWidgetHost) veya launcher'ın kendi widget'ları. */
 enum class WidgetKind(val code: String, val title: String) {
     System("sys", "Widget"),
@@ -57,17 +66,19 @@ data class HomeLayout(
     val libraryOnly: List<String> = emptyList(),
     /** Widget sayfası (iOS "Bugün" görünümü, ilk sayfanın solunda): yukarıdan aşağı sıralı widget'lar. */
     val today: List<WidgetItem> = emptyList(),
+    /** Gizlenmiş sayfalar: ana ekranda görünmez; içindeki uygulamalar arşivde durur, Sayfaları Düzenle'den açılır. */
+    val hiddenPages: List<HiddenPage> = emptyList(),
 ) {
 
     /** Ana ekranda (ızgara, klasör veya dock) görünen tüm uygulama anahtarları. */
     val homeKeys: Set<String>
         get() = buildSet {
             addAll(dock)
-            items.forEach { item ->
+            (items + hiddenPages.flatMap { it.items }).forEach { item ->
                 when (item) {
                     is AppItem -> add(item.key)
                     is FolderItem -> addAll(item.keys)
-                    is WidgetItem, is PageBreak -> Unit
+                    is WidgetItem, is PageBreak, is GapItem -> Unit
                 }
             }
         }
@@ -83,9 +94,16 @@ data class HomeLayout(
                     else -> out += item
                 }
                 is WidgetItem -> out += item
-                is PageBreak -> if (out.lastOrNull() !is PageBreak) out += item // art arda sayfa sonu tek olur
+                is PageBreak -> {
+                    // Sayfa sonundan hemen önceki boşluklar etkisizdir.
+                    while (out.lastOrNull() is GapItem) out.removeAt(out.lastIndex)
+                    if (out.lastOrNull() !is PageBreak) out += item // art arda sayfa sonu tek olur
+                }
+                is GapItem -> out += item
             }
         }
+        // Listenin sonundaki boşluklar etkisizdir.
+        while (out.lastOrNull() is GapItem) out.removeAt(out.lastIndex)
         return copy(items = out)
     }
 
@@ -94,12 +112,56 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> if (item.key == key) null else item
                 is FolderItem -> item.copy(keys = item.keys - key)
-                is WidgetItem, is PageBreak -> item
+                is WidgetItem, is PageBreak, is GapItem -> item
             }
         },
         dock = dock - key,
         libraryOnly = libraryOnly - key,
+        hiddenPages = hiddenPages.map { hp ->
+            hp.copy(items = hp.items.mapNotNull { item ->
+                when (item) {
+                    is AppItem -> if (item.key == key) null else item
+                    is FolderItem -> item.copy(keys = item.keys - key).takeIf { it.keys.isNotEmpty() }
+                    else -> item
+                }
+            })
+        }.filter { hp -> hp.items.any { it is AppItem || it is FolderItem || it is WidgetItem } },
     ).normalized()
+
+    /** Görünen sayfaların öğeleri (yerleşim sırasıyla); sayfa sonları ve boşluklar dahil değil. */
+    fun visiblePages(columns: Int, rows: Int, visible: (HomeItem) -> Boolean): List<List<HomeItem>> {
+        val pl = GridPacker.pack(items, columns, rows) { it !is GapItem && visible(it) }
+        val n = GridPacker.pageCount(pl)
+        val out = List(n) { ArrayList<HomeItem>() }
+        pl.forEach { p -> if (p.item !is PageBreak) out[p.page.coerceIn(0, n - 1)] += p.item }
+        // Boşluklar sayfanın düzenini korur: sayfanın sonundakiler atılır.
+        return out.map { pg -> pg.dropLastWhile { it is GapItem } }.filter { pg -> pg.any { it !is GapItem } }
+    }
+
+    /**
+     * Sayfaları Düzenle sonucu: [pages] tüm sayfalar (sırasıyla) ve gizli olup olmadıkları. Görünen sayfalar
+     * aralarında sayfa sonuyla yeniden dizilir; gizliler sıralarıyla saklanır.
+     */
+    fun withPages(pages: List<Pair<List<HomeItem>, Boolean>>): HomeLayout {
+        val out = ArrayList<HomeItem>()
+        val hidden = ArrayList<HiddenPage>()
+        pages.forEachIndexed { i, (pg, isHidden) ->
+            if (isHidden) hidden += HiddenPage(i, pg)
+            else {
+                if (out.isNotEmpty()) out += PageBreak(UUID.randomUUID().toString())
+                out += pg
+            }
+        }
+        return copy(items = out, hiddenPages = hidden).normalized()
+    }
+
+    /**
+     * [id] öğesini [page]/[row]/[col] hücresine getirir: öğe o hücreden ÖNCE yerleşiyorsa ve hedef hücre boşsa
+     * önüne görünmez boşluklar eklenir (iOS 18+ gibi istediğin yere koyma). Öğe bir boşluğun yerine bırakıldıysa
+     * o boşluk kaldırılır; arkadaki simgeler kaymaz.
+     */
+    fun placeAt(id: String, page: Int, row: Int, col: Int, columns: Int, rows: Int, visible: (HomeItem) -> Boolean): HomeLayout =
+        copy(items = GridPacker.withGaps(items, id, page, row, col, columns, rows, visible) { GapItem(UUID.randomUUID().toString()) })
 
     /** Anahtarı düzenin her yerinden (ızgara, klasör, dock, arşiv) siler. */
     fun dropKey(key: String): HomeLayout = withoutKey(key)
@@ -149,7 +211,7 @@ data class HomeLayout(
             else when (item) {
                 is AppItem -> FolderItem(UUID.randomUUID().toString(), newFolderName, listOf(item.key, draggedKey))
                 is FolderItem -> item.copy(keys = item.keys + draggedKey)
-                is WidgetItem, is PageBreak -> item
+                is WidgetItem, is PageBreak, is GapItem -> item
             }
         }
         return base.copy(items = newItems)
@@ -193,7 +255,7 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> lib += item.key
                 is FolderItem -> lib += item.keys
-                is WidgetItem, is PageBreak -> Unit
+                is WidgetItem, is PageBreak, is GapItem -> Unit
             }
             false
         }
@@ -210,7 +272,7 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> if (item.key in set) listOf(item.key) else emptyList()
                 is FolderItem -> if (item.id in set) item.keys else item.keys.filter { it in set }
-                is WidgetItem, is PageBreak -> emptyList()
+                is WidgetItem, is PageBreak, is GapItem -> emptyList()
             }
         }.distinct()
     }
@@ -221,7 +283,7 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> if (item.key in keys) null else item
                 is FolderItem -> item.copy(keys = item.keys - keys)
-                is WidgetItem, is PageBreak -> item
+                is WidgetItem, is PageBreak, is GapItem -> item
             }
         },
     ).normalized()
@@ -287,7 +349,7 @@ data class HomeLayout(
             when (item) {
                 is AppItem -> if (item.key !in set) out += item
                 is FolderItem -> out += item.copy(keys = item.keys - set)
-                is WidgetItem, is PageBreak -> out += item
+                is WidgetItem, is PageBreak, is GapItem -> out += item
             }
         }
         if (!placed) out += folder
@@ -381,29 +443,32 @@ data class HomeLayout(
     val homeWidgets: List<WidgetItem> get() = items.filterIsInstance<WidgetItem>()
 
     /** Tüm widget'lar (ana ekran + widget sayfası). */
-    val widgets: List<WidgetItem> get() = (homeWidgets + today).flatMap { listOf(it) + it.stack }
+    val widgets: List<WidgetItem> get() =
+        (homeWidgets + today + hiddenPages.flatMap { hp -> hp.items.filterIsInstance<WidgetItem>() }).flatMap { listOf(it) + it.stack }
 
     fun toJson(): String = toJsonObject().toString()
 
     fun toJsonObject(): JSONObject {
         val arr = JSONArray()
-        for (item in items) {
-            arr.put(
-                when (item) {
-                    is AppItem -> JSONObject().put("t", "a").put("k", item.key)
-                    is FolderItem -> JSONObject().put("t", "f").put("id", item.id)
-                        .put("n", item.name).put("k", JSONArray(item.keys))
-                    is WidgetItem -> widgetJson(item)
-                    is PageBreak -> JSONObject().put("t", "b").put("id", item.id)
-                }
-            )
-        }
+        for (item in items) arr.put(itemJson(item))
         return JSONObject()
             .put("v", 3)
             .put("items", arr)
+            .put("hp", JSONArray().also { a ->
+                hiddenPages.forEach { hp -> a.put(JSONObject().put("pos", hp.pos).put("items", JSONArray().also { b -> hp.items.forEach { b.put(itemJson(it)) } })) }
+            })
             .put("dock", JSONArray(dock))
             .put("lib", JSONArray(libraryOnly))
             .put("today", JSONArray().also { a -> today.forEach { a.put(widgetJson(it)) } })
+    }
+
+    private fun itemJson(item: HomeItem): JSONObject = when (item) {
+        is AppItem -> JSONObject().put("t", "a").put("k", item.key)
+        is FolderItem -> JSONObject().put("t", "f").put("id", item.id)
+            .put("n", item.name).put("k", JSONArray(item.keys))
+        is WidgetItem -> widgetJson(item)
+        is PageBreak -> JSONObject().put("t", "b").put("id", item.id)
+        is GapItem -> JSONObject().put("t", "g").put("id", item.id)
     }
 
     private fun widgetJson(item: WidgetItem): JSONObject = JSONObject().put("t", "w").put("id", item.id)
@@ -419,7 +484,22 @@ data class HomeLayout(
         }
 
         fun fromJsonObject(o: JSONObject): HomeLayout? = try {
-            val ia = o.getJSONArray("items")
+            val items = itemsFrom(o.getJSONArray("items"))
+            val hpa = o.optJSONArray("hp") ?: JSONArray()
+            val hidden = List(hpa.length()) { i -> hpa.getJSONObject(i).let { h -> HiddenPage(h.optInt("pos"), itemsFrom(h.getJSONArray("items"))) } }
+            val da = o.optJSONArray("dock") ?: JSONArray()
+            val la = o.optJSONArray("lib") ?: JSONArray()
+            val ta = o.optJSONArray("today") ?: JSONArray()
+            HomeLayout(
+                items, List(da.length()) { da.getString(it) }, List(la.length()) { la.getString(it) },
+                List(ta.length()) { widgetFrom(ta.getJSONObject(it)) },
+                hidden,
+            )
+        } catch (e: Exception) {
+            null
+        }
+
+        private fun itemsFrom(ia: JSONArray): List<HomeItem> {
             val items = ArrayList<HomeItem>()
             for (i in 0 until ia.length()) {
                 val j = ia.getJSONObject(i)
@@ -428,6 +508,8 @@ data class HomeLayout(
                     items += AppItem(j.getString("k"))
                 } else if (t == "b") {
                     items += PageBreak(j.optString("id").ifEmpty { UUID.randomUUID().toString() })
+                } else if (t == "g") {
+                    items += GapItem(j.optString("id").ifEmpty { UUID.randomUUID().toString() })
                 } else if (t == "w") {
                     items += widgetFrom(j)
                 } else {
@@ -439,15 +521,7 @@ data class HomeLayout(
                     )
                 }
             }
-            val da = o.optJSONArray("dock") ?: JSONArray()
-            val la = o.optJSONArray("lib") ?: JSONArray()
-            val ta = o.optJSONArray("today") ?: JSONArray()
-            HomeLayout(
-                items, List(da.length()) { da.getString(it) }, List(la.length()) { la.getString(it) },
-                List(ta.length()) { widgetFrom(ta.getJSONObject(it)) },
-            )
-        } catch (e: Exception) {
-            null
+            return items
         }
 
         private fun widgetFrom(j: JSONObject): WidgetItem = WidgetItem(
@@ -498,9 +572,19 @@ data class HomeLayout(
                         val ks = item.keys.filter { it in valid && seen.add(it) }
                         if (ks.isNotEmpty()) items += item.copy(keys = ks)
                     }
-                    is WidgetItem, is PageBreak -> items += item
+                    is WidgetItem, is PageBreak, is GapItem -> items += item
                 }
             }
+            // Gizli sayfalar: içlerindeki uygulamalar da "yerinde" sayılır (yeni uygulama sanılıp eklenmez).
+            val hidden = src.hiddenPages.map { hp ->
+                hp.copy(items = hp.items.mapNotNull { item ->
+                    when (item) {
+                        is AppItem -> item.takeIf { it.key in valid && seen.add(it.key) }
+                        is FolderItem -> item.keys.filter { it in valid && seen.add(it) }.takeIf { it.isNotEmpty() }?.let { item.copy(keys = it) }
+                        else -> item
+                    }
+                })
+            }.filter { hp -> hp.items.any { it is AppItem || it is FolderItem || it is WidgetItem } }
             val lib = ArrayList<String>()
             // Kısayollar arşivde durmaz (yalnızca ana ekranda): arşive düşen kısayol düzenden çıkar.
             for (k in src.libraryOnly) if (k in valid && seen.add(k) && !k.startsWith("sc:")) lib += k
@@ -510,7 +594,7 @@ data class HomeLayout(
                 // Yeni sabitlenen kısayol her zaman ana ekrana gelir (kullanıcı "Ana ekrana ekle" dedi).
                 if (toHome || k.startsWith("sc:")) items += AppItem(k) else lib += k
             }
-            return HomeLayout(items, dock, lib, src.today).normalized()
+            return HomeLayout(items, dock, lib, src.today, hidden).normalized()
         }
     }
 }
