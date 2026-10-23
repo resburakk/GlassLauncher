@@ -68,8 +68,15 @@ import kotlin.math.sin
 private val TR = Locale("tr", "TR")
 private val Red = Color(0xFFFF453A)
 
-/** Widget kutusunun köşe yarıçapı (iOS widget'larına yakın oran). */
-fun widgetCorner(width: Dp): Dp = (width * 0.13f).coerceIn(14.dp, 26.dp)
+/**
+ * iOS widget köşe yarıçapı: küçük (2×2) widget genişliğinin %13,5'i (iPhone'da ~22 pt). iOS'ta olduğu gibi
+ * küçük, orta ve büyük widget'ta aynıdır.
+ */
+@Composable
+fun widgetCorner(): Dp = LocalHomeMetrics.current?.let { it.widgetWidth(2) * 0.135f } ?: 22.dp
+
+/** iOS widget şekli: sürekli köşe (squircle, %60 yumuşaklık), simgelerle aynı köşe eğrisi. */
+fun widgetShape(radius: Dp): androidx.compose.ui.graphics.Shape = SquircleShape(radius, 0.6f)
 
 /** Saniye veya dakika başında yenilenen saat (yalnızca ekrandayken çalışır; arka planda pil harcamaz). */
 @Composable
@@ -89,7 +96,7 @@ private fun rememberNow(everySecond: Boolean): LocalDateTime {
 @Composable
 fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, strength: Float) {
     if (w.stack.isNotEmpty()) { WidgetStack(w, vm, width, height, strength); return }
-    val shape = RoundedCornerShape(widgetCorner(width))
+    val shape = widgetShape(widgetCorner())
     when (w.kind) {
         WidgetKind.System -> SystemWidget(w, vm, width, height)
         // Cam saat zeminsizdir (iOS kilit ekranı saati gibi): rakamların kendisi cam.

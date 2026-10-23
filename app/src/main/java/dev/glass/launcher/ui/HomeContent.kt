@@ -592,6 +592,8 @@ internal fun HomeContent(
                                     id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = pageJiggle,
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },
                                     widgetLabel = if (item.stack.isNotEmpty()) "Widget yığını, ${item.stack.size + 1} widget" else if (item.kind == WidgetKind.System) "Widget" else "${item.kind.title} widget'ı",
+                                    // Sistem widget'ları ve yığınlar dokunuşu kendileri yönetir.
+                                    onClick = if (item.kind != WidgetKind.System && item.stack.isEmpty()) { r -> vm.openWidget(item, view, r) } else null,
                                 ) { WidgetBody(item, vm, w, h, settings.glassStrength) }
                             }
                             is PageBreak -> Unit // görünmez sayfa sonu

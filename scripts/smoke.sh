@@ -383,6 +383,9 @@ for f in 1 2 3 4 5 6; do adb shell input motionevent MOVE $((W*80/100 - W*f/20))
 sleep 0.3; shot 26b-widget-kayarken
 adb shell input motionevent MOVE $((W*80/100)) $((H*55/100)); adb shell input motionevent UP $((W*80/100)) $((H*55/100)); step "bırak" 2
 shot 26c-widget-durunca
+# 27) Widget'a dokununca ilgili uygulama açılır (iOS gibi): Takvim widget'ı
+tap_desc "Takvim widget'ı" && { step "takvim widget dokunuş" 3; shot 27a-widget-dokunus; adb shell dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity" | sed 's/^ */::notice::ACIK /'; }
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done

@@ -388,7 +388,8 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
     val k = minOf(maxW / realW, maxH / realH, 1.25f)
     val cw = realW * k
     val ch = realH * k
-    val corner = widgetCorner(cw)
+    val corner = widgetCorner() * k
+    val cardShape = widgetShape(corner)
     val img by produceState<ImageBitmap?>(null, w.key) {
         val info = w.info ?: return@produceState
         value = withContext(Dispatchers.Default) {
@@ -403,8 +404,8 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
     val info = w.info
     val density = LocalDensity.current.density
     Box(
-        Modifier.size(cw, ch).clip(RoundedCornerShape(corner)).background(Color.White.copy(alpha = 0.10f))
-            .border(0.8.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(corner)),
+        Modifier.size(cw, ch).clip(cardShape).background(Color.White.copy(alpha = 0.10f))
+            .border(0.8.dp, Color.White.copy(alpha = 0.18f), cardShape),
         contentAlignment = Alignment.Center,
     ) {
         val b = img

@@ -462,8 +462,16 @@ internal fun WidgetCell(
     onDrop: (Offset, String?) -> Unit,
     /** Ekran okuyucunun okuyacağı ad (ör. "Hava Durumu widget'ı"). */
     widgetLabel: String = "Widget",
+    /** Dokununca (düzenleme modu dışında): launcher widget'larında ilgili uygulamayı açar. */
+    onClick: ((Rect) -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    // iOS: widget'a basılınca hafifçe içeri çöker.
+    val pressScale by androidx.compose.animation.core.animateFloatAsState(
+        if (pressed && onClick != null && !edit) 0.96f else 1f, LocalMotion.current.tween(if (pressed) 90 else 160), label = "widgetPress",
+    )
     val density = LocalDensity.current
     val wPx = with(density) { width.toPx() }
     val hPx = with(density) { height.toPx() }
@@ -491,9 +499,14 @@ internal fun WidgetCell(
             .graphicsLayer {
                 alpha = if (drag.key == id) 0f else 1f
                 rotationZ = if (edit) jiggle.value * 0.5f else 0f
+                scaleX = pressScale; scaleY = pressScale
             }
             .cachedLayer(edit)
             .semantics { contentDescription = widgetLabel }
+            .then(
+                if (onClick != null && !edit) Modifier.clickable(interactionSource = interaction, indication = null, onClickLabel = "Aç") { onClick(target.cellRect) }
+                else Modifier
+            )
     ) { content() }
 }
 

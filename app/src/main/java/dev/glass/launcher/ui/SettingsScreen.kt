@@ -766,7 +766,7 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             "Renkli: simge tek renk çizilir."
     )
     Group("Şekil") {
-        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.225f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
+        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.2237f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
             onChange { it.copy(iconCorner = v) }
         }
         RowDivider()

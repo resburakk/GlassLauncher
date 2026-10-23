@@ -1219,7 +1219,7 @@ fun HomeScreen(
                     // Widget hayaleti: aynı boyutta cam kutu
                     Box(
                         Modifier.size(gs.width, gs.height)
-                            .liquidGlass(RoundedCornerShape(widgetCorner(gs.width)), settings.glassStrength, 16.dp)
+                            .liquidGlass(widgetShape(widgetCorner()), settings.glassStrength, 16.dp)
                     )
                 } else if (group) {
                     val icon = drag.iconDp

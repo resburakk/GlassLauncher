@@ -246,6 +246,51 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         launch(app, r?.let { Rect(it.left.toInt(), it.top.toInt(), it.right.toInt(), it.bottom.toInt()) }, opts)
     }
 
+    /**
+     * Launcher'ın kendi widget'ına dokununca ilgili uygulamayı açar (iOS gibi): saatler → Saat, takvim → Takvim,
+     * hava durumu → telefonun hava durumu uygulaması, fotoğraf → galeri, pil → pil ayarları.
+     * Uygulama widget'ın yerinden büyüyerek açılır.
+     */
+    fun openWidget(w: WidgetItem, view: android.view.View, rect: androidx.compose.ui.geometry.Rect?) {
+        val ctx = getApplication<Application>()
+        val pm = ctx.packageManager
+        val list = apps.value
+        fun byIntent(i: android.content.Intent): AppInfo? {
+            val pkgs = runCatching { pm.queryIntentActivities(i, 0).map { it.activityInfo.packageName } }.getOrDefault(emptyList())
+            // Sistem/üretici uygulaması önce (ör. Honor Saat), sonra diğerleri.
+            return pkgs.firstNotNullOfOrNull { p -> list.firstOrNull { it.packageName == p && !it.isShortcut && it.isSystem } }
+                ?: pkgs.firstNotNullOfOrNull { p -> list.firstOrNull { it.packageName == p && !it.isShortcut } }
+        }
+        fun byName(vararg names: String): AppInfo? = list.firstOrNull { a ->
+            !a.isShortcut && names.any { n -> dev.glass.launcher.data.AppCategorizer.normalize(a.label).contains(n) }
+        }
+        val app: AppInfo? = when (w.kind) {
+            WidgetKind.DigitalClock, WidgetKind.AnalogClock, WidgetKind.GlassClock ->
+                byIntent(android.content.Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS)) ?: byName("saat", "clock")
+            WidgetKind.Calendar ->
+                byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR))
+                    ?: byIntent(android.content.Intent(android.content.Intent.ACTION_VIEW, android.provider.CalendarContract.CONTENT_URI.buildUpon().appendPath("time").build()))
+                    ?: byName("takvim", "calendar")
+            WidgetKind.Photo ->
+                byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_GALLERY))
+                    ?: byName("galeri", "gallery", "fotograf", "photos")
+            WidgetKind.Weather -> byName("hava durumu", "weather")
+            else -> null
+        }
+        if (app != null) { launchFrom(app, view, rect); return }
+        // Uygulama karşılığı olmayanlar: pil → pil ayarları (ya da Ayarlar).
+        val intent = when (w.kind) {
+            WidgetKind.Battery -> android.content.Intent(android.content.Intent.ACTION_POWER_USAGE_SUMMARY)
+            else -> null
+        } ?: return
+        val r = rect?.takeIf { !it.isEmpty }
+        val opts = if (settings.value.appTransitions && r != null) runCatching {
+            android.app.ActivityOptions.makeScaleUpAnimation(view, r.left.toInt(), r.top.toInt(), r.width.toInt(), r.height.toInt()).toBundle()
+        }.getOrNull() else null
+        runCatching { ctx.startActivity(intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK), opts) }
+            .onFailure { runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK), opts) } }
+    }
+
     fun launch(app: AppInfo, bounds: Rect? = null, options: Bundle? = null) {
         // Kilitli uygulama: önce parmak izi / yüz / ekran kilidi (kısayolu da sahibi olan uygulamaya göre).
         if (app.appKey in settings.value.lockedApps && !AppLock.recentlyUnlocked(app.appKey)) {

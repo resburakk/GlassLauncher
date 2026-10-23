@@ -61,7 +61,8 @@ data class LauncherSettings(
     /** Açılırken parmak izi / yüz / ekran kilidi istenen uygulamalar. */
     val lockedApps: Set<String> = emptySet(),
     val tintColor: Int = 0xFF64D2FF.toInt(),
-    val iconCorner: Float = 0.28125f,
+    /** Simge köşe yarıçapı / simge boyu. iOS: %22,37 (sürekli köşe, %60 yumuşaklıkla). */
+    val iconCorner: Float = 0.2237f,
     /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
     val cornerSmoothing: Float = 0.6f,
     /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
@@ -301,7 +302,7 @@ data class LauncherSettings(
         put("hSpacing", hSpacing.toDouble()); put("vSpacing", vSpacing.toDouble())
         put("labelGap", labelGap.toDouble()); put("labelSize", labelSize.toDouble())
         put("iconScale", iconScale.toDouble()); put("iconStyle", iconStyle.name); put("iconStyleDark", iconStyleDark.name); put("darkOriginalApps", JSONArray(darkOriginalApps.toList())); put("hiddenApps", JSONArray(hiddenApps.toList())); put("iconPack", iconPack); put("lockedApps", JSONArray(lockedApps.toList())); put("tintColor", tintColor)
-        put("iconCorner", iconCorner.toDouble()); put("iconGlass", iconGlass)
+        put("iconCorner2", iconCorner.toDouble()); put("iconGlass", iconGlass)
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
@@ -374,7 +375,8 @@ data class LauncherSettings(
                 hiddenApps = o.optJSONArray("hiddenApps")?.let { arr -> (0 until arr.length()).map { arr.optString(it) }.toSet() } ?: d.hiddenApps,
                 lockedApps = o.optJSONArray("lockedApps")?.let { arr -> (0 until arr.length()).map { arr.optString(it) }.toSet() } ?: d.lockedApps,
                 tintColor = o.optInt("tintColor", d.tintColor),
-                iconCorner = f("iconCorner", d.iconCorner),
+                // Eski kayıtlı değer ("iconCorner") bir kez iOS ölçüsüne döner; sonra kullanıcının ayarı korunur.
+                iconCorner = f("iconCorner2", d.iconCorner),
                 iconGlass = o.optBoolean("iconGlass", d.iconGlass),
                 customIcons = iconMap,
                 dockHeight = f("dockHeight", d.dockHeight),

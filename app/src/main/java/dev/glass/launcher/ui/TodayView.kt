@@ -150,6 +150,7 @@ fun TodayPage(
     val editNow by rememberUpdatedState(edit)
     // Widget'ların ekrandaki alanları (sürükleyerek sıralama ve uzun basmanın widget'a mı boşluğa mı olduğu için).
     val bounds = remember { mutableStateMapOf<String, Rect>() }
+    val hostView = androidx.compose.ui.platform.LocalView.current
     androidx.compose.runtime.LaunchedEffect(widgets) {
         val ids = widgets.map { it.id }.toSet()
         bounds.keys.retainAll(ids)
@@ -265,7 +266,7 @@ fun TodayPage(
                 Column(
                     Modifier
                         .width(contentW)
-                        .liquidGlass(RoundedCornerShape(widgetCorner(contentW)), settings.panelGlassStrength, 0.dp, overlay = true)
+                        .liquidGlass(widgetShape(widgetCorner()), settings.panelGlassStrength, 0.dp, overlay = true)
                         .padding(u * 20f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -336,7 +337,13 @@ fun TodayPage(
                                             )
                                         } else Modifier.pointerInput(w.id) {
                                             // Basılı tutunca widget menüsü (boyut, düzenle, kaldır).
-                                            detectTapGestures(onLongPress = { bounds[w.id]?.let { r -> onMenu(w, r) } })
+                                            detectTapGestures(
+                                                onLongPress = { bounds[w.id]?.let { r -> onMenu(w, r) } },
+                                                // Dokununca ilgili uygulama (launcher widget'ları; sistem widget'ları kendileri yönetir).
+                                                onTap = if (w.kind != dev.glass.launcher.data.WidgetKind.System && w.stack.isEmpty()) {
+                                                    { vm.openWidget(w, hostView, bounds[w.id]) }
+                                                } else null,
+                                            )
                                         }
                                     ),
                             ) {
@@ -385,4 +392,3 @@ private fun TodayButton(text: String, settings: LauncherSettings, onClick: () ->
 }
 
 /** Yardımcı: dp genişliği için widget köşesi (Widgets.kt ile aynı kural). */
-@Suppress("unused") private fun todayCorner(w: Dp): Dp = widgetCorner(w)
