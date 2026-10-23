@@ -675,12 +675,21 @@ fun HomeScreen(
                 }.getOrNull()
             }
         }
+        val unlockAnim = remember { androidx.compose.animation.core.Animatable(1f) }
+        LaunchedEffect(Unit) {
+            UnlockAnim.events.collect { hide ->
+                if (hide) unlockAnim.snapTo(0f)
+                else unlockAnim.animateTo(1f, androidx.compose.animation.core.tween(560, easing = androidx.compose.animation.core.CubicBezierEasing(0.2f, 0.9f, 0.25f, 1f)))
+            }
+        }
+        // Açılış sürerken duvar kâğıdının hazır kopyası çizilir ve uzaklaşır (sistem duvar kâğıdı hareket ettirilemez).
+        val unlocking by remember { derivedStateOf { unlockAnim.value < 0.999f } }
         // Geçiş sürüyor mu (yalnızca eşik geçilince yeniden oluşturulur).
         val anyTransition by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f || today.progress > 0.001f } }
         val regionsOpen = glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
         if (settings.launcherWallpaper && wp != null) {
             val homeImg = homeBlurImg
-            val needSharp = !fromSync || regionsOpen || (homeBlurR >= 1f && homeImg == null)
+            val needSharp = !fromSync || regionsOpen || (homeBlurR >= 1f && homeImg == null) || unlocking
             when {
                 // Ana ekran bulanıklığı: hazır bulanık kopya (sabit, ucuz).
                 homeImg != null -> Image(
@@ -693,6 +702,9 @@ fun HomeScreen(
                     Modifier.fillMaxSize().graphicsLayer {
                         // Son uygulamalar açılırken kopya da söner (küçültülen pencerede dikdörtgen görünmesin).
                         alpha = 1f - homeHide()
+                        // Kilit açılışı: duvar kâğıdı %7 yakından uzaklaşarak yerine gelir.
+                        val zw = 1f + 0.07f * (1f - unlockAnim.value)
+                        scaleX = zw; scaleY = zw
                         // Bulanık kopya hazırlanırken geçici olarak eski yol.
                         renderEffect = if (homeBlurR >= 1f) BlurEffect(homeBlurR, homeBlurR, TileMode.Clamp) else null
                     },
@@ -715,15 +727,6 @@ fun HomeScreen(
             }
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
-        val unlockAnim = remember { androidx.compose.animation.core.Animatable(1f) }
-        LaunchedEffect(Unit) {
-            UnlockAnim.events.collect { hide ->
-                if (hide) { unlockAnim.snapTo(0f); UnlockAnim.progress.floatValue = 0f }
-                else unlockAnim.animateTo(1f, androidx.compose.animation.core.tween(620, easing = androidx.compose.animation.core.CubicBezierEasing(0.16f, 1f, 0.3f, 1f))) {
-                    UnlockAnim.progress.floatValue = value
-                }
-            }
-        }
         Box(
             Modifier.fillMaxSize()
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
@@ -736,10 +739,9 @@ fun HomeScreen(
                     // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
                     val h = homeHide()
                     if (h > 0f) { k *= 1f - 0.06f * h; alpha = 1f - h }
-                    // Kilit açılışı (iOS): simgeler hücre hücre gelir (bkz. UnlockAnim.cellTransform); burada yalnızca
-                    // arama hapı gibi hücre dışı öğeler için hafif bir belirme.
+                    // Kilit açılışı (iOS 26): ana ekran tek parça %12 büyükten yerine oturur, hızla belirir.
                     val un = unlockAnim.value
-                    if (un < 1f) alpha *= (0.4f + 0.6f * un).coerceIn(0f, 1f)
+                    if (un < 1f) { k *= 1f + 0.12f * (1f - un); alpha *= (un * 2.2f).coerceIn(0f, 1f) }
                     scaleX = k; scaleY = k
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width
