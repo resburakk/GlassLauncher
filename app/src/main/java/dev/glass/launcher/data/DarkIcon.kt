@@ -21,7 +21,14 @@ import kotlin.math.sqrt
  */
 object DarkIcon {
 
-    private class Bg(val uniform: Boolean, val colorful: Boolean, val hue: Float, val sat: Float, val lum: Float)
+    private class Bg(val uniform: Boolean, val colorful: Boolean, val hue: Float, val sat: Float, val lum: Float, val v: Float = 1f) {
+        /**
+         * Zemin zaten koyu mu (X, Uber, TikTok gibi siyah/koyu gri): yalnızca hafifçe karartılır. Parlaklığa (luma)
+         * göre değil HSV değerine göre bakılır: koyu lacivert, kırmızı, mor gibi doygun renkli zeminler (Booking,
+         * Pinterest, e-Devlet) luma'da düşük çıkıp yanlışlıkla "koyu" sayılıyor ve hiç dönüştürülmüyordu.
+         */
+        val dark: Boolean get() = if (colorful) v < 0.30f else lum < 0.30f
+    }
 
     /** Uyarlanabilir simge: zemin ve ön plan katmanları ayrı. [orig] ikisinin normal birleşimi. */
     fun fromLayers(bgLayer: Bitmap, fgLayer: Bitmap, orig: Bitmap): Bitmap {
@@ -32,7 +39,7 @@ object DarkIcon {
         while (i < bg.size) { if ((bg[i] ushr 24) > 200) samples += bg[i]; i += 3 }
         if (samples.size < 50) return fromFlat(orig)
         val info = analyze(samples.toIntArray())
-        if (info.lum < 0.30f) return scaled(orig, 0.92f)
+        if (info.dark) return scaled(orig, 0.92f)
         val fg = IntArray(n * n).also { fgLayer.getPixels(it, 0, n, 0, 0, n, n) }
         val weight = FloatArray(n * n) { (fg[it] ushr 24) / 255f }
         // Ön plan katmanı simgenin çoğunu kaplıyorsa (Honor/MagicOS: zemin plakası ön planın içinde) katmanlar
@@ -77,8 +84,8 @@ object DarkIcon {
         val cut = max(percentile(dd, 0.60f) * 1.6f, 18f)
         val samples = raw.filterIndexed { k, _ -> dd[k] <= cut }.toIntArray()
         val info = analyze(samples)
-        if (info.lum < 0.30f) return scaled(orig, 0.92f)
-        if (!info.uniform) return floodFlat(px, n, med, orig) ?: scaled(orig, 0.72f)
+        if (info.dark) return scaled(orig, 0.92f)
+        if (!info.uniform) return floodFlat(px, n, med, orig) ?: whiteOnGradient(px, n, info, orig) ?: scaled(orig, 0.72f)
         val pal = IntArray(min(64, samples.size)) { samples[(it.toLong() * (samples.size - 1) / max(1, min(64, samples.size) - 1)).toInt()] }
         val weight = FloatArray(n * n) { p ->
             val c = px[p]
@@ -127,7 +134,7 @@ object DarkIcon {
         val stepS = maxOf(1, count / samples.size)
         for (p in mask.indices) if (mask[p]) { if (idx % stepS == 0 && k < samples.size) samples[k++] = px[p]; idx++ }
         val info = analyze(samples.copyOf(k))
-        if (!info.uniform || info.lum < 0.30f) return null
+        if (info.dark) return null
         // Ön plan ağırlığı: zemin dışı; kenarlarda zemine olan uzaklıkla yumuşak geçiş (pürüzsüz logo kenarı).
         val weight = FloatArray(n * n) { p ->
             val c = px[p]
@@ -138,6 +145,56 @@ object DarkIcon {
             }
         }
         return compose(px, weight, info, orig, n)
+    }
+
+    /**
+     * Renk geçişli (Instagram gibi) zemin üzerinde beyaz sembol: zemin siyaha döner, sembol zeminin AYNI noktadaki
+     * rengini alır (iOS'taki gibi). Zemin rengi, beyaz olmayan piksellerin kaba ızgara ortalamasından kestirilir.
+     */
+    private fun whiteOnGradient(px: IntArray, n: Int, info: Bg, orig: Bitmap): Bitmap? {
+        if (!info.colorful) return null
+        val hsv = FloatArray(3)
+        fun white(c: Int): Boolean { toHsv(c, hsv); return (c ushr 24) > 120 && hsv[1] < 0.22f && hsv[2] > 0.80f }
+        var whites = 0
+        for (c in px) if (white(c)) whites++
+        // Beyaz sembol belirgin olmalı ama simgenin çoğu olmamalı.
+        if (whites < 0.04f * n * n || whites > 0.55f * n * n) return null
+        val g = 8
+        val sr = FloatArray(g * g); val sg = FloatArray(g * g); val sb = FloatArray(g * g); val cnt = IntArray(g * g)
+        for (y in 0 until n) for (x in 0 until n) {
+            val c = px[y * n + x]
+            if ((c ushr 24) < 200 || white(c)) continue
+            val k = (y * g / n) * g + (x * g / n)
+            sr[k] += ((c shr 16) and 0xff).toFloat(); sg[k] += ((c shr 8) and 0xff).toFloat(); sb[k] += (c and 0xff).toFloat(); cnt[k]++
+        }
+        // Boş hücreler komşulardan doldurulur.
+        repeat(4) {
+            for (k in 0 until g * g) if (cnt[k] == 0) {
+                val x = k % g; val y = k / g
+                var r = 0f; var gg = 0f; var b = 0f; var m = 0
+                for ((dx, dy) in listOf(-1 to 0, 1 to 0, 0 to -1, 0 to 1)) {
+                    val xx = x + dx; val yy = y + dy
+                    if (xx !in 0 until g || yy !in 0 until g) continue
+                    val q = yy * g + xx
+                    if (cnt[q] > 0) { r += sr[q] / cnt[q]; gg += sg[q] / cnt[q]; b += sb[q] / cnt[q]; m++ }
+                }
+                if (m > 0) { sr[k] = r / m; sg[k] = gg / m; sb[k] = b / m; cnt[k] = 1 }
+            }
+        }
+        val field = IntArray(n * n) { p ->
+            val fx = (p % n).toFloat() * g / n - 0.5f; val fy = (p / n).toFloat() * g / n - 0.5f
+            val x0 = floor(fx).toInt().coerceIn(0, g - 1); val y0 = floor(fy).toInt().coerceIn(0, g - 1)
+            val x1 = (x0 + 1).coerceAtMost(g - 1); val y1 = (y0 + 1).coerceAtMost(g - 1)
+            val tx = (fx - x0).coerceIn(0f, 1f); val ty = (fy - y0).coerceIn(0f, 1f)
+            fun ch(a: FloatArray, k: Int) = if (cnt[k] > 0) a[k] / cnt[k] else 128f
+            fun bil(a: FloatArray) = lerp(lerp(ch(a, y0 * g + x0), ch(a, y0 * g + x1), tx), lerp(ch(a, y1 * g + x0), ch(a, y1 * g + x1), tx), ty)
+            (0xff shl 24) or (clamp(bil(sr)) shl 16) or (clamp(bil(sg)) shl 8) or clamp(bil(sb))
+        }
+        val weight = FloatArray(n * n) { p ->
+            val c = px[p]
+            if ((c ushr 24) < 40) 0f else { toHsv(c, hsv); smooth(0.62f, 0.86f, hsv[2]) * (1f - smooth(0.18f, 0.32f, hsv[1])) * ((c ushr 24) / 255f) }
+        }
+        return compose(px, weight, info, orig, n, bgPx = field, forceColorize = true)
     }
 
     /** Koyu zemin + yeniden renklendirilmiş ön plan. [fg] ön plan renkleri, [w] ön plan ağırlığı (0..1). */
@@ -218,11 +275,11 @@ object DarkIcon {
             val hue = ((atan2(sy, sx) / (2 * Math.PI)).toFloat() + 1f) % 1f
             val satMean = sats.average().toFloat()
             val satStd = sqrt(sats.map { (it - satMean) * (it - satMean) }.average()).toFloat()
-            return Bg(r > 0.97 && satStd < 0.18f, true, hue, percentile(sats, 0.5f), lum)
+            return Bg(r > 0.97 && satStd < 0.18f, true, hue, percentile(sats, 0.5f), lum, percentile(vals.toList(), 0.5f))
         }
         val vMean = vals.average().toFloat()
         val vStd = sqrt(vals.map { (it - vMean) * (it - vMean) }.average()).toFloat()
-        return Bg(frac < 0.15f && vStd < 0.10f, false, 0f, 0f, lum)
+        return Bg(frac < 0.15f && vStd < 0.10f, false, 0f, 0f, lum, vMean)
     }
 
     private fun scaled(src: Bitmap, k: Float): Bitmap {
