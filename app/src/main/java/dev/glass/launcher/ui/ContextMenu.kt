@@ -191,10 +191,6 @@ fun ContextMenuOverlay(
                     add(MenuAction("Boyut: $label", Glyph.Widget) { onResizeWidget(sz) })
                 }
             }
-            if (widget.kind == WidgetKind.System && widget.stack.isEmpty() && menuSettings.glassSystemWidgets) {
-                val orig = vm.widgetHost.isOriginal(widget.appWidgetId)
-                add(MenuAction(if (orig) "Cam Görünüm" else "Orijinal Görünüm", Glyph.Pencil) { vm.widgetHost.setOriginal(widget.appWidgetId, !orig) })
-            }
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
             onAddToStack?.let { add(MenuAction("Yığına Widget Ekle", Glyph.Plus) { it() }) }
             if (widget.stack.isNotEmpty()) add(MenuAction("Yığını Dağıt", Glyph.Grid) { vm.editLayout { l -> l.unstack(widget.id) } })

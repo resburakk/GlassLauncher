@@ -362,22 +362,20 @@ tap_text "Sayfalar" && { step "sayfalar" 3; shot 25a-sayfalari-duzenle; tap_text
 tap_text "+" && { step "artı menü" 2; tap_text "Özelleştir" && { step "özelleştir" 3; shot 25b-ozellestir; adb shell input keyevent KEYCODE_BACK; step "geri" 1; }; }
 adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 
-# 26) Telefonun widget'ları cam görünümde (Clock) ve sayfa kayarken cam: parmak ekrandayken kareler
-add_sys() {
+# 26) Kendi widget'larımız (Takvim, Hava Durumu) ve sayfa kayarken cam: parmak ekrandayken kareler
+add_builtin() {
   adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
   tap_text "+"; step "artı" 2
-  tap_text "Widget Ekle"; step "galeri" 8
-  shot 26g-galeri-cam
-  adb shell uiautomator dump /sdcard/ui2.xml 2>&1 | head -2 | while IFS= read -r l; do echo "::notice::DUMP $l"; done
-  adb shell cat /sdcard/ui2.xml 2>/dev/null | tr '>' '\n' | grep -oE 'text="[^"]{1,40}' | head -12 | tr '\n' ' ' | sed 's/^/::notice::METIN /'; echo
-  adb shell run-as dev.glass.launcher cat shared_prefs/widget_glass.xml 2>&1 | grep -oE 'name="c:[^"@]+@[0-9]*" value="[a-z]+"' | sed 's/name="c://; s/@[0-9]*" value=/ /' | head -25 | while IFS= read -r l; do echo "::notice::WIDGET $l"; done
-  # Galeride cam sürekli çizildiğinden ekran dökümü bazen alınamıyor: Clock satırının yerine dokunulur (alfabetik 3. satır).
-  { tap_text "$1" || adb shell input tap $cx $((H*415/1000)); } && { step "$1" 3; shot 26i-clock-detay; adb shell input swipe $((W*80/100)) $((H*45/100)) $((W*20/100)) $((H*45/100)) 300; step "sonraki widget" 2; shot 26h-cam-onizleme; { tap_text "Widget Ekle" || adb shell input tap $cx $((H*90/100)); }; step "eklendi" 4; }
+  tap_text "Widget Ekle"; step "galeri" 5
+  # Kendi widget'larımız listenin en altında: liste sona kaydırılır.
+  for k in 1 2 3 4; do adb shell input swipe $cx $((H*80/100)) $cx $((H*25/100)) 200; sleep 0.4; done; sleep 1
+  tap_text "Glass Launcher" && { step "kendi widgetlarımız" 3; tap_text "$1" && step "$1" 3; tap_text "Widget Ekle"; step "eklendi" 3; }
   adb shell input keyevent KEYCODE_BACK; step "geri" 1
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
 }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
-add_sys "Clock"
+add_builtin "Takvim"
+add_builtin "Hava Durumu"
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 26a-widgetlar
 adb shell input motionevent DOWN $((W*80/100)) $((H*55/100)); sleep 0.1
