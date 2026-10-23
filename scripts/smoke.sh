@@ -368,6 +368,9 @@ add_sys() {
   tap_text "+"; step "artı" 2
   tap_text "Widget Ekle"; step "galeri" 8
   shot 26g-galeri-cam
+  adb shell uiautomator dump /sdcard/ui2.xml 2>&1 | head -2 | while IFS= read -r l; do echo "::notice::DUMP $l"; done
+  adb shell cat /sdcard/ui2.xml 2>/dev/null | tr '>' '\n' | grep -oE 'text="[^"]{1,40}' | head -12 | tr '\n' ' ' | sed 's/^/::notice::METIN /'; echo
+  adb shell run-as dev.glass.launcher cat shared_prefs/widget_glass.xml 2>&1 | grep -oE 'name="c:[^"@]+@[0-9]*" value="[a-z]+"' | sed 's/name="c://; s/@[0-9]*" value=/ /' | head -25 | while IFS= read -r l; do echo "::notice::WIDGET $l"; done
   tap_text "$1" && { step "$1" 3; adb shell input swipe $((W*80/100)) $((H*45/100)) $((W*20/100)) $((H*45/100)) 300; step "sonraki widget" 2; shot 26h-cam-onizleme; tap_text "Widget Ekle"; step "eklendi" 4; }
   adb shell input keyevent KEYCODE_BACK; step "geri" 1
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
