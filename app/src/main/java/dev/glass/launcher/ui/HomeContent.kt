@@ -499,6 +499,15 @@ internal fun HomeContent(
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
+            // iOS 26 ana ekran sayfalaması: parmak bırakılınca bir seferde en çok bir sayfa geçilir, sayfa sekmeden
+            // (kritik sönümlü yay, ~0,4 sn) yumuşakça yerine oturur; yarıdan fazla çekilirse ya da hafifçe fırlatılırsa
+            // sonraki sayfaya geçer.
+            flingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(
+                state = pagerState,
+                pagerSnapDistance = androidx.compose.foundation.pager.PagerSnapDistance.atMost(1),
+                snapAnimationSpec = motion.spring(damping = 1f, stiffness = 330f),
+                snapPositionalThreshold = 0.5f,
+            ),
             // Sürüklerken TÜM sayfalar bellekte kalır: sürüklemenin başladığı sayfa (ve onu izleyen dokunma
             // kodu) uzak bir sayfaya geçilince atılmasın, yoksa bırakma kayboluyordu.
             // Bütün ana ekran sayfaları hep hazır tutulur: sayfa değişince bir sonrakinin simgeleri baştan hazırlanıyor,
