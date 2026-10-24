@@ -396,6 +396,7 @@ tap_desc "Takvim widget'ı" && { step "takvim widget dokunuş" 3; shot 27a-widge
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 
 adb logcat -d > logcat.txt
+grep "GlassDrag" logcat.txt | sed 's/^.*GlassDrag: //' | grep -E "Folder|kapalı" | head -10 | cut -c1-900 | while IFS= read -r line; do echo "::notice::DRAG $line"; done
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
   grep -A45 "FATAL EXCEPTION" logcat.txt | head -60 | sed 's/^.*AndroidRuntime: //' | while IFS= read -r line; do
