@@ -15,6 +15,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberUpdatedState
 
 import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.foundation.Canvas
@@ -516,8 +517,10 @@ private fun DrawScope.drawBackdrop(
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
 fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f, rimWidth: Dp = 1.2.dp): Modifier =
     // iOS 26 simgelerinin altında gölge yok (ölçüldü); "Simge gölgesi" ayarıyla açılabilir.
-    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosMaterial(shape).iosRim(shape, rimGlow, rimWidth)
-    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosMaterial(shape)
+    // Malzeme ve kenar ışığı her boyut/şekil için bir kez hazır görüntü olarak üretilir, her karede yalnızca
+    // kopyalanır (her simge için her karede şekil çizgisi hesaplamak 120 Hz'i 60'a düşürüyordu).
+    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosIconOverlay(shape, rimGlow, rimWidth)
+    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosIconOverlay(shape, rimGlow, rimWidth)
         .drawWithContent {
             drawContent()
             drawRect(
@@ -959,5 +962,60 @@ internal fun Modifier.iosMaterial(shape: Shape): Modifier = this.drawWithCache {
         drawRect(shade)
         drawPath(path, Color.Black.copy(alpha = 0.035f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 4f))
         drawPath(path, Color.Black.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 1.6f))
+    }
+}
+
+
+/** Simge üst katmanlarının (malzeme + kenar ışığı) hazır görüntüleri: boyut, şekil ve parlaklığa göre. */
+private object IconOverlayCache {
+    private val map = object : LinkedHashMap<String, androidx.compose.ui.graphics.ImageBitmap>(16, 0.75f, true) {
+        override fun removeEldestEntry(e: MutableMap.MutableEntry<String, androidx.compose.ui.graphics.ImageBitmap>?) = size > 24
+    }
+    @Synchronized fun get(key: String, make: () -> androidx.compose.ui.graphics.ImageBitmap) = map.getOrPut(key, make)
+}
+
+/**
+ * iOS 26 simge malzemesi + kenar ışığı tek hazır görüntüde (bkz. [iosMaterial], [iosRim]: görünüm aynı).
+ * 44 dp'den küçük simgelerde çizilmez.
+ */
+internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp): Modifier = this.drawWithCache {
+    if (size.minDimension < 44.dp.toPx() || size.width < 1f || size.height < 1f) return@drawWithCache onDrawWithContent { drawContent() }
+    val wPx = size.width.toInt().coerceAtLeast(1)
+    val hPx = size.height.toInt().coerceAtLeast(1)
+    val rimPx = rimWidth.toPx()
+    val key = "$wPx x $hPx|${shape.hashCode()}|${(rimGlow * 100).toInt()}|${(rimPx * 10).toInt()}"
+    val img = IconOverlayCache.get(key) {
+        val bmp = android.graphics.Bitmap.createBitmap(wPx, hPx, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(bmp)
+        val outline = shape.createOutline(Size(wPx.toFloat(), hPx.toFloat()), layoutDirection, this)
+        val path = Path().apply { addOutline(outline) }.asAndroidPath()
+        c.clipPath(path)
+        val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        // Malzeme: üstten alta hafif koyulaşma + kenarda yumuşak iç gölge.
+        p.shader = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(), intArrayOf(0, 0, 0x09000000), floatArrayOf(0f, 0.35f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, wPx.toFloat(), hPx.toFloat(), p)
+        p.shader = null
+        p.style = android.graphics.Paint.Style.STROKE
+        val mw = minOf(wPx, hPx) * 0.014f
+        p.color = 0x09000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
+        p.color = 0x0D000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
+        // Kenar ışığı: üst/alt ortada ince ve soluk, köşelerde söner.
+        if (rimGlow > 0.01f && rimPx > 0.05f) {
+            val a = (0.30f * rimGlow).coerceIn(0f, 1f)
+            val w = (rimPx * 0.4f).coerceIn(1f, 1.6f * density)
+            val wv = android.graphics.Color.argb((a * 255).toInt(), 255, 255, 255)
+            val wm = android.graphics.Color.argb((a * 0.2f * 255).toInt(), 255, 255, 255)
+            val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(), intArrayOf(wv, wm, 0, wm, wv), floatArrayOf(0f, 0.10f, 0.5f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0f, 0.24f, 0.76f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            p.shader = android.graphics.ComposeShader(vert, fade, android.graphics.PorterDuff.Mode.DST_IN)
+            p.strokeWidth = w * 2f
+            c.drawPath(path, p)
+        }
+        bmp.prepareToDraw()
+        bmp.asImageBitmap()
+    }
+    onDrawWithContent {
+        drawContent()
+        drawImage(img, dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()))
     }
 }
