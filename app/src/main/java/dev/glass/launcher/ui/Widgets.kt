@@ -105,7 +105,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
             PhotoWidget(w, vm, width, height)
         }
         else -> Box(
-            Modifier.size(width, height).liquidGlass(shape, strength, 0.dp).background(Color(0x26000000)),
+            Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000)),
         ) {
             when (w.kind) {
                 WidgetKind.DigitalClock -> DigitalClockWidget(w)

@@ -259,6 +259,8 @@ fun Modifier.liquidGlass(
      * parlak). iOS ekran görüntüsüyle karşılaştırılarak ayarlandı.
      */
     brightRim: Boolean = false,
+    /** Widget'lar: simgelerle birebir aynı kenar ışığı (ince, soluk, üst/alt ortada; köşede söner). */
+    iconRim: Boolean = false,
 ): Modifier = composed {
     val look1 = LocalGlass.current
     val ov = LocalOverlayBackdrop.current
@@ -427,8 +429,14 @@ fun Modifier.liquidGlass(
                 )
             }
         )
-        .then(if (look.reduced || brightRim) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
-        .then(if (rimW > 0f) Modifier.border(rimW.dp, rim, shape) else Modifier)
+        .then(if (look.reduced || brightRim || iconRim) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
+        .then(
+            when {
+                iconRim -> Modifier.iosRim(shape, st.iconRimGlow, (1.2f * st.iconRimWidth).dp)
+                rimW > 0f -> Modifier.border(rimW.dp, rim, shape)
+                else -> Modifier
+            }
+        )
 }
 
 /**
@@ -520,11 +528,6 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
             )
         }
         .iosRim(shape, rimGlow, rimWidth)
-        .border(
-            rimWidth / 1.2f,
-            lightRim(0.65f * strength, 0.02f * strength, 0f, 1f),
-            shape,
-        )
 
 @Composable
 fun SearchGlyph(color: Color, glyphSize: Dp) {
@@ -789,18 +792,33 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
 }
 
 /**
- * iOS 26 simge kenar ışığı: üst ve alt kenarda eşit parlak ince çizgi, yanlarda sönük (iOS ekran görüntüsünde
- * üst ve alt kenar içeriden ~28 birim açık, yanlar koyu). Simgeye katmanlı, cam levha gibi bir derinlik verir.
- * [glow] 0 ise hiçbir şey çizilmez (eski görünüm).
+ * iOS 26 simge kenar ışığı (ekran görüntüsüyle karşılaştırıldı): yalnızca üst ve alt kenarın ORTASINDA çok ince
+ * (~1 piksel), soluk bir aydınlık; köşelere doğru tamamen söner, yanlarda yok. Kalın ve köşeye dönen beyaz
+ * çizgi iOS'ta yok. [glow] 0 ise hiçbir şey çizilmez.
  */
 private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
     if (glow <= 0.01f || width < 0.05.dp) this
-    else this.border(
-        width,
-        // iOS 26 ölçümü: simge kenarı üstte ve altta eşit parlak, yanlarda sönük (ışık dikey; köşeden değil).
-        lightRim(0.55f * glow, 0.02f * glow, 0f, 1f),
-        shape,
-    )
+    else this.drawWithCache {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        val path = Path().apply { addOutline(outline) }
+        val w = (width.toPx() * 0.4f).coerceIn(1f, 1.6f * density)
+        val a = (0.30f * glow).coerceIn(0f, 1f)
+        val vert = Brush.verticalGradient(
+            0f to white(a), 0.10f to white(a * 0.2f), 0.5f to Color.Transparent, 0.90f to white(a * 0.2f), 1f to white(a),
+        )
+        // Köşelerde sönsün: yatayda kenarlardan ortaya doğru açılan maske.
+        val fade = Brush.horizontalGradient(
+            0f to Color.Transparent, 0.24f to Color.Black, 0.76f to Color.Black, 1f to Color.Transparent,
+        )
+        val layerPaint = androidx.compose.ui.graphics.Paint()
+        onDrawWithContent {
+            drawContent()
+            drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height), layerPaint)
+            clipPath(path) { drawPath(path, vert, style = androidx.compose.ui.graphics.drawscope.Stroke(w * 2f)) }
+            drawRect(fade, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
+            drawContext.canvas.restore()
+        }
+    }
 
 
 /** Şeklin köşe yarıçapı (px): yuvarlak dikdörtgen ise sol üst köşe, değilse kısa kenarın %30'u. */
