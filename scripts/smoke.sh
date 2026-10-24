@@ -100,8 +100,6 @@ shot 04c1-klasor-menu-kapandi
 adb shell input motionevent DOWN $fx $fy; sleep 1.2
 adb shell input motionevent UP $fx $fy; step "klasör içi menü 2" 2
 shot 04c2-klasor-menu-ikinci
-# Klasör adımlarındaki dokunuş günlüğü hemen alınır (test sonunda tampon taşmış oluyor).
-adb logcat -d -s GlassDrag:D | grep GlassDrag | tail -8 | sed 's/^.*GlassDrag: //' | cut -c1-400 | while IFS= read -r line; do echo "::notice::DRAG04 $line"; done
 adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
@@ -398,7 +396,6 @@ tap_desc "Takvim widget'ı" && { step "takvim widget dokunuş" 3; shot 27a-widge
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 
 adb logcat -d > logcat.txt
-grep "GlassDrag" logcat.txt | sed 's/^.*GlassDrag: //' | grep -E "Folder|iptal" | head -12 | cut -c1-900 | while IFS= read -r line; do echo "::notice::DRAG $line"; done
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
   grep -A45 "FATAL EXCEPTION" logcat.txt | head -60 | sed 's/^.*AndroidRuntime: //' | while IFS= read -r line; do

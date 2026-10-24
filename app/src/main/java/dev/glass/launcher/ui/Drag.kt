@@ -219,7 +219,7 @@ suspend fun PointerInputScope.detectHomeDrag(
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        if (!enabled()) { android.util.Log.d("GlassDrag", "down kapalı layer=${drag.activeLayer}"); return@awaitEachGesture }
+        if (!enabled()) return@awaitEachGesture
         val slop = viewConfiguration.touchSlop
         val editing = isEditing()
         drag.refreshActive()
@@ -235,8 +235,6 @@ suspend fun PointerInputScope.detectHomeDrag(
                 // değişince gönderilen yapay olaylar) yok sayılır. Önceden bunlar uzun basmayı iptal edip dokunuşu
                 // tıklamaya çeviriyordu (klasörde basılı tutunca menü yerine uygulama açılıyordu).
                 val otherDown = ev.changes.any { it.id != down.id && it.pressed }
-                if (c == null || !c.pressed || otherDown) android.util.Log.d("GlassDrag",
-                    "iptal c=${c != null} pressed=${c?.pressed} other=$otherDown n=${ev.changes.size} type=${ev.type} t=${(c?.uptimeMillis ?: 0) - down.uptimeMillis}")
                 r = when {
                     c == null -> -1
                     !c.pressed || otherDown -> 0
@@ -252,8 +250,6 @@ suspend fun PointerInputScope.detectHomeDrag(
             }
             r
         }
-        android.util.Log.d("GlassDrag", "layer=${drag.activeLayer} hit=${hit?.id} outcome=$outcome at=${down.position} " +
-            drag.targetsIn(drag.activeLayer).joinToString { it.id.takeLast(12) + it.cellRect.toString() })
         if (outcome == 0) return@awaitEachGesture
 
         var moved = outcome == 1
