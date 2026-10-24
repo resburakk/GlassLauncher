@@ -61,12 +61,14 @@ data class LauncherSettings(
     /** Açılırken parmak izi / yüz / ekran kilidi istenen uygulamalar. */
     val lockedApps: Set<String> = emptySet(),
     val tintColor: Int = 0xFF64D2FF.toInt(),
-    /** Simge köşe yarıçapı / simge boyu. iOS 26 ekran görüntüsünden ölçüldü: %25,4 (sürekli köşe, %60 yumuşaklık). */
-    val iconCorner: Float = 0.254f,
+    /** Simge köşe yarıçapı / simge boyu. iOS 26 ekran görüntüsünden ölçüldü: %26,2 (sürekli köşe, %60 yumuşaklık). */
+    val iconCorner: Float = 0.262f,
     /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
     val cornerSmoothing: Float = 0.6f,
     /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
     val iconRimGlow: Float = 1f,
+    /** Simgenin altındaki ince temas gölgesi. iOS 26 ölçümü: yok (0). */
+    val iconShadow: Float = 0f,
     val iconGlass: Boolean = true,
     /** Uygulama anahtarı → özel simge dosya adı (filesDir/icons altında). */
     val customIcons: Map<String, String> = emptyMap(),
@@ -304,7 +306,7 @@ data class LauncherSettings(
         put("hSpacing", hSpacing.toDouble()); put("vSpacing", vSpacing.toDouble())
         put("labelGap", labelGap.toDouble()); put("labelSize", labelSize.toDouble())
         put("iconScale", iconScale.toDouble()); put("iconStyle", iconStyle.name); put("iconStyleDark", iconStyleDark.name); put("darkOriginalApps", JSONArray(darkOriginalApps.toList())); put("hiddenApps", JSONArray(hiddenApps.toList())); put("iconPack", iconPack); put("lockedApps", JSONArray(lockedApps.toList())); put("tintColor", tintColor)
-        put("iconCorner3", iconCorner.toDouble()); put("iconGlass", iconGlass)
+        put("iconCorner4", iconCorner.toDouble()); put("iconGlass", iconGlass)
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
         put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
@@ -335,7 +337,7 @@ data class LauncherSettings(
         put("searchGlassBrightness2", searchGlassBrightness.toDouble())
         put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
         put("settingsTheme", settingsTheme); put("labelWeight", labelWeight.toDouble())
-        put("cornerSmoothing", cornerSmoothing.toDouble()); put("iconRimGlow", iconRimGlow.toDouble())
+        put("cornerSmoothing", cornerSmoothing.toDouble()); put("iconRimGlow", iconRimGlow.toDouble()); put("iconShadow", iconShadow.toDouble())
         put("editButtonTextSize", editButtonTextSize.toDouble()); put("editButtonWeight", editButtonWeight.toDouble())
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
@@ -378,7 +380,7 @@ data class LauncherSettings(
                 lockedApps = o.optJSONArray("lockedApps")?.let { arr -> (0 until arr.length()).map { arr.optString(it) }.toSet() } ?: d.lockedApps,
                 tintColor = o.optInt("tintColor", d.tintColor),
                 // Eski kayıtlı değer ("iconCorner") bir kez iOS ölçüsüne döner; sonra kullanıcının ayarı korunur.
-                iconCorner = f("iconCorner3", d.iconCorner),
+                iconCorner = f("iconCorner4", d.iconCorner),
                 iconGlass = o.optBoolean("iconGlass", d.iconGlass),
                 customIcons = iconMap,
                 dockHeight = f("dockHeight", d.dockHeight),
@@ -474,6 +476,7 @@ data class LauncherSettings(
                 labelWeight = f("labelWeight", d.labelWeight),
                 cornerSmoothing = f("cornerSmoothing", d.cornerSmoothing),
                 iconRimGlow = f("iconRimGlow", d.iconRimGlow),
+                iconShadow = f("iconShadow", d.iconShadow),
                 editButtonTextSize = f("editButtonTextSize", d.editButtonTextSize),
                 editButtonWeight = f("editButtonWeight", d.editButtonWeight),
             ).let { loaded ->

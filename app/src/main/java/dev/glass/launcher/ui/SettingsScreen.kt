@@ -766,12 +766,16 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             "Renkli: simge tek renk çizilir."
     )
     Group("Şekil") {
-        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.254f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
+        SliderRow("Köşe yuvarlaklığı", pct(s.iconCorner / 0.262f), s.iconCorner, 0.05f..0.5f, default = Def.iconCorner) { v ->
             onChange { it.copy(iconCorner = v) }
         }
         RowDivider()
         SliderRow("Köşe yumuşaklığı (iOS)", pct(s.cornerSmoothing), s.cornerSmoothing, 0f..1f, default = Def.cornerSmoothing) { v ->
             onChange { it.copy(cornerSmoothing = v) }
+        }
+        RowDivider()
+        SliderRow("Simge gölgesi", pct(s.iconShadow), s.iconShadow, 0f..1f, default = Def.iconShadow) { v ->
+            onChange { it.copy(iconShadow = v) }
         }
         RowDivider()
         SliderRow("Simge kenar parlaklığı", pct(s.iconRimGlow), s.iconRimGlow, 0f..2f, default = Def.iconRimGlow) { v ->

@@ -108,6 +108,8 @@ object GlassLens {
     @Volatile var lightBack: Float = 0.3f
     /** Alt temas gölgesi (simgeler bunu okur; diğer camlar ayarı doğrudan okur). */
     @Volatile var contactShadow: Float = 0.5f
+    /** Simgelerin temas gölgesi (iOS 26: yok). */
+    @Volatile var iconShadow: Float = 0f
     /** Panel kayıtlarına eklenecek kenar payı (px): dışarıdan bükme için. */
     fun padPx(): Int = (48f * density).toInt()
 

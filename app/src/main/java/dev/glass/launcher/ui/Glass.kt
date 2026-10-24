@@ -254,6 +254,11 @@ fun Modifier.liquidGlass(
     overlay: Boolean = false,
     /** iOS 26 kalın kenar merceği (dışarıdan bükme, kavisli eğim, yönlü parlama). Bütün camlarda açık. */
     ios: Boolean = true,
+    /**
+     * iOS 26 dock kenarı: koyu kenar ve gölge yok; çevresinde açık, ışıklı ince çizgi (üst ve alt kavislerde
+     * parlak). iOS ekran görüntüsüyle karşılaştırılarak ayarlandı.
+     */
+    brightRim: Boolean = false,
 ): Modifier = composed {
     val look1 = LocalGlass.current
     val ov = LocalOverlayBackdrop.current
@@ -319,16 +324,20 @@ fun Modifier.liquidGlass(
     if (pageAnchor != null) {
         DisposableEffect(pageAnchor, holeKey) { onDispose { pageAnchor.holes.remove(holeKey) } }
     }
-    val rim = if (look.dark) {
+    val rim = if (brightRim) {
+        // Varsayılan kenar parlaklığına (0,4) göre ölçeklenir; ayarla birlikte artıp azalır.
+        val k = (glow / 0.4f).coerceIn(0f, 2.5f)
+        lightRim(0.70f * k, 0.30f * k, st.glassLightAngle, 0.65f)
+    } else if (look.dark) {
         lightRim(0.45f * s * glow, 0.05f * s * glow, st.glassLightAngle, st.glassLightBack)
     } else {
         lightRim(0.80f * s * glow, 0.10f * s * glow, st.glassLightAngle, st.glassLightBack)
     }
     this
-        .then(if (look.reduced) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
+        .then(if (look.reduced || brightRim) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
         .then(
             when {
-                look.reduced || elevation == 0.dp -> Modifier
+                look.reduced || elevation == 0.dp || brightRim -> Modifier
                 // Sayfa içindeki cam (widget, klasör): sistem gölgesi saydam camın İÇİNDEN de görünür. Sayfa dururken
                 // cam arkasını kendisi çizdiği için örtülüyordu; kayarken arka planı alt katman çizdiğinden gölge
                 // camın içinde koyu bir kare olarak beliriyordu. Bunun yerine yalnızca camın DIŞINA düşen yumuşak gölge.
@@ -418,7 +427,7 @@ fun Modifier.liquidGlass(
                 )
             }
         )
-        .then(if (look.reduced) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
+        .then(if (look.reduced || brightRim) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
         .then(if (rimW > 0f) Modifier.border(rimW.dp, rim, shape) else Modifier)
 }
 
@@ -498,8 +507,9 @@ private fun DrawScope.drawBackdrop(
 
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
 fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f, rimWidth: Dp = 1.2.dp): Modifier =
-    if (!enabled) this.contactShadow(shape, GlassLens.contactShadow).clip(shape).iosRim(shape, rimGlow, rimWidth)
-    else this.contactShadow(shape, GlassLens.contactShadow).clip(shape)
+    // iOS 26 simgelerinin altında gölge yok (ölçüldü); "Simge gölgesi" ayarıyla açılabilir.
+    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosRim(shape, rimGlow, rimWidth)
+    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape)
         .drawWithContent {
             drawContent()
             drawRect(
@@ -779,14 +789,15 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
 }
 
 /**
- * iOS 26 simge kenar ışığı: üst ve sol kenarda ince, parlak bir şerit; alt-sağ kenarda çok hafif.
- * Simgeye cam gibi hafif kabarıklık verir. [glow] 0 ise hiçbir şey çizilmez (eski görünüm).
+ * iOS 26 simge kenar ışığı: ışığa bakan kenarda parlak; yanlarda ve altta da ince açık bir çizgi (iOS ekran
+ * görüntüsünde simgenin alt kenarı çevresinden ~%13 açık). Kenarı yumuşatır, köşeler daha yuvarlak algılanır.
+ * [glow] 0 ise hiçbir şey çizilmez (eski görünüm).
  */
 private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
     if (glow <= 0.01f || width < 0.05.dp) this
     else this.border(
         width,
-        lightRim(0.55f * glow, 0.06f * glow, GlassLens.lightAngle, GlassLens.lightBack),
+        lightRim(0.55f * glow, 0.16f * glow, GlassLens.lightAngle, maxOf(GlassLens.lightBack, 0.5f)),
         shape,
     )
 
