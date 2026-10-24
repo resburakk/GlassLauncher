@@ -872,7 +872,7 @@ internal fun AppCell(
         Column(
             Modifier
                 .requiredWidth(pitchX)
-                .graphicsLayer { scaleX = pressScale; scaleY = pressScale; alpha = pressDim }
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale; alpha = pressDim; compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha }
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

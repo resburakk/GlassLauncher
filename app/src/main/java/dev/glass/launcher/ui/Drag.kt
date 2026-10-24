@@ -371,6 +371,9 @@ internal fun DraggableCell(
                 }
                 .graphicsLayer {
                     alpha = if (drag.key == itemId || hidden) 0f else dim
+                    // Saydamlık katmansız uygulanır: ayrı katman hücre sınırında kesiyor, simgeden taşan bildirim
+                    // rozeti basılı tutunca yarım görünüyordu.
+                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
                     scaleX = scale
                     scaleY = scale
                     rotationZ = if (edit) jiggle.value * sign else 0f
