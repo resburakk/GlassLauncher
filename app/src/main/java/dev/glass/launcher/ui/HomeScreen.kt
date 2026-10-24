@@ -687,6 +687,9 @@ fun HomeScreen(
         val unlocking by remember { derivedStateOf { unlockAnim.value < 0.999f } }
         // Geçiş sürüyor mu (yalnızca eşik geçilince yeniden oluşturulur).
         val anyTransition by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f || today.progress > 0.001f } }
+        // Arşiv / widget sayfası / bulanıklık geçişi sürerken saniye ibresi duraklar (geçişte sayfa her karede yeniden çizilmesin).
+        val liveInMotion by remember { derivedStateOf { (libProgress.floatValue in 0.001f..0.999f) || (today.progress in 0.001f..0.999f) || (blurAmount in 0.001f..0.999f) } }
+        LaunchedEffect(liveInMotion) { LiveMotion.transition = liveInMotion }
         val regionsOpen = glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
         if (settings.launcherWallpaper && wp != null) {
             val homeImg = homeBlurImg

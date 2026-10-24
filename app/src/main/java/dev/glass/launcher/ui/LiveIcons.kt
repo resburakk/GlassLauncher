@@ -6,9 +6,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameMillis
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -36,6 +38,16 @@ enum class LiveIconKind { Clock, Calendar, Weather }
 private val TR_DAYS = arrayOf("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt")
 
 /**
+ * Sayfa kayarken ve arşiv/widget sayfası geçişlerinde canlı simgelerin (saniye ibresi) her kare güncellenmesi
+ * duraklatılır: saniye ibresi bulunduğu sayfanın tamamını her karede yeniden çizdiriyor, kaymayı pürüzlendiriyordu.
+ */
+object LiveMotion {
+    var scrolling by androidx.compose.runtime.mutableStateOf(false)
+    var transition by androidx.compose.runtime.mutableStateOf(false)
+    val paused: Boolean get() = scrolling || transition
+}
+
+/**
  * Şu anki zaman (ms). Yalnızca launcher öndeyken güncellenir; arka planda pil harcamaz.
  * [smooth] true: her karede (akıcı saniye ibresi); false: dakika başlarında.
  */
@@ -47,6 +59,9 @@ private fun rememberNow(smooth: Boolean): () -> Long {
         owner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
             while (true) {
                 if (smooth) {
+                    if (LiveMotion.paused) {
+                        androidx.compose.runtime.snapshotFlow { LiveMotion.paused }.first { !it }
+                    }
                     withFrameMillis { now.longValue = System.currentTimeMillis() }
                 } else {
                     val t = System.currentTimeMillis()

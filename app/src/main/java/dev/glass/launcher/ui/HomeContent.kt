@@ -481,6 +481,7 @@ internal fun HomeContent(
         // görünmezdir; yalnızca her karede tüm ekranı yeniletir (sayfaların kendisi yeniden çizilmez).
         var fullDamageTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
         LaunchedEffect(pagerState.isScrollInProgress) {
+            LiveMotion.scrolling = pagerState.isScrollInProgress
             if (pagerState.isScrollInProgress) while (true) withFrameNanos { fullDamageTick++ }
         }
         Box(Modifier.fillMaxSize().drawBehind { if (fullDamageTick >= 0) drawRect(Color.Transparent) })
