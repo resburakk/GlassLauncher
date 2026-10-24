@@ -251,8 +251,15 @@ internal fun HomeContent(
         val byPage = remember(shownPlacements) { shownPlacements.groupBy { it.page } }
         val shownDock = dockPreview ?: layout.dock
 
+        // Kaydırma bitince camlar arkalarını yeniden kendileri çizer (kayarken bunu sayfanın altındaki katman yapar).
+        // Bu devir teslim sayfayı baştan çizdirir; kaydırmanın son karesine denk gelince sayfa son pikselleri atlayıp
+        // "zınk" diye oturuyordu. Kayma modu, sayfa tamamen durduktan kısa süre sonra (görünmeden) bırakılır.
+        var scrollHold by remember { mutableStateOf(false) }
+        LaunchedEffect(pagerState.isScrollInProgress) {
+            if (pagerState.isScrollInProgress) scrollHold = true else { delay(320); scrollHold = false }
+        }
         // Kayarken katman camlarının merceği kapalı (bkz. GlassMotion).
-        LaunchedEffect(pagerState.isScrollInProgress) { GlassMotion.scrolling = pagerState.isScrollInProgress }
+        LaunchedEffect(scrollHold) { GlassMotion.scrolling = scrollHold }
         // Kaydırma sürerken (parmak kalktıktan sonraki yerine oturma dahil) yüksek kare hızı istenir (Android 15+).
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {
@@ -480,9 +487,9 @@ internal fun HomeContent(
         // kısmi yeniden çizimi ekranın bir kısmını eski karede bırakıyordu (ortadaki sütunlar donuyordu). Bu kutu
         // görünmezdir; yalnızca her karede tüm ekranı yeniletir (sayfaların kendisi yeniden çizilmez).
         var fullDamageTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
-        LaunchedEffect(pagerState.isScrollInProgress) {
-            LiveMotion.scrolling = pagerState.isScrollInProgress
-            if (pagerState.isScrollInProgress) while (true) withFrameNanos { fullDamageTick++ }
+        LaunchedEffect(scrollHold) {
+            LiveMotion.scrolling = scrollHold
+            if (scrollHold) while (true) withFrameNanos { fullDamageTick++ }
         }
         Box(Modifier.fillMaxSize().drawBehind { if (fullDamageTick >= 0) drawRect(Color.Transparent) })
         // Sayfa içi camların arkası (klasör simgeleri, widget'lar): yalnızca sayfalar kayarken, sayfaların ALTINDA
@@ -490,7 +497,7 @@ internal fun HomeContent(
         val pageAnchors = remember { androidx.compose.runtime.mutableStateMapOf<Int, PageAnchor>() }
         val stillJiggle = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         Box(Modifier.fillMaxSize().drawBehind {
-            if (!pagerState.isScrollInProgress || edit || dragging) return@drawBehind
+            if (!scrollHold || edit || dragging) return@drawBehind
             val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
             pageAnchors.forEach { (pg, a) -> drawPageGlassHoles(a, (pg - pos) * size.width, gridOrigin) }
         })
@@ -500,13 +507,13 @@ internal fun HomeContent(
         HorizontalPager(
             state = pagerState,
             userScrollEnabled = !dragging,
-            // Honor MagicOS 10 "Varsayılan" sayfa geçişi (ekran kaydından kare kare ölçüldü): bırakınca sayfa ~40 ms'de
-            // en yüksek hıza çıkar, sonra her karede ~%15 yavaşlayarak sekmeden durur; geçiş ~0,25 sn. Kritik sönümlü,
-            // sert yay (ω ≈ 25/sn). Duvar kâğıdı sabit, simgeler sayfayla tek parça; bir seferde en çok bir sayfa.
+            // Honor MagicOS 10 "Varsayılan" sayfa geçişi (ekran kaydından ölçüldü): sekmeden, kritik sönümlü yay; duvar
+            // kâğıdı sabit, simgeler sayfayla tek parça; bir seferde en çok bir sayfa. Honor'un ölçülen sertliği (ω≈25/sn)
+            // sonda "çakılma" hissi veriyordu: biraz daha yumuşak (ω≈20/sn), sona doğru süzülerek oturur (~0,3 sn).
             flingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(
                 state = pagerState,
                 pagerSnapDistance = androidx.compose.foundation.pager.PagerSnapDistance.atMost(1),
-                snapAnimationSpec = motion.spring(damping = 1f, stiffness = 650f),
+                snapAnimationSpec = motion.spring(damping = 1f, stiffness = 420f),
                 snapPositionalThreshold = 0.5f,
             ),
             // Sürüklerken TÜM sayfalar bellekte kalır: sürüklemenin başladığı sayfa (ve onu izleyen dokunma
@@ -520,7 +527,7 @@ internal fun HomeContent(
                 // Arşiv de ana ekran sayfaları gibi: kayarken kartların bulanık içi sayfanın altındaki ayrı katmanda
                 // (her karede ucuz), kartların kendisi hazır görüntü olarak taşınır.
                 val libAnchor = remember { PageAnchor() }
-                libAnchor.holesActive = { pagerState.isScrollInProgress && !edit && !dragging }
+                libAnchor.holesActive = { scrollHold && !edit && !dragging }
                 DisposableEffect(page, libAnchor) {
                     pageAnchors[page] = libAnchor
                     onDispose { if (pageAnchors[page] === libAnchor) pageAnchors.remove(page) }
@@ -548,7 +555,7 @@ internal fun HomeContent(
             val nearCurrent by remember(page) { derivedStateOf { kotlin.math.abs(page - pagerState.currentPage) <= 1 } }
             val pageJiggle = if (nearCurrent) jiggle else stillJiggle
             // Kayarken (düzenleme/sürükleme dışında) cam arkaları sayfanın altındaki katmanda çizilir.
-            anchor.holesActive = { pagerState.isScrollInProgress && !edit && !dragging }
+            anchor.holesActive = { scrollHold && !edit && !dragging }
             DisposableEffect(page, anchor) {
                 pageAnchors[page] = anchor
                 onDispose { if (pageAnchors[page] === anchor) pageAnchors.remove(page) }
