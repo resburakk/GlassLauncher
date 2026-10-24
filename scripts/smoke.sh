@@ -100,6 +100,8 @@ shot 04c1-klasor-menu-kapandi
 adb shell input motionevent DOWN $fx $fy; sleep 1.2
 adb shell input motionevent UP $fx $fy; step "klasör içi menü 2" 2
 shot 04c2-klasor-menu-ikinci
+# Klasör adımlarındaki dokunuş günlüğü hemen alınır (test sonunda tampon taşmış oluyor).
+adb logcat -d -s GlassDrag:D | grep GlassDrag | tail -8 | sed 's/^.*GlassDrag: //' | cut -c1-400 | while IFS= read -r line; do echo "::notice::DRAG04 $line"; done
 adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
 

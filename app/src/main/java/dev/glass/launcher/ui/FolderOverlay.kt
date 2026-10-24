@@ -221,6 +221,7 @@ fun FolderOverlay(
                                         drag = drag, layer = DragLayer.Folder, isApp = true,
                                         acceptsMerge = false, edit = edit, jiggle = jiggle,
                                         onClick = { r ->
+                                            android.util.Log.d("GlassDrag", "klasör tıklama $k key=${drag.key}")
                                             if (selection?.active == true) selection.toggle(k)
                                             else if (!edit) { vm.launchFrom(app, view, r); onClose() }
                                         },
