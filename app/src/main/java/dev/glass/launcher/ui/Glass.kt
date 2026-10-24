@@ -233,8 +233,12 @@ object GlassMotion {
      * (arşivin zemini zaten aynı bulanık duvar kâğıdı; fark görünmez). Kayma bitince kopya bir kez doğru yerden çizilir.
      */
     var listScrolling by androidx.compose.runtime.mutableStateOf(false)
-    /** Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez; hareket bitince bir kez güncellenir). */
-    val moving: Boolean get() = scrolling || transition
+    /**
+     * Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez; hareket bitince bir kez güncellenir).
+     * Geçişler ([transition]) buna dahil değil: widget sayfası kayarken camlar takibi bırakınca içlerindeki duvar
+     * kâğıdı dışarıdakiyle hizasız kalıyordu.
+     */
+    val moving: Boolean get() = scrolling
 }
 
 /** Arşiv/arama/widget sayfası açıkken arkadaki bulanık duvar kâğıdı (bu katmanlardaki camlar onu büker). */
@@ -409,10 +413,9 @@ fun Modifier.liquidGlass(
                     // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
                     val sh = if (inPage) pageAnchor?.shift?.invoke() else null
                     if (sh != null) {
-                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Geçiş sürerken mercek
-                        // (kırılma) çizilmez, yalnızca bulanık kopya: her widget'ın her karede merceği 120 Hz'i 60'a düşürüyordu.
-                        if (GlassMotion.transition) drawBackdrop(bd, look.rootW, look.rootH, origin + sh, soft = softPx)
-                        else drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
+                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Geçiş sürerken merceğin ek
+                        // yumuşatması (piksel başına 9 örnek) kapalı; mercek ve hizalama aynı kalır.
+                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, if (GlassMotion.transition) 0f else softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
                     } else if (inPage && GlassMotion.listScrolling) {
                         // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
