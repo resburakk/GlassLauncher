@@ -238,7 +238,7 @@ suspend fun PointerInputScope.detectHomeDrag(
                 if (c == null || !c.pressed || otherDown) android.util.Log.d("GlassDrag",
                     "iptal c=${c != null} pressed=${c?.pressed} other=$otherDown n=${ev.changes.size} type=${ev.type} t=${(c?.uptimeMillis ?: 0) - down.uptimeMillis}")
                 r = when {
-                    c == null -> if (ev.changes.none { it.pressed }) 0 else -1
+                    c == null -> -1
                     !c.pressed || otherDown -> 0
                     (c.position - down.position).getDistance() > slop -> {
                         val d = c.position - down.position
