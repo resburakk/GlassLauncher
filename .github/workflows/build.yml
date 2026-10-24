@@ -3,14 +3,15 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Unzip project
-        run: unzip -q GlassLauncher-stage1.zip
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 17
@@ -19,10 +20,50 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.11.1
-      - name: Build debug APK
-        working-directory: GlassLauncher
-        run: gradle assembleDebug --stacktrace
+      - name: Unit tests + build (debug & release) + lint
+        run: |
+          set -o pipefail
+          gradle testDebugUnitTest assembleDebug assembleRelease lintDebug --console=plain 2>&1 | tee build.log
+      - name: Report errors as annotations
+        if: failure()
+        run: |
+          grep -E "^e: |^w: .*(error)" build.log | head -40 | while IFS= read -r line; do
+            echo "::error::${line//$'%'/%25}"
+          done
+          grep -A3 -E " FAILED$" build.log | head -40 | tr '\n' ' ' | sed 's/^/::error::/' ; echo
+          awk '/What went wrong/{f=1} f{print} /Try:/{exit}' build.log | head -20 | tr '\n' ' ' | sed 's/^/::error::/' ; echo
+      - name: Lint summary
+        if: success()
+        run: |
+          f=app/build/reports/lint.txt
+          if [ -f "$f" ]; then
+            echo "::notice::$(grep -E '[0-9]+ errors?, [0-9]+ warnings?' $f | tail -1)"
+            grep -E ': (Error|Warning): ' "$f" | head -40 | while IFS= read -r line; do echo "::warning::LINT ${line//$'%'/%25}"; done
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: GlassLauncher-debug
-          path: GlassLauncher/app/build/outputs/apk/debug/*.apk
+          name: GlassLauncher-apk
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/debug/*.apk
+      - name: Publish to Releases (claude/build branch)
+        if: success() && github.ref == 'refs/heads/claude/build'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk GlassLauncher.apk
+          gh release delete son-surum -y --cleanup-tag || true
+          # Etiketin silinmesi bitmeden yeni sürüm oluşturulursa sürüm taslakta kalabiliyor: kısa bekle.
+          sleep 5
+          gh release create son-surum GlassLauncher.apk \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Glass Launcher (son derleme)" \
+            --notes "Otomatik derleme: ${GITHUB_SHA::7}. Telefonda GlassLauncher.apk dosyasını indirip kurun."
+          # Taslakta kaldıysa yayınla ve doğrula (yayınlanmamış sürüm telefonda görünmez).
+          for i in 1 2 3; do
+            d=$(gh release view son-surum --json isDraft -q .isDraft || echo true)
+            [ "$d" = "false" ] && break
+            gh release edit son-surum --draft=false || true
+            sleep 3
+          done
+          test "$(gh release view son-surum --json isDraft -q .isDraft)" = "false"
