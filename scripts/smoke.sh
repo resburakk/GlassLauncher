@@ -85,7 +85,8 @@ sleep 1.5
 adb shell input motionevent UP $jx $iy; step "klasör oluştur" 2
 adb shell input keyevent KEYCODE_BACK; step "geri" 2
 shot 04a-surukle-sonrasi
-adb shell input tap $ix $iy; step "klasör" 2
+# Klasör adından bulunur (simge yerleşimi değişince sabit koordinat başka uygulamaya denk geliyordu).
+{ tap_text "Klasör" || adb shell input tap $ix $iy; }; step "klasör" 2
 shot 04b-klasor
 # Klasörün içindeki ilk simgeye basılı tut: menü klasörün üstünde açılmalı
 fx=$((W*28/100)); fy=$((H*38/100))
