@@ -725,10 +725,11 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: () -> Float, onCl
     ) {
         val pt = m.pt.value
         val k = m.pillH / (m.pt * 29f) // arama düğmesi boyut çarpanı
-        SearchGlyph(Color.White, m.pt * 13f * k)
+        // iOS 26 ölçümü: büyüteç ve yazı ince, beyazın ~%80'i; büyüteç yazının yanında küçük.
+        SearchGlyph(Color.White.copy(alpha = 0.82f), m.pt * 9.5f * k)
         Spacer(Modifier.width(m.pt * 5f * k))
         Text(
-            "Ara", color = Color.White,
+            "Ara", color = Color.White.copy(alpha = 0.82f),
             fontSize = (LocalLauncherSettings.current.pillTextSize * pt * k).sp,
             fontWeight = fontWeightOf(LocalLauncherSettings.current.pillTextWeight),
             style = LocalTextStyle.current.copy(shadow = IosTextShadow),

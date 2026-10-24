@@ -111,8 +111,9 @@ data class LauncherSettings(
     /** Cam dolgusunun yoğunluğu; düşük = daha saydam (çarpan). */
     val glassOpacity: Float = 0f,
     /** Dock üstündeki "Ara" düğmesinin yazı boyutu (pt) ve kalınlığı (300–700). */
-    val pillTextSize: Float = 12f,
-    val pillTextWeight: Float = 500f,
+    // iOS 26 ölçümü: arama hapı yazısı normal kalınlıkta, simge yazısıyla aynı boyda.
+    val pillTextSize: Float = 11.5f,
+    val pillTextWeight: Float = 400f,
     /** Basılı tutma menüsü görünümü (iOS 26). */
     val menuCorner: Float = 30f,
     val menuWidth: Float = 260f,
@@ -315,7 +316,7 @@ data class LauncherSettings(
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
         put("glassBlur", glassBlur.toDouble()); put("glassBrightness", glassBrightness.toDouble())
         put("glassRimGlow", glassRimGlow.toDouble()); put("glassOpacity", glassOpacity.toDouble())
-        put("pillTextSize", pillTextSize.toDouble()); put("pillTextWeight", pillTextWeight.toDouble())
+        put("pillTextSize2", pillTextSize.toDouble()); put("pillTextWeight2", pillTextWeight.toDouble())
         put("menuCorner", menuCorner.toDouble()); put("menuWidth", menuWidth.toDouble())
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
         put("menuOpacity", menuOpacity.toDouble()); put("menuBlur", menuBlur.toDouble()); put("menuDark", menuDark)
@@ -412,8 +413,8 @@ data class LauncherSettings(
                 glassBrightness = f("glassBrightness", d.glassBrightness),
                 glassRimGlow = f("glassRimGlow", d.glassRimGlow),
                 glassOpacity = f("glassOpacity", d.glassOpacity),
-                pillTextSize = f("pillTextSize", d.pillTextSize),
-                pillTextWeight = f("pillTextWeight", d.pillTextWeight),
+                pillTextSize = f("pillTextSize2", d.pillTextSize),
+                pillTextWeight = f("pillTextWeight2", d.pillTextWeight),
                 menuCorner = f("menuCorner", d.menuCorner),
                 menuWidth = f("menuWidth", d.menuWidth),
                 menuTextSize = f("menuTextSize", d.menuTextSize),

@@ -522,7 +522,7 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
         .iosRim(shape, rimGlow, rimWidth)
         .border(
             rimWidth / 1.2f,
-            lightRim(0.65f * strength, 0.04f * strength, GlassLens.lightAngle, GlassLens.lightBack),
+            lightRim(0.65f * strength, 0.02f * strength, 0f, 1f),
             shape,
         )
 
@@ -530,7 +530,7 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
 fun SearchGlyph(color: Color, glyphSize: Dp) {
     Canvas(Modifier.size(glyphSize)) {
         val s = this.size.minDimension
-        val stroke = s * 0.13f
+        val stroke = s * 0.12f
         val r = s * 0.34f
         val c = Offset(s * 0.42f, s * 0.42f)
         drawCircle(color, radius = r, center = c, style = Stroke(stroke))
@@ -789,15 +789,16 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
 }
 
 /**
- * iOS 26 simge kenar ışığı: ışığa bakan kenarda parlak; yanlarda ve altta da ince açık bir çizgi (iOS ekran
- * görüntüsünde simgenin alt kenarı çevresinden ~%13 açık). Kenarı yumuşatır, köşeler daha yuvarlak algılanır.
+ * iOS 26 simge kenar ışığı: üst ve alt kenarda eşit parlak ince çizgi, yanlarda sönük (iOS ekran görüntüsünde
+ * üst ve alt kenar içeriden ~28 birim açık, yanlar koyu). Simgeye katmanlı, cam levha gibi bir derinlik verir.
  * [glow] 0 ise hiçbir şey çizilmez (eski görünüm).
  */
 private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
     if (glow <= 0.01f || width < 0.05.dp) this
     else this.border(
         width,
-        lightRim(0.55f * glow, 0.16f * glow, GlassLens.lightAngle, maxOf(GlassLens.lightBack, 0.5f)),
+        // iOS 26 ölçümü: simge kenarı üstte ve altta eşit parlak, yanlarda sönük (ışık dikey; köşeden değil).
+        lightRim(0.55f * glow, 0.02f * glow, 0f, 1f),
         shape,
     )
 
