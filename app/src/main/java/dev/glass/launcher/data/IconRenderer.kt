@@ -304,7 +304,7 @@ object IconRenderer {
                 bg?.let { it.bounds = bounds; it.draw(c) }
                 // iOS 26: sembol zemine hafif, yumuşak bir gölge düşürür (katmanlı görünüm). Plakası ön planda
                 // olan simgelerde (Honor) plakanın altına çizgi düşmesin diye yapılmaz.
-                if (fg != null && bg != null && !plated(d, size)) drawGlyphShadow(c, fg, bounds, size)
+                // bisect: gölge kapalı
                 fg?.let { it.bounds = bounds; it.draw(c) }
             }
             IconStyle.Light, IconStyle.Dark, IconStyle.Clear -> {
