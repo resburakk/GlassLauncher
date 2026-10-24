@@ -64,8 +64,38 @@ object FrameStats {
         val late = ms.count { it > expected * 1.5f }
         val worst = ms.last()
         val hz = 1000f / median.coerceAtLeast(0.1f)
-        text = "$label: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
+        val one = "$label: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
             "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
+        // Her türün (ana ekran, arşiv, widget sayfası) son ölçümü ayrı tutulur; en yenisi en üstte.
+        synchronized(results) { results.remove(label); results[label] = one; text = results.values.reversed().joinToString("\n\n") }
+    }
+    private val results = LinkedHashMap<String, String>()
+}
+
+
+/**
+ * [active] sürerken gerçek kare aralıklarını toplar; bitince "Ayarlar > Performans"ta [label] başlığıyla gösterir
+ * (ana ekran sayfa kaydırmasıyla aynı ölçüm; arşiv kaydırması, widget sayfası geçişi için).
+ */
+@androidx.compose.runtime.Composable
+fun MeasureFrames(active: Boolean, label: String) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.LaunchedEffect(active) {
+        if (!active) return@LaunchedEffect
+        val refresh = view.display?.refreshRate?.takeIf { it > 1f } ?: 60f
+        FrameStats.begin()
+        val list = ArrayList<Long>()
+        var last = 0L
+        try {
+            while (list.size < 600) {
+                androidx.compose.runtime.withFrameNanos { t ->
+                    if (last != 0L) list += t - last
+                    last = t
+                }
+            }
+        } finally {
+            FrameStats.report(list.toLongArray(), refresh, label)
+        }
     }
 }

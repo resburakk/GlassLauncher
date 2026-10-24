@@ -226,8 +226,10 @@ val LocalLauncherSettings = staticCompositionLocalOf { LauncherSettings() }
  */
 object GlassMotion {
     var scrolling by androidx.compose.runtime.mutableStateOf(false)
-    /** Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez). */
-    val moving: Boolean get() = scrolling
+    /** Widget sayfası / arşiv / bulanıklık geçişi sürüyor (ekran tek parça kayıyor ya da açılıyor). */
+    var transition by androidx.compose.runtime.mutableStateOf(false)
+    /** Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez; hareket bitince bir kez güncellenir). */
+    val moving: Boolean get() = scrolling || transition
 }
 
 /** Arşiv/arama/widget sayfası açıkken arkadaki bulanık duvar kâğıdı (bu katmanlardaki camlar onu büker). */

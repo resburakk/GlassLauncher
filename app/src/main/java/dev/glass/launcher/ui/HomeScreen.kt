@@ -689,7 +689,10 @@ fun HomeScreen(
         val anyTransition by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f || today.progress > 0.001f } }
         // Arşiv / widget sayfası / bulanıklık geçişi sürerken saniye ibresi duraklar (geçişte sayfa her karede yeniden çizilmesin).
         val liveInMotion by remember { derivedStateOf { (libProgress.floatValue in 0.001f..0.999f) || (today.progress in 0.001f..0.999f) || (blurAmount in 0.001f..0.999f) } }
-        LaunchedEffect(liveInMotion) { LiveMotion.transition = liveInMotion }
+        LaunchedEffect(liveInMotion) { LiveMotion.transition = liveInMotion; GlassMotion.transition = liveInMotion }
+        // Ölçüm: widget sayfası geçişindeki gerçek kare aralıkları (Ayarlar > Performans).
+        val todayMoving by remember { derivedStateOf { today.progress in 0.001f..0.999f } }
+        MeasureFrames(todayMoving, "Son geçiş (widget sayfası)")
         val regionsOpen = glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
         if (settings.launcherWallpaper && wp != null) {
             val homeImg = homeBlurImg

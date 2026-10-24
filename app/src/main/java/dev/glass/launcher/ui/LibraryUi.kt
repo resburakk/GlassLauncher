@@ -120,6 +120,7 @@ fun LibraryPage(
     val gridState = rememberLazyGridState()
     // Arşiv listesi kayarken de kart merceği kapalı (bkz. GlassMotion).
     LaunchedEffect(gridState.isScrollInProgress) { GlassMotion.scrolling = gridState.isScrollInProgress }
+    MeasureFrames(gridState.isScrollInProgress, "Son kaydırma (Uygulama Arşivi)")
     // Ekran en üstteyken aşağı çekilirse arama moduna geçer (arama çubuğuna dokunulmuş gibi).
     val pullDown = remember(gridState) {
         object : NestedScrollConnection {
