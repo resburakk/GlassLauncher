@@ -803,20 +803,25 @@ private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
         val path = Path().apply { addOutline(outline) }
         val w = (width.toPx() * 0.4f).coerceIn(1f, 1.6f * density)
         val a = (0.30f * glow).coerceIn(0f, 1f)
-        val vert = Brush.verticalGradient(
-            0f to white(a), 0.10f to white(a * 0.2f), 0.5f to Color.Transparent, 0.90f to white(a * 0.2f), 1f to white(a),
+        // Dikey ışık (üst/alt) × yatay maske (köşelerde söner) tek gölgelendiricide birleşir: simge başına ayrı
+        // çizim katmanı açılmaz (her karede her simge için katman açmak düzenleme modunda pahalıydı).
+        val wv = android.graphics.Color.argb((a * 255).toInt(), 255, 255, 255)
+        val wm = android.graphics.Color.argb((a * 0.2f * 255).toInt(), 255, 255, 255)
+        val vert = android.graphics.LinearGradient(
+            0f, 0f, 0f, size.height,
+            intArrayOf(wv, wm, 0, wm, wv), floatArrayOf(0f, 0.10f, 0.5f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP,
         )
-        // Köşelerde sönsün: yatayda kenarlardan ortaya doğru açılan maske.
-        val fade = Brush.horizontalGradient(
-            0f to Color.Transparent, 0.24f to Color.Black, 0.76f to Color.Black, 1f to Color.Transparent,
+        val fade = android.graphics.LinearGradient(
+            0f, 0f, size.width, 0f,
+            intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0f, 0.24f, 0.76f, 1f),
+            android.graphics.Shader.TileMode.CLAMP,
         )
-        val layerPaint = androidx.compose.ui.graphics.Paint()
+        val brush = androidx.compose.ui.graphics.ShaderBrush(android.graphics.ComposeShader(vert, fade, android.graphics.PorterDuff.Mode.DST_IN))
+        // Çizgi şeklin içine düşsün diye kalınlığın yarısı kadar içeri: şekil 2w kalınlıkta çizilir, dışı simgenin
+        // kırpmasıyla kesilir (simge zaten kırpılmış; ayrıca kırpma yok).
         onDrawWithContent {
             drawContent()
-            drawContext.canvas.saveLayer(androidx.compose.ui.geometry.Rect(0f, 0f, size.width, size.height), layerPaint)
-            clipPath(path) { drawPath(path, vert, style = androidx.compose.ui.graphics.drawscope.Stroke(w * 2f)) }
-            drawRect(fade, blendMode = androidx.compose.ui.graphics.BlendMode.DstIn)
-            drawContext.canvas.restore()
+            drawPath(path, brush, style = androidx.compose.ui.graphics.drawscope.Stroke(w * 2f))
         }
     }
 
@@ -944,12 +949,11 @@ internal fun Modifier.iosMaterial(shape: Shape): Modifier = this.drawWithCache {
     val path = Path().apply { addOutline(outline) }
     val w = size.minDimension * 0.014f
     val shade = Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.035f))
+    // Simge zaten şekline kırpılmış (glassIcon'da clip, bu katmandan önce): ayrıca kırpma yapılmaz.
     onDrawWithContent {
         drawContent()
-        clipPath(path) {
-            drawRect(shade)
-            drawPath(path, Color.Black.copy(alpha = 0.035f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 4f))
-            drawPath(path, Color.Black.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 1.6f))
-        }
+        drawRect(shade)
+        drawPath(path, Color.Black.copy(alpha = 0.035f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 4f))
+        drawPath(path, Color.Black.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 1.6f))
     }
 }
