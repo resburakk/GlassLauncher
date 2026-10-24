@@ -1021,17 +1021,25 @@ internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp)
         val mw = minOf(wPx, hPx) * 0.014f
         p.color = 0x09000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
         p.color = 0x0D000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
-        // Kenar ışığı: üst/alt ortada ince ve soluk, köşelerde söner.
+        // Kenar parıltısı (iOS 26 App Store simgesinden ölçüldü): üst kenarda simge renginden ~%35 parlak, hafif
+        // camgöbeği-beyaz, ~2 px kalın ve içeri doğru yumuşakça sönen ışık; altta aynısı üsttekinin ~%60'ı.
+        // Kenar ortasında (genişliğin ~%22–80'i) parlak, köşelerde yok.
         if (rimGlow > 0.01f && rimPx > 0.05f) {
-            val a = (0.30f * rimGlow).coerceIn(0f, 1f)
-            val w = (rimPx * 0.4f).coerceIn(1f, 1.6f * density)
-            val wv = android.graphics.Color.argb((a * 255).toInt(), 255, 255, 255)
-            val wm = android.graphics.Color.argb((a * 0.2f * 255).toInt(), 255, 255, 255)
-            val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(), intArrayOf(wv, wm, 0, wm, wv), floatArrayOf(0f, 0.10f, 0.5f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP)
-            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0f, 0.24f, 0.76f, 1f), android.graphics.Shader.TileMode.CLAMP)
-            p.shader = android.graphics.ComposeShader(vert, fade, android.graphics.PorterDuff.Mode.DST_IN)
-            p.strokeWidth = w * 2f
-            c.drawPath(path, p)
+            val aTop = (0.50f * rimGlow).coerceIn(0f, 1f)
+            val aBot = aTop * 0.6f
+            fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
+            val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density)
+            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0.06f, 0.24f, 0.78f, 0.94f), android.graphics.Shader.TileMode.CLAMP)
+            fun glow(scale: Float, width: Float) {
+                val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
+                    intArrayOf(tint(aTop * scale), tint(aTop * scale * 0.15f), 0, tint(aBot * scale * 0.15f), tint(aBot * scale)),
+                    floatArrayOf(0f, 0.07f, 0.5f, 0.93f, 1f), android.graphics.Shader.TileMode.CLAMP)
+                p.shader = android.graphics.ComposeShader(vert, fade, android.graphics.PorterDuff.Mode.DST_IN)
+                p.strokeWidth = width
+                c.drawPath(path, p)
+            }
+            glow(0.35f, w * 5f) // içeri doğru yumuşak hale
+            glow(1f, w * 2f)    // kenardaki parlak çizgi (yarısı şeklin içinde)
         }
         bmp.prepareToDraw()
         bmp.asImageBitmap()
