@@ -799,6 +799,8 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
 private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
     if (glow <= 0.01f || width < 0.05.dp) this
     else this.drawWithCache {
+        // Küçük simgelerde (arşiv kartları, klasör önizlemesi) görünmez; çizilmez (çok sayıda simgede yük olmasın).
+        if (size.minDimension < 44.dp.toPx()) return@drawWithCache onDrawWithContent { drawContent() }
         val outline = shape.createOutline(size, layoutDirection, this)
         val path = Path().apply { addOutline(outline) }
         val w = (width.toPx() * 0.4f).coerceIn(1f, 1.6f * density)
@@ -945,6 +947,8 @@ fun Modifier.outsideShadow(shape: Shape, elevation: Dp): Modifier = this.drawWit
  * Simgenin renklerine dokunmaz, yalnızca üstüne ince bir ışık-gölge katmanı çizer.
  */
 internal fun Modifier.iosMaterial(shape: Shape): Modifier = this.drawWithCache {
+    // Küçük simgelerde görünmez; çizilmez (arşivde/klasör önizlemesinde çok sayıda simge var).
+    if (size.minDimension < 44.dp.toPx()) return@drawWithCache onDrawWithContent { drawContent() }
     val outline = shape.createOutline(size, layoutDirection, this)
     val path = Path().apply { addOutline(outline) }
     val w = size.minDimension * 0.014f

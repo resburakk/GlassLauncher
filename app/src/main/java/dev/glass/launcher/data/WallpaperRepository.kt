@@ -103,6 +103,21 @@ class WallpaperRepository(private val context: Context) {
      * duvar kâğıdı değiştiyse kopyalar ([force] hariç). Canlı duvar kâğıdında veya izin yoksa false döner.
      * Görüntü cihazda kalır; hiçbir yere gönderilmez.
      */
+    private fun sameBytes(a: File, b: File): Boolean = runCatching {
+        a.inputStream().buffered().use { x ->
+            b.inputStream().buffered().use { y ->
+                val ba = ByteArray(64 * 1024); val bb = ByteArray(64 * 1024)
+                while (true) {
+                    val na = x.readNBytes(ba, 0, ba.size); val nb = y.readNBytes(bb, 0, bb.size)
+                    if (na != nb) return@runCatching false
+                    if (na == 0) return@runCatching true
+                    if (!ba.copyOfRange(0, na).contentEquals(bb.copyOfRange(0, nb))) return@runCatching false
+                }
+                @Suppress("UNREACHABLE_CODE") true
+            }
+        }
+    }.getOrDefault(false)
+
     suspend fun syncFromSystem(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         // Android sürümüne göre biri ya da ikisi gerekir; hiçbiri yoksa denemeye gerek yok.
         if (!hasPhotosPermission() && !hasAllFilesAccess()) {
@@ -138,6 +153,13 @@ class WallpaperRepository(private val context: Context) {
                         d.intrinsicWidth.coerceAtLeast(1), d.intrinsicHeight.coerceAtLeast(1), android.graphics.Bitmap.Config.ARGB_8888,
                     ).also { b -> d.setBounds(0, 0, b.width, b.height); d.draw(android.graphics.Canvas(b)) }
                 tmp.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            // Aynı resim yeniden geldiyse (MagicOS kilit açılışında duvar kâğıdı kimliğini yenileyebiliyor) ana ekran
+            // duvar kâğıdı baştan yüklenmez: yükleme her seferinde kısa bir yanıp sönmeye yol açıyordu.
+            if (file.exists() && file.length() == tmp.length() && sameBytes(file, tmp)) {
+                tmp.delete()
+                prefs.edit().putInt("lastId", id).apply()
+                return@runCatching true
             }
             if (!tmp.renameTo(file)) return@runCatching false
             prefs.edit().putInt("lastId", id).putBoolean("fromSync", true).apply()
