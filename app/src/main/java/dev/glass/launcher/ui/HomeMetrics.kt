@@ -92,7 +92,7 @@ data class HomeMetrics(
             val marginX = (width - icon - pitchX * (cols - 1).toFloat()) / 2f
             val labelBlock = if (s.showLabels) u * (s.labelGap + s.labelSize * 1.25f) else 0.dp
             // iOS 26 ekran görüntüsünden ölçüldü: satır aralığı 100,5 pt (önce 98; satırlar aşağı indikçe kayıyordu).
-            val pitchY = max(u * 100.5f * s.vSpacing, icon + labelBlock + u * 4f)
+            val pitchY = max(u * 98f * s.vSpacing, icon + labelBlock + u * 4f)
             val firstTop = max(u * 90f, statusTop + u * 12f)
 
             // Dock (her zaman 4 simge; ızgara sütunlarından bağımsız)
