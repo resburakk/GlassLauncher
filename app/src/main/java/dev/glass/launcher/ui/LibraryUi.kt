@@ -118,8 +118,8 @@ fun LibraryPage(
 ) {
     var searching by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
-    // Arşiv listesi kayarken de kart merceği kapalı (bkz. GlassMotion).
-    LaunchedEffect(gridState.isScrollInProgress) { GlassMotion.scrolling = gridState.isScrollInProgress }
+    // Arşiv listesi kayarken kartlar arkalarını her karede yeniden çizmez (bkz. GlassMotion.listScrolling).
+    LaunchedEffect(gridState.isScrollInProgress) { GlassMotion.listScrolling = gridState.isScrollInProgress }
     MeasureFrames(gridState.isScrollInProgress, "Son kaydırma (Uygulama Arşivi)")
     // Ekran en üstteyken aşağı çekilirse arama moduna geçer (arama çubuğuna dokunulmuş gibi).
     val pullDown = remember(gridState) {
@@ -268,7 +268,9 @@ private fun CategoryTile(
     // iOS 26 ölçüleri (kart genişliğine oranla): iç boşluk %8,5, büyük simgeler arası %7,3.
     val pad = tile * 0.085f
     val gap = tile * 0.073f
-    var center by remember { mutableStateOf(Offset.Zero) }
+    // Kartın ekrandaki merkezi yalnızca dokununca okunur (açılış animasyonunun başlangıcı): durum değişkeni olsaydı
+    // liste kayarken her kart her karede yeniden oluşturuluyordu.
+    val centerHolder = remember { arrayOf(Offset.Zero) }
     // Köşe: kendi ayarı ya da (seçildiyse) dock'un köşesiyle aynı yarıçap; kartın yarısını geçmez.
     val dockR = LocalHomeMetrics.current?.dockCorner
     val tileCorner = (if (settings.libraryTileCornerDock && dockR != null) dockR else u * settings.libraryTileCorner).coerceAtMost(tile / 2f)
@@ -280,7 +282,9 @@ private fun CategoryTile(
         Box(
             Modifier
                 .size(tile)
-                .onGloballyPositioned { center = it.boundsInRoot().center }
+                .onGloballyPositioned { centerHolder[0] = it.boundsInRoot().center }
+                // Kart bir kez hazır görüntüye çizilir; liste kayarken yalnızca bu görüntü taşınır (120 Hz).
+                .cachedLayer(true, 8.dp)
                 // Dock ile aynı Liquid Glass (kırılma, parlama, kenar ışığı; tüm cam ayarları uygulanır).
                 // Arkası bulanık arşiv zemini: şeffaf stilde de bulanık kopya kullanılır. Gölgesiz: yarı saydam
                 // camın altından gölge koyu bir kare gibi görünüyordu.
@@ -302,7 +306,7 @@ private fun CategoryTile(
                                     onClick = { r -> vm.launchFrom(app, view, r) },
                                     onDrop = { p, h -> onDrop(app.key, p, h) },
                                 ) { AppIconImage(app, vm, big, settings.iconGlass, settings.glassStrength) }
-                                i == 3 && rest.isNotEmpty() -> MiniCluster(vm, rest, big, "${g.title} kategorisini aç") { onOpen(center) }
+                                i == 3 && rest.isNotEmpty() -> MiniCluster(vm, rest, big, "${g.title} kategorisini aç") { onOpen(centerHolder[0]) }
                                 else -> Spacer(Modifier.size(big))
                             }
                         }

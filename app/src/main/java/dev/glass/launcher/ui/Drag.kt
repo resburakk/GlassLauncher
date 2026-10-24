@@ -526,7 +526,7 @@ internal fun WidgetCell(
  * çevresinde [margin] kadar taşma payıyla açılır: yazı gölgeleri ve simgeden taşan rozetler kesilmez. Yerleşim
  * değişmez (dışarıya özgün boyut bildirilir).
  */
-private fun Modifier.cachedLayer(on: Boolean, margin: androidx.compose.ui.unit.Dp = 18.dp): Modifier =
+internal fun Modifier.cachedLayer(on: Boolean, margin: androidx.compose.ui.unit.Dp = 18.dp): Modifier =
     if (!on) this else this
         .layout { m, c ->
             // Dışarıya özgün boyut; içteki geniş katman taşma payı kadar sola/yukarı kaydırılır.

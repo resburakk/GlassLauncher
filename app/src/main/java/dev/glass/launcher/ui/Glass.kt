@@ -228,6 +228,11 @@ object GlassMotion {
     var scrolling by androidx.compose.runtime.mutableStateOf(false)
     /** Widget sayfası / arşiv / bulanıklık geçişi sürüyor (ekran tek parça kayıyor ya da açılıyor). */
     var transition by androidx.compose.runtime.mutableStateOf(false)
+    /**
+     * Arşiv listesi dikey kayıyor: sayfa içindeki kartlar konum izlemez ve arkalarının bulanık kopyasını çizmez
+     * (arşivin zemini zaten aynı bulanık duvar kâğıdı; fark görünmez). Kayma bitince kopya bir kez doğru yerden çizilir.
+     */
+    var listScrolling by androidx.compose.runtime.mutableStateOf(false)
     /** Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez; hareket bitince bir kez güncellenir). */
     val moving: Boolean get() = scrolling || transition
 }
@@ -322,6 +327,15 @@ fun Modifier.liquidGlass(
         }
     }
     val pageAnchor = LocalPageAnchor.current
+    if (pageAnchor != null) {
+        // Arşiv listesi durunca kartın sayfaya göre konumu bir kez güncellenir (kayarken izlenmiyordu).
+        LaunchedEffect(pageAnchor) {
+            snapshotFlow { GlassMotion.listScrolling }.collect { s ->
+                val c = lastCoords[0]; val pc = pageAnchor.coords
+                if (!s && c != null && c.isAttached && pc != null && pc.isAttached) origin = pageAnchor.rest + pc.localPositionOf(c, Offset.Zero)
+            }
+        }
+    }
     var inPage by remember { mutableStateOf(false) }
     val holeKey = remember { Any() }
     val holeDensity = LocalDensity.current
@@ -358,7 +372,9 @@ fun Modifier.liquidGlass(
                 val inPageNow = pc != null && pc.isAttached
                 // Sayfa içindeki cam (arşiv kartları) konumunu hep izler: kayarken onu alt katman çizer, devir teslim
                 // aynı karede olur. Yalnızca sayfa dışındaki katman camları hareket sırasında konum izlemez.
-                if (inPageNow || !(overlay && GlassMotion.moving)) {
+                if (inPageNow && GlassMotion.listScrolling) {
+                    // Arşiv listesi kayıyor: konum izlenmez (kayma bitince bir kez güncellenir).
+                } else if (inPageNow || !(overlay && GlassMotion.moving)) {
                     origin = if (inPageNow) pageAnchor!!.rest + pc!!.localPositionOf(c, Offset.Zero) else c.positionInRoot()
                 }
                 inPage = pc != null && pc.isAttached
@@ -393,9 +409,13 @@ fun Modifier.liquidGlass(
                     // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
                     val sh = if (inPage) pageAnchor?.shift?.invoke() else null
                     if (sh != null) {
-                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden (az sayıda cam, ucuz).
-                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
+                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Geçiş sürerken mercek
+                        // (kırılma) çizilmez, yalnızca bulanık kopya: her widget'ın her karede merceği 120 Hz'i 60'a düşürüyordu.
+                        if (GlassMotion.transition) drawBackdrop(bd, look.rootW, look.rootH, origin + sh, soft = softPx)
+                        else drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
+                    } else if (inPage && GlassMotion.listScrolling) {
+                        // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
                     } else if (inPage || !(overlay && GlassMotion.moving)) {
                         // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
                         // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
