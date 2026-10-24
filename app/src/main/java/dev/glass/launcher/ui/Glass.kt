@@ -516,8 +516,8 @@ private fun DrawScope.drawBackdrop(
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
 fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f, rimWidth: Dp = 1.2.dp): Modifier =
     // iOS 26 simgelerinin altında gölge yok (ölçüldü); "Simge gölgesi" ayarıyla açılabilir.
-    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosMaterial(shape).iosRim(shape, rimGlow, rimWidth)
-    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosMaterial(shape)
+    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosRim(shape, rimGlow, rimWidth)
+    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape)
         .drawWithContent {
             drawContent()
             drawRect(
