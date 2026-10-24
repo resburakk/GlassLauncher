@@ -356,7 +356,6 @@ internal fun DraggableCell(
         motion.spring(damping = 0.6f, stiffness = 600f),
         label = "cellScale",
     )
-    val dim by animateFloatAsState(if (pressed) 0.75f else 1f, motion.tween(90), label = "cellDim")
     val sign = remember(itemId) { if ((itemId.hashCode() and 1) == 0) 1f else -1f }
 
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
@@ -370,10 +369,10 @@ internal fun DraggableCell(
                     target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
                 }
                 .graphicsLayer {
-                    alpha = if (drag.key == itemId || hidden) 0f else dim
-                    // Saydamlık katmansız uygulanır: ayrı katman hücre sınırında kesiyor, simgeden taşan bildirim
-                    // rozeti basılı tutunca yarım görünüyordu.
-                    compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha
+                    // Basınca yalnızca küçülür, soluklaşmaz: yarı saydamlık hücreyi ayrı katmana alıp sınırında kesiyordu
+                    // (simgeden taşan bildirim rozeti yarım görünüyordu). Katmansız saydamlık (ModulateAlpha) ise cam
+                    // efektleriyle birlikte basılı tutma anında grafik sürücüsünü kilitledi (emülatör ekranı dondu).
+                    alpha = if (drag.key == itemId || hidden) 0f else 1f
                     scaleX = scale
                     scaleY = scale
                     rotationZ = if (edit) jiggle.value * sign else 0f

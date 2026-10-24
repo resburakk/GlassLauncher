@@ -868,12 +868,11 @@ internal fun AppCell(
     val pressed by interaction.collectIsPressedAsState()
     val motion = LocalMotion.current
     val pressScale by animateFloatAsState(if (pressed) 0.92f else 1f, motion.spring(damping = 0.6f, stiffness = 600f), label = "cellPress")
-    val pressDim by animateFloatAsState(if (pressed) 0.75f else 1f, motion.tween(90), label = "cellDim")
     Box(Modifier.width(icon).height(cellHeight), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
                 .requiredWidth(pitchX)
-                .graphicsLayer { scaleX = pressScale; scaleY = pressScale; alpha = pressDim; compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.ModulateAlpha }
+                .graphicsLayer { scaleX = pressScale; scaleY = pressScale }
                 .clickable(interactionSource = interaction, indication = null, onClick = onClick),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
