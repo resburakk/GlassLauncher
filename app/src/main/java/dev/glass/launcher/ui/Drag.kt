@@ -83,6 +83,12 @@ class DragTarget(val id: String) {
     var cellRect: Rect = Rect.Zero
     var iconRect: Rect = Rect.Zero
     var onDrop: (Offset, String?) -> Unit = { _, _ -> }
+    /**
+     * Konumu şu anki gerçek ekran yerinden yeniden hesaplar. Konum yalnızca yerleşim değişince kaydediliyor;
+     * klasör büyüyerek açılırken (animasyon yerleşimi değiştirmez) simgelerin konumu klasör henüz küçükken kalıyor,
+     * klasör içinde uzun basma simgeyi bulamıyordu. Uzun basma başlarken çağrılır.
+     */
+    var refresh: (() -> Unit)? = null
 }
 
 /**
@@ -131,6 +137,11 @@ class DragState {
     fun homeIconRect(itemId: String): Rect? = targets.values
         .firstOrNull { it.itemId == itemId && (it.place == CellPlace.Grid || it.place == CellPlace.Dock) && !it.iconRect.isEmpty }
         ?.iconRect
+
+    /** Etkin katmandaki hedeflerin konumunu o anki ekran yerinden yeniler (bkz. [DragTarget.refresh]). */
+    fun refreshActive() {
+        targets.values.forEach { if (it.layer == activeLayer) runCatching { it.refresh?.invoke() } }
+    }
 
     fun hitTest(p: Offset): DragTarget? =
         targets.values.firstOrNull { it.layer == activeLayer && it.cellRect.contains(p) }
@@ -211,6 +222,7 @@ suspend fun PointerInputScope.detectHomeDrag(
         if (!enabled()) return@awaitEachGesture
         val slop = viewConfiguration.touchSlop
         val editing = isEditing()
+        drag.refreshActive()
         val hit = drag.hitTest(down.position)
 
         // 0 = vazgeç (dokunma veya kaydırma), 1 = düzenleme modunda doğrudan sürükleme, null = uzun basma
@@ -363,10 +375,14 @@ internal fun DraggableCell(
             Modifier
                 .requiredWidth(pitchX)
                 .onGloballyPositioned { c ->
-                    val o = c.positionInRoot()
-                    target.cellRect = Rect(o.x, o.y, o.x + pitchPx, o.y + cellHPx)
-                    val left = o.x + (pitchPx - iconPx) / 2f
-                    target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
+                    fun update(c: androidx.compose.ui.layout.LayoutCoordinates) {
+                        val o = c.positionInRoot()
+                        target.cellRect = Rect(o.x, o.y, o.x + pitchPx, o.y + cellHPx)
+                        val left = o.x + (pitchPx - iconPx) / 2f
+                        target.iconRect = Rect(left, o.y, left + iconPx, o.y + iconPx)
+                    }
+                    update(c)
+                    target.refresh = { if (c.isAttached) update(c) }
                 }
                 .graphicsLayer {
                     // Basınca yalnızca küçülür, soluklaşmaz: yarı saydamlık hücreyi ayrı katmana alıp sınırında kesiyordu
@@ -502,9 +518,13 @@ internal fun WidgetCell(
         Modifier
             .size(width, height)
             .onGloballyPositioned { c ->
-                val o = c.positionInRoot()
-                target.cellRect = Rect(o.x, o.y, o.x + wPx, o.y + hPx)
-                target.iconRect = target.cellRect
+                fun update(c: androidx.compose.ui.layout.LayoutCoordinates) {
+                    val o = c.positionInRoot()
+                    target.cellRect = Rect(o.x, o.y, o.x + wPx, o.y + hPx)
+                    target.iconRect = target.cellRect
+                }
+                update(c)
+                target.refresh = { if (c.isAttached) update(c) }
             }
             .graphicsLayer {
                 alpha = if (drag.key == id) 0f else 1f
