@@ -130,6 +130,8 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
     val density = LocalDensity.current.density
     var query by remember { mutableStateOf("") }
     var openApp by remember { mutableStateOf<String?>(null) }
+    // Telefon widget'ları bölümü başta kapalı (bir uygulamaya girip geri dönünce açık/kapalı durumu korunur).
+    var phoneOpen by remember { mutableStateOf(false) }
 
     val cacheKey = hm?.let { "${it.columns}x${it.rows}" }
     val apps by produceState(vm.widgetGalleryCache?.takeIf { it.first == cacheKey }?.second, hm) {
@@ -218,7 +220,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                 ) { appKey ->
                     val app = list?.firstOrNull { it.key == appKey }
                     if (app == null) {
-                        GalleryList(list, query, { query = it }, onOpen = { openApp = it }, onClose = onClose)
+                        GalleryList(list, phoneOpen, { phoneOpen = !phoneOpen }, query, { query = it }, onOpen = { openApp = it }, onClose = onClose)
                     } else {
                         GalleryDetail(app, hm, onBack = { openApp = null }, onAdd = ::add)
                     }
@@ -231,6 +233,8 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
 @Composable
 private fun GalleryList(
     apps: List<GalleryApp>?,
+    phoneOpen: Boolean,
+    onTogglePhone: () -> Unit,
     query: String,
     onQuery: (String) -> Unit,
     onOpen: (String) -> Unit,
@@ -275,43 +279,77 @@ private fun GalleryList(
         val shown = if (q.isEmpty()) apps else apps.filter { a ->
             AppCategorizer.normalize(a.name).contains(q) || a.widgets.any { AppCategorizer.normalize(it.title).contains(q) }
         }
+        val glassApps = shown.filter { it.isGlass }
+        val phoneApps = shown.filter { !it.isGlass }
+        // Telefon widget'ları başta kapalı; başlığa dokununca açılır. Arama yapılırken hep açık.
+        val phoneShown = phoneOpen || q.isNotEmpty()
+        val arrow by androidx.compose.animation.core.animateFloatAsState(if (phoneShown) 90f else 0f, label = "phoneArrow")
         LazyColumn(contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp)) {
-            itemsIndexed(shown, key = { _, it -> it.key }) { i, a ->
-                // Başlıklar: önce Glass Launcher widget'ları, sonra telefonun (diğer uygulamaların) widget'ları.
-                if (i == 0 || shown[i - 1].isGlass != a.isGlass) {
-                    Text(
-                        if (a.isGlass) "GLASS LAUNCHER WIDGET'LARI" else "TELEFON WIDGET'LARI",
-                        color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 6.dp, top = if (i == 0) 4.dp else 18.dp, bottom = 6.dp),
-                    )
-                }
+            if (glassApps.isNotEmpty()) item(key = "h:glass") { SectionTitle("GLASS LAUNCHER WIDGET'LARI", 4.dp) }
+            items(glassApps, key = { it.key }) { a -> GalleryRow(a, onOpen) }
+            if (phoneApps.isNotEmpty()) item(key = "h:phone") {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 3.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White.copy(alpha = 0.08f))
-                        .clickable { onOpen(a.key) }
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .padding(top = 14.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onTogglePhone() }
+                        .padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    AppBadge(a, 40.dp)
-                    Spacer(Modifier.width(12.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(a.name, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            when {
-                                a.isGlass -> "Liquid Glass · ${a.widgets[0].sizes.size} boyut"
-                                a.widgets.size == 1 -> a.widgets[0].title
-                                else -> "${a.widgets.size} widget"
-                            },
-                            color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Text("›", color = Color.White.copy(alpha = 0.4f), fontSize = 22.sp)
+                    Text(
+                        "TELEFON WIDGET'LARI", color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        "${phoneApps.size} uygulama", color = Color.White.copy(alpha = 0.4f), fontSize = 13.sp,
+                        modifier = Modifier.padding(end = 8.dp),
+                    )
+                    Text(
+                        "›", color = Color.White.copy(alpha = 0.6f), fontSize = 22.sp,
+                        modifier = Modifier.graphicsLayer { rotationZ = arrow },
+                    )
                 }
             }
+            if (phoneShown) items(phoneApps, key = { it.key }) { a -> GalleryRow(a, onOpen) }
         }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String, top: Dp) {
+    Text(
+        text, color = Color.White.copy(alpha = 0.5f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 6.dp, top = top, bottom = 6.dp),
+    )
+}
+
+@Composable
+private fun GalleryRow(a: GalleryApp, onOpen: (String) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White.copy(alpha = 0.08f))
+            .clickable { onOpen(a.key) }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AppBadge(a, 40.dp)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(a.name, color = Color.White, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                when {
+                    a.isGlass -> "Liquid Glass · ${a.widgets[0].sizes.size} boyut"
+                    a.widgets.size == 1 -> a.widgets[0].title
+                    else -> "${a.widgets.size} widget"
+                },
+                color = Color.White.copy(alpha = 0.55f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Text("›", color = Color.White.copy(alpha = 0.4f), fontSize = 22.sp)
     }
 }
 

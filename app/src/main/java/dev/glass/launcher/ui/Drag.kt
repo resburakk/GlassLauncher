@@ -34,6 +34,7 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -336,7 +337,14 @@ internal fun DraggableCell(
     // Yalnızca bu hücrenin "üzerinde mi" sonucu değişince yeniden çizilir (tüm ızgara değil).
     val hovered by remember(itemId) { derivedStateOf { drag.hoverId == itemId } }
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
+    val pressed0 by interaction.collectIsPressedAsState()
+    // Basılı tutup menü açılınca parmağın kalkışı hücreye ulaşmıyor, "basılı" görünüm (küçük ve soluk) takılı
+    // kalıyordu. Uzun basışta (menü açılırken) basılı görünüm bırakılır; iOS'ta da simge kalkar, küçülmez.
+    var longHeld by remember { mutableStateOf(false) }
+    LaunchedEffect(pressed0) {
+        if (pressed0) { kotlinx.coroutines.delay(400); longHeld = true } else longHeld = false
+    }
+    val pressed = pressed0 && !longHeld
     val motion = LocalMotion.current
     // iOS gibi: üzerine simge gelince büyür, basılınca hafifçe küçülüp kararır.
     val scale by animateFloatAsState(

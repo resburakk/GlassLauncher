@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.runtime.produceState
@@ -258,6 +259,8 @@ fun ContextMenuOverlay(
                 }
         ) {
             when {
+                // iOS: onay penceresi açılınca kalkan simge kaybolur (yarı saydam pencerenin üstündeymiş gibi görünüyordu).
+                confirmRemove -> Unit
                 widget != null -> Unit // widget yerinde kalır; yalnızca menü gösterilir
                 app != null -> AppIconImage(app, vm, req.iconDp, iconGlass, strength)
                 folder != null -> FolderIcon(folder, byKey, vm, req.iconDp, strength)
@@ -440,19 +443,39 @@ private fun RemoveConfirm(
                     modifier = Modifier.padding(horizontal = u * 18f),
                 )
                 Spacer(Modifier.height(u * 12f))
-                if (canDelete) ConfirmButton("Uygulamayı Sil", red, FontWeight.Normal, onDelete)
-                ConfirmButton(removeTitle, blue, FontWeight.Normal, onRemove)
-                ConfirmButton("Vazgeç", blue, FontWeight.SemiBold, onCancel)
+                // iOS uyarısı gibi: düğmeler ince çizgilerle ayrılır.
+                val sep = textColor.copy(alpha = 0.16f)
+                if (canDelete) { ConfirmDivider(sep); ConfirmButton("Uygulamayı Sil", red, FontWeight.Normal, textColor, onDelete) }
+                ConfirmDivider(sep)
+                ConfirmButton(removeTitle, blue, FontWeight.Normal, textColor, onRemove)
+                ConfirmDivider(sep)
+                ConfirmButton("Vazgeç", blue, FontWeight.SemiBold, textColor, onCancel)
             }
         }
     }
 }
 
 @Composable
-private fun ConfirmButton(title: String, color: Color, weight: FontWeight, onClick: () -> Unit) {
+private fun ConfirmDivider(color: Color) {
+    Box(Modifier.fillMaxWidth().height(0.5.dp).background(color))
+}
+
+/**
+ * Onay düğmesi. Android'in varsayılan basma efekti yok: pencereyi açan dokunuş aynı noktadaki düğmede gri, köşesiz
+ * bir şerit bırakıyordu. Yalnızca parmak üzerindeyken hafif vurgu; pencere açılır açılmaz gelen dokunuş yok sayılır.
+ */
+@Composable
+private fun ConfirmButton(title: String, color: Color, weight: FontWeight, textColor: Color, onClick: () -> Unit) {
     val u = LocalPt.current
+    val interaction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val shownAt = remember { android.os.SystemClock.uptimeMillis() }
     Box(
-        Modifier.fillMaxWidth().height(u * 46f).clickable(onClick = onClick),
+        Modifier.fillMaxWidth().height(u * 46f)
+            .background(if (pressed) textColor.copy(alpha = 0.08f) else Color.Transparent)
+            .clickable(interactionSource = interaction, indication = null) {
+                if (android.os.SystemClock.uptimeMillis() - shownAt > 350) onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(title, color = color, fontSize = (17f * u.value).sp, fontWeight = weight, fontFamily = AppFont)
