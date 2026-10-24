@@ -519,8 +519,8 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
     // iOS 26 simgelerinin altında gölge yok (ölçüldü); "Simge gölgesi" ayarıyla açılabilir.
     // Malzeme ve kenar ışığı her boyut/şekil için bir kez hazır görüntü olarak üretilir, her karede yalnızca
     // kopyalanır (her simge için her karede şekil çizgisi hesaplamak 120 Hz'i 60'a düşürüyordu).
-    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosIconOverlay(shape, rimGlow, rimWidth)
-    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosIconOverlay(shape, rimGlow, rimWidth)
+    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape)
+    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape)
         .drawWithContent {
             drawContent()
             drawRect(
