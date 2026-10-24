@@ -679,6 +679,8 @@ internal fun HomeContent(
                         .height(m.dockH)
                         .onGloballyPositioned { dockRect = it.boundsInRoot() }
                         .liquidGlass(appShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp, ios = true, brightRim = true)
+                        // iOS 26 dock'u arkasına göre hafif soğuk/mavimsi (ölçüldü: mavi−kırmızı farkı ~7 birim fazla).
+                        .background(Color(0xFF8FB4FF).copy(alpha = 0.07f), appShape(m.dockCorner))
                 ) {
                     shownDock.forEachIndexed { i, dk ->
                       key(dk) {
