@@ -590,7 +590,8 @@ internal fun HomeContent(
                                 val w = m.widgetWidth(pl.spanX)
                                 val h = m.widgetHeight(pl.spanY)
                                 // iOS: widget simge kenarlarından biraz taşar (bkz. HomeMetrics.widgetBleed); altında uygulama adı.
-                                Column(Modifier.offset(-m.widgetBleed, -m.widgetBleed)) {
+                                // iOS: widget yalnızca yanlara taşar; üstten satır hizasında başlar (ölçüldü).
+                                Column(Modifier.offset(-m.widgetBleed, 0.dp)) {
                                 WidgetCell(
                                     id = item.id, width = w, height = h, drag = drag, edit = edit, jiggle = pageJiggle,
                                     onDrop = { p, hv -> handleDrop(item.id, p, hv) },

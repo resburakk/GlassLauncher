@@ -516,8 +516,8 @@ private fun DrawScope.drawBackdrop(
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
 fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow: Float = 0f, rimWidth: Dp = 1.2.dp): Modifier =
     // iOS 26 simgelerinin altında gölge yok (ölçüldü); "Simge gölgesi" ayarıyla açılabilir.
-    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosRim(shape, rimGlow, rimWidth)
-    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape)
+    if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosMaterial(shape).iosRim(shape, rimGlow, rimWidth)
+    else this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosMaterial(shape)
         .drawWithContent {
             drawContent()
             drawRect(
@@ -929,6 +929,27 @@ fun Modifier.outsideShadow(shape: Shape, elevation: Dp): Modifier = this.drawWit
                 c.nativeCanvas.drawPath(ap, paint)
                 c.nativeCanvas.restore()
             }
+        }
+    }
+}
+
+
+/**
+ * iOS 26 simge malzemesi (ekran görüntüsüyle karşılaştırıldı): simgenin üstünden altına çok hafif koyulaşma
+ * (beyaz zeminde 253 → 245) ve kenarda yumuşak iç gölge; simge düz değil, hafif kabarık bir levha gibi görünür.
+ * Simgenin renklerine dokunmaz, yalnızca üstüne ince bir ışık-gölge katmanı çizer.
+ */
+internal fun Modifier.iosMaterial(shape: Shape): Modifier = this.drawWithCache {
+    val outline = shape.createOutline(size, layoutDirection, this)
+    val path = Path().apply { addOutline(outline) }
+    val w = size.minDimension * 0.014f
+    val shade = Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.035f))
+    onDrawWithContent {
+        drawContent()
+        clipPath(path) {
+            drawRect(shade)
+            drawPath(path, Color.Black.copy(alpha = 0.035f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 4f))
+            drawPath(path, Color.Black.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 1.6f))
         }
     }
 }

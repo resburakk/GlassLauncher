@@ -302,6 +302,9 @@ object IconRenderer {
         when (style) {
             IconStyle.Original -> {
                 bg?.let { it.bounds = bounds; it.draw(c) }
+                // iOS 26: sembol zemine hafif, yumuşak bir gölge düşürür (katmanlı görünüm). Plakası ön planda
+                // olan simgelerde (Honor) plakanın altına çizgi düşmesin diye yapılmaz.
+                if (fg != null && bg != null && !plated(d, size)) drawGlyphShadow(c, fg, bounds, size)
                 fg?.let { it.bounds = bounds; it.draw(c) }
             }
             IconStyle.Light, IconStyle.Dark, IconStyle.Clear -> {
@@ -328,6 +331,20 @@ object IconRenderer {
                     drawTintedFromLuminance(c, fg, bounds, size, tint)
                 }
             }
+        }
+    }
+
+    /** Ön plan katmanının yumuşak gölgesi: aşağı ~%1,8 kaymış, ~%3 bulanık, %18 siyah (iOS simge sembolleri gibi). */
+    private fun drawGlyphShadow(c: Canvas, fg: Drawable, bounds: Rect, size: Int) {
+        runCatching {
+            val tmp = createBitmap(size, size)
+            fg.bounds = bounds
+            fg.draw(Canvas(tmp))
+            val blur = (size * 0.03f).coerceAtLeast(1f)
+            val off = IntArray(2)
+            val alpha = tmp.extractAlpha(Paint().apply { maskFilter = android.graphics.BlurMaskFilter(blur, android.graphics.BlurMaskFilter.Blur.NORMAL) }, off)
+            c.drawBitmap(alpha, off[0].toFloat(), off[1] + size * 0.018f, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { color = 0x2E000000 })
+            alpha.recycle(); tmp.recycle()
         }
     }
 
