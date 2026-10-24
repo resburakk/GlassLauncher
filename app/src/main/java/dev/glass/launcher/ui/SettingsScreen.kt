@@ -778,6 +778,10 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             onChange { it.copy(iconShadow = v) }
         }
         RowDivider()
+        SliderRow("Renk canlılığı", pct(s.iconSaturation), s.iconSaturation, 0.8f..1.5f, default = Def.iconSaturation) { v ->
+            onChange { it.copy(iconSaturation = v) }
+        }
+        RowDivider()
         SliderRow("Simge kenar parlaklığı", pct(s.iconRimGlow), s.iconRimGlow, 0f..2f, default = Def.iconRimGlow) { v ->
             onChange { it.copy(iconRimGlow = v) }
         }

@@ -826,7 +826,16 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
             )
         ) {
             // Ekran okuyucu adı hücreden okur (etiket ya da hücrenin açıklaması); simge ayrıca okunmaz.
-            bmp?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High) }
+            // Renk canlılığı: çizimde doygunluk filtresi (simge görüntüsü ve çözünürlüğü değişmez). Koyu/Renkli/Şeffaf
+            // stiller kendi renk düzenleriyle çalışır; onlara uygulanmaz.
+            val vivid = remember(st.iconSaturation, look.style) {
+                val sat = st.iconSaturation
+                if (kotlin.math.abs(sat - 1f) < 0.01f || look.customFile != null ||
+                    (look.style != dev.glass.launcher.data.IconStyle.Original && look.style != dev.glass.launcher.data.IconStyle.Light)
+                ) null
+                else androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix().apply { setToSaturation(sat) })
+            }
+            bmp?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High, colorFilter = vivid) }
         }
         if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
     }
