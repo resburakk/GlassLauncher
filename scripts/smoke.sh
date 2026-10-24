@@ -77,13 +77,14 @@ adb shell input keyevent KEYCODE_BACK; step "geri"
 # 3) Uzun bas + sürükle
 adb shell input swipe $ix $iy $((W*60/100)) $((H*25/100)) 2500; step "sürükle-bırak" 4
 adb shell input keyevent KEYCODE_BACK; step "geri"
-# Takvim'i Saat'in üstüne sürükleyip bekleyerek klasör oluştur, sonra aç
-jx=$((W*38/100))
-adb shell input motionevent DOWN $ix $iy; sleep 0.7
-for f in 1 2 3 4 5 6 7 8; do adb shell input motionevent MOVE $((ix + (jx-ix)*f/8)) $iy; sleep 0.08; done
-sleep 1.5
-adb shell input motionevent UP $jx $iy; step "klasör oluştur" 2
-adb shell input keyevent KEYCODE_BACK; step "geri" 2
+# Klasör, çoklu seçimle kurulur (sürükleyip bekleme emülatörde yer değiştirmeye dönüşüp klasör oluşturmuyordu).
+adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
+tap_text "Seç"; step "seçim modu" 2
+adb shell input tap $ix $iy; sleep 0.6
+adb shell input tap $((W*38/100)) $iy; step "iki simge seçildi" 2
+tap_text "Klasör Oluştur"; step "klasör oluştur" 2
+tap_text "Bitti"; step "seçimi bitir" 1
+adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
 shot 04a-surukle-sonrasi
 # Klasör adından bulunur (simge yerleşimi değişince sabit koordinat başka uygulamaya denk geliyordu).
 { tap_text "Klasör" || adb shell input tap $ix $iy; }; step "klasör" 2
