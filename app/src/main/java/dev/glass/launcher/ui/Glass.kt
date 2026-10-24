@@ -552,7 +552,6 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
                 )
             )
         }
-        .iosRim(shape, rimGlow, rimWidth)
 
 @Composable
 fun SearchGlyph(color: Color, glyphSize: Dp) {
@@ -822,35 +821,9 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
  * çizgi iOS'ta yok. [glow] 0 ise hiçbir şey çizilmez.
  */
 private fun Modifier.iosRim(shape: Shape, glow: Float, width: Dp): Modifier =
-    if (glow <= 0.01f || width < 0.05.dp) this
-    else this.drawWithCache {
-        // Küçük simgelerde (arşiv kartları, klasör önizlemesi) görünmez; çizilmez (çok sayıda simgede yük olmasın).
-        if (size.minDimension < 44.dp.toPx()) return@drawWithCache onDrawWithContent { drawContent() }
-        val outline = shape.createOutline(size, layoutDirection, this)
-        val path = Path().apply { addOutline(outline) }
-        val w = (width.toPx() * 0.4f).coerceIn(1f, 1.6f * density)
-        val a = (0.30f * glow).coerceIn(0f, 1f)
-        // Dikey ışık (üst/alt) × yatay maske (köşelerde söner) tek gölgelendiricide birleşir: simge başına ayrı
-        // çizim katmanı açılmaz (her karede her simge için katman açmak düzenleme modunda pahalıydı).
-        val wv = android.graphics.Color.argb((a * 255).toInt(), 255, 255, 255)
-        val wm = android.graphics.Color.argb((a * 0.2f * 255).toInt(), 255, 255, 255)
-        val vert = android.graphics.LinearGradient(
-            0f, 0f, 0f, size.height,
-            intArrayOf(wv, wm, 0, wm, wv), floatArrayOf(0f, 0.10f, 0.5f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP,
-        )
-        val fade = android.graphics.LinearGradient(
-            0f, 0f, size.width, 0f,
-            intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0f, 0.24f, 0.76f, 1f),
-            android.graphics.Shader.TileMode.CLAMP,
-        )
-        val brush = androidx.compose.ui.graphics.ShaderBrush(android.graphics.ComposeShader(vert, fade, android.graphics.PorterDuff.Mode.DST_IN))
-        // Çizgi şeklin içine düşsün diye kalınlığın yarısı kadar içeri: şekil 2w kalınlıkta çizilir, dışı simgenin
-        // kırpmasıyla kesilir (simge zaten kırpılmış; ayrıca kırpma yok).
-        onDrawWithContent {
-            drawContent()
-            drawPath(path, brush, style = androidx.compose.ui.graphics.drawscope.Stroke(w * 2f))
-        }
-    }
+    // Widget ve dock kenar ışığı: simgelerle aynı, bir kez üretilen hazır görüntü (her karede ekran kartında
+    // gölgelendiriciyle çizmek emülatörde grafik sürücüsünü kilitliyor, telefonda da kare başına yük getiriyordu).
+    if (glow <= 0.01f || width < 0.05.dp) this else this.cachedGlassOverlay(shape, glow, width, material = false)
 
 
 /** Şeklin köşe yarıçapı (px): yuvarlak dikdörtgen ise sol üst köşe, değilse kısa kenarın %30'u. */
@@ -966,26 +939,6 @@ fun Modifier.outsideShadow(shape: Shape, elevation: Dp): Modifier = this.drawWit
 }
 
 
-/**
- * iOS 26 simge malzemesi (ekran görüntüsüyle karşılaştırıldı): simgenin üstünden altına çok hafif koyulaşma
- * (beyaz zeminde 253 → 245) ve kenarda yumuşak iç gölge; simge düz değil, hafif kabarık bir levha gibi görünür.
- * Simgenin renklerine dokunmaz, yalnızca üstüne ince bir ışık-gölge katmanı çizer.
- */
-internal fun Modifier.iosMaterial(shape: Shape): Modifier = this.drawWithCache {
-    // Küçük simgelerde görünmez; çizilmez (arşivde/klasör önizlemesinde çok sayıda simge var).
-    if (size.minDimension < 44.dp.toPx()) return@drawWithCache onDrawWithContent { drawContent() }
-    val outline = shape.createOutline(size, layoutDirection, this)
-    val path = Path().apply { addOutline(outline) }
-    val w = size.minDimension * 0.014f
-    val shade = Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.035f))
-    // Simge zaten şekline kırpılmış (glassIcon'da clip, bu katmandan önce): ayrıca kırpma yapılmaz.
-    onDrawWithContent {
-        drawContent()
-        drawRect(shade)
-        drawPath(path, Color.Black.copy(alpha = 0.035f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 4f))
-        drawPath(path, Color.Black.copy(alpha = 0.05f), style = androidx.compose.ui.graphics.drawscope.Stroke(w * 1.6f))
-    }
-}
 
 
 /** Simge üst katmanlarının (malzeme + kenar ışığı) hazır görüntüleri: boyut, şekil ve parlaklığa göre. */
@@ -1000,12 +953,16 @@ private object IconOverlayCache {
  * iOS 26 simge malzemesi + kenar ışığı tek hazır görüntüde (bkz. [iosMaterial], [iosRim]: görünüm aynı).
  * 44 dp'den küçük simgelerde çizilmez.
  */
-internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp): Modifier = this.drawWithCache {
+internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp): Modifier =
+    cachedGlassOverlay(shape, rimGlow, rimWidth, material = true)
+
+/** Hazır görüntü olarak çizilen üst katman: [material] simge malzemesi + kenar parıltısı; false: yalnızca parıltı. */
+private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp, material: Boolean): Modifier = this.drawWithCache {
     if (size.minDimension < 44.dp.toPx() || size.width < 1f || size.height < 1f) return@drawWithCache onDrawWithContent { drawContent() }
     val wPx = size.width.toInt().coerceAtLeast(1)
     val hPx = size.height.toInt().coerceAtLeast(1)
     val rimPx = rimWidth.toPx()
-    val key = "$wPx x $hPx|${shape.hashCode()}|${(rimGlow * 100).toInt()}|${(rimPx * 10).toInt()}"
+    val key = "$wPx x $hPx|${shape.hashCode()}|${(rimGlow * 100).toInt()}|${(rimPx * 10).toInt()}|$material"
     val img = IconOverlayCache.get(key) {
         val bmp = android.graphics.Bitmap.createBitmap(wPx, hPx, android.graphics.Bitmap.Config.ARGB_8888)
         val c = android.graphics.Canvas(bmp)
@@ -1013,22 +970,27 @@ internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp)
         val path = Path().apply { addOutline(outline) }.asAndroidPath()
         c.clipPath(path)
         val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        // Malzeme: üstten alta hafif koyulaşma + kenarda yumuşak iç gölge.
-        p.shader = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(), intArrayOf(0, 0, 0x09000000), floatArrayOf(0f, 0.35f, 1f), android.graphics.Shader.TileMode.CLAMP)
-        c.drawRect(0f, 0f, wPx.toFloat(), hPx.toFloat(), p)
-        p.shader = null
+        if (material) {
+            // Malzeme: üstten alta hafif koyulaşma + kenarda yumuşak iç gölge.
+            p.shader = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(), intArrayOf(0, 0, 0x09000000), floatArrayOf(0f, 0.35f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            c.drawRect(0f, 0f, wPx.toFloat(), hPx.toFloat(), p)
+            p.shader = null
+        }
         p.style = android.graphics.Paint.Style.STROKE
-        val mw = minOf(wPx, hPx) * 0.014f
-        p.color = 0x09000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
-        p.color = 0x0D000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
+        if (material) {
+            val mw = minOf(wPx, hPx) * 0.014f
+            p.color = 0x09000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
+            p.color = 0x0D000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
+        }
         // Kenar parıltısı (iOS 26 App Store simgesinden ölçüldü): üst kenarda simge renginden ~%35 parlak, hafif
         // camgöbeği-beyaz, ~2 px kalın ve içeri doğru yumuşakça sönen ışık; altta aynısı üsttekinin ~%60'ı.
         // Kenar ortasında (genişliğin ~%22–80'i) parlak, köşelerde yok.
         if (rimGlow > 0.01f && rimPx > 0.05f) {
-            val aTop = (0.50f * rimGlow).coerceIn(0f, 1f)
+            // Simge: iOS ölçüsü (%50). Widget/dock: önceki ince, soluk kenar (%30, hale yok).
+            val aTop = ((if (material) 0.50f else 0.30f) * rimGlow).coerceIn(0f, 1f)
             val aBot = aTop * 0.6f
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
-            val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density)
+            val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density).let { if (material) it else minOf(it, 0.8f * density) }
             val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0.06f, 0.24f, 0.78f, 0.94f), android.graphics.Shader.TileMode.CLAMP)
             fun glow(scale: Float, width: Float) {
                 val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
@@ -1038,7 +1000,7 @@ internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp)
                 p.strokeWidth = width
                 c.drawPath(path, p)
             }
-            glow(0.35f, w * 5f) // içeri doğru yumuşak hale
+            if (material) glow(0.35f, w * 5f) // içeri doğru yumuşak hale
             glow(1f, w * 2f)    // kenardaki parlak çizgi (yarısı şeklin içinde)
         }
         bmp.prepareToDraw()
