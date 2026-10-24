@@ -231,8 +231,15 @@ suspend fun PointerInputScope.detectHomeDrag(
             while (r < 0) {
                 val ev = awaitPointerEvent(PointerEventPass.Initial)
                 val c = ev.changes.firstOrNull { it.id == down.id }
+                // Yalnızca gerçekten basılı İKİNCİ bir parmak iptal eder; parmağı içermeyen ara olaylar (ör. düzen
+                // değişince gönderilen yapay olaylar) yok sayılır. Önceden bunlar uzun basmayı iptal edip dokunuşu
+                // tıklamaya çeviriyordu (klasörde basılı tutunca menü yerine uygulama açılıyordu).
+                val otherDown = ev.changes.any { it.id != down.id && it.pressed }
+                if (c == null || !c.pressed || otherDown) android.util.Log.d("GlassDrag",
+                    "iptal c=${c != null} pressed=${c?.pressed} other=$otherDown n=${ev.changes.size} type=${ev.type} t=${(c?.uptimeMillis ?: 0) - down.uptimeMillis}")
                 r = when {
-                    c == null || !c.pressed || ev.changes.size > 1 -> 0
+                    c == null -> if (ev.changes.none { it.pressed }) 0 else -1
+                    !c.pressed || otherDown -> 0
                     (c.position - down.position).getDistance() > slop -> {
                         val d = c.position - down.position
                         // Hızlı yatay hareket her zaman sayfa çevirir (iOS gibi); yavaş/kontrollü hareket sürükler.
