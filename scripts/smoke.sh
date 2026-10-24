@@ -92,6 +92,12 @@ fx=$((W*28/100)); fy=$((H*38/100))
 adb shell input motionevent DOWN $fx $fy; sleep 1.2
 adb shell input motionevent UP $fx $fy; step "klasör içi menü" 2
 shot 04c-klasor-menu
+# Menü boşluğa dokunarak kapatılır; ikinci basılı tutmada menü yeniden açılmalı (telefonda yalnızca bir kez açılıyordu).
+adb shell input tap $((W/2)) $((H*8/100)); step "menüyü dokunarak kapat" 2
+shot 04c1-klasor-menu-kapandi
+adb shell input motionevent DOWN $fx $fy; sleep 1.2
+adb shell input motionevent UP $fx $fy; step "klasör içi menü 2" 2
+shot 04c2-klasor-menu-ikinci
 adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
