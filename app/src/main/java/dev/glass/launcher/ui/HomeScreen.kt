@@ -96,6 +96,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -198,6 +199,12 @@ fun HomeScreen(
     val todayVisible by remember { derivedStateOf { today.progress > 0.001f } }
     val todayOpenNow by remember { derivedStateOf { today.progress > 0.5f } }
     LaunchedEffect(today) { snapshotFlow { today.progress > 0.5f }.collect { vm.todayOpen = it } }
+    // Widget sayfası durduktan 320 ms sonra geçiş bitmiş sayılır (ana ekran sayfa kaydırmasıyla aynı bekleme).
+    LaunchedEffect(today) {
+        snapshotFlow { today.progress > 0.001f && today.progress < 0.999f }.collectLatest { m ->
+            if (m) today.hold = true else { kotlinx.coroutines.delay(320); today.hold = false }
+        }
+    }
     // Arşiv kategorisi, dokunulan kartın yerinden büyüyerek açılır ve oraya küçülerek kapanır.
     var groupOrigin by remember { mutableStateOf(TransformOrigin.Center) }
     var rootSize by remember { mutableStateOf(IntSize.Zero) }
@@ -699,7 +706,7 @@ fun HomeScreen(
         // Geçiş sürüyor mu (yalnızca eşik geçilince yeniden oluşturulur).
         val anyTransition by remember { derivedStateOf { blurAmount > 0.001f || libProgress.floatValue > 0.001f || today.progress > 0.001f } }
         // Arşiv / widget sayfası / bulanıklık geçişi sürerken saniye ibresi duraklar (geçişte sayfa her karede yeniden çizilmesin).
-        val liveInMotion by remember { derivedStateOf { (libProgress.floatValue in 0.001f..0.999f) || (today.progress in 0.001f..0.999f) || (blurAmount in 0.001f..0.999f) } }
+        val liveInMotion by remember { derivedStateOf { (libProgress.floatValue in 0.001f..0.999f) || today.moving || (blurAmount in 0.001f..0.999f) } }
         LaunchedEffect(liveInMotion) { LiveMotion.transition = liveInMotion; GlassMotion.transition = liveInMotion }
         // Ölçüm: widget sayfası geçişindeki gerçek kare aralıkları (Ayarlar > Performans).
         val todayMoving by remember { derivedStateOf { today.progress in 0.001f..0.999f } }

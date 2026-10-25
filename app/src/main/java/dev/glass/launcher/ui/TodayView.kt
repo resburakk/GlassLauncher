@@ -88,7 +88,13 @@ class TodayState {
      */
     val anchor = PageAnchor()
     /** Sayfa kayarak açılıyor/kapanıyor mu (yalnızca durum değişince okuyanları yeniler). */
-    val moving by androidx.compose.runtime.derivedStateOf { progress > 0.001f && progress < 0.999f }
+    val moving by androidx.compose.runtime.derivedStateOf { hold || (progress > 0.001f && progress < 0.999f) }
+    /**
+     * Geçiş bittikten sonra kısa bir süre daha "kayıyor" sayılır (ana ekran sayfa kaydırmasındaki gibi): ertelenen işler
+     * (camların kendi çizimi, saniye ibresi, hazır görüntünün bırakılması) sayfa tam otururken aynı karede yapılınca
+     * sonda bir an duraksama hissi veriyordu.
+     */
+    var hold by mutableStateOf(false)
     private var anim: Job? = null
     /** Parmağın son hareket yönü (yakın geçmişe ağırlık veren toplam): bırakınca açılıp kapanmayı belirler. */
     private var recentDx = 0f
