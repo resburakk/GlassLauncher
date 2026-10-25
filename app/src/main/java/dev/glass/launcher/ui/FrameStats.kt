@@ -76,7 +76,9 @@ object FrameStats {
         val late = ms.count { it > expected * 1.5f }
         val worst = ms.last()
         val hz = 1000f / median.coerceAtLeast(0.1f)
-        val one = "$label: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
+        val testName = when (GlassDebug.mask) { 0 -> ""; 8 -> " [test: bulanıklık kapalı]"; 3 -> " [test: cam alt katmanı kapalı]"
+            4 -> " [test: hazır görüntü kapalı]"; 32 -> " [test: ana ekran gizli]"; 16 -> " [test: widget sayfası gizli]"; else -> " [test ${GlassDebug.mask}]" }
+        val one = "$label$testName: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
             "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
         // Her türün (ana ekran, arşiv, widget sayfası) son ölçümü ayrı tutulur; en yenisi en üstte.
