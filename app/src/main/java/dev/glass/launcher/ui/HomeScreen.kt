@@ -424,6 +424,14 @@ fun HomeScreen(
     val clearGlass = settings.glassStyle == "clear"
     // Şeffaf cam: duvar kâğıdının net kopyası (doku olarak; kendi boyutuyla eşlenir).
     val sharpBackdrop = remember(wallpaper) { wallpaper?.let { dev.glass.launcher.data.Blurred(it, it.width, it.height) } }
+    // Şeffaf camın "hafif yumuşak" net kopyası BİR KEZ hazırlanır (yarım ekran çözünürlüğü): önceden her karede her
+    // cam pikselinde tam çözünürlüklü duvar kâğıdından 9 örnek okunuyordu; widget sayfası geçişini 60 Hz'e düşürüyordu.
+    // Arşiv kartlarının hazır bulanık kopyası gibi tek okuma; görünüm aynı.
+    val softPxNow = with(LocalDensity.current) { 2.5.dp.toPx() }
+    val softSharp by produceState<dev.glass.launcher.data.Blurred?>(null, wallpaper, rootSize) {
+        val w = wallpaper
+        value = if (w == null) null else softWallpaperCopy(w, softPxNow, rootSize)?.let { dev.glass.launcher.data.Blurred(it, w.width, w.height) }
+    }
     // Ana ekran bulanıklığı açıkken camların (dock, Ara, klasör simgeleri) içi de en az arkadaki duvar kâğıdı
     // kadar bulanık olmalı; yoksa cam arkasını netleştiriyormuş gibi görünüyordu. Bulanık kopya ekranla aynı
     // oranda ek bulanıklaştırılır (kaydırıcı 0,1'lik adımlarla; arka planda hazırlanır).
@@ -482,7 +490,8 @@ fun HomeScreen(
             noLens = noLens,
             clear = clearGlass,
             // Ana ekran bulanıklığı açıkken şeffaf cam da net kopya yerine aynı oranda bulanık kopyayı kullanır.
-            sharp = if (!useBackdrop || reduced) null else homeBackdrop ?: sharpBackdrop,
+            sharp = if (!useBackdrop || reduced) null else homeBackdrop ?: softSharp ?: sharpBackdrop,
+            sharpSoft = homeBackdrop == null && softSharp != null,
             backdrop = if (!useBackdrop) null else homeBackdrop ?: blurred,
             rootW = rootSize.width.toFloat(),
             rootH = rootSize.height.toFloat(),
@@ -1402,6 +1411,29 @@ private fun GhostIcon(
 
 
 /** Duvar kâğıdının, ekrandaki [radiusPx] Gauss bulanıklığına eşdeğer bulanık küçük kopyası (bir kez, arka planda). */
+/** Net duvar kâğıdının yarım ekran çözünürlüğünde, [softPx] kadar hafif yumuşatılmış kopyası (şeffaf cam). */
+private suspend fun softWallpaperCopy(
+    src: androidx.compose.ui.graphics.ImageBitmap, softPx: Float, rootSize: IntSize,
+): androidx.compose.ui.graphics.ImageBitmap? {
+    if (rootSize.width == 0 || rootSize.height == 0) return null
+    return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        runCatching {
+            val full0 = src.asAndroidBitmap()
+            val full = if (full0.config == android.graphics.Bitmap.Config.HARDWARE) full0.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else full0
+            // Ekranı kaplayan ölçeğin yarısı (en çok orijinal boyut).
+            val k = (maxOf(rootSize.width.toFloat() / full.width, rootSize.height.toFloat() / full.height) * 0.5f).coerceAtMost(1f)
+            val small = android.graphics.Bitmap.createScaledBitmap(
+                full, (full.width * k).toInt().coerceAtLeast(1), (full.height * k).toInt().coerceAtLeast(1), true,
+            ).copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+            // Merceğin 9 örneklik yumuşatması ≈ Gauss sigma 0,9·soft (ekran px); yarım çözünürlükte yarısı.
+            val r = kotlin.math.round(softPx * 0.9f * 0.5f).toInt().coerceIn(1, 12)
+            dev.glass.launcher.data.BlurUtil.boxBlur(small, r, 3)
+            small.prepareToDraw()
+            small.asImageBitmap()
+        }.getOrNull()
+    }
+}
+
 private suspend fun blurredWallpaperCopy(
     src: androidx.compose.ui.graphics.ImageBitmap?, radiusPx: Float, rootSize: IntSize,
 ): androidx.compose.ui.graphics.ImageBitmap? {

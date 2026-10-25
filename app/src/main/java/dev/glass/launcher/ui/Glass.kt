@@ -101,6 +101,8 @@ data class GlassLook(
     val clear: Boolean = false,
     /** Launcher duvar kâğıdının NET kopyası (şeffaf cam için); yoksa null. */
     val sharp: Blurred? = null,
+    /** [sharp] zaten hafif yumuşatılmış hazır kopya: mercekte ek yumuşatma yapılmaz. */
+    val sharpSoft: Boolean = false,
     /** Launcher duvar kâğıdının bulanık kopyası (gerçek arka plan bulanıklığı için); yoksa null. */
     val backdrop: Blurred? = null,
     /** Duvar kâğıdının çizildiği kök alanın boyutu (px). */
@@ -314,7 +316,7 @@ fun Modifier.liquidGlass(
     }
     // Hafif yumuşatma yalnızca net kopyada; katman camlarının kopyası zaten bulanık (9 örneklik yumuşatma boşuna
     // ekran kartı yüküydü).
-    val softPx = if (!overlay && clear && bd != null && bd === look.sharp) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
+    val softPx = if (!overlay && clear && bd != null && bd === look.sharp && !look.sharpSoft) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
     val refr = when {
         look.noLens || look.reduced -> 0f
         clear -> (st.glassRefraction * 1.3f).coerceAtMost(1.2f)
