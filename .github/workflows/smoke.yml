@@ -43,10 +43,12 @@ jobs:
           [ -d shots ] || exit 0
           git config user.name "ci"; git config user.email "ci@users.noreply.github.com"
           mkdir -p /tmp/s && cp shots/*.png /tmp/s/ || exit 0
+          cp shots/*.txt /tmp/s/ 2>/dev/null || true
           git checkout --orphan ci-screens
           git rm -rfq . || true
           cp /tmp/s/*.png .
+          cp /tmp/s/*.txt . 2>/dev/null || true
           echo "$GITHUB_SHA" > SHA.txt
-          git add *.png SHA.txt
+          git add *.png *.txt
           git commit -qm "Emülatör ekran görüntüleri ${GITHUB_SHA::7}"
           git push -f origin ci-screens

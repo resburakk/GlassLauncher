@@ -405,9 +405,15 @@ for m in 0 1 2 4 8 16 32 48 63; do
     [ "$m" = 0 ] && [ "$r" = 1 ] && shot 28a-widget-sayfasi
     adb shell input swipe $((W*85/100)) $((H*50/100)) $((W*18/100)) $((H*50/100)) 350; sleep 1.2
   done
-  adb logcat -d -s GlassPerf:D | grep "mask=$m " | grep "widget sayfas" | tail -1 | sed 's/^.*GlassPerf: //' | cut -c1-600 | while IFS= read -r line; do echo "::notice::PERF $line"; done
+  adb logcat -d -s GlassPerf:D | grep "mask=$m " | grep "widget sayfas" | tail -1 | sed 's/^.*GlassPerf: //' | cut -c1-900 >> shots/perf.txt
 done
-adb shell am start -n dev.glass.launcher/.MainActivity --ei glassDebug 0 >/dev/null 2>&1
+adb shell am start -n dev.glass.launcher/.MainActivity --ei glassDebug 0 >/dev/null 2>&1; sleep 1
+# Karşılaştırma için ana ekran sayfa kaydırması (aynı emülatörde akıcı sayılan durum).
+for r in 1 2 3; do
+  adb shell input swipe $((W*85/100)) $((H*50/100)) $((W*18/100)) $((H*50/100)) 350; sleep 1.2
+  adb shell input swipe $((W*18/100)) $((H*50/100)) $((W*85/100)) $((H*50/100)) 350; sleep 1.2
+done
+adb logcat -d -s GlassPerf:D | grep "ana ekran" | tail -1 | sed 's/^.*GlassPerf: //' | cut -c1-900 >> shots/perf.txt
 
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
