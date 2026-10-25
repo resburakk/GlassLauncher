@@ -132,7 +132,10 @@ class TodayState {
         anim?.cancel()
         if (progress == target) return
         anim = scope.launch {
-            animate(progress, target, velocity, spring(dampingRatio = 1f, stiffness = 420f)) { v, _ -> progress = v }
+            // Bitiş eşiği yarım piksel: varsayılan (0,01 = ekranın %1'i ≈ 12 px) sayfayı son pikselleri süzülmeden
+            // yerine atlatıyordu; geçişin sonunda "dayanma" gibi görünüyordu. Ana ekran sayfa kaydırmasıyla aynı his.
+            val th = (0.5f / widthPx.coerceAtLeast(1f)).coerceAtLeast(0.00005f)
+            animate(progress, target, velocity, spring(dampingRatio = 1f, stiffness = 420f, visibilityThreshold = th)) { v, _ -> progress = v }
         }
     }
 }
