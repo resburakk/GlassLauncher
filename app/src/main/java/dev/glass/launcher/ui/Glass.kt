@@ -995,15 +995,17 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
         p.style = android.graphics.Paint.Style.STROKE
         if (material) {
             val mw = minOf(wPx, hPx) * 0.014f
-            p.color = 0x09000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
-            p.color = 0x0D000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
+            // Koyu kenar biraz daha silik (kullanıcı isteği: önceden 0x09 / 0x0D).
+            p.color = 0x07000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
+            p.color = 0x0A000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
         }
         // Kenar parıltısı (iOS 26 App Store simgesinden ölçüldü): üst kenarda simge renginden ~%35 parlak, hafif
         // camgöbeği-beyaz, ~2 px kalın ve içeri doğru yumuşakça sönen ışık; altta aynısı üsttekinin ~%60'ı.
         // Kenar ortasında (genişliğin ~%22–80'i) parlak, köşelerde yok.
         if (rimGlow > 0.01f && rimPx > 0.05f) {
             // Simge: iOS ölçüsü (%50). Widget/dock: önceki ince, soluk kenar (%30, hale yok).
-            val aTop = ((if (material) 0.50f else 0.30f) * rimGlow).coerceIn(0f, 1f)
+            // Simgelerde parıltı çizgisi çok hafif, neredeyse fark edilmez (kullanıcı isteği; önceden %50).
+            val aTop = ((if (material) 0.15f else 0.30f) * rimGlow).coerceIn(0f, 1f)
             val aBot = aTop * 0.6f
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
             val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density).let { if (material) it else minOf(it, 0.8f * density) }
