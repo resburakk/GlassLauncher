@@ -522,7 +522,11 @@ internal fun HomeContent(
             // Bütün ana ekran sayfaları hep hazır tutulur: sayfa değişince bir sonrakinin simgeleri baştan hazırlanıyor,
             // o karede 30 ms'lik tek bir takılma oluyordu. (Arşiv yalnızca son sayfadayken hazırlanır.)
             beyondViewportPageCount = if (dragging) homeCount else maxOf(1, pageTotal - 1),
-            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned { gridOrigin = it.positionInRoot() },
+            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned {
+                // Widget sayfası geçişinde ana ekran tek parça kayar: konum o sırada güncellenmez. Güncellenince her karede
+                // bütün sayfaların (görünmeyen arşiv dahil) camları baştan çiziliyor, geçiş 120 Hz'in altına düşüyordu.
+                if (today == null || today.progress == 0f) gridOrigin = it.positionInRoot()
+            },
         ) { page ->
             if (page == libIndex) {
                 // Arşiv de ana ekran sayfaları gibi: kayarken kartların bulanık içi sayfanın altındaki ayrı katmanda
