@@ -711,14 +711,14 @@ fun HomeScreen(
                 // Ana ekran bulanıklığı: hazır bulanık kopya (sabit, ucuz).
                 homeImg != null -> Image(
                     homeImg, null,
-                    Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() },
+                    Modifier.fillMaxSize().graphicsLayer { alpha = if (GlassDebug.off(64)) 0f else 1f - homeHide() },
                     contentScale = ContentScale.Crop,
                 )
                 needSharp -> Image(
                     screenWp ?: wp, null,
                     Modifier.fillMaxSize().graphicsLayer {
                         // Son uygulamalar açılırken kopya da söner (küçültülen pencerede dikdörtgen görünmesin).
-                        alpha = 1f - homeHide()
+                        alpha = if (GlassDebug.off(64)) 0f else 1f - homeHide()
                         // Kilit açılışı: duvar kâğıdı %7 yakından uzaklaşarak yerine gelir.
                         val zw = 1f + 0.07f * (1f - unlockAnim.value)
                         scaleX = zw; scaleY = zw
@@ -742,7 +742,7 @@ fun HomeScreen(
                     contentScale = ContentScale.Crop,
                 )
             }
-            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
+            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (GlassDebug.off(64)) 0f else 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
         // Widget sayfası geçişinde ana ekran da hazır görüntü olarak kayar; sayfa dışındaki camların (dock, arama
         // çubuğu) arkası bu alt katmanda her karede doğru yerden çizilir (önceden her karede tüm ana ekran çiziliyordu).

@@ -1157,6 +1157,8 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             4 to "Hazır görüntü kapalı",
             32 to "Ana ekran gizli",
             16 to "Widget sayfası gizli",
+            64 to "Duvar kâğıdı gizli",
+            127 to "Hepsi kapalı",
         )
         options.forEachIndexed { i, (m, label) ->
             if (i > 0) RowDivider()
