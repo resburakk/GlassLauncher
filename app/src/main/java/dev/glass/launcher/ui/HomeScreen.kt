@@ -737,7 +737,7 @@ fun HomeScreen(
                 Image(
                     blurImg, null,
                     Modifier.fillMaxSize().graphicsLayer {
-                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress).coerceIn(0f, 1f)
+                        alpha = if (GlassDebug.off(8)) 0f else (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress).coerceIn(0f, 1f)
                     },
                     contentScale = ContentScale.Crop,
                 )
@@ -750,13 +750,13 @@ fun HomeScreen(
         homeAnchor.shift = { Offset(today.progress * rootSize.width, 0f) }
         homeAnchor.holesActive = { today.moving }
         Box(Modifier.fillMaxSize().drawBehind {
-            if (today.moving) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
+            if (today.moving && !GlassDebug.off(2)) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
         })
         Box(
             Modifier.fillMaxSize()
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
                 .graphicsLayer {
-                    compositingStrategy = if (today.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    compositingStrategy = if (today.moving && !GlassDebug.off(4)) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                         else androidx.compose.ui.graphics.CompositingStrategy.Auto
                     // Açılan katmanın arkasında ana ekran içeriği bulanıklaşır (yarıçap çizimde okunur).
                     val br = blurPxMax * blurAmount
@@ -772,6 +772,7 @@ fun HomeScreen(
                     scaleX = k; scaleY = k
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width
+                    if (GlassDebug.off(32)) alpha = 0f
                 }
                 .onPlaced { homeAnchor.coords = it }
         ) {
@@ -807,7 +808,7 @@ fun HomeScreen(
         }
         if (settings.showToday && todayVisible) {
             // iOS Bugün görünümünde arka plan bulanık ve biraz koyu.
-            Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
+            Box(Modifier.fillMaxSize().drawBehind { if (!GlassDebug.off(8)) drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
             // Arama/menü/galeri açılınca widget sayfası da ana ekran gibi bulanıklaşır (yarıçap çizimde okunur).
             Box(Modifier.fillMaxSize().graphicsLayer {
                 val br = blurPxMax * blurAmount
@@ -815,7 +816,7 @@ fun HomeScreen(
             }) {
             // Geçişte widget camlarının arkası: sayfanın altında, o anki kaymaya göre (sayfa hazır görüntü olarak kayar).
             Box(Modifier.fillMaxSize().drawBehind {
-                if (today.moving) drawPageGlassHoles(today.anchor, (today.progress - 1f) * size.width, Offset.Zero)
+                if (today.moving && !GlassDebug.off(1)) drawPageGlassHoles(today.anchor, (today.progress - 1f) * size.width, Offset.Zero)
             })
             TodayPage(
                 state = today,

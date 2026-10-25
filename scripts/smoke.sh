@@ -395,6 +395,20 @@ shot 26c-widget-durunca
 tap_desc "Takvim widget'ı" && { step "takvim widget dokunuş" 3; shot 27a-widget-dokunus; adb shell dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity" | sed 's/^ */::notice::ACIK /'; }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 
+# 28) Ölçüm: widget sayfası geçişinde parçalar tek tek kapatılarak kare süreleri karşılaştırılır.
+adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
+adb logcat -c
+for m in 0 1 2 4 8 16 32 48 63; do
+  adb shell am start -n dev.glass.launcher/.MainActivity --ei glassDebug $m >/dev/null 2>&1; sleep 1
+  for r in 1 2 3; do
+    adb shell input swipe $((W*18/100)) $((H*50/100)) $((W*85/100)) $((H*50/100)) 350; sleep 1.2
+    [ "$m" = 0 ] && [ "$r" = 1 ] && shot 28a-widget-sayfasi
+    adb shell input swipe $((W*85/100)) $((H*50/100)) $((W*18/100)) $((H*50/100)) 350; sleep 1.2
+  done
+  adb logcat -d -s GlassPerf:D | grep "mask=$m " | grep "widget sayfas" | tail -1 | sed 's/^.*GlassPerf: //' | cut -c1-600 | while IFS= read -r line; do echo "::notice::PERF $line"; done
+done
+adb shell am start -n dev.glass.launcher/.MainActivity --ei glassDebug 0 >/dev/null 2>&1
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

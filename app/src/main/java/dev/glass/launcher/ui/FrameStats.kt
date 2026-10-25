@@ -8,6 +8,15 @@ import androidx.compose.runtime.setValue
  * Sayfa kaydırmalarındaki gerçek kare ölçümü (telefonda akıcılığı sayıyla görmek için).
  * Ana ekranda/arşive her kaydırmada kare aralıkları ölçülür; Ayarlar > Cam > Performans'ta gösterilir.
  */
+/**
+ * Yalnızca test için (emülatör ölçümü): geçişteki parçaları tek tek kapatıp hangisinin yük getirdiğini bulmak.
+ * Normal kullanımda 0; yalnızca adb ile "glassDebug" ekiyle açılınca değişir.
+ */
+object GlassDebug {
+    var mask by androidx.compose.runtime.mutableIntStateOf(0)
+    fun off(bit: Int): Boolean = mask and bit != 0
+}
+
 object FrameStats {
     var text by mutableStateOf("Henüz ölçüm yok: ana ekranda birkaç kez sayfa kaydırın.")
         private set
@@ -68,6 +77,7 @@ object FrameStats {
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
             "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
         // Her türün (ana ekran, arşiv, widget sayfası) son ölçümü ayrı tutulur; en yenisi en üstte.
+        android.util.Log.d("GlassPerf", "mask=${GlassDebug.mask} " + one.replace('\n', ' '))
         synchronized(results) { results.remove(label); results[label] = one; text = results.values.reversed().joinToString("\n\n") }
     }
     private val results = LinkedHashMap<String, String>()

@@ -173,7 +173,8 @@ fun TodayPage(
             .graphicsLayer {
                 translationX = (state.progress - 1f) * size.width
                 // Kayarken sayfa bir kez hazır görüntüye çizilir, sonra yalnızca bu görüntü taşınır (arşiv gibi).
-                compositingStrategy = if (state.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                if (GlassDebug.off(16)) alpha = 0f
+                compositingStrategy = if (state.moving && !GlassDebug.off(4)) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                     else androidx.compose.ui.graphics.CompositingStrategy.Auto
             }
             .onPlaced { todayAnchor.coords = it }
