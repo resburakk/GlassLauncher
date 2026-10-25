@@ -554,7 +554,6 @@ fun HomeScreen(
                 )
             }
             .onSizeChanged { rootSize = it }
-            .drawWithContent { DrawCount.hit("kök"); drawContent() }
             // Boş alana dokunma: düzenleme modundaysa moddan çıkar (iOS gibi; titreme durur, düğmeler kapanır).
             // Düzenleme modu dışında çift dokunma ekranı kilitler (ayarlardan kapatılabilir).
             .pointerInput(Unit) {
@@ -719,14 +718,14 @@ fun HomeScreen(
                 // Ana ekran bulanıklığı: hazır bulanık kopya (sabit, ucuz).
                 homeImg != null -> Image(
                     homeImg, null,
-                    Modifier.fillMaxSize().graphicsLayer { alpha = if (GlassDebug.off(64)) 0f else 1f - homeHide() },
+                    Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() },
                     contentScale = ContentScale.Crop,
                 )
                 needSharp -> Image(
                     screenWp ?: wp, null,
                     Modifier.fillMaxSize().graphicsLayer {
                         // Son uygulamalar açılırken kopya da söner (küçültülen pencerede dikdörtgen görünmesin).
-                        alpha = if (GlassDebug.off(64)) 0f else 1f - homeHide()
+                        alpha = 1f - homeHide()
                         // Kilit açılışı: duvar kâğıdı %7 yakından uzaklaşarak yerine gelir.
                         val zw = 1f + 0.07f * (1f - unlockAnim.value)
                         scaleX = zw; scaleY = zw
@@ -745,12 +744,12 @@ fun HomeScreen(
                 Image(
                     blurImg, null,
                     Modifier.fillMaxSize().graphicsLayer {
-                        alpha = if (GlassDebug.off(8)) 0f else (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress).coerceIn(0f, 1f)
+                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress).coerceIn(0f, 1f)
                     },
                     contentScale = ContentScale.Crop,
                 )
             }
-            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = if (GlassDebug.off(64)) 0f else 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
+            if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
         // Widget sayfası geçişinde ana ekran da hazır görüntü olarak kayar; sayfa dışındaki camların (dock, arama
         // çubuğu) arkası bu alt katmanda her karede doğru yerden çizilir (önceden her karede tüm ana ekran çiziliyordu).
@@ -758,14 +757,13 @@ fun HomeScreen(
         homeAnchor.shift = { Offset(today.progress * rootSize.width, 0f) }
         homeAnchor.holesActive = { today.moving }
         Box(Modifier.fillMaxSize().drawBehind {
-            if (today.moving) DrawCount.hit("alt katman")
-            if (today.moving && !GlassDebug.off(2)) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
+            if (today.moving) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
         })
         Box(
             Modifier.fillMaxSize()
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
                 .graphicsLayer {
-                    compositingStrategy = if (today.moving && !GlassDebug.off(4)) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    compositingStrategy = if (today.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                         else androidx.compose.ui.graphics.CompositingStrategy.Auto
                     // Açılan katmanın arkasında ana ekran içeriği bulanıklaşır (yarıçap çizimde okunur).
                     val br = blurPxMax * blurAmount
@@ -781,10 +779,8 @@ fun HomeScreen(
                     scaleX = k; scaleY = k
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width
-                    if (GlassDebug.off(32)) alpha = 0f
                 }
                 .onPlaced { homeAnchor.coords = it }
-                .drawWithContent { DrawCount.hit("ana ekran"); drawContent() }
         ) {
             androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides homeAnchor) {
             HomeContent(
@@ -818,7 +814,7 @@ fun HomeScreen(
         }
         if (settings.showToday && todayVisible) {
             // iOS Bugün görünümünde arka plan bulanık ve biraz koyu.
-            Box(Modifier.fillMaxSize().drawBehind { if (!GlassDebug.off(8)) drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
+            Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
             // Arama/menü/galeri açılınca widget sayfası da ana ekran gibi bulanıklaşır (yarıçap çizimde okunur).
             Box(Modifier.fillMaxSize().graphicsLayer {
                 val br = blurPxMax * blurAmount
@@ -826,7 +822,7 @@ fun HomeScreen(
             }) {
             // Geçişte widget camlarının arkası: sayfanın altında, o anki kaymaya göre (sayfa hazır görüntü olarak kayar).
             Box(Modifier.fillMaxSize().drawBehind {
-                if (today.moving && !GlassDebug.off(1)) drawPageGlassHoles(today.anchor, (today.progress - 1f) * size.width, Offset.Zero)
+                if (today.moving) drawPageGlassHoles(today.anchor, (today.progress - 1f) * size.width, Offset.Zero)
             })
             TodayPage(
                 state = today,

@@ -1148,30 +1148,6 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             "gölge, parlama) sadeleştirilir. Düşük güç modu bunları her zaman sadeleştirir ve sallanma/saniye " +
             "ibresi gibi sürekli animasyonları azaltır."
     )
-    // Geçici: widget sayfası geçişinde hangi parçanın yavaşlattığını telefonda ölçmek için (kalıcı ayar değil).
-    Group("Geçiş testi (geçici)") {
-        val options = listOf(
-            0 to "Normal",
-            8 to "Arka plan bulanıklığı ve karartma kapalı",
-            3 to "Cam alt katmanları kapalı",
-            4 to "Hazır görüntü kapalı",
-            32 to "Ana ekran gizli",
-            16 to "Widget sayfası gizli",
-            64 to "Duvar kâğıdı gizli",
-            127 to "Hepsi kapalı",
-        )
-        options.forEachIndexed { i, (m, label) ->
-            if (i > 0) RowDivider()
-            Row(
-                Modifier.fillMaxWidth().clickable { GlassDebug.mask = m }.padding(horizontal = 16.dp, vertical = 13.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(label, color = Fg, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                if (GlassDebug.mask == m) Text("✓", color = Color(0xFF0A84FF), fontSize = 17.sp)
-            }
-        }
-    }
-    Footer("Bir seçenek seç, ana ekranla widget sayfası arasında birkaç kez geç, sonra aşağıdaki \"Son geçiş\" satırına bak. Ölçüm hangi seçenekle yapıldığını da yazar. Görüntü bozuk görünebilir; bu yalnızca ölçüm içindir. Bitince \"Normal\"e dön.")
     Group("Kaydırma ölçümü") {
         Text(FrameStats.text, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
     }

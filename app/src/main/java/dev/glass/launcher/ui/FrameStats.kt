@@ -8,26 +8,6 @@ import androidx.compose.runtime.setValue
  * Sayfa kaydırmalarındaki gerçek kare ölçümü (telefonda akıcılığı sayıyla görmek için).
  * Ana ekranda/arşive her kaydırmada kare aralıkları ölçülür; Ayarlar > Cam > Performans'ta gösterilir.
  */
-/**
- * Yalnızca test için (emülatör ölçümü): geçişteki parçaları tek tek kapatıp hangisinin yük getirdiğini bulmak.
- * Normal kullanımda 0; yalnızca adb ile "glassDebug" ekiyle açılınca değişir.
- */
-object GlassDebug {
-    var mask by androidx.compose.runtime.mutableIntStateOf(0)
-    /** Test ölçümü sürüyor (maske 0 iken de az kareli geçişler ölçülsün). */
-    @Volatile var test = false
-    fun off(bit: Int): Boolean = mask and bit != 0
-}
-
-/** Test: ölçülen hareket boyunca hangi parçanın kaç kez yeniden çizildiği (kayıt = katmanın baştan hazırlanması). */
-object DrawCount {
-    private val m = LinkedHashMap<String, Int>()
-    @Volatile var on = false
-    fun hit(name: String) { if (on) synchronized(m) { m[name] = (m[name] ?: 0) + 1 } }
-    fun reset() { synchronized(m) { m.clear() }; on = true }
-    fun dump(): String { on = false; return synchronized(m) { m.entries.joinToString(", ") { "${it.key} ${it.value}" } } }
-}
-
 object FrameStats {
     var text by mutableStateOf("Henüz ölçüm yok: ana ekranda birkaç kez sayfa kaydırın.")
         private set
@@ -57,7 +37,6 @@ object FrameStats {
     fun begin() {
         synchronized(lock) { samples.clear() }
         recording = true
-        DrawCount.reset()
     }
 
     private fun breakdown(budget: Float): String {
@@ -78,23 +57,17 @@ object FrameStats {
 
     /** [intervalsNs]: art arda karelerin arası (ns), [refresh]: ekranın bildirdiği yenileme hızı (Hz). */
     fun report(intervalsNs: LongArray, refresh: Float, label: String = "Son kaydırma (ana ekran)") {
-        // Testte (emülatör yazılımla çizer, çok yavaş) az kareli geçişler de ölçülür.
-        if (intervalsNs.size < (if (GlassDebug.mask != 0 || GlassDebug.test) 3 else 8)) { recording = false; return }
+        if (intervalsNs.size < 8) { recording = false; return }
         val ms = intervalsNs.map { it / 1_000_000f }.sorted()
         val median = ms[ms.size / 2]
         val expected = 1000f / refresh.coerceAtLeast(1f)
         val late = ms.count { it > expected * 1.5f }
         val worst = ms.last()
         val hz = 1000f / median.coerceAtLeast(0.1f)
-        val testName = when (GlassDebug.mask) { 0 -> ""; 8 -> " [test: bulanıklık kapalı]"; 3 -> " [test: cam alt katmanı kapalı]"
-            4 -> " [test: hazır görüntü kapalı]"; 32 -> " [test: ana ekran gizli]"; 16 -> " [test: widget sayfası gizli]"; 64 -> " [test: duvar kâğıdı gizli]"; 127 -> " [test: hepsi kapalı]"; else -> " [test ${GlassDebug.mask}]" }
-        val draws = DrawCount.dump()
-        val one = "$label$testName: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
+        val one = "$label: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
-            "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected) +
-            "\n\nYeniden çizim (${ms.size} karede): " + draws.ifEmpty { "yok" }
+            "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
         // Her türün (ana ekran, arşiv, widget sayfası) son ölçümü ayrı tutulur; en yenisi en üstte.
-        android.util.Log.d("GlassPerf", "mask=${GlassDebug.mask} " + one.replace('\n', ' '))
         synchronized(results) { results.remove(label); results[label] = one; text = results.values.reversed().joinToString("\n\n") }
     }
     private val results = LinkedHashMap<String, String>()
