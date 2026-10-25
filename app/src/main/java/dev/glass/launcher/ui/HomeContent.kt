@@ -495,6 +495,18 @@ internal fun HomeContent(
         // Sayfa içi camların arkası (klasör simgeleri, widget'lar): yalnızca sayfalar kayarken, sayfaların ALTINDA
         // her karede o anki kaymaya göre çizilir. Sayfalar hazır görüntü olarak taşınırken camların içi donuk kalmaz.
         val pageAnchors = remember { androidx.compose.runtime.mutableStateMapOf<Int, PageAnchor>() }
+        // Widget sayfası geçişi: ana ekran tek parça kayarken sayfalardaki camların arkası, sayfaların DIŞINDAKİ alt
+        // katmanda (HomeScreen) gerçek ekran konumuna göre çizilir; yoksa camın içi geçiş öncesi yerde kalıyordu.
+        val outerAnchor = LocalPageAnchor.current
+        val todayMoving = { today?.moving == true }
+        androidx.compose.runtime.SideEffect {
+            outerAnchor?.drawExtra = { sx ->
+                if (!edit && !dragging) {
+                    val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                    pageAnchors.forEach { (pg, a) -> drawPageGlassHoles(a, (pg - pos) * size.width + sx, gridOrigin) }
+                }
+            }
+        }
         val stillJiggle = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         Box(Modifier.fillMaxSize().drawBehind {
             // Arşiv yukarı/aşağı kayarken de kart camlarının arkası burada çizilir (kartlar kendi arkalarını çizmez).
@@ -532,7 +544,7 @@ internal fun HomeContent(
                 // Arşiv de ana ekran sayfaları gibi: kayarken kartların bulanık içi sayfanın altındaki ayrı katmanda
                 // (her karede ucuz), kartların kendisi hazır görüntü olarak taşınır.
                 val libAnchor = remember { PageAnchor() }
-                libAnchor.holesActive = { (scrollHold || GlassMotion.listHoles) && !edit && !dragging }
+                libAnchor.holesActive = { (scrollHold || GlassMotion.listHoles || todayMoving()) && !edit && !dragging }
                 DisposableEffect(page, libAnchor) {
                     pageAnchors[page] = libAnchor
                     onDispose { if (pageAnchors[page] === libAnchor) pageAnchors.remove(page) }
@@ -560,7 +572,7 @@ internal fun HomeContent(
             val nearCurrent by remember(page) { derivedStateOf { kotlin.math.abs(page - pagerState.currentPage) <= 1 } }
             val pageJiggle = if (nearCurrent) jiggle else stillJiggle
             // Kayarken (düzenleme/sürükleme dışında) cam arkaları sayfanın altındaki katmanda çizilir.
-            anchor.holesActive = { scrollHold && !edit && !dragging }
+            anchor.holesActive = { (scrollHold || todayMoving()) && !edit && !dragging }
             DisposableEffect(page, anchor) {
                 pageAnchors[page] = anchor
                 onDispose { if (pageAnchors[page] === anchor) pageAnchors.remove(page) }

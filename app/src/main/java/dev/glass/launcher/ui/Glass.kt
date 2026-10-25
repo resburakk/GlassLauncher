@@ -127,6 +127,11 @@ class PageAnchor {
     /** Sayfanın kendisi (katman dönüşümüyle) kayıyorsa o anki kayması; çizimde okunur (widget sayfası). */
     var shift: (() -> Offset)? = null
     val holes = androidx.compose.runtime.mutableStateMapOf<Any, GlassHole>()
+    /**
+     * Ek alt katman çizimi (ana ekran): widget sayfası geçişinde ana ekran sayfalarındaki camların (widget, klasör)
+     * arkası da bu katmanda, o anki kaymaya ([shiftX]) göre çizilir.
+     */
+    var drawExtra: (androidx.compose.ui.graphics.drawscope.DrawScope.(shiftX: Float) -> Unit)? = null
     /** true: camlar normal gölgesini korur (ana ekranın sayfa dışı camları: dock, arama çubuğu). */
     var normalShadow = false
 }

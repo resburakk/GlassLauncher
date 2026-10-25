@@ -757,7 +757,10 @@ fun HomeScreen(
         homeAnchor.shift = { Offset(today.progress * rootSize.width, 0f) }
         homeAnchor.holesActive = { today.moving }
         Box(Modifier.fillMaxSize().drawBehind {
-            if (today.moving) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
+            if (today.moving) {
+                drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
+                homeAnchor.drawExtra?.invoke(this, today.progress * size.width)
+            }
         })
         Box(
             Modifier.fillMaxSize()
