@@ -81,6 +81,13 @@ class TodayState {
         private set
     /** Ekran genişliği (px); kaydırma miktarını orana çevirmek için. */
     var widthPx = 1f
+    /**
+     * Sayfanın cam yerleşimi. Geçiş sürerken (arşivdeki gibi) sayfa hazır görüntü olarak kayar, widget camlarının
+     * arkası sayfanın altındaki ince katmanda her karede doğru yerden çizilir.
+     */
+    val anchor = PageAnchor()
+    /** Sayfa kayarak açılıyor/kapanıyor mu (yalnızca durum değişince okuyanları yeniler). */
+    val moving by androidx.compose.runtime.derivedStateOf { progress > 0.001f && progress < 0.999f }
     private var anim: Job? = null
     /** Parmağın son hareket yönü (yakın geçmişe ağırlık veren toplam): bırakınca açılıp kapanmayı belirler. */
     private var recentDx = 0f
@@ -156,12 +163,19 @@ fun TodayPage(
         bounds.keys.retainAll(ids)
     }
 
-    val todayAnchor = remember { PageAnchor() }
+    val todayAnchor = state.anchor
     todayAnchor.shift = { Offset((state.progress - 1f) * state.widthPx, 0f) }
+    // Geçişte camların arkasını alt katman çizer (HomeScreen); widget'lar kendi arkalarını çizmez, sayfa yeniden çizilmez.
+    todayAnchor.holesActive = { state.moving }
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .graphicsLayer { translationX = (state.progress - 1f) * size.width }
+            .graphicsLayer {
+                translationX = (state.progress - 1f) * size.width
+                // Kayarken sayfa bir kez hazır görüntüye çizilir, sonra yalnızca bu görüntü taşınır (arşiv gibi).
+                compositingStrategy = if (state.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    else androidx.compose.ui.graphics.CompositingStrategy.Auto
+            }
             .onPlaced { todayAnchor.coords = it }
             // Sola kaydırınca sayfa kapanır (dikey kaydırma içerikte kalır).
             .draggable(

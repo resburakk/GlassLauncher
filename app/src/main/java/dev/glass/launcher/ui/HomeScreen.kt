@@ -790,6 +790,10 @@ fun HomeScreen(
                 val br = blurPxMax * blurAmount
                 if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
             }) {
+            // Geçişte widget camlarının arkası: sayfanın altında, o anki kaymaya göre (sayfa hazır görüntü olarak kayar).
+            Box(Modifier.fillMaxSize().drawBehind {
+                if (today.moving) drawPageGlassHoles(today.anchor, (today.progress - 1f) * size.width, Offset.Zero)
+            })
             TodayPage(
                 state = today,
                 widgets = layout.today,
