@@ -119,7 +119,14 @@ fun LibraryPage(
     var searching by remember { mutableStateOf(false) }
     val gridState = rememberLazyGridState()
     // Arşiv listesi kayarken kartlar arkalarını her karede yeniden çizmez (bkz. GlassMotion.listScrolling).
-    LaunchedEffect(gridState.isScrollInProgress) { GlassMotion.listScrolling = gridState.isScrollInProgress }
+    LaunchedEffect(gridState.isScrollInProgress) {
+        val sc = gridState.isScrollInProgress
+        GlassMotion.listScrolling = sc
+        // Kayma bitince kart arka planları yumuşakça belirir (birden yerine oturmasın).
+        if (sc) GlassMotion.listFade = 0f
+        else androidx.compose.animation.core.animate(GlassMotion.listFade, 1f,
+            animationSpec = androidx.compose.animation.core.tween(260)) { v, _ -> GlassMotion.listFade = v }
+    }
     MeasureFrames(gridState.isScrollInProgress, "Son kaydırma (Uygulama Arşivi)")
     // Ekran en üstteyken aşağı çekilirse arama moduna geçer (arama çubuğuna dokunulmuş gibi).
     val pullDown = remember(gridState) {

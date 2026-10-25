@@ -234,6 +234,11 @@ object GlassMotion {
      */
     var listScrolling by androidx.compose.runtime.mutableStateOf(false)
     /**
+     * Arşiv kayması bitince kartların arka planı (kayarken çizilmiyordu) bir anda değil, bu oranla yumuşakça belirir
+     * (önceden parmak kalkınca cam arka planı birden "yerine oturuyordu"). 1 = tam görünür.
+     */
+    var listFade by androidx.compose.runtime.mutableFloatStateOf(1f)
+    /**
      * Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez; hareket bitince bir kez güncellenir).
      * Geçişler ([transition]) buna dahil değil: widget sayfası kayarken camlar takibi bırakınca içlerindeki duvar
      * kâğıdı dışarıdakiyle hizasız kalıyordu.
@@ -413,17 +418,23 @@ fun Modifier.liquidGlass(
                     // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
                     val sh = if (inPage) pageAnchor?.shift?.invoke() else null
                     if (sh != null) {
-                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Geçiş sürerken merceğin ek
-                        // yumuşatması (piksel başına 9 örnek) kapalı; mercek ve hizalama aynı kalır.
-                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, if (GlassMotion.transition) 0f else softPx, clear || iosLens,
+                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Yumuşatma geçişte de açık:
+                        // kapatılınca kayarken cam içi keskin görünüp bırakınca birden bulanıklaşıyordu.
+                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
                     } else if (inPage && GlassMotion.listScrolling) {
                         // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
                     } else if (inPage || !(overlay && GlassMotion.moving)) {
                         // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
                         // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
+                        val fade = if (inPage) GlassMotion.listFade else 1f
+                        if (fade < 0.999f) drawContext.canvas.saveLayer(
+                            androidx.compose.ui.geometry.Rect(Offset.Zero, size),
+                            androidx.compose.ui.graphics.Paint().apply { alpha = fade },
+                        )
                         drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
+                        if (fade < 0.999f) drawContext.canvas.restore()
                     }
                 }
             }
