@@ -53,6 +53,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -178,6 +179,7 @@ fun TodayPage(
                     else androidx.compose.ui.graphics.CompositingStrategy.Auto
             }
             .onPlaced { todayAnchor.coords = it }
+            .drawWithContent { DrawCount.hit("widget sayfası"); drawContent() }
             // Sola kaydırınca sayfa kapanır (dikey kaydırma içerikte kalır).
             .draggable(
                 orientation = Orientation.Horizontal,

@@ -197,7 +197,8 @@ fun PageBox(
                 .graphicsLayer {
                     compositingStrategy = if (cache) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                     else androidx.compose.ui.graphics.CompositingStrategy.Auto
-                },
+                }
+                .drawWithContent { DrawCount.hit("sayfa"); drawContent() },
             content = content,
         )
     }
@@ -420,6 +421,7 @@ fun Modifier.liquidGlass(
         .smoothClip(shape)
         .then(
             if (bd != null) Modifier.drawBehind {
+                DrawCount.hit(if (inPage) "sayfa camı" else "cam")
                 // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
                 if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
                     // Katman camı hareket halindeyken kopya çizilmez: cam şeffaf kalır, arkadaki gerçek arka plan

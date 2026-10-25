@@ -19,6 +19,15 @@ object GlassDebug {
     fun off(bit: Int): Boolean = mask and bit != 0
 }
 
+/** Test: ölçülen hareket boyunca hangi parçanın kaç kez yeniden çizildiği (kayıt = katmanın baştan hazırlanması). */
+object DrawCount {
+    private val m = LinkedHashMap<String, Int>()
+    @Volatile var on = false
+    fun hit(name: String) { if (on) synchronized(m) { m[name] = (m[name] ?: 0) + 1 } }
+    fun reset() { synchronized(m) { m.clear() }; on = true }
+    fun dump(): String { on = false; return synchronized(m) { m.entries.joinToString(", ") { "${it.key} ${it.value}" } } }
+}
+
 object FrameStats {
     var text by mutableStateOf("Henüz ölçüm yok: ana ekranda birkaç kez sayfa kaydırın.")
         private set
@@ -48,6 +57,7 @@ object FrameStats {
     fun begin() {
         synchronized(lock) { samples.clear() }
         recording = true
+        DrawCount.reset()
     }
 
     private fun breakdown(budget: Float): String {
@@ -78,9 +88,11 @@ object FrameStats {
         val hz = 1000f / median.coerceAtLeast(0.1f)
         val testName = when (GlassDebug.mask) { 0 -> ""; 8 -> " [test: bulanıklık kapalı]"; 3 -> " [test: cam alt katmanı kapalı]"
             4 -> " [test: hazır görüntü kapalı]"; 32 -> " [test: ana ekran gizli]"; 16 -> " [test: widget sayfası gizli]"; 64 -> " [test: duvar kâğıdı gizli]"; 127 -> " [test: hepsi kapalı]"; else -> " [test ${GlassDebug.mask}]" }
+        val draws = DrawCount.dump()
         val one = "$label$testName: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
-            "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
+            "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected) +
+            "\n\nYeniden çizim (${ms.size} karede): " + draws.ifEmpty { "yok" }
         // Her türün (ana ekran, arşiv, widget sayfası) son ölçümü ayrı tutulur; en yenisi en üstte.
         android.util.Log.d("GlassPerf", "mask=${GlassDebug.mask} " + one.replace('\n', ' '))
         synchronized(results) { results.remove(label); results[label] = one; text = results.values.reversed().joinToString("\n\n") }

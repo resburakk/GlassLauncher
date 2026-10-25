@@ -547,6 +547,7 @@ fun HomeScreen(
                 )
             }
             .onSizeChanged { rootSize = it }
+            .drawWithContent { DrawCount.hit("kök"); drawContent() }
             // Boş alana dokunma: düzenleme modundaysa moddan çıkar (iOS gibi; titreme durur, düğmeler kapanır).
             // Düzenleme modu dışında çift dokunma ekranı kilitler (ayarlardan kapatılabilir).
             .pointerInput(Unit) {
@@ -750,6 +751,7 @@ fun HomeScreen(
         homeAnchor.shift = { Offset(today.progress * rootSize.width, 0f) }
         homeAnchor.holesActive = { today.moving }
         Box(Modifier.fillMaxSize().drawBehind {
+            if (today.moving) DrawCount.hit("alt katman")
             if (today.moving && !GlassDebug.off(2)) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
         })
         Box(
@@ -775,6 +777,7 @@ fun HomeScreen(
                     if (GlassDebug.off(32)) alpha = 0f
                 }
                 .onPlaced { homeAnchor.coords = it }
+                .drawWithContent { DrawCount.hit("ana ekran"); drawContent() }
         ) {
             androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides homeAnchor) {
             HomeContent(
