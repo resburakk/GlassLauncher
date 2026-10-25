@@ -122,10 +122,9 @@ fun LibraryPage(
     LaunchedEffect(gridState.isScrollInProgress) {
         val sc = gridState.isScrollInProgress
         GlassMotion.listScrolling = sc
-        // Kayma bitince kart arka planları yumuşakça belirir (birden yerine oturmasın).
-        if (sc) GlassMotion.listFade = 0f
-        else androidx.compose.animation.core.animate(GlassMotion.listFade, 1f,
-            animationSpec = androidx.compose.animation.core.tween(260)) { v, _ -> GlassMotion.listFade = v }
+        // Kayma bitince cam arkası birkaç kare daha alt katmanda kalır; kartlar bu sırada son konumlarını alır.
+        if (sc) GlassMotion.listHold = true
+        else { kotlinx.coroutines.delay(120); GlassMotion.listHold = false }
     }
     MeasureFrames(gridState.isScrollInProgress, "Son kaydırma (Uygulama Arşivi)")
     // Ekran en üstteyken aşağı çekilirse arama moduna geçer (arama çubuğuna dokunulmuş gibi).

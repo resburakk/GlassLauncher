@@ -497,7 +497,8 @@ internal fun HomeContent(
         val pageAnchors = remember { androidx.compose.runtime.mutableStateMapOf<Int, PageAnchor>() }
         val stillJiggle = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
         Box(Modifier.fillMaxSize().drawBehind {
-            if (!scrollHold || edit || dragging) return@drawBehind
+            // Arşiv yukarı/aşağı kayarken de kart camlarının arkası burada çizilir (kartlar kendi arkalarını çizmez).
+            if (!(scrollHold || GlassMotion.listHoles) || edit || dragging) return@drawBehind
             val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
             pageAnchors.forEach { (pg, a) -> drawPageGlassHoles(a, (pg - pos) * size.width, gridOrigin) }
         })
@@ -527,7 +528,7 @@ internal fun HomeContent(
                 // Arşiv de ana ekran sayfaları gibi: kayarken kartların bulanık içi sayfanın altındaki ayrı katmanda
                 // (her karede ucuz), kartların kendisi hazır görüntü olarak taşınır.
                 val libAnchor = remember { PageAnchor() }
-                libAnchor.holesActive = { scrollHold && !edit && !dragging }
+                libAnchor.holesActive = { (scrollHold || GlassMotion.listHoles) && !edit && !dragging }
                 DisposableEffect(page, libAnchor) {
                     pageAnchors[page] = libAnchor
                     onDispose { if (pageAnchors[page] === libAnchor) pageAnchors.remove(page) }

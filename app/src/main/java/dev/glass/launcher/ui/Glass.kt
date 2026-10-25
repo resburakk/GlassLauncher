@@ -234,10 +234,12 @@ object GlassMotion {
      */
     var listScrolling by androidx.compose.runtime.mutableStateOf(false)
     /**
-     * Arşiv kayması bitince kartların arka planı (kayarken çizilmiyordu) bir anda değil, bu oranla yumuşakça belirir
-     * (önceden parmak kalkınca cam arka planı birden "yerine oturuyordu"). 1 = tam görünür.
+     * Arşiv kayması bittikten sonraki kısa süre: kartların cam arkası birkaç kare daha alt katmanda çizilir; bu sırada
+     * kartlar son konumlarını alır ve devir teslimde cam içi atlamaz.
      */
-    var listFade by androidx.compose.runtime.mutableFloatStateOf(1f)
+    var listHold by androidx.compose.runtime.mutableStateOf(false)
+    /** Arşiv kartlarının cam arkası şu an sayfanın altındaki katmanda mı çiziliyor (dikey kaydırma). */
+    val listHoles: Boolean get() = listScrolling || listHold
     /**
      * Katman camları şu an hareket halinde mi (kopya çizilmez, konum izlenmez; hareket bitince bir kez güncellenir).
      * Geçişler ([transition]) buna dahil değil: widget sayfası kayarken camlar takibi bırakınca içlerindeki duvar
@@ -396,8 +398,10 @@ fun Modifier.liquidGlass(
                     if (old == null || old.rect != r || old.clip != clipR || old.bd !== bd || old.refr != refr || old.clear != clear ||
                         old.soft != softPx || old.rootW != look.rootW || old.rootH != look.rootH
                     ) {
+                        // Arşiv kayarken alan her karede değişir ama boyutu aynı kalır: şekil yeniden oluşturulmaz.
                         val outline = shape.createOutline(r.size, holeDir, holeDensity)
-                        val path = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
+                        val path = if (old != null && old.rect.size == r.size) old.path
+                            else androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
                         pageAnchor.holes[holeKey] = GlassHole(
                             // Kayarken de tam cam (mercek + parlama): önceden sade çiziliyor, sayfa yerine oturunca
                             // mercek birden gelip kartlar aydınlanıyordu.
@@ -427,14 +431,8 @@ fun Modifier.liquidGlass(
                     } else if (inPage || !(overlay && GlassMotion.moving)) {
                         // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
                         // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
-                        val fade = if (inPage) GlassMotion.listFade else 1f
-                        if (fade < 0.999f) drawContext.canvas.saveLayer(
-                            androidx.compose.ui.geometry.Rect(Offset.Zero, size),
-                            androidx.compose.ui.graphics.Paint().apply { alpha = fade },
-                        )
                         drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
                             ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
-                        if (fade < 0.999f) drawContext.canvas.restore()
                     }
                 }
             }
