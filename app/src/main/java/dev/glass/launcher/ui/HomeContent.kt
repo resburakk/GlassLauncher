@@ -537,7 +537,7 @@ internal fun HomeContent(
             modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned {
                 // Widget sayfası geçişinde ana ekran tek parça kayar: konum o sırada güncellenmez. Güncellenince her karede
                 // bütün sayfaların (görünmeyen arşiv dahil) camları baştan çiziliyor, geçiş 120 Hz'in altına düşüyordu.
-                if (today == null || today.progress == 0f) gridOrigin = it.positionInRoot()
+                if ((today == null || today.progress == 0f) && !GlassMotion.homeShift) gridOrigin = it.positionInRoot()
             },
         ) { page ->
             if (page == libIndex) {

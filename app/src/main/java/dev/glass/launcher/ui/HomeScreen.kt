@@ -97,6 +97,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -220,6 +221,13 @@ fun HomeScreen(
     // bulanıklıklarıyla yine çok bulanıkken duvar kâğıdı neredeyse net kalıyor, arka plan tutarsız görünüyordu.
     val blurAmount by animateFloatAsState(if (fullBlur) 1f else 0f, motion.tween(280), label = "blurAmount")
     val blurK by rememberUpdatedState(settings.glassBlur)
+    // Aramaya çekme (iOS gibi parmağı izler): 0 = yok, 1 = açılma eşiği; eşikten sonra dirençle biraz daha uzar.
+    val pull = remember { androidx.compose.animation.core.Animatable(0f) }
+    val pullScope = rememberCoroutineScope()
+    val pullOn by remember { derivedStateOf { pull.value > 0.001f } }
+    LaunchedEffect(Unit) {
+        snapshotFlow { today.progress > 0.001f || pullOn }.collect { GlassMotion.homeShift = it }
+    }
     // (Bulanıklık yarıçapı çizim katmanında okunur: geçiş sırasında ana ekran her karede yeniden oluşturulmasın.)
     val blurPxMax = with(LocalDensity.current) { 22.dp.toPx() } * settings.glassBlur
     val scrim by animateFloatAsState(
@@ -575,9 +583,34 @@ fun HomeScreen(
                 var startY = 0f
                 var startX = 0f
                 var total = 0f
+                // Bu çekme aramayı mı açacak (başlangıç bölgesine atanmış hareket "Arama" ise parmağı izler).
+                var pullSearch = false
+                val pullPx = 110.dp.toPx()
+                fun pullFor(t: Float): Float {
+                    val raw = (t / pullPx).coerceAtLeast(0f)
+                    // Eşiğe kadar parmakla bire bir; sonra lastik bant gibi giderek artan direnç.
+                    return if (raw <= 1f) raw else 1f + (1f - 1f / (1f + (raw - 1f) * 0.8f)) * 0.35f
+                }
                 detectVerticalDragGestures(
-                    onDragStart = { startY = it.y; startX = it.x; total = 0f },
+                    onDragStart = {
+                        startY = it.y; startX = it.x; total = 0f
+                        val chosen = if (startY < topZonePx) settingsNow.topSwipe else settingsNow.midSwipe
+                        pullSearch = chosen == SwipeAction.Search && overlayNow == Overlay.None && !editNow &&
+                            !bridge.onLibrary && today.progress < 0.01f
+                    },
                     onDragEnd = {
+                        if (pullSearch) {
+                            val open = total > pullPx * 0.7f
+                            pullScope.launch {
+                                // Açılınca bulanıklık aramanın kendi geçişine devredilir; açılmazsa yaylı geri döner.
+                                if (open) pull.animateTo(0f, androidx.compose.animation.core.tween(260))
+                                else pull.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 380f, visibilityThreshold = 0.001f))
+                            }
+                            if (open) overlay = Overlay.Search
+                            pullSearch = false
+                            total = 0f
+                            return@detectVerticalDragGestures
+                        }
                         // Ortadan yukarı kaydırma: telefonun kendi son kullanılanlar ekranı (tek hareketle).
                         if (overlayNow == Overlay.None && !editNow && !bridge.onLibrary && today.progress < 0.01f &&
                             total < -80.dp.toPx() && startY > topZonePx && settingsNow.upSwipeRecents
@@ -610,8 +643,14 @@ fun HomeScreen(
                         }
                         total = 0f
                     },
-                    onDragCancel = { total = 0f },
-                    onVerticalDrag = { _, dy -> total += dy },
+                    onDragCancel = {
+                        total = 0f
+                        if (pullSearch) { pullSearch = false; pullScope.launch { pull.animateTo(0f, androidx.compose.animation.core.spring(0.72f, 380f, 0.001f)) } }
+                    },
+                    onVerticalDrag = { _, dy ->
+                        total += dy
+                        if (pullSearch) pullScope.launch { pull.snapTo(pullFor(total)) }
+                    },
                 )
             }
     ) {
@@ -710,6 +749,7 @@ fun HomeScreen(
         // Ölçüm: widget sayfası geçişindeki gerçek kare aralıkları (Ayarlar > Performans).
         val todayMoving by remember { derivedStateOf { today.progress in 0.001f..0.999f } }
         MeasureFrames(todayMoving, "Son geçiş (widget sayfası)")
+        MeasureFrames(pullOn, "Son çekme (arama)")
         val regionsOpen = glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
         if (settings.launcherWallpaper && wp != null) {
             val homeImg = homeBlurImg
@@ -744,7 +784,7 @@ fun HomeScreen(
                 Image(
                     blurImg, null,
                     Modifier.fillMaxSize().graphicsLayer {
-                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress).coerceIn(0f, 1f)
+                        alpha = (1f - homeHide()) * maxOf(blurAmount, libProgress.floatValue, today.progress, pull.value).coerceIn(0f, 1f)
                     },
                     contentScale = ContentScale.Crop,
                 )
@@ -782,6 +822,12 @@ fun HomeScreen(
                     scaleX = k; scaleY = k
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width
+                    // Aramaya çekerken ana ekran parmakla dirençli biçimde aşağı iner ve hafifçe solar (iOS gibi).
+                    val pv = pull.value
+                    if (pv > 0f) {
+                        translationY = pv * 46.dp.toPx()
+                        alpha *= 1f - 0.35f * pv.coerceAtMost(1f)
+                    }
                 }
                 .onPlaced { homeAnchor.coords = it }
         ) {
@@ -848,7 +894,11 @@ fun HomeScreen(
         }
         }
         // Karartma çizimde okunur (geçişte ana ekran her karede yeniden oluşturulmasın).
-        Box(Modifier.fillMaxSize().drawBehind { if (scrim > 0.001f) drawRect(Color.Black.copy(alpha = scrim)) })
+        Box(Modifier.fillMaxSize().drawBehind {
+            // Aramaya çekerken arka plan da parmakla birlikte hafifçe kararır.
+            val sc = maxOf(scrim, 0.10f * pull.value.coerceIn(0f, 1f))
+            if (sc > 0.001f) drawRect(Color.Black.copy(alpha = sc))
+        })
 
         CompositionLocalProvider(LocalGlassRegions provides glassRegions) {
 
@@ -1120,23 +1170,15 @@ fun HomeScreen(
         )
         confirmDeletePage?.let { ids ->
             val apps = ids.count { id -> layout.items.any { it.id == id && (it is AppItem || it is FolderItem) } }
-            androidx.compose.material3.AlertDialog(
-                onDismissRequest = { confirmDeletePage = null },
-                title = { Text("Bu sayfa silinsin mi?") },
-                text = {
-                    Text(
-                        if (apps == 0) "Sayfada görünen bir şey yok; sayfa kaldırılacak."
-                        else "Sayfadaki uygulamalar ve klasörler silinmez, Uygulama Arşivi'nde kalır. Widget'lar kaldırılır."
-                    )
-                },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(onClick = {
-                        vm.deletePage(ids); confirmDeletePage = null
-                    }) { Text("Sil", color = Color(0xFFFF453A)) }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(onClick = { confirmDeletePage = null }) { Text("Vazgeç") }
-                },
+            GlassAlert(
+                title = "Bu sayfa silinsin mi?",
+                message = if (apps == 0) "Sayfada görünen bir şey yok; sayfa kaldırılacak."
+                    else "Sayfadaki uygulamalar ve klasörler silinmez, Uygulama Arşivi'nde kalır. Widget'lar kaldırılır.",
+                buttons = listOf(
+                    GlassAlertButton("Sayfayı Sil", destructive = true) { vm.deletePage(ids); confirmDeletePage = null },
+                    GlassAlertButton("Vazgeç", bold = true) { confirmDeletePage = null },
+                ),
+                onDismiss = { confirmDeletePage = null },
             )
         }
         AnimatedVisibility(
@@ -1162,14 +1204,15 @@ fun HomeScreen(
             }
             val u = LocalPt.current
             val corner = u * settings.menuCorner
-            val ink = if (settings.menuDark) Color.White else Color(0xF21C1C1E)
+            val plusDark = menuDarkNow()
+            val ink = menuInk(plusDark)
             val rowH = u * settings.menuRowHeight
             Box(Modifier.width(u * 230f)) {
                 BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { vis }, menuBlur = true)
                 Column(
                     Modifier
                         .width(u * 230f)
-                        .menuGlass(appShape(corner), settings.menuOpacity, settings.menuDark)
+                        .menuGlass(appShape(corner), settings.menuOpacity, plusDark)
                         .pointerInput(Unit) { detectTapGestures { } }
                 ) {
                     MenuRow("Widget Ekle", ink, rowH, padTop = u * 6f, leading = { GlyphIcon(Glyph.Widget, ink, u * 22f) }) {

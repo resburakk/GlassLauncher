@@ -593,7 +593,11 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
 @Composable
 private fun MenuPage(s: LauncherSettings, onChange: ((LauncherSettings) -> LauncherSettings) -> Unit) {
     Group("Görünüm") {
-        ToggleRow("Koyu menü", s.menuDark, default = Def.menuDark) { v -> onChange { it.copy(menuDark = v) } }
+        ToggleRow("Telefonun koyu modunu izle", s.menuAuto, default = Def.menuAuto) { v -> onChange { it.copy(menuAuto = v) } }
+        if (!s.menuAuto) {
+            RowDivider()
+            ToggleRow("Koyu menü", s.menuDark, default = Def.menuDark) { v -> onChange { it.copy(menuDark = v) } }
+        }
         RowDivider()
         SliderRow("Cam açıklığı", pct(s.menuOpacity), s.menuOpacity, 0.1f..0.95f, default = Def.menuOpacity) { v -> onChange { it.copy(menuOpacity = v) } }
         RowDivider()

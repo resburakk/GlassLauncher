@@ -83,6 +83,12 @@ private class MenuAction(
     val destructive: Boolean = false,
     /** true: dokununca menü kapanmaz (ör. onay penceresi açılır). */
     val keepOpen: Boolean = false,
+    /** "Diğer" alt menüsündeki satır (biraz içeriden, soluk). */
+    val sub: Boolean = false,
+    /** Satırın sağındaki işaret (ör. alt menü oku). */
+    val trailing: String? = null,
+    /** Widget boyutları: tek satırda boyut düğmeleri olarak çizilir. */
+    val sizes: List<Span> = emptyList(),
     val run: () -> Unit,
 )
 
@@ -181,17 +187,20 @@ fun ContextMenuOverlay(
     var confirmRemove by remember { mutableStateOf(false) }
 
     val menuSettings = LocalLauncherSettings.current
+    // iOS 26 gibi sade menü: sık kullanılanlar görünür, az kullanılanlar "Diğer" alt menüsünde (menünün içinde açılır).
+    var moreOpen by remember { mutableStateOf(false) }
+    fun MutableList<MenuAction>.addMore(more: List<MenuAction>) {
+        if (more.isEmpty()) return
+        add(MenuAction("Diğer", Glyph.Grid, keepOpen = true, trailing = if (moreOpen) "⌃" else "›") { moreOpen = !moreOpen })
+        if (moreOpen) more.forEach { m -> add(MenuAction(m.title, m.glyph, m.destructive, m.keepOpen, sub = true, run = m.run)) }
+    }
     val actions = buildList {
         if (widget != null) {
             onEditWidget?.let { edit ->
                 add(MenuAction(if (widget.kind == WidgetKind.Photo) "Fotoğrafı Değiştir" else "Widget'ı Düzenle", Glyph.Pencil) { edit() })
             }
-            widgetSizes.forEach { sz ->
-                if (sz.x != widget.spanX || sz.y != widget.spanY) {
-                    val label = if (sz.title.contains('×')) sz.title else "${sz.title} (${sz.x}×${sz.y})"
-                    add(MenuAction("Boyut: $label", Glyph.Widget) { onResizeWidget(sz) })
-                }
-            }
+            // Boyutlar tek satırda (iOS gibi küçük düğmeler); önceden her boyut ayrı bir satırdı.
+            if (widgetSizes.size > 1) add(MenuAction("", null, sizes = widgetSizes) {})
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
             onAddToStack?.let { add(MenuAction("Yığına Widget Ekle", Glyph.Plus) { it() }) }
             if (widget.stack.isNotEmpty()) add(MenuAction("Yığını Dağıt", Glyph.Grid) { vm.editLayout { l -> l.unstack(widget.id) } })
@@ -199,32 +208,40 @@ fun ContextMenuOverlay(
         } else if (app != null && app.isShortcut) {
             // Sabitlenmiş kısayol (ör. Chrome "Ana ekrana ekle"): silmek yalnızca kısayolu kaldırır, uygulama kalır.
             add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
-            add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
-            if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
             if (req.place == CellPlace.Folder) add(MenuAction("Klasörden Çıkar", Glyph.Minus) { onRemoveFromFolder() })
+            addMore(buildList {
+                add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
+                if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
+            })
             add(MenuAction("Kısayolu Sil", Glyph.Trash, destructive = true) { vm.removeShortcut(app) })
         } else if (app != null) {
-            add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
-            add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
-            if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
-            // Koyu modda simge görünümü değişiyorsa: bu uygulamayı koyu modda orijinal bırak / yeniden koyulaştır.
-            if (menuSettings.iconStyleDark != dev.glass.launcher.data.IconStyle.Original) {
-                val keep = app.key in menuSettings.darkOriginalApps
-                add(MenuAction(if (keep) "Koyu Modda Koyulaştır" else "Koyu Modda Orijinal Kalsın", Glyph.Pencil) { vm.toggleDarkOriginal(app) })
-            }
             val locked = app.appKey in menuSettings.lockedApps
-            add(MenuAction(if (locked) "Kilidi Kaldır" else "Uygulamayı Kilitle", Glyph.Lock) {
+            val lock = MenuAction(if (locked) "Kilidi Kaldır" else "Uygulamayı Kilitle", Glyph.Lock) {
                 if (locked) AppLock.authenticate("Kilidi kaldır", app.label) { vm.setLocked(app, false) } else vm.setLocked(app, true)
-            })
-            add(MenuAction("Uygulamayı Gizle", Glyph.Hide) { vm.setHidden(app, true) })
-            add(MenuAction("Uygulama Bilgisi", Glyph.Info) { vm.openAppInfo(app) })
+            }
+            val info = MenuAction("Uygulama Bilgisi", Glyph.Info) { vm.openAppInfo(app) }
+            val more = buildList {
+                add(MenuAction("Simgeyi Değiştir", Glyph.Pencil) { onChangeIcon() })
+                if (hasCustomIcon) add(MenuAction("Varsayılan Simge", Glyph.Close) { onResetIcon() })
+                // Koyu modda simge görünümü değişiyorsa: bu uygulamayı koyu modda orijinal bırak / yeniden koyulaştır.
+                if (menuSettings.iconStyleDark != dev.glass.launcher.data.IconStyle.Original) {
+                    val keep = app.key in menuSettings.darkOriginalApps
+                    add(MenuAction(if (keep) "Koyu Modda Koyulaştır" else "Koyu Modda Orijinal Kalsın", Glyph.Pencil) { vm.toggleDarkOriginal(app) })
+                }
+                add(MenuAction("Uygulamayı Gizle", Glyph.Hide) { vm.setHidden(app, true) })
+            }
             when (req.place) {
                 CellPlace.Library -> {
                     if (!onHome) add(MenuAction("Ana Ekrana Ekle", Glyph.Plus) { onAddToHome() })
+                    add(lock); add(info)
+                    addMore(more)
                     if (!app.isSystem) add(MenuAction("Uygulamayı Sil", Glyph.Trash, destructive = true) { vm.uninstall(app) })
                 }
                 else -> {
+                    add(MenuAction("Ana Ekranı Düzenle", Glyph.Edit) { onEditHome() })
                     if (req.place == CellPlace.Folder) add(MenuAction("Klasörden Çıkar", Glyph.Minus) { onRemoveFromFolder() })
+                    add(lock); add(info)
+                    addMore(more)
                     add(MenuAction("Uygulamayı Kaldır", Glyph.Minus, destructive = true, keepOpen = true) { confirmRemove = true })
                 }
             }
@@ -239,12 +256,17 @@ fun ContextMenuOverlay(
     val motion = LocalMotion.current
     val appear = remember { Animatable(0f) }
     LaunchedEffect(Unit) { appear.animateTo(1f, motion.bouncy()) }
+    // Ölçüm: menü açılışındaki gerçek kare aralıkları (Ayarlar > Performans).
+    MeasureFrames(appear.isRunning, "Son açılış (menü)")
+    // Menünün son konumu (yerleşimde hesaplanır): arkasındaki bulanık alan açılışta büyümez, baştan bu boyutta durur.
+    val menuRect = remember { arrayOfNulls<Rect>(1) }
 
     val st = LocalLauncherSettings.current
     val u = LocalPt.current
     val corner = u * st.menuCorner
     val menuW = u * st.menuWidth
-    val textColor = if (st.menuDark) Color.White else Color(0xF21C1C1E)
+    val dark = menuDarkNow()
+    val textColor = menuInk(dark)
     val red = Color(0xFFFF3B30)
     val glassOpacity = (st.menuOpacity + if (overPanel) 0.2f else 0f).coerceAtMost(0.95f)
 
@@ -276,7 +298,7 @@ fun ContextMenuOverlay(
                 red = red,
                 corner = corner,
                 opacity = glassOpacity,
-                dark = st.menuDark,
+                dark = dark,
                 onDelete = { vm.uninstall(app); onClose() },
                 onRemove = { onRemoveFromHome(); onClose() },
                 onCancel = { onClose() },
@@ -343,13 +365,17 @@ fun ContextMenuOverlay(
                 }
             }
             actions.forEach { a ->
-                val c = if (a.destructive) red else textColor
+                val c = when { a.destructive -> red; a.sub -> textColor.copy(alpha = 0.85f); else -> textColor }
                 add { pt, pb ->
-                    MenuRow(
+                    if (a.sizes.isNotEmpty() && widget != null) {
+                        SizeRow(a.sizes, widget.spanX, widget.spanY, textColor, rowH, pt, pb) { sz -> onResizeWidget(sz); onClose() }
+                    } else MenuRow(
                         title = a.title,
                         color = c,
                         rowH = rowH, padTop = pt, padBottom = pb,
-                        leading = { a.glyph?.let { GlyphIcon(it, c, 20.dp) } },
+                        leading = { a.glyph?.let { GlyphIcon(it, c, if (a.sub) 18.dp else 20.dp) } },
+                        indent = if (a.sub) u * 14f else 0.dp,
+                        trailing = a.trailing,
                         onClick = { a.run(); if (!a.keepOpen) onClose() },
                     )
                 }
@@ -362,12 +388,12 @@ fun ContextMenuOverlay(
             modifier = Modifier.fillMaxSize(),
             content = {
                 Box(Modifier.width(menuW).heightIn(max = maxH)) {
-                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() }, menuBlur = true)
+                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() }, menuBlur = true, fixedBounds = { menuRect[0] })
                     Column(
                         Modifier
                             .width(menuW)
                             .heightIn(max = maxH)
-                            .menuGlass(appShape(corner), glassOpacity, st.menuDark)
+                            .menuGlass(appShape(corner), glassOpacity, dark)
                             .pointerInput(Unit) { detectTapGestures { } }
                             .verticalScroll(scroll)
                     ) {
@@ -384,6 +410,7 @@ fun ContextMenuOverlay(
             val x = req.iconRect.left.coerceIn(sideMarginPx, maxX)
             val y = if (below) req.cellRect.bottom + gapPx else req.iconRect.top - gapPx - p.height
             val py = y.coerceIn(topLimit, (bottomLimit - p.height).coerceAtLeast(topLimit))
+            menuRect[0] = Rect(x.toFloat(), py, x + p.width.toFloat(), py + p.height)
             // Büyüme noktası: simgenin menüye en yakın kenarı (menü altta ise üst kenar, üstte ise alt kenar).
             val ox = ((req.iconRect.center.x - x) / p.width.coerceAtLeast(1)).coerceIn(0f, 1f)
             val oy = if (below) 0f else 1f
@@ -399,6 +426,67 @@ fun ContextMenuOverlay(
         }
     }
 }
+
+/** Menüler koyu mu: varsayılan olarak telefonun koyu/açık modu (Ayarlar > Menü'den elle de seçilebilir). */
+@Composable
+internal fun menuDarkNow(): Boolean {
+    val st = LocalLauncherSettings.current
+    return if (st.menuAuto) androidx.compose.foundation.isSystemInDarkTheme() else st.menuDark
+}
+
+/** Menü yazı rengi (koyu menüde beyaz, açıkta iOS koyu grisi). */
+internal fun menuInk(dark: Boolean): Color = if (dark) Color.White else Color(0xF21C1C1E)
+
+/**
+ * Ortak cam onay penceresi (iOS uyarısı gibi): başlık, açıklama ve alt alta düğmeler. Bütün onaylar (uygulama
+ * kaldırma, sayfa silme) aynı görünümde; telefonun koyu/açık moduna uyar.
+ */
+@Composable
+internal fun GlassAlert(
+    title: String,
+    message: String,
+    /** Düğmeler: (yazı, kırmızı mı, kalın mı, iş). */
+    buttons: List<GlassAlertButton>,
+    onDismiss: () -> Unit,
+) {
+    val st = LocalLauncherSettings.current
+    val u = LocalPt.current
+    val dark = menuDarkNow()
+    val ink = menuInk(dark)
+    val corner = u * st.menuCorner
+    val blue = if (dark) Color(0xFF64B5FF) else Color(0xFF0A84FF)
+    Box(
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.15f)).pointerInput(Unit) { detectTapGestures { onDismiss() } },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.width(u * 280f)) {
+            BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), menuBlur = true)
+            Column(
+                Modifier
+                    .width(u * 280f)
+                    .menuGlass(appShape(corner), (st.menuOpacity + 0.15f).coerceAtMost(0.95f), dark)
+                    .pointerInput(Unit) { detectTapGestures { } }
+                    .padding(top = u * 18f, bottom = u * 6f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(title, color = ink, fontSize = (17f * u.value).sp, fontWeight = FontWeight.SemiBold,
+                    fontFamily = AppFont, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = u * 18f))
+                Spacer(Modifier.height(u * 6f))
+                Text(message, color = ink.copy(alpha = 0.75f), fontSize = (13f * u.value).sp,
+                    fontFamily = AppFont, textAlign = TextAlign.Center, modifier = Modifier.padding(horizontal = u * 18f))
+                Spacer(Modifier.height(u * 12f))
+                val sep = ink.copy(alpha = 0.16f)
+                buttons.forEach { b ->
+                    ConfirmDivider(sep)
+                    ConfirmButton(b.title, if (b.destructive) Color(0xFFFF3B30) else blue,
+                        if (b.bold) FontWeight.SemiBold else FontWeight.Normal, ink, b.onClick)
+                }
+            }
+        }
+    }
+}
+
+internal class GlassAlertButton(val title: String, val destructive: Boolean = false, val bold: Boolean = false, val onClick: () -> Unit)
 
 /** iOS tarzı onay: "Uygulamayı Sil" / "Ana Ekrandan Kaldır" / "Vazgeç". */
 @Composable
@@ -523,6 +611,10 @@ internal fun MenuRow(
     /** İlk/son satırda menünün iç boşluğu satırın içine alınır: basılı vurgu kenara (ve köşelere) kadar dolar. */
     padTop: androidx.compose.ui.unit.Dp = 0.dp,
     padBottom: androidx.compose.ui.unit.Dp = 0.dp,
+    /** Alt menü satırı: soldan biraz içeride. */
+    indent: androidx.compose.ui.unit.Dp = 0.dp,
+    /** Sağdaki işaret (alt menü oku). */
+    trailing: String? = null,
     onClick: () -> Unit,
 ) {
     val st = LocalLauncherSettings.current
@@ -533,7 +625,7 @@ internal fun MenuRow(
             .height(rowH + padTop + padBottom)
             .clickable(onClick = onClick)
             .padding(top = padTop, bottom = padBottom)
-            .padding(horizontal = u * 18f),
+            .padding(start = u * 18f + indent, end = u * 18f),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(Modifier.width(u * 26f), contentAlignment = Alignment.CenterStart) { leading?.invoke() }
@@ -542,6 +634,35 @@ internal fun MenuRow(
             title, color = color, fontSize = (st.menuTextSize * u.value).sp, fontWeight = FontWeight.Normal,
             fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f),
         )
+        if (trailing != null) Text(trailing, color = color.copy(alpha = 0.5f), fontSize = (st.menuTextSize * 1.1f * u.value).sp, fontFamily = AppFont)
+    }
+}
+
+/** Widget boyutları tek satırda (iOS 26 gibi): her boyut küçük bir düğme, geçerli boyut dolu görünür. */
+@Composable
+private fun SizeRow(
+    sizes: List<Span>, curX: Int, curY: Int, color: Color, rowH: androidx.compose.ui.unit.Dp,
+    padTop: androidx.compose.ui.unit.Dp, padBottom: androidx.compose.ui.unit.Dp, onPick: (Span) -> Unit,
+) {
+    val st = LocalLauncherSettings.current
+    val u = LocalPt.current
+    Row(
+        Modifier.fillMaxWidth().height(rowH + padTop + padBottom).padding(top = padTop, bottom = padBottom).padding(horizontal = u * 12f),
+        horizontalArrangement = Arrangement.spacedBy(u * 6f),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        sizes.forEach { sz ->
+            val cur = sz.x == curX && sz.y == curY
+            Box(
+                Modifier.weight(1f).height(rowH * 0.72f).clip(RoundedCornerShape(50))
+                    .background(if (cur) color.copy(alpha = 0.18f) else color.copy(alpha = 0.06f))
+                    .clickable(enabled = !cur) { onPick(sz) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(sz.title, color = color, fontSize = (st.menuTextSize * 0.82f * u.value).sp, fontFamily = AppFont,
+                    fontWeight = if (cur) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+            }
+        }
     }
 }
 

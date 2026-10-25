@@ -178,16 +178,14 @@ fun PagesEditor(
         }
     }
     confirmDelete?.let { e ->
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { confirmDelete = null },
-            title = { Text("Sayfa silinsin mi?") },
-            text = { Text("Sayfadaki uygulamalar ve klasörler silinmez, Uygulama Arşivi'nde kalır. Widget'lar kaldırılır.") },
-            confirmButton = {
-                androidx.compose.material3.TextButton(onClick = {
-                    deleted += e.items; entries.remove(e); confirmDelete = null
-                }) { Text("Sil", color = Color(0xFFFF453A)) }
-            },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { confirmDelete = null }) { Text("Vazgeç") } },
+        GlassAlert(
+            title = "Sayfa silinsin mi?",
+            message = "Sayfadaki uygulamalar ve klasörler silinmez, Uygulama Arşivi'nde kalır. Widget'lar kaldırılır.",
+            buttons = listOf(
+                GlassAlertButton("Sayfayı Sil", destructive = true) { deleted += e.items; entries.remove(e); confirmDelete = null },
+                GlassAlertButton("Vazgeç", bold = true) { confirmDelete = null },
+            ),
+            onDismiss = { confirmDelete = null },
         )
     }
 }

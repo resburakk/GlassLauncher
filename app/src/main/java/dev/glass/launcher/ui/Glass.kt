@@ -243,6 +243,11 @@ object GlassMotion {
      */
     var listScrolling by androidx.compose.runtime.mutableStateOf(false)
     /**
+     * Ana ekran tek parça kaydırılıyor (widget sayfası geçişi, aramaya çekme): sayfaların konumu bu sırada güncellenmez
+     * (güncellenince bütün sayfaların camları her karede baştan çiziliyordu).
+     */
+    var homeShift by androidx.compose.runtime.mutableStateOf(false)
+    /**
      * Arşiv kayması bittikten sonraki kısa süre: kartların cam arkası birkaç kare daha alt katmanda çizilir; bu sırada
      * kartlar son konumlarını alır ve devir teslimde cam içi atlamaz.
      */
@@ -625,6 +630,11 @@ fun BlurBackdrop(
     strongBlur: Boolean = false,
     /** true: menü bulanıklığı (genel cam ayarlarından bağımsız, yazılar okunur kalsın diye güçlü). */
     menuBlur: Boolean = false,
+    /**
+     * Alanın sabit (son) konumu: açılış animasyonunda menü büyürken bulanık alan her karede değişmez; yalnızca
+     * görünürlüğü artar (alan her karede değişince bulanıklık her karede yeniden hesaplanıyordu).
+     */
+    fixedBounds: (() -> androidx.compose.ui.geometry.Rect?)? = null,
 ) {
     val reg = LocalGlassRegions.current ?: return
     val map = if (rootOnly) reg.rootRegions else reg.regions
@@ -633,6 +643,11 @@ fun BlurBackdrop(
     val cr = with(LocalDensity.current) { corner.toPx() }
     val coords = remember { arrayOfNulls<LayoutCoordinates>(1) }
     fun update() {
+        fixedBounds?.invoke()?.let { fb ->
+            val rr = RoundRect(fb, CornerRadius(cr.coerceAtMost(minOf(fb.width, fb.height) / 2f)))
+            if (map[key] != rr) map[key] = rr
+            return
+        }
         val c = coords[0] ?: return
         if (!c.isAttached) return
         val b = c.boundsInRoot()
@@ -681,6 +696,9 @@ fun BlurBackdrop(
  * İçerik katmanına uygulanır: içeriği net çizer, ardından [GlassRegions]'daki alanlara içeriğin bulanık
  * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
  */
+/** Bölge bulanıklığının hesaplandığı küçültme oranı (3 = üçte bir çözünürlük). */
+private const val BLUR_DOWNSCALE = 3f
+
 fun Modifier.glassRegionBlur(
     reg: GlassRegions,
     radius: Dp = 30.dp,
@@ -708,17 +726,17 @@ fun Modifier.glassRegionBlur(
         }
     }
     val effect = remember(r) {
-        android.graphics.RenderEffect.createBlurEffect(r, r, android.graphics.Shader.TileMode.CLAMP)
+        android.graphics.RenderEffect.createBlurEffect(r / BLUR_DOWNSCALE, r / BLUR_DOWNSCALE, android.graphics.Shader.TileMode.CLAMP)
     }
     val strongNode = remember { android.graphics.RenderNode("glassRegionBlurStrong") }
     val sr = with(LocalDensity.current) { strongRadius.toPx() }.coerceAtLeast(r * 2.2f)
     val strongEffect = remember(sr) {
-        android.graphics.RenderEffect.createBlurEffect(sr, sr, android.graphics.Shader.TileMode.CLAMP)
+        android.graphics.RenderEffect.createBlurEffect(sr / BLUR_DOWNSCALE, sr / BLUR_DOWNSCALE, android.graphics.Shader.TileMode.CLAMP)
     }
     val menuNode = remember { android.graphics.RenderNode("glassRegionBlurMenu") }
     val mr = with(LocalDensity.current) { menuRadius.toPx() }.coerceAtLeast(0.5f)
     val menuEffect = remember(mr) {
-        android.graphics.RenderEffect.createBlurEffect(mr, mr, android.graphics.Shader.TileMode.CLAMP)
+        android.graphics.RenderEffect.createBlurEffect(mr / BLUR_DOWNSCALE, mr / BLUR_DOWNSCALE, android.graphics.Shader.TileMode.CLAMP)
     }
     this.drawWithContent {
         drawContent()
@@ -736,25 +754,22 @@ fun Modifier.glassRegionBlur(
             drawContext.canvas = prev
             node.endRecording()
         }
-        // İki katman: bulanıklık, içerik düğümünü saran ayrı düğümde (Haze kütüphanesindeki gibi).
-        blurNode.setPosition(0, 0, w, h)
-        blurNode.setRenderEffect(effect)
-        blurNode.beginRecording(w, h).also { it.drawRenderNode(node) }
-        blurNode.endRecording()
-        val anyStrong = list.any { it.key in reg.strong }
-        if (anyStrong) {
-            strongNode.setPosition(0, 0, w, h)
-            strongNode.setRenderEffect(strongEffect)
-            strongNode.beginRecording(w, h).also { it.drawRenderNode(node) }
-            strongNode.endRecording()
+        // İki katman: bulanıklık, içerik düğümünü saran ayrı düğümde (Haze kütüphanesindeki gibi). Bulanıklık 1/3
+        // çözünürlükte hesaplanır (yarıçap da 1/3): bu güçlü bulanıklıkta görünüm aynı, ekran kartı yükü ~9 kat az.
+        // Önceden tam çözünürlükte her karede hesaplanıyordu; menü açılışı 120 Hz'in altına düşüyordu.
+        val ds = BLUR_DOWNSCALE
+        val sw = (w / ds).toInt().coerceAtLeast(1); val sh = (h / ds).toInt().coerceAtLeast(1)
+        fun record(n: android.graphics.RenderNode, e: android.graphics.RenderEffect) {
+            n.setPosition(0, 0, sw, sh)
+            n.setRenderEffect(e)
+            n.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
+            n.endRecording()
         }
-        if (list.any { it.key in reg.menu }) {
-            menuNode.setPosition(0, 0, w, h)
-            menuNode.setRenderEffect(menuEffect)
-            menuNode.beginRecording(w, h).also { it.drawRenderNode(node) }
-            menuNode.endRecording()
-        }
+        if (list.any { it.key !in reg.menu && it.key !in reg.strong }) record(blurNode, effect)
+        if (list.any { it.key in reg.strong }) record(strongNode, strongEffect)
+        if (list.any { it.key in reg.menu }) record(menuNode, menuEffect)
         fun blurFor(k: Any) = when (k) { in reg.menu -> menuNode; in reg.strong -> strongNode; else -> blurNode }
+        fun android.graphics.Canvas.drawBlur(n: android.graphics.RenderNode) { save(); scale(ds, ds); drawRenderNode(n); restore() }
         drawIntoCanvas { c ->
             val nc = c.nativeCanvas
             list.forEachIndexed { i, entry ->
@@ -789,11 +804,11 @@ fun Modifier.glassRegionBlur(
                     ln.setRenderEffect(android.graphics.RenderEffect.createRuntimeShaderEffect(sh, "content"))
                     val lc = ln.beginRecording(rw + pad * 2, rh + pad * 2)
                     lc.translate(-(l - pad).toFloat(), -(t - pad).toFloat())
-                    lc.drawRenderNode(blurFor(entry.key))
+                    lc.drawBlur(blurFor(entry.key))
                     ln.endRecording()
                     nc.drawRenderNode(ln)
                 } else {
-                    nc.drawRenderNode(blurFor(entry.key))
+                    nc.drawBlur(blurFor(entry.key))
                 }
                 // Şeklin dışında kalan bulanık kopya yumuşak kenarla silinir.
                 path.fillType = android.graphics.Path.FillType.INVERSE_WINDING
