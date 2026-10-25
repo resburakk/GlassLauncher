@@ -125,6 +125,8 @@ class PageAnchor {
     /** Sayfanın kendisi (katman dönüşümüyle) kayıyorsa o anki kayması; çizimde okunur (widget sayfası). */
     var shift: (() -> Offset)? = null
     val holes = androidx.compose.runtime.mutableStateMapOf<Any, GlassHole>()
+    /** true: camlar normal gölgesini korur (ana ekranın sayfa dışı camları: dock, arama çubuğu). */
+    var normalShadow = false
 }
 
 /** Sayfa içindeki bir camın arkası: sayfaya göre alanı, şekli ve çizim ayarları. */
@@ -371,7 +373,7 @@ fun Modifier.liquidGlass(
                 // Sayfa içindeki cam (widget, klasör): sistem gölgesi saydam camın İÇİNDEN de görünür. Sayfa dururken
                 // cam arkasını kendisi çizdiği için örtülüyordu; kayarken arka planı alt katman çizdiğinden gölge
                 // camın içinde koyu bir kare olarak beliriyordu. Bunun yerine yalnızca camın DIŞINA düşen yumuşak gölge.
-                pageAnchor != null -> Modifier.outsideShadow(shape, elevation)
+                pageAnchor != null && !pageAnchor.normalShadow -> Modifier.outsideShadow(shape, elevation)
                 else -> Modifier.shadow(elevation, shape, clip = false, ambientColor = black(0.2f), spotColor = black(0.2f))
             }
         )

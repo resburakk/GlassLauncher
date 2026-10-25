@@ -106,6 +106,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -734,10 +735,20 @@ fun HomeScreen(
             }
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
+        // Widget sayfası geçişinde ana ekran da hazır görüntü olarak kayar; sayfa dışındaki camların (dock, arama
+        // çubuğu) arkası bu alt katmanda her karede doğru yerden çizilir (önceden her karede tüm ana ekran çiziliyordu).
+        val homeAnchor = remember { PageAnchor().apply { normalShadow = true } }
+        homeAnchor.shift = { Offset(today.progress * rootSize.width, 0f) }
+        homeAnchor.holesActive = { today.moving }
+        Box(Modifier.fillMaxSize().drawBehind {
+            if (today.moving) drawPageGlassHoles(homeAnchor, today.progress * size.width, Offset.Zero)
+        })
         Box(
             Modifier.fillMaxSize()
                 // Dönüşte arka plan hafifçe yakınlaşarak yerine gelir (iOS gibi).
                 .graphicsLayer {
+                    compositingStrategy = if (today.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                        else androidx.compose.ui.graphics.CompositingStrategy.Auto
                     // Açılan katmanın arkasında ana ekran içeriği bulanıklaşır (yarıçap çizimde okunur).
                     val br = blurPxMax * blurAmount
                     if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
@@ -753,7 +764,9 @@ fun HomeScreen(
                     // Widget sayfası açılırken ana ekran (dock dahil) sayfa gibi sağa kayar.
                     translationX = today.progress * size.width
                 }
+                .onPlaced { homeAnchor.coords = it }
         ) {
+            androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides homeAnchor) {
             HomeContent(
                 vm = vm,
                 layout = layout,
@@ -781,6 +794,7 @@ fun HomeScreen(
                 today = if (settings.showToday) today else null,
                 todayAllowed = { !editNow && drag.key == null && overlayNow == Overlay.None },
             )
+            }
         }
         if (settings.showToday && todayVisible) {
             // iOS Bugün görünümünde arka plan bulanık ve biraz koyu.
