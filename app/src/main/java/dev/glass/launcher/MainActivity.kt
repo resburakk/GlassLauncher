@@ -257,7 +257,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.hasExtra("glassDebug")) { dev.glass.launcher.ui.GlassDebug.mask = intent.getIntExtra("glassDebug", 0); return }
+        if (intent.hasExtra("glassDebug")) { dev.glass.launcher.ui.GlassDebug.test = true; dev.glass.launcher.ui.GlassDebug.mask = intent.getIntExtra("glassDebug", 0); return }
         if (intent.getBooleanExtra(EXTRA_ADD_WIDGET, false)) {
             addWidgetRequest++
             return

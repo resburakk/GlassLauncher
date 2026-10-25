@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
  */
 object GlassDebug {
     var mask by androidx.compose.runtime.mutableIntStateOf(0)
+    /** Test ölçümü sürüyor (maske 0 iken de az kareli geçişler ölçülsün). */
+    @Volatile var test = false
     fun off(bit: Int): Boolean = mask and bit != 0
 }
 
@@ -66,7 +68,8 @@ object FrameStats {
 
     /** [intervalsNs]: art arda karelerin arası (ns), [refresh]: ekranın bildirdiği yenileme hızı (Hz). */
     fun report(intervalsNs: LongArray, refresh: Float, label: String = "Son kaydırma (ana ekran)") {
-        if (intervalsNs.size < 8) { recording = false; return }
+        // Testte (emülatör yazılımla çizer, çok yavaş) az kareli geçişler de ölçülür.
+        if (intervalsNs.size < (if (GlassDebug.mask != 0 || GlassDebug.test) 3 else 8)) { recording = false; return }
         val ms = intervalsNs.map { it / 1_000_000f }.sorted()
         val median = ms[ms.size / 2]
         val expected = 1000f / refresh.coerceAtLeast(1f)
