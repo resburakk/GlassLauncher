@@ -269,10 +269,11 @@ fun TodayPage(
                 Spacer(Modifier.width(8.dp))
                 Text("Ara", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
             }
-            // Bugünün tarihi (büyük): üstte gün adı, altında gün ve ay.
+            // Bugünün tarihi (büyük): üstte gün adı, altında gün ve ay. Yalnızca sayfa boşken; widget eklenince kalkar.
             val today = remember { LocalDate.now() }
             val tr = remember { Locale("tr", "TR") }
-            Column(Modifier.width(contentW).padding(top = u * 22f, bottom = u * 18f)) {
+            if (widgets.isNotEmpty()) Spacer(Modifier.height(u * 16f))
+            else Column(Modifier.width(contentW).padding(top = u * 22f, bottom = u * 18f)) {
                 Text(
                     today.format(DateTimeFormatter.ofPattern("EEEE", tr)).replaceFirstChar { it.titlecase(tr) },
                     color = Color(0xD9FFFFFF), fontSize = (u.value * 17f).sp, fontWeight = FontWeight.SemiBold,
