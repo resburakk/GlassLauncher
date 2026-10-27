@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Kodsuz simge paketi: launcher'lar paketi tema niyetleriyle bulur, simgeleri appfilter.xml'den okur. -->
+    <application android:label="Cam 27" android:icon="@drawable/cam_settings" android:hasCode="false">
+        <activity android:name="android.app.Activity" android:exported="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" android:label="Cam 27">
+            <intent-filter>
+                <action android:name="org.adw.launcher.THEMES" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.novalauncher.THEME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="com.anddoes.launcher.THEME" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

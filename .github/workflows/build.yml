@@ -46,19 +46,21 @@ jobs:
           path: |
             app/build/outputs/apk/release/*.apk
             app/build/outputs/apk/debug/*.apk
+            iconpack/build/outputs/apk/release/*.apk
       - name: Publish to Releases (claude/build branch)
         if: success() && github.ref == 'refs/heads/claude/build'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp app/build/outputs/apk/release/app-release.apk GlassLauncher.apk
+          cp iconpack/build/outputs/apk/release/iconpack-release.apk Cam27-SimgePaketi.apk
           gh release delete son-surum -y --cleanup-tag || true
           # Etiketin silinmesi bitmeden yeni sürüm oluşturulursa sürüm taslakta kalabiliyor: kısa bekle.
           sleep 5
-          gh release create son-surum GlassLauncher.apk \
+          gh release create son-surum GlassLauncher.apk Cam27-SimgePaketi.apk \
             --target "$GITHUB_SHA" --prerelease \
             --title "Glass Launcher (son derleme)" \
-            --notes "Otomatik derleme: ${GITHUB_SHA::7}. Telefonda GlassLauncher.apk dosyasını indirip kurun."
+            --notes "Otomatik derleme: ${GITHUB_SHA::7}. Telefonda GlassLauncher.apk dosyasını indirip kurun. Cam27-SimgePaketi.apk: isteğe bağlı simge paketi (Ayarlar > Simgeler > Simge paketi)."
           # Taslakta kaldıysa yayınla ve doğrula (yayınlanmamış sürüm telefonda görünmez).
           for i in 1 2 3; do
             d=$(gh release view son-surum --json isDraft -q .isDraft || echo true)

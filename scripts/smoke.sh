@@ -407,6 +407,19 @@ for f in 1 2 3 4 5 6 7 8 9 10; do adb shell input motionevent MOVE $((W*20/100 +
 sleep 0.8; shot 28b-gecis-yarida
 adb shell input motionevent MOVE $((W*20/100)) $((H*45/100)); adb shell input motionevent UP $((W*20/100)) $((H*45/100)); step "bırak" 2
 
+# 29) Cam 27 simge paketi: kurulur, Ayarlar > Simgeler'den seçilir, ana ekran görüntülenir.
+PACK=iconpack/build/outputs/apk/release/iconpack-release.apk
+if [ -f "$PACK" ]; then
+  adb install -r "$PACK" >/dev/null && echo "::notice::Simge paketi kuruldu" || echo "::warning::Simge paketi kurulamadı"
+  adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3
+  tap_text "Simgeler" && step "simgeler" 2
+  shot 29a-simge-ayarlari
+  tap_text "Cam 27" && step "paket seçildi" 2
+  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+  adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
+  shot 29b-simge-paketi
+fi
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then
