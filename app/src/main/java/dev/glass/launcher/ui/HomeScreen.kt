@@ -1220,6 +1220,7 @@ fun HomeScreen(
             val vis by transition.animateFloat(transitionSpec = { motion.tween(150) }, label = "plusVis") {
                 if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
             }
+            MeasureFrames(transition.isRunning, "Son açılış (+ menüsü)")
             val u = LocalPt.current
             val corner = u * settings.menuCorner
             val plusDark = menuDarkNow()

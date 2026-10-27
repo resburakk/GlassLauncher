@@ -738,36 +738,27 @@ fun Modifier.glassRegionBlur(
     val menuEffect = remember(mr) {
         android.graphics.RenderEffect.createBlurEffect(mr / BLUR_DOWNSCALE, mr / BLUR_DOWNSCALE, android.graphics.Shader.TileMode.CLAMP)
     }
+    // Hangi bulanıklık türleri gerekiyor (yalnızca alan eklenip kaldırılınca değişir; alanın boyutu/görünürlüğü değil).
+    val kinds by remember(reg, includeRoot) {
+        androidx.compose.runtime.derivedStateOf {
+            val keys = if (includeRoot) reg.regions.keys + reg.rootRegions.keys else reg.regions.keys.toSet()
+            Triple(
+                keys.any { it !in reg.menu && it !in reg.strong },
+                keys.any { it in reg.strong },
+                keys.any { it in reg.menu },
+            )
+        }
+    }
+    val ds = BLUR_DOWNSCALE
+    // İki katman: İÇTEKİ içeriği ve bulanık kopyalarını kaydeder (yalnızca içerik değişince); DIŞTAKİ her karede yalnızca
+    // hazır bulanık kopyayı alanlara yerleştirir. Önceden menü açılırken görünürlük her karede değiştiği için içerik
+    // her karede baştan kaydediliyor, bulanıklık her karede yeniden hesaplanıyordu (menü açılışı 120 Hz'in altında).
     this.drawWithContent {
         drawContent()
         val list = if (includeRoot) reg.regions.entries.toList() + reg.rootRegions.entries else reg.regions.entries.toList()
         if (reduced || list.isEmpty()) return@drawWithContent
         val w = size.width.toInt(); val h = size.height.toInt()
         if (w <= 0 || h <= 0) return@drawWithContent
-        node.setPosition(0, 0, w, h)
-        val rc = node.beginRecording(w, h)
-        val prev = drawContext.canvas
-        try {
-            drawContext.canvas = androidx.compose.ui.graphics.Canvas(rc)
-            drawContent()
-        } finally {
-            drawContext.canvas = prev
-            node.endRecording()
-        }
-        // İki katman: bulanıklık, içerik düğümünü saran ayrı düğümde (Haze kütüphanesindeki gibi). Bulanıklık 1/3
-        // çözünürlükte hesaplanır (yarıçap da 1/3): bu güçlü bulanıklıkta görünüm aynı, ekran kartı yükü ~9 kat az.
-        // Önceden tam çözünürlükte her karede hesaplanıyordu; menü açılışı 120 Hz'in altına düşüyordu.
-        val ds = BLUR_DOWNSCALE
-        val sw = (w / ds).toInt().coerceAtLeast(1); val sh = (h / ds).toInt().coerceAtLeast(1)
-        fun record(n: android.graphics.RenderNode, e: android.graphics.RenderEffect) {
-            n.setPosition(0, 0, sw, sh)
-            n.setRenderEffect(e)
-            n.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
-            n.endRecording()
-        }
-        if (list.any { it.key !in reg.menu && it.key !in reg.strong }) record(blurNode, effect)
-        if (list.any { it.key in reg.strong }) record(strongNode, strongEffect)
-        if (list.any { it.key in reg.menu }) record(menuNode, menuEffect)
         fun blurFor(k: Any) = when (k) { in reg.menu -> menuNode; in reg.strong -> strongNode; else -> blurNode }
         fun android.graphics.Canvas.drawBlur(n: android.graphics.RenderNode) { save(); scale(ds, ds); drawRenderNode(n); restore() }
         drawIntoCanvas { c ->
@@ -816,6 +807,35 @@ fun Modifier.glassRegionBlur(
                 nc.restore()
             }
         }
+    }
+    .graphicsLayer { }
+    .drawWithContent {
+        drawContent()
+        val (anyPlain, anyStrong, anyMenu) = kinds
+        if (reduced || !(anyPlain || anyStrong || anyMenu)) return@drawWithContent
+        val w = size.width.toInt(); val h = size.height.toInt()
+        if (w <= 0 || h <= 0) return@drawWithContent
+        node.setPosition(0, 0, w, h)
+        val rc = node.beginRecording(w, h)
+        val prev = drawContext.canvas
+        try {
+            drawContext.canvas = androidx.compose.ui.graphics.Canvas(rc)
+            drawContent()
+        } finally {
+            drawContext.canvas = prev
+            node.endRecording()
+        }
+        // Bulanıklık 1/3 çözünürlükte hesaplanır (yarıçap da 1/3): bu güçlü bulanıklıkta görünüm aynı, yük ~9 kat az.
+        val sw = (w / ds).toInt().coerceAtLeast(1); val sh = (h / ds).toInt().coerceAtLeast(1)
+        fun record(n: android.graphics.RenderNode, e: android.graphics.RenderEffect) {
+            n.setPosition(0, 0, sw, sh)
+            n.setRenderEffect(e)
+            n.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
+            n.endRecording()
+        }
+        if (anyPlain) record(blurNode, effect)
+        if (anyStrong) record(strongNode, strongEffect)
+        if (anyMenu) record(menuNode, menuEffect)
     }
 }
 
