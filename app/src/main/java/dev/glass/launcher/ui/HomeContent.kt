@@ -574,7 +574,7 @@ internal fun HomeContent(
             // Kayarken (düzenleme/sürükleme dışında) cam arkaları sayfanın altındaki katmanda çizilir.
             anchor.holesActive = { (scrollHold || todayMoving()) && !edit && !dragging }
             // Güvence: geçiş sırasında cam kendi arkasını çizerse de o anki kaymaya göre doğru yerden çizsin (donuk kalmasın).
-            anchor.shift = { today?.takeIf { it.moving }?.let { Offset(it.progress * it.widthPx, 0f) } }
+            anchor.shift = { today?.takeIf { it.moving }?.let { Offset(it.progress * it.widthPx, 0f) } ?: Offset.Zero }
             DisposableEffect(page, anchor) {
                 pageAnchors[page] = anchor
                 onDispose { if (pageAnchors[page] === anchor) pageAnchors.remove(page) }
