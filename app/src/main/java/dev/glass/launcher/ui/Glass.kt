@@ -696,8 +696,8 @@ fun BlurBackdrop(
  * İçerik katmanına uygulanır: içeriği net çizer, ardından [GlassRegions]'daki alanlara içeriğin bulanık
  * kopyasını kırparak çizer. (İçerik, kendi çiziminde iki kez çizilir; bu Android'in desteklediği yoldur.)
  */
-/** Bölge bulanıklığının hesaplandığı küçültme oranı (3 = üçte bir çözünürlük). */
-private const val BLUR_DOWNSCALE = 3f
+/** Bölge bulanıklığının hesaplandığı küçültme oranı (4 = dörtte bir çözünürlük; menü açılışında ekran kartı yükü az). */
+private const val BLUR_DOWNSCALE = 4f
 
 fun Modifier.glassRegionBlur(
     reg: GlassRegions,
