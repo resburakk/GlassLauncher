@@ -154,9 +154,21 @@ fun SearchOverlay(
         r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { query = it }
     }
 
+    // Son aramalar (iOS "Recent Searches"): bir sonuçla sonuçlanan aramalar saklanır, en yeni üstte, en çok 5 tane.
+    val recentPrefs = remember { ctx.getSharedPreferences("search_recent", android.content.Context.MODE_PRIVATE) }
+    var recent by remember { mutableStateOf(recentPrefs.getString("list", "").orEmpty().split('\n').filter { it.isNotBlank() }) }
+    fun saveRecent() {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        recent = (listOf(q) + recent.filter { !it.equals(q, ignoreCase = true) }).take(5)
+        recentPrefs.edit().putString("list", recent.joinToString("\n")).apply()
+    }
+    fun clearRecent() { recent = emptyList(); recentPrefs.edit().remove("list").apply() }
+
     fun close() { keyboard?.hide(); onClose() }
-    fun open(app: AppInfo) { keyboard?.hide(); vm.launch(app); onClose() }
+    fun open(app: AppInfo) { saveRecent(); keyboard?.hide(); vm.launch(app); onClose() }
     fun launch(i: Intent) {
+        saveRecent()
         keyboard?.hide()
         runCatching { ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         onClose()
@@ -221,6 +233,34 @@ fun SearchOverlay(
             Spacer(Modifier.height(10.dp))
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (query.isBlank() && recent.isNotEmpty()) {
+                    // iOS gibi: başlık + "Temizle", altında ince çizgi ve büyüteçli son aramalar (dokununca yeniden aranır).
+                    Column(Modifier.fillMaxWidth().graphicsLayer { alpha = visibility().coerceIn(0f, 1f) }) {
+                        Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "Son Aramalar", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp).weight(1f),
+                            )
+                            Text(
+                                "Temizle", color = Color(0xE6FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { clearRecent() }.padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                        }
+                        Box(Modifier.fillMaxWidth().padding(horizontal = 6.dp).height(0.5.dp).background(Color(0x40FFFFFF)))
+                        recent.forEach { r ->
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { query = r }
+                                    .padding(horizontal = 6.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                SearchGlyph(Color(0xE6FFFFFF), 18.dp)
+                                Spacer(Modifier.width(12.dp))
+                                Text(r, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = SearchTextShadow))
+                            }
+                        }
+                    }
+                }
                 if (query.isNotBlank()) {
                     Box(
                         if (st.searchResultsPanel) {

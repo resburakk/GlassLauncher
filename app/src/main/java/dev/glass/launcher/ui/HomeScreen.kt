@@ -230,6 +230,10 @@ fun HomeScreen(
     }
     // (Bulanıklık yarıçapı çizim katmanında okunur: geçiş sırasında ana ekran her karede yeniden oluşturulmasın.)
     val blurPxMax = with(LocalDensity.current) { 22.dp.toPx() } * settings.glassBlur
+    // Arama (iOS Spotlight) arkası çok daha bulanık: bu kat sayı son açılan tam bulanık katmana göre tutulur
+    // (kapanırken birden düşmesin).
+    var blurBoost by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(overlay) { if (overlay in FullBlurOverlays) blurBoost = if (overlay == Overlay.Search) 2.2f else 1f }
     val scrim by animateFloatAsState(
         when {
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
@@ -237,7 +241,7 @@ fun HomeScreen(
             // Arşiv kategorisi tam ekran açılır: iOS 26'daki gibi arka plan bulanık ve biraz koyulaşmış.
             overlay == Overlay.Group -> 0.22f
             // Arama (iOS Spotlight gibi): koyuluk bulanıklıktan gelir, karartma çok hafif.
-            overlay == Overlay.Search -> 0.10f
+            overlay == Overlay.Search -> 0.16f
             fullBlur -> 0.28f
             overlay == Overlay.Menu -> 0.18f
             overlay == Overlay.LockPrompt -> 0.10f
@@ -258,7 +262,7 @@ fun HomeScreen(
     LaunchedEffect(windowBlur) {
         // Sistem duvar kâğıdı: pencere arkası bulanıklığı (Android 12+, cihaz destekliyorsa).
         // Son uygulamalar açılırken (ana ekran soluyor) pencere bulanıklığı da kalkar: küçültülen pencerede dikdörtgen olmasın.
-        snapshotFlow { if (copyCovers || homeHide() > 0.01f) 0f else maxOf(blurAmount, libProgress.floatValue, homeBlurNow) }
+        snapshotFlow { if (copyCovers || homeHide() > 0.01f) 0f else maxOf(blurAmount * blurBoost, libProgress.floatValue, homeBlurNow) }
             .collect { f -> windowBlur?.invoke(f * blurK) }
     }
     var lockReason by remember { mutableStateOf(LockReason.Lock) }
@@ -694,6 +698,10 @@ fun HomeScreen(
         val overlayBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, overlayBlurR, rootSize) {
             value = blurredWallpaperCopy(wp, overlayBlurR, rootSize)
         }
+        // Arama için daha güçlü bulanık duvar kâğıdı (iOS Spotlight gibi; bir kez hazırlanır).
+        val searchBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, overlayBlurR, rootSize) {
+            value = blurredWallpaperCopy(wp, overlayBlurR * 2.2f, rootSize)
+        }
         val homeBlurImg by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, wp, homeBlurR, rootSize) {
             value = if (homeBlurR < 1f) null else blurredWallpaperCopy(wp, homeBlurR, rootSize)
         }
@@ -789,6 +797,16 @@ fun HomeScreen(
                     contentScale = ContentScale.Crop,
                 )
             }
+            val sImg = searchBlurImg
+            if (sImg != null) {
+                Image(
+                    sImg, null,
+                    Modifier.fillMaxSize().graphicsLayer {
+                        alpha = if (blurBoost > 1.5f) (1f - homeHide()) * blurAmount.coerceIn(0f, 1f) else 0f
+                    },
+                    contentScale = ContentScale.Crop,
+                )
+            }
             if (settings.wallpaperDim > 0f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = 1f - homeHide() }.background(Color.Black.copy(alpha = settings.wallpaperDim)))
         }
         // Widget sayfası geçişinde ana ekran da hazır görüntü olarak kayar; sayfa dışındaki camların (dock, arama
@@ -809,7 +827,7 @@ fun HomeScreen(
                     compositingStrategy = if (today.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                         else androidx.compose.ui.graphics.CompositingStrategy.Auto
                     // Açılan katmanın arkasında ana ekran içeriği bulanıklaşır (yarıçap çizimde okunur).
-                    val br = blurPxMax * blurAmount
+                    val br = blurPxMax * blurAmount * blurBoost
                     if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
                     var k = 1f
                     if (returnInfo != null) k = 1f + 0.05f * (1f - returnAnim.value)
@@ -866,7 +884,7 @@ fun HomeScreen(
             Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
             // Arama/menü/galeri açılınca widget sayfası da ana ekran gibi bulanıklaşır (yarıçap çizimde okunur).
             Box(Modifier.fillMaxSize().graphicsLayer {
-                val br = blurPxMax * blurAmount
+                val br = blurPxMax * blurAmount * blurBoost
                 if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
             }) {
             // Geçişte widget camlarının arkası: sayfanın altında, o anki kaymaya göre (sayfa hazır görüntü olarak kayar).
