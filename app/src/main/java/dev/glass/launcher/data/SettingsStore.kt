@@ -68,7 +68,8 @@ data class LauncherSettings(
     /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
     val iconRimGlow: Float = 1f,
     /** Simgenin altındaki ince temas gölgesi. iOS 26 ölçümü: yok (0). */
-    val iconShadow: Float = 0f,
+    /** Simge alt gölgesi: widget ve klasörlerin alt temas gölgesiyle aynı (0,5). */
+    val iconShadow: Float = 0.5f,
     /** Simge renk canlılığı (doygunluk çarpanı; 1 = orijinal). Çizimde uygulanır, simge görüntüsü değişmez. */
     val iconSaturation: Float = 1.15f,
     val iconGlass: Boolean = true,
@@ -342,7 +343,7 @@ data class LauncherSettings(
         put("searchGlassBrightness2", searchGlassBrightness.toDouble())
         put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
         put("settingsTheme", settingsTheme); put("labelWeight", labelWeight.toDouble())
-        put("cornerSmoothing", cornerSmoothing.toDouble()); put("iconRimGlow", iconRimGlow.toDouble()); put("iconShadow", iconShadow.toDouble()); put("iconSaturation", iconSaturation.toDouble())
+        put("cornerSmoothing", cornerSmoothing.toDouble()); put("iconRimGlow", iconRimGlow.toDouble()); put("iconShadow2", iconShadow.toDouble()); put("iconSaturation", iconSaturation.toDouble())
         put("editButtonTextSize", editButtonTextSize.toDouble()); put("editButtonWeight", editButtonWeight.toDouble())
         put("metricsVersion", METRICS_VERSION)
         put("glassStrength", glassStrength.toDouble()); put("theme", theme.name)
@@ -483,7 +484,7 @@ data class LauncherSettings(
                 labelWeight = f("labelWeight", d.labelWeight),
                 cornerSmoothing = f("cornerSmoothing", d.cornerSmoothing),
                 iconRimGlow = f("iconRimGlow", d.iconRimGlow),
-                iconShadow = f("iconShadow", d.iconShadow),
+                iconShadow = f("iconShadow2", d.iconShadow),
                 iconSaturation = f("iconSaturation", d.iconSaturation),
                 editButtonTextSize = f("editButtonTextSize", d.editButtonTextSize),
                 editButtonWeight = f("editButtonWeight", d.editButtonWeight),

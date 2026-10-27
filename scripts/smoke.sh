@@ -395,6 +395,15 @@ shot 26c-widget-durunca
 tap_desc "Takvim widget'ı" && { step "takvim widget dokunuş" 3; shot 27a-widget-dokunus; adb shell dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity" | sed 's/^ */::notice::ACIK /'; }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 
+# 28) Widget sayfası geçişi yarıda tutulur: ana ekrandaki widget camlarının içi duvar kâğıdıyla hizalı olmalı.
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
+shot 28a-gecis-oncesi
+adb shell input motionevent DOWN $((W*20/100)) $((H*45/100)); sleep 0.1
+for f in 1 2 3 4 5 6 7 8; do adb shell input motionevent MOVE $((W*20/100 + W*f*4/100)) $((H*45/100)); sleep 0.06; done
+sleep 0.8; shot 28b-gecis-yarida
+adb shell input motionevent MOVE $((W*20/100)) $((H*45/100)); adb shell input motionevent UP $((W*20/100)) $((H*45/100)); step "bırak" 2
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

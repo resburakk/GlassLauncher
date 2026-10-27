@@ -96,6 +96,9 @@ import kotlinx.coroutines.delay
  * en altta internette ve Play Store'da arama. Eşleşen harfler kalın gösterilir.
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** Arama çubuğundaki yazının hafif gölgesi (okunurluk için, abartısız). */
+private val SearchTextShadow = androidx.compose.ui.graphics.Shadow(Color(0x55000000), androidx.compose.ui.geometry.Offset(0f, 1f), 3f)
+
 @Composable
 fun SearchOverlay(
     vm: LauncherViewModel,
@@ -255,17 +258,20 @@ fun SearchOverlay(
                     .fillMaxSize()
                     // Arama camı ayarı (Genel / Dock ile eşit) [strength] içinde zaten uygulanmış.
                     .liquidGlass(CircleShape, strength, 0.dp, panel = true, overlay = true)
+                    // Açık arka planda yazı okunsun diye çubuğun içi çok hafif koyulaşır.
+                    .background(Color.Black.copy(alpha = 0.10f), CircleShape)
                     .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SearchGlyph(Color(0xCCFFFFFF), 18.dp)
+                SearchGlyph(Color(0xE6FFFFFF), 18.dp)
                 Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = query,
                     onValueChange = { query = it },
                     singleLine = true,
-                    textStyle = TextStyle(color = Color.White, fontSize = fieldSize, fontFamily = AppFont),
+                    // Yazı biraz daha belirgin: hafif gölge (açık arka planda kaybolmasın).
+                    textStyle = TextStyle(color = Color.White, fontSize = fieldSize, fontFamily = AppFont, shadow = SearchTextShadow),
                     cursorBrush = SolidColor(Color.White),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
@@ -274,7 +280,8 @@ fun SearchOverlay(
                     modifier = Modifier.weight(1f).focusRequester(focus),
                     decorationBox = { inner ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = fieldSize, fontFamily = AppFont)
+                            if (query.isEmpty()) Text("Ara", color = Color(0xD9FFFFFF), fontSize = fieldSize, fontFamily = AppFont,
+                                style = TextStyle(shadow = SearchTextShadow))
                             inner()
                         }
                     },
@@ -359,6 +366,8 @@ private fun SuggestionsPanel(
             }
             // Gölgesiz: yarı saydam camın içinden gölge koyu bir dikdörtgen gibi görünüyordu.
             .liquidGlass(panelShape, strength * st.dockOpacity, 0.dp, panel = true, overlay = true)
+            // Öneri paneli göze batacak kadar parlaktı: hafif koyu tonla biraz kısılır.
+            .background(Color.Black.copy(alpha = 0.12f), panelShape)
     ) {
         suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
             val row = i / 4
