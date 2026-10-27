@@ -388,7 +388,7 @@ fun ContextMenuOverlay(
             modifier = Modifier.fillMaxSize(),
             content = {
                 Box(Modifier.width(menuW).heightIn(max = maxH)) {
-                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() }, menuBlur = true, fixedBounds = { menuRect[0] })
+                    BlurBackdrop(corner, Modifier.matchParentSize(), shape = appShape(corner), alpha = { appear.value.coerceIn(0f, 1f) * visibility() }, menuBlur = true)
                     Column(
                         Modifier
                             .width(menuW)
