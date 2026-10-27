@@ -710,6 +710,21 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
             }
         }
     }
+    Group(null) {
+        // Simge paketi hazırlamak için: telefondaki uygulamaların adı ve paket adı tek seferde paylaşılır.
+        ActionRow("Uygulama listesini paylaş") {
+            val pm = ctx.packageManager
+            val launcher = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            val list = pm.queryIntentActivities(launcher, 0)
+                .map { ri -> ri.loadLabel(pm).toString() to "${ri.activityInfo.packageName}/${ri.activityInfo.name}" }
+                .sortedBy { it.first.lowercase() }
+                .joinToString("\n") { (l, c) -> "$l — $c" }
+            val send = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(android.content.Intent.EXTRA_SUBJECT, "Uygulama listesi")
+                .putExtra(android.content.Intent.EXTRA_TEXT, list)
+            runCatching { ctx.startActivity(android.content.Intent.createChooser(send, "Uygulama listesini paylaş").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
+    }
     Footer(
         if (packs.isEmpty()) "Yüklü simge paketi yok. Play Store'dan Nova veya ADW uyumlu bir simge paketi yükleyince burada görünür."
         else "Paketin içermediği uygulamalar kendi simgesiyle kalır. Koyu, renkli ve şeffaf görünümler paket simgelerine de uygulanır."
