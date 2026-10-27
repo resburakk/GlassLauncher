@@ -400,7 +400,7 @@ adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
 shot 28a-gecis-oncesi
 adb shell input motionevent DOWN $((W*20/100)) $((H*45/100)); sleep 0.1
-for f in 1 2 3 4 5 6 7 8; do adb shell input motionevent MOVE $((W*20/100 + W*f*4/100)) $((H*45/100)); sleep 0.06; done
+for f in 1 2 3 4 5 6 7 8 9 10; do adb shell input motionevent MOVE $((W*20/100 + W*f*1/100)) $((H*45/100)); sleep 0.06; done
 sleep 0.8; shot 28b-gecis-yarida
 adb shell input motionevent MOVE $((W*20/100)) $((H*45/100)); adb shell input motionevent UP $((W*20/100)) $((H*45/100)); step "bırak" 2
 
