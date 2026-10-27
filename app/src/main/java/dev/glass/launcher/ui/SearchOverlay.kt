@@ -90,15 +90,15 @@ import dev.glass.launcher.data.DeviceSearch
 import dev.glass.launcher.data.SearchRanker
 import kotlinx.coroutines.delay
 
+/** Arama çubuğundaki yazının hafif gölgesi (okunurluk için, abartısız). */
+private val SearchTextShadow = androidx.compose.ui.graphics.Shadow(Color(0x55000000), androidx.compose.ui.geometry.Offset(0f, 1f), 3f)
+
 /**
  * iOS tarzı arama: cam arama kutusu (temizle / mikrofon), adlı 4'lü öneri paneli (dock ölçüsünde, dört
  * kenarı eşit boşluklu), "En İyi Sonuç" + "Uygulamalar", izin verildiyse kişiler / mesajlar / dosyalar,
  * en altta internette ve Play Store'da arama. Eşleşen harfler kalın gösterilir.
  */
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-/** Arama çubuğundaki yazının hafif gölgesi (okunurluk için, abartısız). */
-private val SearchTextShadow = androidx.compose.ui.graphics.Shadow(Color(0x55000000), androidx.compose.ui.geometry.Offset(0f, 1f), 3f)
-
 @Composable
 fun SearchOverlay(
     vm: LauncherViewModel,
