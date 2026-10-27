@@ -73,6 +73,8 @@ enum class CellPlace { Grid, Dock, Folder, Library }
  * [id] kayıt kimliğidir (aynı uygulama hem ana ekranda hem arşivde görünebilir); [itemId] sürüklenen öğedir.
  */
 class DragTarget(val id: String) {
+    /** Kayıt anahtarı (katman + kimlik): aynı uygulama klasörde ve arşivde aynı kimlikle bulunur, birbirini ezmesin. */
+    internal var regKey: String = id
     var itemId: String = id
     var place: CellPlace = CellPlace.Grid
     var layer: DragLayer = DragLayer.Home
@@ -125,14 +127,17 @@ class DragState {
     val isDragging: Boolean get() = key != null
 
     fun register(t: DragTarget) {
-        targets[t.id] = t
+        // Klasördeki ve arşivdeki aynı uygulama aynı kimliği taşır: anahtar katmanı da içerir. Önceden arşiv sayfası yeniden
+        // çizilince klasördeki simgenin kaydını eziyor, klasörde basılı tutma birkaç denemeden sonra menü açmıyordu.
+        t.regKey = "${t.layer}/${t.id}"
+        targets[t.regKey] = t
     }
 
     fun unregister(t: DragTarget) {
-        if (targets[t.id] === t) targets.remove(t.id)
+        if (targets[t.regKey] === t) targets.remove(t.regKey)
     }
 
-    fun target(id: String): DragTarget? = targets[id]
+    fun target(id: String): DragTarget? = targets.values.firstOrNull { it.id == id }
 
     /** Ana ekranda veya dock'ta görünen bir öğenin simge alanı (kök koordinatı); yoksa null. */
     fun homeIconRect(itemId: String): Rect? = targets.values
@@ -220,7 +225,7 @@ suspend fun PointerInputScope.detectHomeDrag(
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        if (!enabled()) { android.util.Log.d("GlassDrag", "kapalı layer=${drag.activeLayer}"); return@awaitEachGesture }
+        if (!enabled()) return@awaitEachGesture
         val slop = viewConfiguration.touchSlop
         val editing = isEditing()
         drag.refreshActive()
@@ -251,7 +256,6 @@ suspend fun PointerInputScope.detectHomeDrag(
             }
             r
         }
-        android.util.Log.d("GlassDrag", "layer=${drag.activeLayer} hit=${hit?.id?.takeLast(20)} outcome=$outcome key=${drag.key}")
         if (outcome == 0) return@awaitEachGesture
 
         var moved = outcome == 1

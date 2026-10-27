@@ -107,7 +107,6 @@ for n in 3 4; do
   adb shell input motionevent UP $fx $fy; step "klasör içi menü $n" 2
   shot 04c$n-klasor-menu-$n
 done
-adb logcat -d -s GlassDrag:D | grep GlassDrag | tail -14 | sed 's/^.*GlassDrag: //' | cut -c1-300 > shots/drag.txt
 adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
