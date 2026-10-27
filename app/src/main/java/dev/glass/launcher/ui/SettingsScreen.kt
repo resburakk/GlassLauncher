@@ -1070,6 +1070,14 @@ private fun WidgetsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> La
     Group(null) {
         NavRow("Widget ekle", Glyph.Plus, Color(0xFFFF375F)) { onAddWidget() }
     }
+    Group("Widget görünümü") {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("glass" to "Şeffaf", "light" to "Renkli", "dark" to "Renkli koyu", "auto" to "Otomatik").forEach { (k, t) ->
+                Chip(t, s.widgetStyle == k, Modifier.weight(1f)) { onChange { it.copy(widgetStyle = k) } }
+            }
+        }
+    }
+    Footer("Şeffaf: cam görünüm. Renkli: iOS widget'ları gibi dolu açık zemin. Renkli koyu: dolu koyu zemin. Otomatik: telefonun koyu/açık moduna göre renkli ya da renkli koyu. Diğer uygulamaların widget'ları değişmez.")
     Group("Widget sayfası") {
         ToggleRow("Widget sayfası (ilk sayfanın solunda)", s.showToday, default = Def.showToday) { v -> onChange { it.copy(showToday = v) } }
     }

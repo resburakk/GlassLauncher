@@ -129,6 +129,8 @@ data class LauncherSettings(
     val menuDark: Boolean = false,
     /** Menüler telefonun koyu/açık moduna uyar (kapalıysa [menuDark] kullanılır). */
     val menuAuto: Boolean = true,
+    /** Launcher widget'larının görünümü: "glass" şeffaf cam, "light" renkli, "dark" renkli koyu, "auto" telefona göre. */
+    val widgetStyle: String = "glass",
     // Hareketler
     /** Ekranın üst kenarından aşağı kaydırma. */
     val topSwipe: SwipeAction = SwipeAction.ControlCenter,
@@ -324,7 +326,7 @@ data class LauncherSettings(
         put("pillTextSize2", pillTextSize.toDouble()); put("pillTextWeight2", pillTextWeight.toDouble())
         put("menuCorner", menuCorner.toDouble()); put("menuWidth", menuWidth.toDouble())
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
-        put("menuOpacity", menuOpacity.toDouble()); put("menuBlur", menuBlur.toDouble()); put("menuDark", menuDark); put("menuAuto", menuAuto)
+        put("menuOpacity", menuOpacity.toDouble()); put("menuBlur", menuBlur.toDouble()); put("menuDark", menuDark); put("menuAuto", menuAuto); put("widgetStyle", widgetStyle)
         put("dockCorner2", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
         put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
@@ -428,6 +430,7 @@ data class LauncherSettings(
                 menuBlur = f("menuBlur", d.menuBlur),
                 menuDark = o.optBoolean("menuDark", d.menuDark),
                 menuAuto = o.optBoolean("menuAuto", d.menuAuto),
+                widgetStyle = o.optString("widgetStyle", d.widgetStyle),
                 dockCorner = f("dockCorner2", d.dockCorner),
                 pillScale = f("pillScale", d.pillScale),
                 pillOffset = f("pillOffset", d.pillOffset),

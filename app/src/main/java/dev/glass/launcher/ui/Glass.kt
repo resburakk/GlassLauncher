@@ -157,6 +157,7 @@ class GlassHole(
 
 /** Bir sayfanın cam arkalarını sayfa [dx] kadar kaymışken çizer. [rootOffset]: çizim alanının kökteki sol üst köşesi. */
 fun DrawScope.drawPageGlassHoles(anchor: PageAnchor, dx: Float, rootOffset: Offset) {
+    GlassTrace.hit("altkatman(${anchor.holes.size})")
     for (h in anchor.holes.values) {
         val left = h.rect.left + dx
         val top = h.rect.top
@@ -431,7 +432,13 @@ fun Modifier.liquidGlass(
         .then(
             if (bd != null) Modifier.drawBehind {
                 // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
+                if (inPage && pageAnchor != null && pageAnchor.holesActive()) GlassTrace.hit("devretti")
                 if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
+                    GlassTrace.hit(when {
+                        !inPage -> "sayfasız"
+                        pageAnchor?.shift?.invoke()?.let { it != Offset.Zero } == true -> "kaydırmalı"
+                        else -> "kaydırmasız"
+                    })
                     // Katman camı hareket halindeyken kopya çizilmez: cam şeffaf kalır, arkadaki gerçek arka plan
                     // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
                     val sh = if (inPage) pageAnchor?.shift?.invoke() else null

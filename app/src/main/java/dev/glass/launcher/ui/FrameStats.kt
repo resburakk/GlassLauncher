@@ -8,6 +8,15 @@ import androidx.compose.runtime.setValue
  * Sayfa kaydırmalarındaki gerçek kare ölçümü (telefonda akıcılığı sayıyla görmek için).
  * Ana ekranda/arşive her kaydırmada kare aralıkları ölçülür; Ayarlar > Cam > Performans'ta gösterilir.
  */
+/** Geçici tanı: ölçülen hareket boyunca camların hangi yoldan çizildiği (widget sayfası geçişi donukluğu). */
+object GlassTrace {
+    private val m = LinkedHashMap<String, Int>()
+    @Volatile var on = false
+    fun hit(name: String) { if (on) synchronized(m) { m[name] = (m[name] ?: 0) + 1 } }
+    fun reset() { synchronized(m) { m.clear() }; on = true }
+    fun dump(): String { on = false; return synchronized(m) { m.entries.joinToString(", ") { "${it.key} ${it.value}" } } }
+}
+
 object FrameStats {
     var text by mutableStateOf("Henüz ölçüm yok: ana ekranda birkaç kez sayfa kaydırın.")
         private set
@@ -37,6 +46,7 @@ object FrameStats {
     fun begin() {
         synchronized(lock) { samples.clear() }
         recording = true
+        GlassTrace.reset()
     }
 
     private fun breakdown(budget: Float): String {
@@ -64,9 +74,11 @@ object FrameStats {
         val late = ms.count { it > expected * 1.5f }
         val worst = ms.last()
         val hz = 1000f / median.coerceAtLeast(0.1f)
+        val trace = GlassTrace.dump()
         val one = "$label: ${ms.size} kare, ortalama ≈ ${hz.toInt()} Hz " +
             "(kare arası ${"%.1f".format(median)} ms). Takılan kare: $late (%${(late * 100 / ms.size)}), " +
-            "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected)
+            "en uzun ${"%.0f".format(worst)} ms. Ekranın bildirdiği hız: ${refresh.toInt()} Hz." + breakdown(expected) +
+            (if (trace.isNotEmpty()) "\n\nCam tanısı: $trace" else "")
         // Her türün (ana ekran, arşiv, widget sayfası) son ölçümü ayrı tutulur; en yenisi en üstte.
         synchronized(results) { results.remove(label); results[label] = one; text = results.values.reversed().joinToString("\n\n") }
     }

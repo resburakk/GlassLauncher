@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -92,6 +94,26 @@ private fun rememberNow(everySecond: Boolean): LocalDateTime {
     return now
 }
 
+/** Widget içindeki yazı ve çizgi renkleri (şeffaf/koyu zeminde beyaz, renkli açık zeminde koyu). */
+internal class WidgetInk(
+    val primary: Color, val secondary: Color, val dim: Color, val track: Color,
+    /** Analog saat kadranı ve akrep/yelkovan. */
+    val face: Color, val hand: Color,
+)
+private val GlassInk = WidgetInk(Color.White, Color(0xCCFFFFFF), Color(0x99FFFFFF), Color(0x33FFFFFF), Color(0xF2FFFFFF), Color(0xFF1C1C1E))
+private val LightInk = WidgetInk(Color(0xFF1C1C1E), Color(0x991C1C1E), Color(0x801C1C1E), Color(0x1F1C1C1E), Color(0xFFF2F2F7), Color(0xFF1C1C1E))
+private val DarkInk = WidgetInk(Color.White, Color(0xB3FFFFFF), Color(0x80FFFFFF), Color(0x33FFFFFF), Color(0xFF2C2C2E), Color.White)
+internal val LocalWidgetInk = androidx.compose.runtime.staticCompositionLocalOf { GlassInk }
+
+/** Widget görünümü: 0 şeffaf cam, 1 renkli (açık), 2 renkli koyu. */
+@Composable
+internal fun widgetFill(): Int = when (LocalLauncherSettings.current.widgetStyle) {
+    "light" -> 1
+    "dark" -> 2
+    "auto" -> if (androidx.compose.foundation.isSystemInDarkTheme()) 2 else 1
+    else -> 0
+}
+
 /** Bir widget'ın içeriği. Dış çerçeve (cam, köşe) burada çizilir. */
 @Composable
 fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, strength: Float) {
@@ -104,16 +126,33 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
         WidgetKind.Photo -> Box(Modifier.size(width, height).clip(shape).background(Color(0x33000000))) {
             PhotoWidget(w, vm, width, height)
         }
-        else -> Box(
-            Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000)),
-        ) {
-            when (w.kind) {
-                WidgetKind.DigitalClock -> DigitalClockWidget(w)
-                WidgetKind.AnalogClock -> AnalogClockWidget(w)
-                WidgetKind.Calendar -> CalendarWidget(w)
-                WidgetKind.Battery -> BatteryWidget(w)
-                WidgetKind.Weather -> WeatherWidget(w)
-                else -> Unit
+        else -> {
+            val fill = widgetFill()
+            val weather = w.kind == WidgetKind.Weather
+            val frame = if (fill == 0) {
+                Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000))
+            } else {
+                // iOS 26 dolu widget: hava durumu gökyüzü renginde, diğerleri açık (beyaz) ya da koyu zemin.
+                val bg = when {
+                    weather && fill == 1 -> Brush.verticalGradient(listOf(Color(0xFF2F7DE1), Color(0xFF6FAEF0)))
+                    weather -> Brush.verticalGradient(listOf(Color(0xFF0F1D40), Color(0xFF2A3E6B)))
+                    fill == 1 -> SolidColor(Color.White)
+                    else -> SolidColor(Color(0xFF1C1C1E))
+                }
+                Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
+            }
+            val ink = when { fill == 0 || weather -> GlassInk; fill == 1 -> LightInk; else -> DarkInk }
+            androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
+                Box(frame) {
+                    when (w.kind) {
+                        WidgetKind.DigitalClock -> DigitalClockWidget(w)
+                        WidgetKind.AnalogClock -> AnalogClockWidget(w)
+                        WidgetKind.Calendar -> CalendarWidget(w)
+                        WidgetKind.Battery -> BatteryWidget(w)
+                        WidgetKind.Weather -> WeatherWidget(w)
+                        else -> Unit
+                    }
+                }
             }
         }
     }
@@ -153,17 +192,18 @@ private fun SystemWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height
 private fun DigitalClockWidget(w: WidgetItem) {
     val now = rememberNow(everySecond = false)
     val big = w.spanX >= 4
+    val ink = LocalWidgetInk.current
     Column(
         Modifier.fillMaxSize().padding(16.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = if (big) Alignment.Start else Alignment.CenterHorizontally,
     ) {
         Text(
-            now.format(DateTimeFormatter.ofPattern("HH:mm")), color = Color.White,
+            now.format(DateTimeFormatter.ofPattern("HH:mm")), color = ink.primary,
             fontSize = if (big) 56.sp else 40.sp, fontWeight = FontWeight.Bold,
         )
         Text(
-            now.format(DateTimeFormatter.ofPattern("d MMMM EEEE", TR)), color = Color(0xCCFFFFFF),
+            now.format(DateTimeFormatter.ofPattern("d MMMM EEEE", TR)), color = ink.secondary,
             fontSize = if (big) 17.sp else 13.sp, maxLines = 1,
         )
     }
@@ -172,18 +212,19 @@ private fun DigitalClockWidget(w: WidgetItem) {
 @Composable
 private fun AnalogClockWidget(w: WidgetItem) {
     val now = rememberNow(everySecond = true)
+    val ink = LocalWidgetInk.current
     Box(Modifier.fillMaxSize().padding(12.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
             val r = min(size.width, size.height) / 2f
             val c = Offset(size.width / 2f, size.height / 2f)
-            drawCircle(Color(0xF2FFFFFF), r, c)
+            drawCircle(ink.face, r, c)
             for (i in 0 until 60) {
                 val a = Math.toRadians(i * 6.0)
                 val major = i % 5 == 0
                 val outer = r * 0.94f
                 val inner = if (major) r * 0.80f else r * 0.88f
                 drawLine(
-                    if (major) Color(0xFF1C1C1E) else Color(0x661C1C1E),
+                    if (major) ink.hand else ink.hand.copy(alpha = 0.4f),
                     Offset(c.x + (sin(a) * inner).toFloat(), c.y - (cos(a) * inner).toFloat()),
                     Offset(c.x + (sin(a) * outer).toFloat(), c.y - (cos(a) * outer).toFloat()),
                     strokeWidth = if (major) r * 0.035f else r * 0.015f,
@@ -193,10 +234,10 @@ private fun AnalogClockWidget(w: WidgetItem) {
             val h = now.hour % 12 + now.minute / 60f
             val m = now.minute + now.second / 60f
             rotate(h * 30f, c) {
-                drawLine(Color(0xFF1C1C1E), c, Offset(c.x, c.y - r * 0.5f), r * 0.07f, StrokeCap.Round)
+                drawLine(ink.hand, c, Offset(c.x, c.y - r * 0.5f), r * 0.07f, StrokeCap.Round)
             }
             rotate(m * 6f, c) {
-                drawLine(Color(0xFF1C1C1E), c, Offset(c.x, c.y - r * 0.75f), r * 0.05f, StrokeCap.Round)
+                drawLine(ink.hand, c, Offset(c.x, c.y - r * 0.75f), r * 0.05f, StrokeCap.Round)
             }
             rotate(now.second * 6f, c) {
                 drawLine(Red, Offset(c.x, c.y + r * 0.15f), Offset(c.x, c.y - r * 0.82f), r * 0.02f, StrokeCap.Round)
@@ -210,17 +251,19 @@ private fun AnalogClockWidget(w: WidgetItem) {
 private fun CalendarWidget(w: WidgetItem) {
     val now = rememberNow(everySecond = false)
     val today = now.toLocalDate()
+    val ink = LocalWidgetInk.current
     if (w.spanX < 4 && w.spanY < 4) {
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Text(
                 today.dayOfWeek.getDisplayName(TextStyle.FULL, TR).uppercase(TR),
                 color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
             )
-            Text("${today.dayOfMonth}", color = Color.White, fontSize = 52.sp, fontWeight = FontWeight.Light)
+            // Gün rakamı biraz küçük (önceden 52).
+            Text("${today.dayOfMonth}", color = ink.primary, fontSize = 44.sp, fontWeight = FontWeight.Light)
             Spacer(Modifier.weight(1f))
             Text(
                 today.month.getDisplayName(TextStyle.FULL, TR) + " " + today.year,
-                color = Color(0xCCFFFFFF), fontSize = 13.sp,
+                color = ink.secondary, fontSize = 13.sp,
             )
         }
     } else {
@@ -234,6 +277,7 @@ private fun MonthGrid(today: LocalDate, modifier: Modifier) {
     val first = ym.atDay(1)
     val offset = (first.dayOfWeek.value - 1) // Pazartesi başlangıçlı
     val days = ym.lengthOfMonth()
+    val ink = LocalWidgetInk.current
     Column(modifier) {
         Text(
             ym.month.getDisplayName(TextStyle.FULL, TR).uppercase(TR),
@@ -243,7 +287,7 @@ private fun MonthGrid(today: LocalDate, modifier: Modifier) {
         val names = listOf("Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz")
         Row(Modifier.fillMaxWidth()) {
             names.forEach {
-                Text(it, color = Color(0x99FFFFFF), fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                Text(it, color = ink.dim, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
             }
         }
         val cells = offset + days
@@ -262,7 +306,7 @@ private fun MonthGrid(today: LocalDate, modifier: Modifier) {
                                     contentAlignment = Alignment.Center,
                                 ) {
                                     Text(
-                                        "$day", color = Color.White, fontSize = 12.sp,
+                                        "$day", color = if (isToday) Color.White else ink.primary, fontSize = 12.sp,
                                         fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
                                     )
                                 }
@@ -297,6 +341,7 @@ private fun BatteryWidget(w: WidgetItem) {
         onDispose { runCatching { ctx.unregisterReceiver(receiver) } }
     }
     val pct = level.coerceIn(0, 100)
+    val ink = LocalWidgetInk.current
     val color = when {
         charging -> Color(0xFF30D158)
         pct <= 20 -> Red
@@ -312,18 +357,18 @@ private fun BatteryWidget(w: WidgetItem) {
             Canvas(Modifier.fillMaxSize()) {
                 val inset = stroke / 2f
                 val arcSize = Size(size.width - stroke, size.height - stroke)
-                drawArc(Color(0x33FFFFFF), -90f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
+                drawArc(ink.track, -90f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
                 drawArc(color, -90f, 360f * pct / 100f, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
             }
-            Text(if (level < 0) "–" else "%$pct", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text(if (level < 0) "–" else "%$pct", color = ink.primary, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         }
         if (w.spanX >= 4) {
             Spacer(Modifier.width(18.dp))
             Column {
-                Text("Telefon", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                Text("Telefon", color = ink.primary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     if (charging) "Şarj oluyor" else "Pil",
-                    color = Color(0xCCFFFFFF), fontSize = 14.sp,
+                    color = ink.secondary, fontSize = 14.sp,
                 )
             }
         }
