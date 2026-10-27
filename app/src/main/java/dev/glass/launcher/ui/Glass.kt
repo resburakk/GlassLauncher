@@ -738,17 +738,8 @@ fun Modifier.glassRegionBlur(
     val menuEffect = remember(mr) {
         android.graphics.RenderEffect.createBlurEffect(mr / BLUR_DOWNSCALE, mr / BLUR_DOWNSCALE, android.graphics.Shader.TileMode.CLAMP)
     }
-    // Hangi bulanıklık türleri gerekiyor (yalnızca alan eklenip kaldırılınca değişir; alanın boyutu/görünürlüğü değil).
-    val kinds by remember(reg, includeRoot) {
-        androidx.compose.runtime.derivedStateOf {
-            val keys = if (includeRoot) reg.regions.keys + reg.rootRegions.keys else reg.regions.keys.toSet()
-            Triple(
-                keys.any { it !in reg.menu && it !in reg.strong },
-                keys.any { it in reg.strong },
-                keys.any { it in reg.menu },
-            )
-        }
-    }
+    // Son kaydın anahtarı (bulanıklık türleri + boyut): değişmedikçe bulanık kopya yeniden kaydedilmez.
+    val lastKey = remember { arrayOfNulls<Any>(1) }
     val ds = BLUR_DOWNSCALE
     // İki katman: İÇTEKİ içeriği ve bulanık kopyalarını kaydeder (yalnızca içerik değişince); DIŞTAKİ her karede yalnızca
     // hazır bulanık kopyayı alanlara yerleştirir. Önceden menü açılırken görünürlük her karede değiştiği için içerik
@@ -756,9 +747,39 @@ fun Modifier.glassRegionBlur(
     this.drawWithContent {
         drawContent()
         val list = if (includeRoot) reg.regions.entries.toList() + reg.rootRegions.entries else reg.regions.entries.toList()
-        if (reduced || list.isEmpty()) return@drawWithContent
+        if (reduced || list.isEmpty()) { lastKey[0] = null; return@drawWithContent }
         val w = size.width.toInt(); val h = size.height.toInt()
         if (w <= 0 || h <= 0) return@drawWithContent
+        val anyPlain = list.any { it.key !in reg.menu && it.key !in reg.strong }
+        val anyStrong = list.any { it.key in reg.strong }
+        val anyMenu = list.any { it.key in reg.menu }
+        val key = listOf(anyPlain, anyStrong, anyMenu, w, h)
+        if (key != lastKey[0]) {
+            // İçerik düğümü yalnızca içteki katmanı (aşağıdaki graphicsLayer) gösterir: içerik değişince o katman kendini
+            // yeniler, bulanık kopya da kendiliğinden güncellenir. Burada yalnızca bir kez (alan türü/boyutu değişince)
+            // kaydedilir; menü açılırken her karede yeniden kaydedilip bulanıklık her karede hesaplanmaz.
+            node.setPosition(0, 0, w, h)
+            val rc = node.beginRecording(w, h)
+            val prev = drawContext.canvas
+            try {
+                drawContext.canvas = androidx.compose.ui.graphics.Canvas(rc)
+                drawContent()
+            } finally {
+                drawContext.canvas = prev
+                node.endRecording()
+            }
+            val sw = (w / ds).toInt().coerceAtLeast(1); val sh = (h / ds).toInt().coerceAtLeast(1)
+            fun record(n: android.graphics.RenderNode, e: android.graphics.RenderEffect) {
+                n.setPosition(0, 0, sw, sh)
+                n.setRenderEffect(e)
+                n.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
+                n.endRecording()
+            }
+            if (anyPlain) record(blurNode, effect)
+            if (anyStrong) record(strongNode, strongEffect)
+            if (anyMenu) record(menuNode, menuEffect)
+            lastKey[0] = key
+        }
         fun blurFor(k: Any) = when (k) { in reg.menu -> menuNode; in reg.strong -> strongNode; else -> blurNode }
         fun android.graphics.Canvas.drawBlur(n: android.graphics.RenderNode) { save(); scale(ds, ds); drawRenderNode(n); restore() }
         drawIntoCanvas { c ->
@@ -808,35 +829,8 @@ fun Modifier.glassRegionBlur(
             }
         }
     }
+    // İçerik kendi katmanında: içerik düğümü bu katmana bağlanır (bkz. yukarıda), içerik değişince bulanık kopya da yenilenir.
     .graphicsLayer { }
-    .drawWithContent {
-        drawContent()
-        val (anyPlain, anyStrong, anyMenu) = kinds
-        if (reduced || !(anyPlain || anyStrong || anyMenu)) return@drawWithContent
-        val w = size.width.toInt(); val h = size.height.toInt()
-        if (w <= 0 || h <= 0) return@drawWithContent
-        node.setPosition(0, 0, w, h)
-        val rc = node.beginRecording(w, h)
-        val prev = drawContext.canvas
-        try {
-            drawContext.canvas = androidx.compose.ui.graphics.Canvas(rc)
-            drawContent()
-        } finally {
-            drawContext.canvas = prev
-            node.endRecording()
-        }
-        // Bulanıklık 1/3 çözünürlükte hesaplanır (yarıçap da 1/3): bu güçlü bulanıklıkta görünüm aynı, yük ~9 kat az.
-        val sw = (w / ds).toInt().coerceAtLeast(1); val sh = (h / ds).toInt().coerceAtLeast(1)
-        fun record(n: android.graphics.RenderNode, e: android.graphics.RenderEffect) {
-            n.setPosition(0, 0, sw, sh)
-            n.setRenderEffect(e)
-            n.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
-            n.endRecording()
-        }
-        if (anyPlain) record(blurNode, effect)
-        if (anyStrong) record(strongNode, strongEffect)
-        if (anyMenu) record(menuNode, menuEffect)
-    }
 }
 
 /** Parlaklık ayarı: pozitifse beyaz, negatifse siyah ince bir katman ekler. */
