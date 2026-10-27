@@ -511,6 +511,10 @@ internal fun HomeContent(
         Box(Modifier.fillMaxSize().drawBehind {
             // Arşiv yukarı/aşağı kayarken de kart camlarının arkası burada çizilir (kartlar kendi arkalarını çizmez).
             if (!(scrollHold || GlassMotion.listHoles) || edit || dragging) return@drawBehind
+            // Widget sayfası geçişi de sayfa kaydırıcısından başladığı için "kayıyor" sayılıyordu: bu katman ana ekranla
+            // birlikte kayıp camları geçiş öncesi yerden çiziyor, doğru yerden çizilen dış katmanın üstünü örtüyordu
+            // (widget'ların içi donuk görünüyordu). Geçişte camları yalnızca dış katman (HomeScreen) çizer.
+            if (todayMoving()) return@drawBehind
             val pos = pagerState.currentPage + pagerState.currentPageOffsetFraction
             pageAnchors.forEach { (pg, a) -> drawPageGlassHoles(a, (pg - pos) * size.width, gridOrigin) }
         })
