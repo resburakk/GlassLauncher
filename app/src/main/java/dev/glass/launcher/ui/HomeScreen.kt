@@ -247,7 +247,8 @@ fun HomeScreen(
             overlay == Overlay.LockPrompt -> 0.10f
             else -> 0f
         },
-        motion.tween(260), label = "scrim",
+        // Menü kapanırken karartma menüyle aynı sürede kalkar.
+        motion.tween(if (overlay == Overlay.None) 200 else 260), label = "scrim",
     )
     // Arşive geçiş oranı (HomeContent yazar); arka plan geçiş sırasında kademeli bulanıklaşır.
     val libProgress = remember { mutableFloatStateOf(0f) }
@@ -1044,9 +1045,11 @@ fun HomeScreen(
         AnimatedVisibility(
             overlay == Overlay.Menu,
             enter = fadeIn(motion.tween(160)) + scaleIn(motion.bouncy(), initialScale = 0.9f),
-            exit = fadeOut(motion.tween(140)),
+            // Kapanış: menü, arkasındaki bulanıklık ve karartma AYNI sürede biter (önceden karartma menüden sonra da
+            // ekranda kalıyor, kapanışta bir katman takılı kalmış gibi görünüyordu). iOS gibi hafifçe küçülerek söner.
+            exit = fadeOut(motion.tween(200)) + scaleOut(motion.tween(200), targetScale = 0.94f),
         ) {
-            val menuVis by transition.animateFloat(transitionSpec = { motion.tween(150) }, label = "menuVis") {
+            val menuVis by transition.animateFloat(transitionSpec = { motion.tween(if (targetState == androidx.compose.animation.EnterExitState.Visible) 150 else 200) }, label = "menuVis") {
                 if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
             }
             menuHolder[0]?.let { req ->
