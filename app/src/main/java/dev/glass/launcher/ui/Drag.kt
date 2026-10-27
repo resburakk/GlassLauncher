@@ -220,7 +220,7 @@ suspend fun PointerInputScope.detectHomeDrag(
 ) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-        if (!enabled()) return@awaitEachGesture
+        if (!enabled()) { android.util.Log.d("GlassDrag", "kapalı layer=${drag.activeLayer}"); return@awaitEachGesture }
         val slop = viewConfiguration.touchSlop
         val editing = isEditing()
         drag.refreshActive()
@@ -251,6 +251,7 @@ suspend fun PointerInputScope.detectHomeDrag(
             }
             r
         }
+        android.util.Log.d("GlassDrag", "layer=${drag.activeLayer} hit=${hit?.id?.takeLast(20)} outcome=$outcome key=${drag.key}")
         if (outcome == 0) return@awaitEachGesture
 
         var moved = outcome == 1
