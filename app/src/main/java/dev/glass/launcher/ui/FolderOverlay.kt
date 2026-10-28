@@ -207,7 +207,9 @@ fun FolderOverlay(
                         .height(rowH * 3),
             ) { page ->
                 val keys = pages.getOrNull(page).orEmpty()
-                Column(Modifier.fillMaxSize()) {
+                // Her sayfa hazır görüntü olarak kayar (ana ekran sayfaları gibi): kaydırırken simgeler, gölgeleri ve
+                // camları her karede yeniden çizilmez; yalnızca düzenleme modunda (sallanma) yeniden çizilir.
+                Column(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }) {
                     keys.chunked(3).forEach { row ->
                         Row(
                             Modifier.height(rowH).padding(start = sidePad),

@@ -953,7 +953,11 @@ fun HomeScreen(
             MeasureFrames(transition.isRunning, "Son açılış (klasör)")
             folderHolder[0]?.let { f ->
                 // Klasör katmanı da menünün arkasında bulanıklaşır (ayrı katmanda: alttaki ana ekran silinmez).
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
+                Box(Modifier.fillMaxSize().graphicsLayer {
+                    // Ayrı katman yalnızca içinde menü açıkken (bölgesel bulanıklık için) gerekir. Önceden hep açıktı:
+                    // klasörde sayfa kaydırırken tüm tam ekran katman her karede baştan çiziliyordu (60 Hz).
+                    compositingStrategy = if (glassRegions.regions.isNotEmpty()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+                }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
                 FolderOverlay(
                     folder = f,
                     byKey = byKey,
@@ -990,7 +994,11 @@ fun HomeScreen(
             exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = groupOrigin) + fadeOut(motion.tween(200)),
         ) {
             groupHolder[0]?.let { g ->
-                Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
+                Box(Modifier.fillMaxSize().graphicsLayer {
+                    // Ayrı katman yalnızca içinde menü açıkken (bölgesel bulanıklık için) gerekir. Önceden hep açıktı:
+                    // klasörde sayfa kaydırırken tüm tam ekran katman her karede baştan çiziliyordu (60 Hz).
+                    compositingStrategy = if (glassRegions.regions.isNotEmpty()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
+                }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
                 LibraryGroupOverlay(
                     group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
