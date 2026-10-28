@@ -276,7 +276,7 @@ fun ContextMenuOverlay(
             Modifier
                 .offset { IntOffset(req.iconRect.left.roundToInt(), req.iconRect.top.roundToInt()) }
                 .graphicsLayer {
-                    val k = 1f + 0.08f * appear.value
+                    val k = 1f + 0.08f * appear.value * visibility()
                     scaleX = k; scaleY = k
                 }
         ) {
@@ -290,7 +290,8 @@ fun ContextMenuOverlay(
         }
 
         if (confirmRemove && app != null) {
-            RemoveConfirm(
+            // Dış katman artık solmadığı için onay penceresi kendi içinde söner.
+            Box(Modifier.fillMaxSize().graphicsLayer { alpha = visibility() }) { RemoveConfirm(
                 appName = app.label,
                 canDelete = !app.isSystem,
                 removeTitle = "Ana Ekrandan Kaldır",
@@ -302,7 +303,7 @@ fun ContextMenuOverlay(
                 onDelete = { vm.uninstall(app); onClose() },
                 onRemove = { onRemoveFromHome(); onClose() },
                 onCancel = { onClose() },
-            )
+            ) }
             return@Box
         }
 
@@ -417,10 +418,13 @@ fun ContextMenuOverlay(
             layout(constraints.maxWidth, constraints.maxHeight) {
                 p.placeWithLayer(x.roundToInt(), py.roundToInt()) {
                     val a = appear.value
+                    val v = visibility()
                     transformOrigin = TransformOrigin(ox, oy)
-                    scaleX = 0.25f + 0.75f * a
-                    scaleY = 0.25f + 0.75f * a
-                    alpha = a.coerceIn(0f, 1f)
+                    // Kapanışta simgeye doğru küçülerek söner (iOS); açılışta simgeden büyür.
+                    val s = (0.25f + 0.75f * a) * (0.6f + 0.4f * v)
+                    scaleX = s
+                    scaleY = s
+                    alpha = a.coerceIn(0f, 1f) * v
                 }
             }
         }

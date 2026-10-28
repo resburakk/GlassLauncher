@@ -56,6 +56,8 @@ import dev.glass.launcher.data.ThemeMode
 import dev.glass.launcher.data.WidgetItem
 import dev.glass.launcher.data.WidgetKind
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
@@ -1046,12 +1048,13 @@ fun HomeScreen(
         }
         AnimatedVisibility(
             overlay == Overlay.Menu,
-            enter = fadeIn(motion.tween(160)) + scaleIn(motion.bouncy(), initialScale = 0.9f),
-            // Kapanış: menü, arkasındaki bulanıklık ve karartma AYNI sürede biter (önceden karartma menüden sonra da
-            // ekranda kalıyor, kapanışta bir katman takılı kalmış gibi görünüyordu). iOS gibi hafifçe küçülerek söner.
-            exit = fadeOut(motion.tween(200)) + scaleOut(motion.tween(200), targetScale = 0.94f),
+            // Tam ekran katmana ölçek/solma UYGULANMAZ: ekranın ortasından büyüyüp küçülüyor, menü önce yanlış yerde
+            // beliriyor ve kapanırken ortaya kayıyordu. Açılış/kapanış yalnızca menünün kendi içinde (simgeden) yapılır;
+            // menü camı ve arkasındaki bulanıklık aynı değerle (menuVis) söner.
+            enter = EnterTransition.None,
+            exit = ExitTransition.None,
         ) {
-            val menuVis by transition.animateFloat(transitionSpec = { motion.tween(if (targetState == androidx.compose.animation.EnterExitState.Visible) 150 else 200) }, label = "menuVis") {
+            val menuVis by transition.animateFloat(transitionSpec = { motion.tween(if (targetState == androidx.compose.animation.EnterExitState.Visible) 150 else 170) }, label = "menuVis") {
                 if (it == androidx.compose.animation.EnterExitState.Visible) 1f else 0f
             }
             menuHolder[0]?.let { req ->
