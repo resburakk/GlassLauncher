@@ -185,13 +185,14 @@ fun FolderOverlay(
             if (closing) 0f else 1f, androidx.compose.animation.core.tween(160), label = "folderLens",
         )
         if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true, shape = panelShape, alpha = { lensVis })
+        // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar. İçerikten AYRI katmanda (arkada) çizilir: önceden
+        // sayfalar camın yumuşak kenarlı kırpma katmanının içindeydi; sayfa kaydırırken bu panel boyu katman her
+        // karede baştan çiziliyordu. Şimdi cam hazır kalır, sayfaları kaydırıcının kendi kırpması sınırlar.
+        Box(Modifier.matchParentSize().lightGlass(panelShape, 0.75f, 0.35f))
         Column(
             Modifier
                 .width(panelW)
                 .onGloballyPositioned { panelRect = it.boundsInRoot() }
-                // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar; gölge YOK (yarı saydam panelde
-                // gölge içeriden koyu bir kare gibi görünüyordu).
-                .lightGlass(panelShape, 0.75f, 0.35f)
                 .pointerInput(Unit) { detectTapGestures { } }
                 .padding(top = topPad, bottom = bottomPad),
             horizontalAlignment = Alignment.CenterHorizontally,
