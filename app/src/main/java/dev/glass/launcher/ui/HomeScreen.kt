@@ -832,9 +832,8 @@ fun HomeScreen(
                 .graphicsLayer {
                     compositingStrategy = if (today.moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
                         else androidx.compose.ui.graphics.CompositingStrategy.Auto
-                    // Açılan katmanın arkasında ana ekran içeriği bulanıklaşır (yarıçap çizimde okunur).
-                    val br = blurPxMax * blurAmount * blurBoost
-                    if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
+                    // Açılan katmanın arkasındaki bulanıklık aşağıda: downsampledBlur (düşük çözünürlük, sabit yarıçap).
+                    if (blurAmount > 0.003f) clip = true
                     var k = 1f
                     if (returnInfo != null) k = 1f + 0.05f * (1f - returnAnim.value)
                     // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
@@ -853,6 +852,7 @@ fun HomeScreen(
                         alpha *= 1f - 0.35f * pv.coerceAtMost(1f)
                     }
                 }
+                .downsampledBlur({ blurAmount }, { blurPxMax * blurBoost })
                 .onPlaced { homeAnchor.coords = it }
         ) {
             androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides homeAnchor) {
@@ -889,10 +889,7 @@ fun HomeScreen(
             // iOS Bugün görünümünde arka plan bulanık ve biraz koyu.
             Box(Modifier.fillMaxSize().drawBehind { drawRect(Color.Black.copy(alpha = 0.12f * today.progress)) })
             // Arama/menü/galeri açılınca widget sayfası da ana ekran gibi bulanıklaşır (yarıçap çizimde okunur).
-            Box(Modifier.fillMaxSize().graphicsLayer {
-                val br = blurPxMax * blurAmount * blurBoost
-                if (br > 0.5f) { renderEffect = BlurEffect(br, br, TileMode.Clamp); clip = true }
-            }) {
+            Box(Modifier.fillMaxSize().graphicsLayer { clip = blurAmount > 0.003f }.downsampledBlur({ blurAmount }, { blurPxMax * blurBoost })) {
             // Geçişte widget camlarının arkası: sayfanın altında, o anki kaymaya göre (sayfa hazır görüntü olarak kayar).
             Box(Modifier.fillMaxSize().drawBehind {
                 if (today.moving) drawPageGlassHoles(today.anchor, (today.progress - 1f) * size.width, Offset.Zero)
@@ -953,6 +950,7 @@ fun HomeScreen(
             enter = scaleIn(motion.bouncy(), initialScale = 0.2f, transformOrigin = folderOrigin) + fadeIn(motion.tween(180)),
             exit = scaleOut(motion.tween(220), targetScale = 0.2f, transformOrigin = folderOrigin) + fadeOut(motion.tween(200)),
         ) {
+            MeasureFrames(transition.isRunning, "Son açılış (klasör)")
             folderHolder[0]?.let { f ->
                 // Klasör katmanı da menünün arkasında bulanıklaşır (ayrı katmanda: alttaki ana ekran silinmez).
                 Box(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {

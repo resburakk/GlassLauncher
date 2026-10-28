@@ -196,6 +196,7 @@ fun FolderOverlay(
                 .padding(top = topPad, bottom = bottomPad),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            MeasureFrames(pagerState.isScrollInProgress, "Son kaydırma (klasör)")
             HorizontalPager(
                 state = pagerState,
                 // Tek sayfada kaydırılacak yer yok: çekmeyi aşağıdaki esnek çekme karşılar.

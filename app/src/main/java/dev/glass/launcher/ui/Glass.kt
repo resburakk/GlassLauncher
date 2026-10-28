@@ -1057,3 +1057,52 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
         drawImage(img, dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()))
     }
 }
+
+/**
+ * Açılan katmanın (klasör, arşiv kategorisi, arama, widget galerisi) arkasındaki içeriğin bulanıklığı.
+ * Önceden içerik tam çözünürlükte, her karede değişen yarıçapla bulanıklaştırılıyordu (RenderEffect yarıçapı
+ * animasyonla değişince her kare baştan hesaplanır): klasör açılışı ve içindeki kaydırma 120 Hz'in altına düşüyordu.
+ * Şimdi bulanık kopya 1/BLUR_DOWNSCALE çözünürlükte, SABİT yarıçapla çizilir (glassRegionBlur ile aynı yol);
+ * geçişte net içerik söner, bulanık kopya belirir. Ekran kartı yükü ~16 kat az.
+ */
+fun Modifier.downsampledBlur(amount: () -> Float, radiusPx: () -> Float): Modifier = composed {
+    val node = remember { android.graphics.RenderNode("downBlurContent") }
+    val blurNode = remember { android.graphics.RenderNode("downBlur") }
+    val lastR = remember { floatArrayOf(-1f) }
+    this.drawWithContent {
+        val a = amount().coerceIn(0f, 1f)
+        val r = radiusPx()
+        val w = size.width.toInt(); val h = size.height.toInt()
+        if (a <= 0.003f || r < 0.5f || w <= 0 || h <= 0) { drawContent(); return@drawWithContent }
+        node.setPosition(0, 0, w, h)
+        val rc = node.beginRecording(w, h)
+        val prev = drawContext.canvas
+        try {
+            drawContext.canvas = androidx.compose.ui.graphics.Canvas(rc)
+            drawContent()
+        } finally {
+            drawContext.canvas = prev
+            node.endRecording()
+        }
+        val ds = BLUR_DOWNSCALE
+        val sw = (w / ds).toInt().coerceAtLeast(1); val sh = (h / ds).toInt().coerceAtLeast(1)
+        if (lastR[0] != r) {
+            lastR[0] = r
+            blurNode.setRenderEffect(android.graphics.RenderEffect.createBlurEffect(r / ds, r / ds, android.graphics.Shader.TileMode.CLAMP))
+        }
+        blurNode.setPosition(0, 0, sw, sh)
+        blurNode.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
+        blurNode.endRecording()
+        val nc = drawContext.canvas.nativeCanvas
+        if (a < 0.997f) {
+            // Net içerik söner (bulanık kopyanın altından net kenarlar görünmesin).
+            node.setAlpha(1f - a)
+            nc.drawRenderNode(node)
+        }
+        blurNode.setAlpha(a)
+        nc.save()
+        nc.scale(ds, ds)
+        nc.drawRenderNode(blurNode)
+        nc.restore()
+    }
+}
