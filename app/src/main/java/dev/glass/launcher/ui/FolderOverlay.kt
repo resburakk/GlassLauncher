@@ -181,9 +181,11 @@ fun FolderOverlay(
         // Şeffaf cam: panelin arkasındaki ana ekran görüntüsü kenarda mercek gibi bükülür (yalnızca alt katmanda).
         // Kapanırken panelle birlikte söner: önceden tam boyutta kalıp animasyon sonunda birden kayboluyor, bulanık
         // arka planın içinde bir an net bir alan gibi görünüyordu.
-        val lensVis by androidx.compose.animation.core.animateFloatAsState(
-            if (closing) 0f else 1f, androidx.compose.animation.core.tween(160), label = "folderLens",
-        )
+        // Açılışta da panelle birlikte belirir (panelin solma süresiyle aynı): önceden hemen tam görünürdü, panel
+        // küçükken simgenin yanında bulanık bir leke gibi görünüyordu.
+        val lensAnim = remember { androidx.compose.animation.core.Animatable(0f) }
+        LaunchedEffect(closing) { lensAnim.animateTo(if (closing) 0f else 1f, androidx.compose.animation.core.tween(if (closing) 160 else 200)) }
+        val lensVis by remember { derivedStateOf { lensAnim.value * lensAnim.value } }
         if (clearGlass) BlurBackdrop(panelCorner, Modifier.matchParentSize(), rootOnly = true, shape = panelShape, alpha = { lensVis })
         // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar. İçerikten AYRI katmanda (arkada) çizilir: önceden
         // sayfalar camın yumuşak kenarlı kırpma katmanının içindeydi; sayfa kaydırırken bu panel boyu katman her
