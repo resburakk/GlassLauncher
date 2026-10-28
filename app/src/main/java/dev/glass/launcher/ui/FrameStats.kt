@@ -36,6 +36,7 @@ object FrameStats {
     /** Kaydırma başladı: ayrıntılı örnek toplamaya başla. */
     fun begin() {
         synchronized(lock) { samples.clear() }
+        DrawCount.reset()
         recording = true
     }
 
@@ -52,7 +53,7 @@ object FrameStats {
         fun avg(i: Int) = "%.1f".format(list.map { it[i] }.average())
         return "\n\nKare süreleri (bütçe ${"%.1f".format(budget)} ms):\n• " + part(0, "Arayüz:") + "\n• " + part(1, "Çizim:") +
             "\n   (hazırlık ${avg(3)} / komut ${avg(4)} / gönderim ${avg(5)} ms)" +
-            "\n• " + part(2, "Ekran kartı:")
+            "\n• " + part(2, "Ekran kartı:") + DrawCount.summary(list.size)
     }
 
     /** [intervalsNs]: art arda karelerin arası (ns), [refresh]: ekranın bildirdiği yenileme hızı (Hz). */
@@ -97,5 +98,21 @@ fun MeasureFrames(active: Boolean, label: String) {
         } finally {
             FrameStats.report(list.toLongArray(), refresh, label)
         }
+    }
+}
+
+
+/**
+ * Tanı: ölçüm sırasında hangi pahalı katmanların kaç kez yeniden çizildiği (kare sayısıyla karşılaştırılır).
+ * Kare sayısına yakın bir değer, o katmanın her karede baştan çizildiğini gösterir.
+ */
+object DrawCount {
+    private val counts = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    fun hit(name: String) { counts.merge(name, 1, Int::plus) }
+    fun reset() = counts.clear()
+    fun summary(frames: Int): String {
+        val m = counts.toSortedMap()
+        if (m.isEmpty()) return "\n• Yeniden çizilen katman yok (hepsi hazır görüntüden)."
+        return "\n• Yeniden çizilen ($frames karede): " + m.entries.joinToString(", ") { "${it.key} ${it.value}" }
     }
 }

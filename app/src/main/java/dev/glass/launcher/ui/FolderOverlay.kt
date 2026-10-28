@@ -44,6 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -122,6 +124,8 @@ fun FolderOverlay(
         val sidePad = u * 27.5f
         val topPad = u * 29f
         val bottomPad = u * 15f
+        // Bildirim rozetinin simgenin üstüne taşan payı (sayfa görüntüsünün içinde kalsın diye).
+        val badgeRoom = u * 12f
         val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
         val panelShape = appShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
         val pages = folder.keys.chunked(9)
@@ -161,6 +165,26 @@ fun FolderOverlay(
             onReorder(key, idx)
         }
 
+        // Sayfa kayarken ve esneme geri dönerken her karede TÜM ekran "değişti" sayılır (ana ekrandaki gibi): telefonun
+        // kısmi yeniden çizimi, hazır görüntü olarak kayan sayfaları yarı kaymış karede bırakıyordu. Görünmezdir;
+        // sayfalar yeniden çizilmez. Durduktan sonra kısa bir süre daha sürer (son kare de tam yenilensin).
+        val folderMoving by remember {
+            derivedStateOf { pagerState.isScrollInProgress || rubber.isRunning || rubber.value != 0f || rubberY.value != 0f }
+        }
+        var fullDamageTick by remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        LaunchedEffect(folderMoving) {
+            val until = { System.nanoTime() }
+            var stopAt = Long.MAX_VALUE
+            while (true) {
+                androidx.compose.runtime.withFrameNanos { fullDamageTick++ }
+                if (!folderMoving) {
+                    if (stopAt == Long.MAX_VALUE) stopAt = until() + 250_000_000L
+                    if (until() > stopAt) break
+                }
+            }
+        }
+        Box(Modifier.fillMaxSize().drawBehind { if (fullDamageTick >= 0) drawRect(Color.Transparent) })
+
         // Panel ekranın TAM ortasında (üstten/alttan eşit); ad, panelin hemen üstüne yerleşir.
         Layout(content = {
         // Klasör adı panelin ÜSTÜNDE, iOS'taki gibi büyük ve kalın; dokununca düzenlenir.
@@ -190,16 +214,21 @@ fun FolderOverlay(
         // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar. İçerikten AYRI katmanda (arkada) çizilir: önceden
         // sayfalar camın yumuşak kenarlı kırpma katmanının içindeydi; sayfa kaydırırken bu panel boyu katman her
         // karede baştan çiziliyordu. Şimdi cam hazır kalır, sayfaları kaydırıcının kendi kırpması sınırlar.
-        Box(Modifier.matchParentSize().lightGlass(panelShape, 0.75f, 0.35f))
+        Box(Modifier.matchParentSize().drawBehind { DrawCount.hit("Klasör camı") }.lightGlass(panelShape, 0.75f, 0.35f))
         Column(
             Modifier
                 .width(panelW)
                 .onGloballyPositioned { panelRect = it.boundsInRoot() }
                 .pointerInput(Unit) { detectTapGestures { } }
-                .padding(top = topPad, bottom = bottomPad),
+                // Üst boşluğun bir kısmı sayfanın içine alınır (badgeRoom): bildirim rozeti simgenin üstüne taşar,
+                // sayfa hazır görüntüsünün sınırında kesiliyordu. Simgelerin yeri değişmez.
+                .padding(top = topPad - badgeRoom, bottom = bottomPad),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             MeasureFrames(pagerState.isScrollInProgress, "Son kaydırma (klasör)")
+            // Sayfalar panelin içinde kırpılır; çerçeve SABİT kalır, esneme yalnızca içeriği kaydırır (önceden kırpma
+            // da içerikle birlikte kayıyor, tek sayfalı klasörde simgeler panelin dışına taşıyordu).
+            Box(Modifier.fillMaxWidth().height(rowH * 3 + badgeRoom).clipToBounds()) {
             HorizontalPager(
                 state = pagerState,
                 // Tek sayfada kaydırılacak yer yok: çekmeyi aşağıdaki esnek çekme karşılar.
@@ -207,12 +236,17 @@ fun FolderOverlay(
                 modifier = Modifier
                     .graphicsLayer { translationX = rubber.value }
                     .fillMaxWidth()
-                        .height(rowH * 3),
+                        .height(rowH * 3 + badgeRoom),
             ) { page ->
                 val keys = pages.getOrNull(page).orEmpty()
                 // Her sayfa hazır görüntü olarak kayar (ana ekran sayfaları gibi): kaydırırken simgeler, gölgeleri ve
                 // camları her karede yeniden çizilmez; yalnızca düzenleme modunda (sallanma) yeniden çizilir.
-                Column(Modifier.fillMaxSize().graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }) {
+                Column(
+                    Modifier.fillMaxSize()
+                        .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                        .drawBehind { DrawCount.hit("Klasör sayfası") }
+                        .padding(top = badgeRoom)
+                ) {
                     keys.chunked(3).forEach { row ->
                         Row(
                             Modifier.height(rowH).padding(start = sidePad),
@@ -243,6 +277,7 @@ fun FolderOverlay(
                         }
                     }
                 }
+            }
             }
 
             if (pages.size > 1) {

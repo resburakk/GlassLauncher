@@ -749,6 +749,7 @@ fun Modifier.glassRegionBlur(
         if (reduced || list.isEmpty()) return@drawWithContent
         val w = size.width.toInt(); val h = size.height.toInt()
         if (w <= 0 || h <= 0) return@drawWithContent
+        DrawCount.hit(if (includeRoot) "Kök cam bulanıklığı" else "Katman cam bulanıklığı")
         node.setPosition(0, 0, w, h)
         val rc = node.beginRecording(w, h)
         val prev = drawContext.canvas
@@ -1074,6 +1075,7 @@ fun Modifier.downsampledBlur(amount: () -> Float, radiusPx: () -> Float): Modifi
         val r = radiusPx()
         val w = size.width.toInt(); val h = size.height.toInt()
         if (a <= 0.003f || r < 0.5f || w <= 0 || h <= 0) { drawContent(); return@drawWithContent }
+        DrawCount.hit("Arka plan bulanıklığı")
         node.setPosition(0, 0, w, h)
         val rc = node.beginRecording(w, h)
         val prev = drawContext.canvas
