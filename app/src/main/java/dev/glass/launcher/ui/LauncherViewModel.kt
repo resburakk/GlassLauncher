@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import dev.glass.launcher.data.withPlaced
+
 import dev.glass.launcher.data.LaunchStats
 import dev.glass.launcher.data.HomeItem
 
@@ -137,7 +139,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                     val fresh = list.filter { it.installTime > seenAt && it.key in b0.libraryOnly }.map { it.key }
                     if (fresh.isNotEmpty()) {
                         base = b0.copy(
-                            items = b0.items + fresh.map { dev.glass.launcher.data.AppItem(it) },
+                            items = b0.items.withPlaced(fresh.map { dev.glass.launcher.data.AppItem(it) }),
                             libraryOnly = b0.libraryOnly - fresh.toSet(),
                         )
                     }

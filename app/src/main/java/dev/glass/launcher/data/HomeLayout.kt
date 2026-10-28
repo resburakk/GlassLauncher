@@ -20,6 +20,20 @@ data class PageBreak(override val id: String) : HomeItem
  */
 data class GapItem(override val id: String) : HomeItem
 
+/**
+ * Yeni öğeyi son sayfadaki İLK boş hücreye koyar (serbest yerleşimdeki boşluk); boşluk yoksa listenin sonuna ekler
+ * (son sayfada yer varsa oraya, yoksa kendiliğinden yeni sayfaya geçer). Önceden hep sona ekleniyordu: son sayfanın
+ * son simgesi en alttaysa yukarıda boş yer olsa bile yeni uygulama yeni bir sayfa açıyordu.
+ */
+internal fun MutableList<HomeItem>.placeOnLastPage(item: HomeItem) {
+    val start = indexOfLast { it is PageBreak } + 1
+    val gap = (start until size).firstOrNull { this[it] is GapItem }
+    if (gap != null) this[gap] = item else add(item)
+}
+
+internal fun List<HomeItem>.withPlaced(newItems: List<HomeItem>): List<HomeItem> =
+    toMutableList().apply { newItems.forEach { placeOnLastPage(it) } }
+
 /** Gizlenmiş ana ekran sayfası (iOS "Sayfaları Düzenle"): [pos] tüm sayfalar içindeki sırası. */
 data class HiddenPage(val pos: Int, val items: List<HomeItem>)
 
@@ -386,13 +400,13 @@ data class HomeLayout(
     fun addToHome(key: String): HomeLayout {
         if (key in homeKeys) return this
         val base = withoutKey(key)
-        return base.copy(items = base.items + AppItem(key))
+        return base.copy(items = base.items.withPlaced(listOf(AppItem(key))))
     }
 
-    /** Klasördeki uygulamayı klasörden çıkarıp ana ekranın sonuna koyar. */
+    /** Klasördeki uygulamayı klasörden çıkarıp son sayfadaki ilk boş yere (yoksa sona) koyar. */
     fun takeOutOfFolder(key: String): HomeLayout {
         val base = withoutKey(key)
-        return base.copy(items = base.items + AppItem(key))
+        return base.copy(items = base.items.withPlaced(listOf(AppItem(key))))
     }
 
     /** Widget'ı [index] konumuna ekler (iOS: geçerli sayfanın başına). */
@@ -593,7 +607,7 @@ data class HomeLayout(
             val toHome = base == null || addNewToHome
             for (k in appKeys) if (seen.add(k)) {
                 // Yeni sabitlenen kısayol her zaman ana ekrana gelir (kullanıcı "Ana ekrana ekle" dedi).
-                if (toHome || k.startsWith("sc:")) items += AppItem(k) else lib += k
+                if (toHome || k.startsWith("sc:")) items.placeOnLastPage(AppItem(k)) else lib += k
             }
             return HomeLayout(items, dock, lib, src.today, hidden).normalized()
         }
