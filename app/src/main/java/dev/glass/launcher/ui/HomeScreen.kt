@@ -763,7 +763,9 @@ fun HomeScreen(
         val regionsOpen = glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()
         if (settings.launcherWallpaper && wp != null) {
             val homeImg = homeBlurImg
-            val needSharp = !fromSync || regionsOpen || (homeBlurR >= 1f && homeImg == null) || unlocking
+            // Menü/panel alanları açıkken de telefonun kendi duvar kâğıdı kalır: alanların arkasına bulanık duvar kâğıdı
+            // alan içinde çizilir (glassRegionBlur). Önceden tüm ekrana kopya çiziliyor, menü açılınca ekranın tonu değişiyordu.
+            val needSharp = !fromSync || (homeBlurR >= 1f && homeImg == null) || unlocking
             when {
                 // Ana ekran bulanıklığı: hazır bulanık kopya (sabit, ucuz).
                 homeImg != null -> Image(

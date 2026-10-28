@@ -714,6 +714,11 @@ fun Modifier.glassRegionBlur(
     val blurNode = remember { android.graphics.RenderNode("glassRegionBlur") }
     val r = with(LocalDensity.current) { radius.toPx() }.coerceAtLeast(0.5f)
     val reduced = LocalGlass.current.reduced
+    // Alanların altına çizilen bulanık duvar kâğıdı: sistem duvar kâğıdı gösterilirken içerikte duvar kâğıdı yoktur;
+    // önceden alan açılınca tüm ekrana launcher'ın kendi kopyası çiziliyor, ekranın tonu değişiyordu.
+    val under = LocalGlass.current.backdrop
+    val underW = LocalGlass.current.rootW
+    val underH = LocalGlass.current.rootH
     val refr = if (LocalGlass.current.noLens) 0f else LocalLauncherSettings.current.glassRefraction
     // Her cam alanı için ayrı mercek düğümü ve gölgelendirici (uniform'lar alana özeldir).
     val lensNodes = remember { ArrayList<android.graphics.RenderNode>() }
@@ -785,6 +790,9 @@ fun Modifier.glassRegionBlur(
                 if (vis >= 0.99f) nc.drawPath(path, AaClearPaint)
                 else nc.drawPath(path, fadePaint.apply { alpha = (vis * 255).toInt() })
                 nc.saveLayerAlpha(rr.left, rr.top, rr.right, rr.bottom, (vis * 255).toInt())
+                if (under != null) translate(rr.left, rr.top) {
+                    drawBackdrop(under, underW, underH, Offset(rr.left, rr.top), area = Size(rr.width, rr.height))
+                }
                 val rw = rr.width.toInt(); val rh = rr.height.toInt()
                 if (refr > 0.01f && rw > 4 && rh > 4) {
                     // Kırılma: alanın bulanık kopyası kendi düğümüne alınır, kenarında mercek gibi bükülür.
