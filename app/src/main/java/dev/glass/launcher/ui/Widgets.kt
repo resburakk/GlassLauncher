@@ -134,8 +134,8 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
             } else {
                 // iOS 26 dolu widget: hava durumu gökyüzü renginde, diğerleri açık (beyaz) ya da koyu zemin.
                 val bg = when {
-                    weather && fill == 1 -> Brush.verticalGradient(listOf(Color(0xFF2F7DE1), Color(0xFF6FAEF0)))
-                    weather -> Brush.verticalGradient(listOf(Color(0xFF0F1D40), Color(0xFF2A3E6B)))
+                    // Hava durumu: zemini WeatherBackdrop çizer (hava türü ve gün evresine göre sahne).
+                    weather -> SolidColor(Color.Transparent)
                     fill == 1 -> SolidColor(Color.White)
                     else -> SolidColor(Color(0xFF1C1C1E))
                 }
@@ -144,6 +144,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
             val ink = when { fill == 0 || weather -> GlassInk; fill == 1 -> LightInk; else -> DarkInk }
             androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
                 Box(frame) {
+                    if (weather && fill != 0) WeatherBackdrop(dark = fill == 2)
                     when (w.kind) {
                         WidgetKind.DigitalClock -> DigitalClockWidget(w)
                         WidgetKind.AnalogClock -> AnalogClockWidget(w)

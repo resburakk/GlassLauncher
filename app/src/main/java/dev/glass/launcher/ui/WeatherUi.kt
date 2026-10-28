@@ -26,6 +26,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -34,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -277,4 +279,191 @@ fun WeatherLiveIcon(look: LiveLook = LiveLook.Light, tint: Color = Color(0xFF64D
             }
         }
     }
+}
+
+/** Günün evresi: widget zemininin rengi ve gökyüzü öğeleri buna göre seçilir. */
+enum class SkyPhase { Day, Dusk, Night }
+
+/**
+ * Şu anki evre. Gün doğumu/batımı biliniyorsa onlara göre (batıştan 40 dk önce – 35 dk sonra ve doğuşun ±30 dk'sı
+ * alacakaranlık), bilinmiyorsa saate göre. Hava verisi 30 dakikada bir gelse de evre her dakika güncellenir.
+ */
+fun phaseOf(w: WeatherNow?, nowMin: Int): SkyPhase {
+    val rise = w?.sunrise?.takeIf { it >= 0 } ?: 7 * 60
+    val set = w?.sunset?.takeIf { it >= 0 } ?: 18 * 60
+    return when {
+        nowMin in (set - 40)..(set + 35) || nowMin in (rise - 30)..(rise + 30) -> SkyPhase.Dusk
+        nowMin < rise - 30 || nowMin > set + 35 -> SkyPhase.Night
+        else -> SkyPhase.Day
+    }
+}
+
+@Composable
+private fun rememberMinuteOfDay(): Int {
+    val v = androidx.compose.runtime.produceState(nowMinute()) {
+        while (true) {
+            kotlinx.coroutines.delay(60_000L - System.currentTimeMillis() % 60_000L)
+            value = nowMinute()
+        }
+    }
+    return v.value
+}
+
+private fun nowMinute(): Int = java.util.Calendar.getInstance().let { it.get(java.util.Calendar.HOUR_OF_DAY) * 60 + it.get(java.util.Calendar.MINUTE) }
+
+private fun c(v: Long) = Color(v)
+
+/** Gökyüzü degradesi (üst, alt): hava türü × gün evresi. */
+private fun skyGradient(sky: Sky, phase: SkyPhase): Pair<Color, Color> = when (sky) {
+    Sky.Clear -> when (phase) {
+        SkyPhase.Day -> c(0xFF2A7BDE) to c(0xFF6CB6F5)
+        SkyPhase.Dusk -> c(0xFF33427F) to c(0xFFE58A5F)
+        SkyPhase.Night -> c(0xFF0A1433) to c(0xFF22386A)
+    }
+    Sky.PartlyCloudy -> when (phase) {
+        SkyPhase.Day -> c(0xFF3A80D2) to c(0xFF84B3E2)
+        SkyPhase.Dusk -> c(0xFF3F4677) to c(0xFFC98468)
+        SkyPhase.Night -> c(0xFF101A35) to c(0xFF2B3B60)
+    }
+    Sky.Cloudy -> when (phase) {
+        SkyPhase.Day -> c(0xFF627790) to c(0xFF97A7BA)
+        SkyPhase.Dusk -> c(0xFF4D5270) to c(0xFF8E7676)
+        SkyPhase.Night -> c(0xFF1B2231) to c(0xFF363F52)
+    }
+    Sky.Fog -> when (phase) {
+        SkyPhase.Day -> c(0xFF77838F) to c(0xFFA6AFB8)
+        SkyPhase.Dusk -> c(0xFF66626F) to c(0xFF9E8A84)
+        SkyPhase.Night -> c(0xFF252A33) to c(0xFF444A54)
+    }
+    Sky.Drizzle, Sky.Rain -> when (phase) {
+        SkyPhase.Day -> c(0xFF4A5E74) to c(0xFF7A8EA3)
+        SkyPhase.Dusk -> c(0xFF3D4460) to c(0xFF736571)
+        SkyPhase.Night -> c(0xFF121925) to c(0xFF2A3647)
+    }
+    Sky.Snow -> when (phase) {
+        SkyPhase.Day -> c(0xFF6F8DAD) to c(0xFFA9BCD1)
+        SkyPhase.Dusk -> c(0xFF5E6486) to c(0xFFA595A6)
+        SkyPhase.Night -> c(0xFF1A2436) to c(0xFF3A4862)
+    }
+    Sky.Storm -> when (phase) {
+        SkyPhase.Day -> c(0xFF374050) to c(0xFF5A6474)
+        SkyPhase.Dusk -> c(0xFF2C2E42) to c(0xFF564A5A)
+        SkyPhase.Night -> c(0xFF0D1018) to c(0xFF242A38)
+    }
+}
+
+private fun Color.dim(k: Float) = Color(red * k, green * k, blue * k, alpha)
+
+/**
+ * Hava durumu widget'ının zemini (renkli görünümler): gökyüzü degradesi ve havaya göre çizilmiş sahne —
+ * güneş parıltısı, gün batımı ışığı, ay ve yıldızlar, yumuşak bulutlar, yağmur çizgileri, kar taneleri,
+ * sis bantları, fırtınada şimşek ışığı. Hareketsizdir (iOS widget'ları gibi) ve önbelleğe alınır: yalnızca
+ * boyut, hava türü ya da gün evresi değişince yeniden çizilir; kaydırma ve geçişlerde maliyeti yoktur.
+ */
+@Composable
+fun WeatherBackdrop(dark: Boolean, modifier: Modifier = Modifier) {
+    val data = WeatherRepo.now.collectAsStateWithLifecycle().value
+    val minute = rememberMinuteOfDay()
+    val sky = data?.sky ?: Sky.PartlyCloudy
+    val phase = phaseOf(data, minute)
+    Box(modifier.fillMaxSize().drawWithCache {
+        val (top, bottom) = skyGradient(sky, phase).let { (a, b) -> if (dark) a.dim(0.62f) to b.dim(0.62f) else a to b }
+        val w = size.width; val h = size.height; val m = size.minDimension
+        val bg = Brush.verticalGradient(listOf(top, bottom))
+        val rnd = java.util.Random(sky.ordinal * 31L + phase.ordinal)
+        val night = phase == SkyPhase.Night
+        val rainy = sky == Sky.Rain || sky == Sky.Drizzle || sky == Sky.Storm
+        val cloudy = sky != Sky.Clear && sky != Sky.Fog
+        // Yıldızlar: gece, gökyüzü açık ya da parçalı bulutluyken.
+        val stars = if (night && (sky == Sky.Clear || sky == Sky.PartlyCloudy)) List(22) {
+            Triple(Offset(w * (0.35f + rnd.nextFloat() * 0.63f), h * rnd.nextFloat() * 0.62f), m * (0.004f + rnd.nextFloat() * 0.007f), 0.35f + rnd.nextFloat() * 0.55f)
+        } else emptyList()
+        // Yağmur çizgileri ve kar taneleri.
+        val drops = if (rainy) List(if (sky == Sky.Drizzle) 26 else 46) {
+            Offset(w * rnd.nextFloat(), h * (0.18f + rnd.nextFloat() * 0.85f)) to (0.18f + rnd.nextFloat() * 0.3f)
+        } else emptyList()
+        val flakes = if (sky == Sky.Snow) List(40) {
+            Triple(Offset(w * rnd.nextFloat(), h * (0.12f + rnd.nextFloat() * 0.88f)), m * (0.008f + rnd.nextFloat() * 0.014f), 0.45f + rnd.nextFloat() * 0.5f)
+        } else emptyList()
+        // Bulut rengi: yağışlı / fırtınalı havada koyu, gece daha da koyu; açık havada beyazımsı.
+        val cloudCol = when {
+            sky == Sky.Storm -> if (night) c(0xFF2A3040) else c(0xFF4A5363)
+            rainy || sky == Sky.Snow -> if (night) c(0xFF3A4558) else c(0xFFB9C3CF)
+            sky == Sky.Cloudy -> if (night) c(0xFF4A5468) else c(0xFFE3E8EE)
+            else -> if (night) c(0xFF5A6684) else Color.White
+        }.let { if (dark) it.dim(0.8f) else it }
+        fun puff(cx: Float, cy: Float, r: Float, a: Float) = Triple(Offset(cx, cy), r, a)
+        val puffs = buildList {
+            if (cloudy) {
+                // Sağ üstte toplanan yumuşak bulut kümesi (yazılar solda kalır).
+                add(puff(w * 0.78f, h * 0.10f, m * 0.42f, 0.55f))
+                add(puff(w * 1.02f, h * 0.20f, m * 0.40f, 0.5f))
+                add(puff(w * 0.55f, h * 0.02f, m * 0.36f, 0.45f))
+                if (sky != Sky.PartlyCloudy) {
+                    add(puff(w * 0.25f, h * 0.0f, m * 0.40f, 0.42f))
+                    add(puff(w * 0.62f, h * 0.24f, m * 0.34f, 0.40f))
+                }
+            }
+        }
+        onDrawBehind {
+            drawRect(bg)
+            // Güneş parıltısı (gündüz) ve gün batımı ışığı (alacakaranlık).
+            if (phase == SkyPhase.Day && (sky == Sky.Clear || sky == Sky.PartlyCloudy)) {
+                val sc = Offset(w * 0.86f, h * 0.12f)
+                drawCircle(Brush.radialGradient(listOf(Color(0x80FFF4C8), Color(0x00FFF4C8)), sc, m * 0.75f), m * 0.75f, sc)
+                drawCircle(Color(0xF2FFE9A0), m * 0.11f, sc)
+            }
+            if (phase == SkyPhase.Dusk) {
+                val gc = Offset(w * 0.7f, h * 1.08f)
+                val a = if (sky == Sky.Clear || sky == Sky.PartlyCloudy) 0.55f else 0.28f
+                drawCircle(Brush.radialGradient(listOf(Color(0xFFFFA25E).copy(alpha = a), Color(0x00FFA25E)), gc, w * 1.0f), w * 1.0f, gc)
+            }
+            stars.forEach { (o, r, a) -> drawCircle(Color.White.copy(alpha = a), r, o) }
+            if (night && (sky == Sky.Clear || sky == Sky.PartlyCloudy)) {
+                val mc = Offset(w * 0.84f, h * 0.17f); val r = m * 0.085f
+                drawCircle(Brush.radialGradient(listOf(Color(0x40DDE6FF), Color(0x00DDE6FF)), mc, m * 0.45f), m * 0.45f, mc)
+                val disc = Path().apply { addOval(androidx.compose.ui.geometry.Rect(mc.x - r, mc.y - r, mc.x + r, mc.y + r)) }
+                val cut = Path().apply { addOval(androidx.compose.ui.geometry.Rect(mc.x - r * 0.45f, mc.y - r * 1.15f, mc.x + r * 1.55f, mc.y + r * 0.85f)) }
+                drawPath(Path().apply { op(disc, cut, androidx.compose.ui.graphics.PathOperation.Difference) }, Color(0xFFF4F1D2))
+            }
+            // Fırtına: bulutların ardında soğuk şimşek ışığı.
+            if (sky == Sky.Storm) {
+                val lc = Offset(w * 0.7f, h * 0.15f)
+                drawCircle(Brush.radialGradient(listOf(Color(0x55C9C2FF), Color(0x00C9C2FF)), lc, m * 0.6f), m * 0.6f, lc)
+            }
+            val stormBolt = sky == Sky.Storm
+            puffs.forEach { (o, r, a) ->
+                drawCircle(Brush.radialGradient(listOf(cloudCol.copy(alpha = a), cloudCol.copy(alpha = a * 0.55f), cloudCol.copy(alpha = 0f)), o, r), r, o)
+            }
+            if (sky == Sky.Fog) {
+                // Sis: geniş, yumuşak ve yatay uzamış pus kütleleri (çizgi gibi görünmez).
+                listOf(Triple(0.75f, 0.30f, 0.20f), Triple(0.25f, 0.62f, 0.16f), Triple(0.8f, 0.85f, 0.18f)).forEach { (fx, fy, a) ->
+                    val cx = w * fx; val cy = h * fy
+                    scale(2.2f, 0.55f, Offset(cx, cy)) {
+                        drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = a), Color.White.copy(alpha = 0f)), Offset(cx, cy), m * 0.45f), m * 0.45f, Offset(cx, cy))
+                    }
+                }
+            }
+            if (stormBolt) {
+                // Bulutların altından inen ince şimşek.
+                val bx = w * 0.80f; val by = h * 0.26f; val k = m * 0.22f
+                val bolt = Path().apply {
+                    moveTo(bx + k * 0.10f, by); lineTo(bx - k * 0.22f, by + k * 0.55f); lineTo(bx + k * 0.02f, by + k * 0.55f)
+                    lineTo(bx - k * 0.16f, by + k * 1.05f); lineTo(bx + k * 0.30f, by + k * 0.42f); lineTo(bx + k * 0.06f, by + k * 0.42f); close()
+                }
+                drawCircle(Brush.radialGradient(listOf(Color(0x40FFF3B0), Color(0x00FFF3B0)), Offset(bx, by + k * 0.5f), k * 1.4f), k * 1.4f, Offset(bx, by + k * 0.5f))
+                drawPath(bolt, Color(0xE6FFF1A8))
+            }
+            val len = m * (if (sky == Sky.Drizzle) 0.05f else 0.085f)
+            val sw = m * (if (sky == Sky.Drizzle) 0.008f else 0.010f)
+            // Yağış sol taraftaki yazıların üstünde soluklaşır (okunaklılık); sağda tam görünür.
+            fun side(x: Float) = (0.25f + 0.75f * ((x / w - 0.3f) / 0.35f).coerceIn(0f, 1f))
+            drops.forEach { (o, a) ->
+                drawLine(Color(0xFFDCEBFF).copy(alpha = a * side(o.x)), o, Offset(o.x - len * 0.28f, o.y + len), sw, StrokeCap.Round)
+            }
+            flakes.forEach { (o, r, a) -> drawCircle(Color.White.copy(alpha = a * side(o.x)), r, o) }
+            // Yazıların okunaklılığı için alt kısımda hafif gölge.
+            drawRect(Brush.verticalGradient(listOf(Color(0x00000000), Color(0x1F000000)), h * 0.45f, h))
+        }
+    })
 }

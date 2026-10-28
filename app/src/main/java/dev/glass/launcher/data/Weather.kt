@@ -47,6 +47,9 @@ data class WeatherNow(
     val hours: List<HourWeather>,
     val days: List<DayWeather>,
     val updatedAt: Long,
+    /** Bugünün gün doğumu / batımı (günün dakikası); bilinmiyorsa -1. Widget'ın gün batımı ve gece görünümü için. */
+    val sunrise: Int = -1,
+    val sunset: Int = -1,
 )
 
 /**
@@ -105,7 +108,7 @@ object WeatherRepo {
         val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +
             "&current=temperature_2m,weather_code,is_day" +
             "&hourly=temperature_2m,weather_code,is_day" +
-            "&daily=weather_code,temperature_2m_max,temperature_2m_min" +
+            "&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset" +
             "&timezone=auto&forecast_days=6"
         val body = runCatching {
             val c = URL(url).openConnection() as HttpURLConnection
@@ -157,6 +160,11 @@ object WeatherRepo {
             hours = hours,
             days = days,
             updatedAt = o.optLong("_at", System.currentTimeMillis()),
+            sunrise = minuteOf(daily.optJSONArray("sunrise")?.optString(0)),
+            sunset = minuteOf(daily.optJSONArray("sunset")?.optString(0)),
         )
     }
+
+    /** "2026-10-28T18:12" → 1092 (günün dakikası); okunamazsa -1. */
+    private fun minuteOf(t: String?): Int = runCatching { t!!.substring(11, 13).toInt() * 60 + t.substring(14, 16).toInt() }.getOrDefault(-1)
 }
