@@ -243,7 +243,8 @@ fun HomeScreen(
             // Arama (iOS Spotlight gibi): koyuluk bulanıklıktan gelir, karartma çok hafif.
             overlay == Overlay.Search -> 0.16f
             fullBlur -> 0.28f
-            overlay == Overlay.Menu -> 0.18f
+            // Basılı tutma menüsü: karartma yok (açılıp kapanırken ekran kararıp aydınlanıyor gibi görünüyordu).
+            overlay == Overlay.Menu -> 0f
             overlay == Overlay.LockPrompt -> 0.10f
             else -> 0f
         },
@@ -1009,7 +1010,6 @@ fun HomeScreen(
             }
             folderMenuHolder[0]?.let { req ->
                 Box(Modifier.fillMaxSize()) {
-                    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
                     ContextMenuOverlay(
                         visibility = { menuVis },
                         req = req,
