@@ -239,41 +239,27 @@ fun TodayPage(
         // iOS gibi esnek: en üstte/altta çekmeye devam edince içerik direnç artarak kayar, bırakınca geri döner.
         val rb = rememberRubberBand()
         rb.extent = constraints.maxHeight.toFloat().coerceAtLeast(1f)
+        // Arama çubuğunun üst kenarı, ana ekrandaki ilk simge satırının üst kenarıyla aynı hizada. Çubuk SABİT kalır
+        // (uygulama arşivindeki gibi): widget'lar kayarken altında yumuşakça solarak kaybolur.
+        val searchTop = maxOf(statusTop + u * 6f, hm.firstTop)
+        val searchH = u * 43f
+        Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
                 .fillMaxSize()
+                .padding(top = searchTop + searchH)
+                .todayEdgeFade(u * 16f)
                 .nestedScroll(rb.connection)
                 .nestedScroll(pullToSearch)
                 .verticalScroll(rememberScrollState())
-                                // Arama çubuğunun üst kenarı, ana ekrandaki ilk simge satırının üst kenarıyla aynı hizada.
-                .padding(top = maxOf(statusTop + u * 6f, hm.firstTop), bottom = navBottom + u * 28f),
+                .padding(top = u * 16f, bottom = navBottom + u * 28f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
         Column(Modifier.fillMaxWidth().rubberY(rb), horizontalAlignment = Alignment.CenterHorizontally) {
-            // Arama çubuğu (dokununca launcher araması açılır). Düzenleme modunda iOS gibi kaybolur: üstteki
-            // "+" ve "Bitti" düğmeleri onun yerine geçer (üst üste binmesinler). Yeri korunur, içerik zıplamaz.
-            val searchAlpha by androidx.compose.animation.core.animateFloatAsState(
-                if (edit) 0f else 1f, androidx.compose.animation.core.tween(180), label = "todaySearch",
-            )
-            Row(
-                Modifier
-                    .width(contentW)
-                    .height(u * 43f)
-                    .graphicsLayer { alpha = searchAlpha; scaleX = 0.94f + 0.06f * searchAlpha; scaleY = scaleX }
-                    .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, overlay = true)
-                    .clickable(remember { MutableInteractionSource() }, null, enabled = !edit) { onOpenSearch() }
-                    .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SearchGlyph(Color(0xCCFFFFFF), u * 17f)
-                Spacer(Modifier.width(8.dp))
-                Text("Ara", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
-            }
             // Bugünün tarihi (büyük): üstte gün adı, altında gün ve ay. Yalnızca sayfa boşken; widget eklenince kalkar.
             val today = remember { LocalDate.now() }
             val tr = remember { Locale("tr", "TR") }
-            if (widgets.isNotEmpty()) Spacer(Modifier.height(u * 16f))
-            else Column(Modifier.width(contentW).padding(top = u * 22f, bottom = u * 18f)) {
+            if (widgets.isEmpty()) Column(Modifier.width(contentW).padding(top = u * 6f, bottom = u * 18f)) {
                 Text(
                     today.format(DateTimeFormatter.ofPattern("EEEE", tr)).replaceFirstChar { it.titlecase(tr) },
                     color = Color(0xD9FFFFFF), fontSize = (u.value * 17f).sp, fontWeight = FontWeight.SemiBold,
@@ -394,6 +380,28 @@ fun TodayPage(
             }
         }
         }
+        // Sabit arama çubuğu (dokununca launcher araması açılır). Düzenleme modunda iOS gibi kaybolur: üstteki
+        // "+" ve "Bitti" düğmeleri onun yerine geçer (üst üste binmesinler).
+        val searchAlpha by androidx.compose.animation.core.animateFloatAsState(
+            if (edit) 0f else 1f, androidx.compose.animation.core.tween(180), label = "todaySearch",
+        )
+        Row(
+            Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = searchTop)
+                .width(contentW)
+                .height(searchH)
+                .graphicsLayer { alpha = searchAlpha; scaleX = 0.94f + 0.06f * searchAlpha; scaleY = scaleX }
+                .liquidGlass(CircleShape, settings.panelGlassStrength, 0.dp, overlay = true)
+                .clickable(remember { MutableInteractionSource() }, null, enabled = !edit) { onOpenSearch() }
+                .padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            SearchGlyph(Color(0xCCFFFFFF), u * 17f)
+            Spacer(Modifier.width(8.dp))
+            Text("Ara", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
+        }
+        }
     }
     }
 }
@@ -417,3 +425,18 @@ private fun TodayButton(text: String, settings: LauncherSettings, onClick: () ->
 }
 
 /** Yardımcı: dp genişliği için widget köşesi (Widgets.kt ile aynı kural). */
+
+
+/** Widget sayfası: kayan içerik üst kenarda (sabit arama çubuğunun altında) yumuşakça solar. */
+private fun Modifier.todayEdgeFade(top: Dp): Modifier = this
+    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+    .drawWithContent {
+        drawContent()
+        val h = size.height
+        if (h <= 0f) return@drawWithContent
+        val t = (top.toPx() / h).coerceIn(0f, 0.5f)
+        drawRect(
+            androidx.compose.ui.graphics.Brush.verticalGradient(0f to Color.Transparent, t to Color.Black),
+            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+        )
+    }

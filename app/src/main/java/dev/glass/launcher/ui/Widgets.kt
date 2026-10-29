@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -293,23 +294,31 @@ private fun MonthGrid(today: LocalDate, modifier: Modifier) {
         }
         val cells = offset + days
         val weeks = (cells + 6) / 7
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.SpaceEvenly) {
-            for (wk in 0 until weeks) {
-                Row(Modifier.fillMaxWidth()) {
-                    for (d in 0 until 7) {
-                        val day = wk * 7 + d - offset + 1
-                        Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                            if (day in 1..days) {
-                                val isToday = day == today.dayOfMonth
-                                Box(
-                                    Modifier.size(24.dp).clip(RoundedCornerShape(12.dp))
-                                        .background(if (isToday) Red else Color.Transparent),
-                                    contentAlignment = Alignment.Center,
-                                ) {
-                                    Text(
-                                        "$day", color = if (isToday) Color.White else ink.primary, fontSize = 12.sp,
-                                        fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
-                                    )
+        // Haftalar kalan yüksekliği EŞİT paylaşır; gün dairesi ve yazı satır yüksekliğine göre küçülür. Önceden her gün
+        // sabit 24 dp'ydi: alçak (4×2) widget'ta satırlar birbirine biniyor, son hafta (26–31) hiç görünmüyordu.
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val rowH = maxHeight / weeks
+            val dot = minOf(rowH * 0.92f, maxWidth / 7f * 0.92f, 24.dp)
+            val fs = (dot.value * 0.5f).coerceIn(7f, 12f).sp
+            Column(Modifier.fillMaxSize()) {
+                for (wk in 0 until weeks) {
+                    Row(Modifier.fillMaxWidth().weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        for (d in 0 until 7) {
+                            val day = wk * 7 + d - offset + 1
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                if (day in 1..days) {
+                                    val isToday = day == today.dayOfMonth
+                                    Box(
+                                        Modifier.size(dot).clip(CircleShape)
+                                            .background(if (isToday) Red else Color.Transparent),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        Text(
+                                            "$day", color = if (isToday) Color.White else ink.primary, fontSize = fs,
+                                            fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
+                                            maxLines = 1, softWrap = false,
+                                        )
+                                    }
                                 }
                             }
                         }
