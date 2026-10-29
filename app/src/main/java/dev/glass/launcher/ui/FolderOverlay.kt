@@ -212,10 +212,16 @@ fun FolderOverlay(
         }
 
         fun reorderAt(key: String, pos: Offset) {
-            // Bırakılan noktadaki hücrenin yerine geçer; boş alana bırakılırsa sona gider.
-            val hit = drag.targetsIn(DragLayer.Folder).firstOrNull { it.cellRect.contains(pos) }?.id
-            val idx = hit?.let { folder.keys.indexOf(it) }?.takeIf { it >= 0 } ?: (folder.keys.size - 1)
-            onReorder(key, idx)
+            // GÜNCEL sıra ve konumlarla (bırakma işlemi sürükleme başında kaydedilir; eski sırayla hesaplanınca
+            // sürüklerken yapılan canlı sıralamayı geri alıyordu). Sürüklenen simgenin kendi (boş) yerine bırakılırsa
+            // sıra olduğu gibi kalır; başka bir simgenin üstüne bırakılırsa onun yerine, boş alana bırakılırsa sona geçer.
+            drag.refreshActive()
+            val keys = keysNow
+            if (key !in keys) return
+            val hit = drag.targetsIn(DragLayer.Folder).firstOrNull { it.itemId in keys && it.cellRect.contains(pos) }?.itemId
+            if (hit == key) return
+            val idx = hit?.let { keys.indexOf(it) } ?: (keys.size - 1)
+            if (idx != keys.indexOf(key)) reorderNow(key, idx)
         }
 
         // Sayfa kayarken ve esneme geri dönerken her karede TÜM ekran "değişti" sayılır (ana ekrandaki gibi): telefonun
