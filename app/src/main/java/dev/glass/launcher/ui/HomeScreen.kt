@@ -668,6 +668,17 @@ fun HomeScreen(
     ) {
         // İçerik katmanı kaydedilir: üstteki menü/düğmeler bunu bulanıklaştırıp yalnızca kendi arkalarında gösterir.
         val glassRegions = remember { GlassRegions() }
+        // GEÇİCİ tanı: klasör açılınca cam değerleri (Ayarlar > Performans).
+        LaunchedEffect(overlay) {
+            if (overlay != Overlay.Folder) return@LaunchedEffect
+            delay(600)
+            val st = settingsNow
+            GlassDebug.status = "Bulanıklık şiddeti ${"%.2f".format(st.glassBlur)} → ana ekran bulanıklığı ${(blurPxMax * blurBoost).toInt()} px" +
+                " (görünürlük ${"%.2f".format(blurAmount)})\nCam stili: ${st.glassStyle}, launcher duvar kâğıdı: ${if (st.launcherWallpaper) "açık" else "kapalı"}" +
+                ", ana ekran duvar kâğıdı bulanıklığı ${"%.2f".format(st.homeWallpaperBlur)}" +
+                "\nPencere arkası bulanıklığı: ${when (GlassDebug.windowBlurSupported) { true -> "destekleniyor"; false -> "desteklenmiyor"; null -> "bilinmiyor" }}, yarıçap ${GlassDebug.windowBlurPx} px" +
+                "\nAna ekran saydamlığı: ${"%.2f".format(1f - homeHide())}, cam alanı: ${glassRegions.regions.size}+${glassRegions.rootRegions.size}"
+        }
         // Ayarlar tamamen açılınca arkadaki ana ekran hiç çizilmez (opak sayfanın arkası); kapanırken hemen görünür.
         var settingsCovering by remember { mutableStateOf(false) }
         LaunchedEffect(overlay) {
@@ -684,7 +695,7 @@ fun HomeScreen(
                 // baştan oynatılıyordu (alanların kenar yumuşatmalı silme yolları ve ara katman dahil), ekran kartı
                 // ~11 ms. Artık yalnızca bir kez çizilir; kaydırmada tek bir tam ekran görüntü olarak birleştirilir.
                 .graphicsLayer {
-                    compositingStrategy = if (glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty())
+                    compositingStrategy = if (!GlassDebug.noRootCache && (glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty()))
                         CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }
                 // Görünmez yapmak yetmiyordu: katman çizim hattında her karede yine hazırlanıyordu. Artık içerik
@@ -846,6 +857,10 @@ fun HomeScreen(
                         else androidx.compose.ui.graphics.CompositingStrategy.Auto
                     // Açılan katmanın arkasındaki bulanıklık aşağıda: downsampledBlur (düşük çözünürlük, sabit yarıçap).
                     if (blurAmount > 0.003f) clip = true
+                    if (GlassDebug.oldHomeBlur) {
+                        val br = blurPxMax * blurAmount * blurBoost
+                        renderEffect = if (br > 0.5f) BlurEffect(br, br, TileMode.Clamp) else null
+                    } else renderEffect = null
                     var k = 1f
                     if (returnInfo != null) k = 1f + 0.05f * (1f - returnAnim.value)
                     // Son uygulamalar ekranına geçerken simgeler solup hafifçe küçülür; duvar kâğıdı yerinde kalır.
@@ -864,7 +879,7 @@ fun HomeScreen(
                         alpha *= 1f - 0.35f * pv.coerceAtMost(1f)
                     }
                 }
-                .downsampledBlur({ blurAmount }, { blurPxMax * blurBoost })
+                .downsampledBlur({ if (GlassDebug.oldHomeBlur) 0f else blurAmount }, { blurPxMax * blurBoost })
                 .onPlaced { homeAnchor.coords = it }
         ) {
             androidx.compose.runtime.CompositionLocalProvider(LocalPageAnchor provides homeAnchor) {

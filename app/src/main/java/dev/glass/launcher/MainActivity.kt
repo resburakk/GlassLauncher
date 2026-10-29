@@ -315,8 +315,10 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     fun setWallpaperBlur(fraction: Float) {
+        dev.glass.launcher.ui.GlassDebug.windowBlurSupported = windowManager.isCrossWindowBlurEnabled
         if (!windowManager.isCrossWindowBlurEnabled && lastBlur <= 0) return
-        val r = ((fraction.coerceIn(0f, 2f) * MAX_WALLPAPER_BLUR) / 6f).toInt() * 6
+        val r = if (dev.glass.launcher.ui.GlassDebug.noWindowBlur) 0 else ((fraction.coerceIn(0f, 2f) * MAX_WALLPAPER_BLUR) / 6f).toInt() * 6
+        dev.glass.launcher.ui.GlassDebug.windowBlurPx = r
         if (r == lastBlur) return
         lastBlur = r
         runCatching {
