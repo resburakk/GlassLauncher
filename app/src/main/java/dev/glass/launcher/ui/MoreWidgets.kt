@@ -331,7 +331,8 @@ fun MusicWidget(w: WidgetItem) {
         Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Canvas(Modifier.size(30.dp)) { playGlyph(ink.dim, false) }
             Spacer(Modifier.height(8.dp))
-            Text("Şu an çalan bir şey yok", color = ink.secondary, fontSize = 13.sp, fontFamily = AppFont)
+            Text("Şu an çalan bir şey yok", color = ink.secondary, fontSize = 13.sp, fontFamily = AppFont,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
         return
     }
