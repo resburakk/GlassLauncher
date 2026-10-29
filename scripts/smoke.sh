@@ -415,8 +415,7 @@ adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 1
 
 # 26) Kendi widget'larımız (Takvim, Hava Durumu) ve sayfa kayarken cam: parmak ekrandayken kareler
 add_builtin() {
-  # Boş bir yere (arama düğmesinin hemen üstü) basılı tutulur: sayfa dolunca ortası bir simgeye denk geliyordu.
-  adb shell input swipe $((W*85/100)) $((H*75/100)) $((W*85/100)) $((H*75/100)) 900; step "düzenleme modu" 2
+  adb shell input swipe $cx $((H*62/100)) $cx $((H*62/100)) 900; step "düzenleme modu" 2
   tap_text "+"; step "artı" 2
   tap_text "Widget Ekle"; step "galeri" 5
   # Kendi widget'larımız listenin başında, "Glass Launcher Widget'ları" başlığı altında.
@@ -432,16 +431,16 @@ add_builtin() {
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
 }
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
-add_builtin "Takvim"
-add_builtin "Hava Durumu"
-# Yeni widget'lar: her biri eklendiği sayfada görüntülenir.
+# Yeni widget'lar önce (sayfa dolmadan): her biri eklendiği sayfada görüntülenir.
 n=1
-for wname in "Şimdi Çalıyor" "Namaz Vakitleri" "Uygulama Önerileri" "Yaklaşan Etkinlikler"; do
+for wname in "Şimdi Çalıyor" "Namaz Vakitleri"; do
   add_builtin "$wname"
   shot 26n$n-yeni-widget
   n=$((n+1))
 done
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+add_builtin "Takvim"
+add_builtin "Hava Durumu"
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 26a-widgetlar
 adb shell input motionevent DOWN $((W*80/100)) $((H*55/100)); sleep 0.1
