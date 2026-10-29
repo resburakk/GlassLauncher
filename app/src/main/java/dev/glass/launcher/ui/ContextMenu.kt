@@ -92,94 +92,94 @@ private class MenuAction(
     val run: () -> Unit,
 )
 
-/** Kısayol simgesi türü: 0 = boş/bembeyaz (uygulama simgesi kullanılır), 1 = tek renkli çizim (yazı rengine boyanır), 2 = renkli. */
 /**
  * Kısayol simgesinden menü sembolü (yalnızca şekil; renk sonra yazı rengiyle verilir). Uyarlanabilir simgede tek renk
- * katmanı (Android 13+) ya da ön katman kullanılır, zemin atılır. Düz resimde köşedeki zemin rengi bulunur, her pikselin
- * bu zeminden farkı şeklin saydamlığı olur: beyaz kare/daire içindeki koyu ya da renkli sembol tek renk kalır.
- * (Önceden simgeler zeminleriyle çiziliyordu; menüde etraflarında beyaz kutular görünüyordu.)
+ * katmanı (Android 13+) ya da ön katman kullanılır. Simgede en çok bulunan renk geniş bir alanı kaplıyorsa zemindir
+ * (beyaz kare/daire): her pikselin bu zeminden farkı şeklin saydamlığı olur. Bulunan şekil kırpılıp hep aynı boyuta
+ * getirilir. (Önceden simgeler zeminleriyle çiziliyordu; menüde etraflarında beyaz kutular görünüyordu.)
  */
 private fun menuGlyph(d: android.graphics.drawable.Drawable, px: Int): android.graphics.Bitmap? {
-    val src: android.graphics.Bitmap
-    if (d is android.graphics.drawable.AdaptiveIconDrawable) {
-        val layer = (if (android.os.Build.VERSION.SDK_INT >= 33) d.monochrome else null) ?: d.foreground ?: return null
-        // Ön katman 108 birimlik tuvaldir, görünen alan ortadaki 72 birim: ortası büyütülerek alınır.
-        val big = (px * 1.5f).toInt()
-        val full = android.graphics.Bitmap.createBitmap(big, big, android.graphics.Bitmap.Config.ARGB_8888)
-        val c = android.graphics.Canvas(full)
-        layer.setBounds(0, 0, big, big); layer.draw(c)
-        val off = (big - px) / 2
-        src = android.graphics.Bitmap.createBitmap(full, off, off, px, px)
-        // Ön katmanda zemin yoksa doğrudan saydamlık kullanılır.
-        return alphaMask(src, opaqueBg = cornerOpaque(src))
-    }
-    src = d.toBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
-    return alphaMask(src, opaqueBg = cornerOpaque(src))
+    val big = px * 3
+    val layer: android.graphics.drawable.Drawable = if (d is android.graphics.drawable.AdaptiveIconDrawable) {
+        (if (android.os.Build.VERSION.SDK_INT >= 33) d.monochrome else null) ?: d.foreground ?: d
+    } else d
+    val src = android.graphics.Bitmap.createBitmap(big, big, android.graphics.Bitmap.Config.ARGB_8888)
+    val c = android.graphics.Canvas(src)
+    layer.setBounds(0, 0, big, big)
+    layer.draw(c)
+    val mask = shapeMask(src) ?: return null
+    return fitGlyph(mask, px)
 }
 
-private fun cornerOpaque(b: android.graphics.Bitmap): Boolean {
-    val pts = listOf(b.width / 2 to 1, 1 to b.height / 2, b.width - 2 to b.height / 2, b.width / 2 to b.height - 2)
-    return pts.count { (x, y) -> android.graphics.Color.alpha(b.getPixel(x, y)) > 200 } >= 3
-}
-
-private fun alphaMask(b: android.graphics.Bitmap, opaqueBg: Boolean): android.graphics.Bitmap? {
+private fun shapeMask(b: android.graphics.Bitmap): IntArray? {
     val w = b.width; val h = b.height
     val px = IntArray(w * h); b.getPixels(px, 0, w, 0, 0, w, h)
-    val out = IntArray(w * h)
-    if (!opaqueBg) {
-        for (i in px.indices) out[i] = (android.graphics.Color.alpha(px[i]) shl 24) or 0xFFFFFF
-    } else {
-        // Zemin rengi: kenar ortalarının ortalaması (yuvarlak köşeler saydam olabilir, köşelerin kendisi alınmaz).
-        val samples = listOf(px[w / 2 + w], px[w * (h / 2) + 1], px[w * (h / 2) + w - 2], px[w * (h - 2) + w / 2])
-        val br = samples.map { android.graphics.Color.red(it) }.average().toFloat()
-        val bg = samples.map { android.graphics.Color.green(it) }.average().toFloat()
-        val bb = samples.map { android.graphics.Color.blue(it) }.average().toFloat()
-        var maxD = 1f
-        val dist = FloatArray(px.size)
+    // En sık renk (4 bitlik kovalarla); yalnızca tam opak pikseller.
+    val counts = HashMap<Int, Int>()
+    var opaque = 0
+    for (c in px) {
+        if (android.graphics.Color.alpha(c) < 200) continue
+        opaque++
+        val k = ((c shr 20) and 0xF shl 8) or ((c shr 12) and 0xF shl 4) or ((c shr 4) and 0xF)
+        counts[k] = (counts[k] ?: 0) + 1
+    }
+    if (opaque < w * h * 0.02f) {
+        // Neredeyse tamamen yarı saydam: doğrudan saydamlık.
+        return px.map { (android.graphics.Color.alpha(it) shl 24) or 0xFFFFFF }.toIntArray()
+    }
+    val top = counts.maxByOrNull { it.value }!!
+    val out = IntArray(px.size)
+    if (top.value > opaque * 0.35f) {
+        var sr = 0f; var sg = 0f; var sb = 0f; var n = 0
+        for (c in px) {
+            if (android.graphics.Color.alpha(c) < 200) continue
+            val k = ((c shr 20) and 0xF shl 8) or ((c shr 12) and 0xF shl 4) or ((c shr 4) and 0xF)
+            if (k != top.key) continue
+            sr += android.graphics.Color.red(c); sg += android.graphics.Color.green(c); sb += android.graphics.Color.blue(c); n++
+        }
+        sr /= n; sg /= n; sb /= n
+        val dist = FloatArray(px.size); var maxD = 1f
         for (i in px.indices) {
             val c = px[i]; val a = android.graphics.Color.alpha(c)
             if (a < 30) continue
-            val dr = android.graphics.Color.red(c) - br; val dg = android.graphics.Color.green(c) - bg; val db = android.graphics.Color.blue(c) - bb
+            val dr = android.graphics.Color.red(c) - sr; val dg = android.graphics.Color.green(c) - sg; val db = android.graphics.Color.blue(c) - sb
             val dd = kotlin.math.sqrt(dr * dr + dg * dg + db * db) * (a / 255f)
             dist[i] = dd; if (dd > maxD) maxD = dd
         }
-        if (maxD < 40f) return null // zeminden ayırt edilebilir şekil yok
+        if (maxD < 40f) return null
         for (i in px.indices) {
-            val al = ((dist[i] / maxD - 0.12f) / 0.6f).coerceIn(0f, 1f)
+            val al = ((dist[i] / maxD - 0.12f) / 0.55f).coerceIn(0f, 1f)
             out[i] = ((al * 255f).toInt() shl 24) or 0xFFFFFF
         }
+    } else {
+        for (i in px.indices) out[i] = (android.graphics.Color.alpha(px[i]) shl 24) or 0xFFFFFF
     }
-    // Neredeyse boşsa (görünmez sembol) kullanılmaz.
-    if (out.count { (it ushr 24) > 60 } < w * h * 0.02f) return null
-    return android.graphics.Bitmap.createBitmap(out, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    return out
 }
 
-private fun classifyIcon(b: android.graphics.Bitmap): Int {
-    var total = 0; var opaque = 0; var white = 0; var satSum = 0f
-    var y = 0
-    while (y < b.height) {
-        var x = 0
-        while (x < b.width) {
-            val c = b.getPixel(x, y)
-            total++
-            if (android.graphics.Color.alpha(c) >= 40) {
-                opaque++
-                val r = android.graphics.Color.red(c) / 255f
-                val g = android.graphics.Color.green(c) / 255f
-                val bl = android.graphics.Color.blue(c) / 255f
-                val mx = maxOf(r, g, bl); val mn = minOf(r, g, bl)
-                satSum += if (mx <= 0f) 0f else (mx - mn) / mx
-                if (mn > 0.9f) white++
-            }
-            x += 2
+/** Şeklin dolu kısmını kırpar, [px] kutusuna %88 doldurarak ortalar (tüm semboller aynı boyutta görünür). */
+private fun fitGlyph(mask: IntArray, px: Int): android.graphics.Bitmap? {
+    val big = px * 3
+    var l = big; var t = big; var r = -1; var bt = -1
+    for (y in 0 until big) for (x in 0 until big) {
+        if ((mask[y * big + x] ushr 24) > 50) {
+            if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > bt) bt = y
         }
-        y += 2
     }
-    if (total == 0 || opaque < total * 0.03f) return 0
-    if (white > opaque * 0.9f) return 0
-    val avgSat = satSum / opaque
-    return if (avgSat < 0.12f && opaque < total * 0.7f) 1 else 2
+    if (r < 0 || (r - l) < 4 || (bt - t) < 4) return null
+    val full = android.graphics.Bitmap.createBitmap(mask, big, big, android.graphics.Bitmap.Config.ARGB_8888)
+    val cw = r - l + 1; val ch = bt - t + 1
+    val scale = px * 0.88f / maxOf(cw, ch)
+    val dw = cw * scale; val dh = ch * scale
+    val out = android.graphics.Bitmap.createBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+    android.graphics.Canvas(out).drawBitmap(
+        full, android.graphics.Rect(l, t, r + 1, bt + 1),
+        android.graphics.RectF((px - dw) / 2f, (px - dh) / 2f, (px + dw) / 2f, (px + dh) / 2f),
+        android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG),
+    )
+    return out
 }
+
 
 private val Red = Color(0xFFFF453A)
 
