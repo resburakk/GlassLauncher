@@ -124,7 +124,11 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
         WidgetKind.System -> SystemWidget(w, vm, width, height)
         // Cam saat zeminsizdir (iOS kilit ekranı saati gibi): rakamların kendisi cam.
         WidgetKind.GlassClock -> GlassClockWidget(w, width, height)
-        WidgetKind.Photo -> Box(Modifier.size(width, height).clip(shape).background(Color(0x33000000))) {
+        // Fotoğraf seçilmemişken diğer widget'lar gibi Liquid Glass cam; fotoğraf seçilince fotoğrafın kendisi.
+        WidgetKind.Photo -> Box(
+            if (w.data.isEmpty()) Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000))
+            else Modifier.size(width, height).clip(shape).background(Color(0x33000000))
+        ) {
             PhotoWidget(w, vm, width, height)
         }
         else -> {
