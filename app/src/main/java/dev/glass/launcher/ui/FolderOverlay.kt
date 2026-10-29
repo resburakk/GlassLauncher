@@ -131,6 +131,8 @@ fun FolderOverlay(
         val edgeIn = u * 6f
         // Kenardaki yumuşak kaybolma bandının genişliği.
         val fadeW = u * 14f
+        // Kaydırırken solma bandı (yaklaşık bir simge genişliğinin yarısından fazlası).
+        val fadeWide = u * 46f
         val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
         val panelShape = appShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
         val pages = folder.keys.chunked(9)
@@ -286,6 +288,10 @@ fun FolderOverlay(
             // da içerikle birlikte kayıyor, tek sayfalı klasörde simgeler panelin dışına taşıyordu).
             // Kenarlarda yumuşak kaybolma (uygulama arşivindeki gibi): kayan simgeler kenara yaklaştıkça solar; keskin
             // kesik yok. Durağan sayfada simgeler bu bandın içine girmez (yan boşluk daha geniş).
+            // Solma bandı kaydırırken geniş ve yumuşak (iOS gibi uzun bir geçiş); dururken simgelere dokunmayacak kadar dar.
+            val fadeNow = androidx.compose.animation.core.animateFloatAsState(
+                if (folderMoving) fadeWide.value else fadeW.value, androidx.compose.animation.core.tween(220), label = "folderFade",
+            )
             Box(
                 Modifier.fillMaxWidth().height(rowH * 3 + badgeRoom).clipToBounds()
                     .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
@@ -293,7 +299,7 @@ fun FolderOverlay(
                         drawContent()
                         val w = size.width
                         if (w <= 0f) return@drawWithContent
-                        val f = (fadeW.toPx() / w).coerceIn(0f, 0.3f)
+                        val f = (fadeNow.value.dp.toPx() / w).coerceIn(0f, 0.3f)
                         drawRect(
                             Brush.horizontalGradient(0f to Color.Transparent, f to Color.Black, (1f - f) to Color.Black, 1f to Color.Transparent),
                             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
