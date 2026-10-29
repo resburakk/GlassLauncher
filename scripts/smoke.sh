@@ -433,7 +433,7 @@ add_builtin() {
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 # Yeni widget'lar önce (sayfa dolmadan): her biri eklendiği sayfada görüntülenir.
 n=1
-for wname in "Şimdi Çalıyor" "Namaz Vakitleri"; do
+for wname in "Google Play" "Uygulama Önerileri"; do
   add_builtin "$wname"
   shot 26n$n-yeni-widget
   n=$((n+1))

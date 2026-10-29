@@ -118,6 +118,7 @@ private val GlassBuiltins = listOf(
     Triple("b:events", "Yaklaşan Etkinlikler", WidgetKind.Events),
     Triple("b:music", "Şimdi Çalıyor", WidgetKind.Music),
     Triple("b:prayer", "Namaz Vakitleri", WidgetKind.Prayer),
+    Triple("b:play", "Google Play", WidgetKind.PlayStore),
 )
 
 /**
@@ -497,6 +498,7 @@ private fun BuiltinPreview(kind: WidgetKind, w: Dp) {
         WidgetKind.Events -> Text("09:30", color = Color(0xFFFF453A), fontSize = big, fontWeight = FontWeight.SemiBold)
         WidgetKind.Music -> GlyphIcon(Glyph.Mic, Color.White, w * 0.32f)
         WidgetKind.Prayer -> Text("Akşam", color = Color(0xFF30D158), fontSize = big * 0.9f, fontWeight = FontWeight.SemiBold)
+        WidgetKind.PlayStore -> GlyphIcon(Glyph.Bag, Color.White, w * 0.32f)
         else -> GlyphIcon(Glyph.Widget, Color.White, w * 0.3f)
     }
 }

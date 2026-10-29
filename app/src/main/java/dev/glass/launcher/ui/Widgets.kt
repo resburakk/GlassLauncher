@@ -144,7 +144,12 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                     fill == 1 -> SolidColor(Color.White)
                     else -> SolidColor(Color(0xFF1C1C1E))
                 }
-                Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
+                // Simge dizen widget'lar (Öneriler, Google Play) renkli görünümde düz beyaz/koyu değil, yarı saydam cam:
+                // simgeler düz beyaz zeminde sönük duruyordu.
+                if (w.kind == WidgetKind.Suggestions || w.kind == WidgetKind.PlayStore)
+                    Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true)
+                        .background(if (fill == 1) Color.White.copy(alpha = 0.45f) else Color(0xFF1C1C1E).copy(alpha = 0.55f))
+                else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
             }
             val ink = when { fill == 0 || weather -> GlassInk; fill == 1 -> LightInk; else -> DarkInk }
             androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
@@ -160,6 +165,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                         WidgetKind.Events -> EventsWidget(w)
                         WidgetKind.Music -> MusicWidget(w)
                         WidgetKind.Prayer -> PrayerWidget(w)
+                        WidgetKind.PlayStore -> PlayStoreWidget(w, vm, strength)
                         else -> Unit
                     }
                 }
@@ -473,6 +479,7 @@ fun rememberWidgetCaption(w: WidgetItem, vm: LauncherViewModel): String {
             WidgetKind.Events -> "Takvim"
             WidgetKind.Music -> "Müzik"
             WidgetKind.Prayer -> "Namaz Vakitleri"
+            WidgetKind.PlayStore -> "Google Play"
             WidgetKind.System -> runCatching {
                 val info = vm.widgetHost.info(w.appWidgetId)
                 val pm = ctx.packageManager

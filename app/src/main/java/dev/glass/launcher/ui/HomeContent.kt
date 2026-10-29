@@ -420,8 +420,20 @@ internal fun HomeContent(
             val marginPx = with(density) { m.marginX.toPx() }
             val x = pos.x - gridOrigin.x
             val y = pos.y - gridOrigin.y - firstTopPx
-            val col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
-            val row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
+            var col = floor((x - marginPx + (pitchXPx - iconPx) / 2f) / pitchXPx).toInt().coerceIn(0, m.columns - 1)
+            var row = floor(y / pitchYPx).toInt().coerceIn(0, m.rows - 1)
+            // Widget: parmak widget'ın ORTASIDIR (hayalet parmağa ortalı çizilir). Sol üst köşesinin en yakın hücresine
+            // oturur ve sayfanın içine sığacak şekilde sınırlanır. Önceden parmağın hücresi sol üst köşe sayılıyordu;
+            // alta ya da ortaya bırakılan widget sayfadan taşıyor, yeni bir sayfaya atılıyordu.
+            (cur.items.firstOrNull { it.id == id } as? WidgetItem)?.let { wi ->
+                val sx = wi.spanX.coerceIn(1, m.columns); val sy = wi.spanY.coerceIn(1, m.rows)
+                val bleedPx = with(density) { m.widgetBleed.toPx() }
+                val wPx = with(density) { m.widgetWidth(sx).toPx() }
+                val hPx = with(density) { m.widgetHeight(sy).toPx() }
+                val left = x - wPx / 2f; val top = y - hPx / 2f
+                col = kotlin.math.round((left - marginPx + bleedPx) / pitchXPx).toInt().coerceIn(0, (m.columns - sx).coerceAtLeast(0))
+                row = kotlin.math.round((top + bleedPx) / pitchYPx).toInt().coerceIn(0, (m.rows - sy).coerceAtLeast(0))
+            }
             val without = cur.items.filter { it.id != id }
             // Sondaki yeni (boş) sayfaya bırakıldı: öğe yeni sayfaya geçer.
             if (pagerState.currentPage >= GridPacker.pageCount(GridPacker.pack(without, m.columns, m.rows, visible))) {

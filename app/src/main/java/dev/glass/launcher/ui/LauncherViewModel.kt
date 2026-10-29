@@ -297,6 +297,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             }
             WidgetKind.Prayer -> byName("vakit", "namaz", "ezan")
             WidgetKind.Suggestions -> return
+            WidgetKind.PlayStore -> list.firstOrNull { it.packageName == "com.android.vending" && !it.isShortcut }
             else -> null
         }
         if (app != null) { launchFrom(app, view, rect); return }
