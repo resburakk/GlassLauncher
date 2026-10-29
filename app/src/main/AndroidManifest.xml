@@ -8,6 +8,8 @@
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Üstten kaydırınca telefonun kendi Kontrol Merkezi'ni / bildirim gölgesini açmak için. -->
     <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <!-- Bildirim paneli: dinleyicinin arka planda kapatılmaması için pil optimizasyonu muafiyeti istenebilir. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- Uygulama kilidi ve gizli uygulamalar: telefonun parmak izi / yüz / ekran kilidi penceresi (veri launcher'a gelmez). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <!-- Hava durumu widget'ı ve canlı simge: Open-Meteo'dan veri (yalnızca yaklaşık konum koordinatı gönderilir). -->

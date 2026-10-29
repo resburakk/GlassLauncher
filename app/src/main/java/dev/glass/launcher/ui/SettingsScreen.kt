@@ -144,6 +144,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Wallpaper("Duvar Kâğıdı", Glyph.Wallpaper, Color(0xFF34C759)),
     Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
     Gestures("Hareketler", Glyph.Grid, Color(0xFF30D158)),
+    NotifPanel("Bildirim Paneli", Glyph.Message, Color(0xFFFF3B30)),
     Widgets("Widget'lar", Glyph.Widget, Color(0xFFFF375F)),
     Library("Uygulama Arşivi", Glyph.Grid, Color(0xFFBF5AF2)),
     Privacy("Gizli ve Kilitli Uygulamalar", Glyph.Lock, Color(0xFF5856D6)),
@@ -263,6 +264,7 @@ fun SettingsScreen(
                         SettingsPage.Wallpaper -> WallpaperPage(vm, s, onChange)
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
                         SettingsPage.Gestures -> GesturesPage(s, onChange)
+                        SettingsPage.NotifPanel -> NotifPanelPage()
                         SettingsPage.Widgets -> WidgetsPage(s, onChange, onAddWidget)
                         SettingsPage.Library -> LibraryPageSettings(s, onChange)
                         SettingsPage.Privacy -> PrivacyPage(vm, s)
@@ -423,7 +425,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
     val groups = listOf(
         listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders, SettingsPage.Fonts),
         listOf(SettingsPage.Glass, SettingsPage.Menu, SettingsPage.Search, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
-        listOf(SettingsPage.Widgets, SettingsPage.Library, SettingsPage.Privacy),
+        listOf(SettingsPage.NotifPanel, SettingsPage.Widgets, SettingsPage.Library, SettingsPage.Privacy),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
     )
     groups.forEach { g ->
@@ -507,8 +509,62 @@ private fun BadgeGroup(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
     )
     Footer(
         "Kırmızı rozet, uygulamanın okunmamış bildirim sayısını gösterir; klasörde içindekilerin toplamı görünür. " +
-            "Launcher yalnızca uygulama başına sayıyı tutar; bildirimlerin içeriği okunmaz, saklanmaz, hiçbir yere gönderilmez."
+            "Bildirim içerikleri yalnızca bildirim paneli ve basılı tutma menüsü için bellekte tutulur; diske yazılmaz, hiçbir yere gönderilmez."
     )
+}
+
+/**
+ * Bildirim paneli (1. aşama): izin durumu ve MagicOS arka plan yönlendirmeleri; okunan bildirimlerin özeti.
+ */
+@Composable
+private fun NotifPanelPage() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var tick by remember { mutableStateOf(0) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e -> if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) tick++ }
+        lifecycle.lifecycle.addObserver(obs)
+        onDispose { lifecycle.lifecycle.removeObserver(obs) }
+    }
+    val bg = dev.glass.launcher.service.BackgroundAccess
+    val center = dev.glass.launcher.service.NotifCenter
+    val granted = remember(tick) { dev.glass.launcher.service.BadgeListener.isGranted(ctx) }
+    val battery = remember(tick) { bg.batteryExempt(ctx) }
+    val connected by center.connected.collectAsState()
+    val items by center.items.collectAsState()
+    LaunchedEffect(tick) { center.ensureBound(ctx) }
+    Group("İzinler") {
+        if (granted) InfoRow("Bildirim erişimi", "Açık")
+        else ActionRow("Bildirim erişimini aç") { bg.openNotificationAccess(ctx) }
+        RowDivider()
+        if (granted && !connected) ActionRow("Dinleyiciyi yeniden bağla") { center.ensureBound(ctx); tick++ }
+        else InfoRow("Dinleyici", if (connected) "Bağlı" else "Bekliyor")
+        RowDivider()
+        if (battery) InfoRow("Pil optimizasyonu", "Kısıtlanmıyor")
+        else ActionRow("Pil optimizasyonundan muaf tut") { bg.requestBatteryExempt(ctx) }
+        RowDivider()
+        ActionRow("Uygulama başlatma (MagicOS)") { bg.openStartupManager(ctx) }
+    }
+    Footer(
+        "Bildirim erişimi açılmıyorsa önce Ayarlar > Uygulamalar > Glass Launcher > ⋮ > \"Kısıtlanmış ayarlara izin ver\" seçin. " +
+            "MagicOS bildirim dinleyicisini arka planda kapatabilir: \"Uygulama başlatma\" ekranında Glass Launcher için " +
+            "\"Otomatik yönet\"i kapatıp \"Otomatik başlat\", \"İkincil başlat\" ve \"Arka planda çalış\"ı açın."
+    )
+    if (granted) {
+        val groups = remember(items) { center.groups(items) }
+        Group("Okunan bildirimler") {
+            if (groups.isEmpty()) InfoRow("Bildirim yok", "")
+            groups.take(12).forEachIndexed { i, g ->
+                val label = remember(g.pkg) {
+                    runCatching { ctx.packageManager.getApplicationLabel(ctx.packageManager.getApplicationInfo(g.pkg, 0)).toString() }.getOrDefault(g.pkg)
+                }
+                val replies = g.items.count { it.reply != null }
+                InfoRow(label, "${g.items.size}" + if (replies > 0) " · yanıtlanabilir $replies" else "")
+                if (i < minOf(groups.size, 12) - 1) RowDivider()
+            }
+        }
+        Footer("Panel sonraki aşamalarda eklenecek. Bu liste yalnızca bildirimlerin doğru okunduğunu doğrulamak için; içerikler bellekte tutulur, diske yazılmaz.")
+    }
 }
 
 @Composable

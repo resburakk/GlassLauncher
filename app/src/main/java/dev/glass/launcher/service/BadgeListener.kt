@@ -10,20 +10,27 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Uygulama simgelerindeki bildirim sayıları (iOS rozetleri) ve basılı tutma menüsündeki son bildirim
- * önizlemesi. Önizleme (başlık + kısa metin) yalnızca bellekte tutulur, diske yazılmaz ve hiçbir yere
+ * Uygulama simgelerindeki bildirim sayıları (iOS rozetleri), basılı tutma menüsündeki son bildirim
+ * önizlemesi ve launcher'ın bildirim paneli ([NotifCenter]). Önizleme (başlık + kısa metin) yalnızca bellekte tutulur, diske yazılmaz ve hiçbir yere
  * gönderilmez. Kullanıcı "Bildirim erişimi" izni verdiğinde çalışır.
  */
 class BadgeListener : NotificationListenerService() {
 
-    override fun onListenerConnected() = recount()
-    override fun onListenerDisconnected() { Badges.set(emptyMap()) }
+    override fun onListenerConnected() { NotifCenter.onConnected(this); recount() }
+    override fun onListenerDisconnected() {
+        Badges.set(emptyMap())
+        NotifCenter.onDisconnected()
+        // MagicOS dinleyiciyi arka planda kapatabilir: sistemden yeniden bağlanmayı iste.
+        runCatching { requestRebind(component(this)) }
+    }
     override fun onNotificationPosted(sbn: StatusBarNotification?) = recount()
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = recount()
     override fun onNotificationRankingUpdate(rankingMap: RankingMap?) = recount()
 
     private fun recount() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
+        // Bildirim paneli: tüm bildirimler (içerik yalnızca bellekte).
+        runCatching { NotifCenter.set(NotifCenter.build(active)) }
         val ranking = runCatching { currentRanking }.getOrNull()
         val r = Ranking()
         val out = HashMap<String, Int>()
