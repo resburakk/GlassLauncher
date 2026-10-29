@@ -1096,10 +1096,15 @@ fun Modifier.downsampledBlur(amount: () -> Float, radiusPx: () -> Float): Modifi
         blurNode.beginRecording(sw, sh).also { it.scale(1f / ds, 1f / ds); it.drawRenderNode(node) }
         blurNode.endRecording()
         val nc = drawContext.canvas.nativeCanvas
+        // İçerik düğümünün kendi saydamlığına DOKUNULMAZ: bulanık kopyanın kaynağı da odur. Önceden net içeriği
+        // söndürmek için düğümün saydamlığı azaltılıyordu; açılışın son karesinde ~%1'de kalıyor, bulanık kopya da
+        // neredeyse görünmez oluyordu (120 Hz telefonda klasörün arkasında ana ekran hiç görünmüyordu).
+        node.setAlpha(1f)
         if (a < 0.997f) {
-            // Net içerik söner (bulanık kopyanın altından net kenarlar görünmesin).
-            node.setAlpha(1f - a)
+            // Net içerik ayrı bir ara katmanda söner (bulanık kopyanın altından net kenarlar görünmesin).
+            nc.saveLayerAlpha(0f, 0f, w.toFloat(), h.toFloat(), ((1f - a) * 255f).toInt())
             nc.drawRenderNode(node)
+            nc.restore()
         }
         blurNode.setAlpha(a)
         nc.save()

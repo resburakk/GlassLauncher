@@ -117,17 +117,3 @@ object DrawCount {
     }
 }
 
-
-/**
- * GEÇİCİ tanı (klasör arkasında ana ekranın görünmemesi): Ayarlar > Performans'taki anahtarlar ve durum satırı.
- * Kaydedilmez; uygulama yeniden açılınca kapanır.
- */
-object GlassDebug {
-    var noWindowBlur by mutableStateOf(false)
-    var oldHomeBlur by mutableStateOf(false)
-    var noRootCache by mutableStateOf(false)
-    /** Pencere arkası bulanıklığı: cihaz desteği ve son uygulanan yarıçap (MainActivity yazar). */
-    @Volatile var windowBlurSupported: Boolean? = null
-    @Volatile var windowBlurPx: Int = 0
-    var status by mutableStateOf("Henüz klasör açılmadı.")
-}

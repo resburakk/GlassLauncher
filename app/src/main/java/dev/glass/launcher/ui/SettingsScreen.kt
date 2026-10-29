@@ -1175,16 +1175,6 @@ private fun PerformancePage(s: LauncherSettings, onChange: ((LauncherSettings) -
             "gölge, parlama) sadeleştirilir. Düşük güç modu bunları her zaman sadeleştirir ve sallanma/saniye " +
             "ibresi gibi sürekli animasyonları azaltır."
     )
-    Group("Geçici tanı (klasör arkası)") {
-        Text(GlassDebug.status, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
-        RowDivider()
-        ToggleRow("1) Pencere arkası bulanıklığını kapat", GlassDebug.noWindowBlur) { GlassDebug.noWindowBlur = it }
-        RowDivider()
-        ToggleRow("2) Ana ekran bulanıklığı: eski yöntem", GlassDebug.oldHomeBlur) { GlassDebug.oldHomeBlur = it }
-        RowDivider()
-        ToggleRow("3) Hazır görüntüyü kapat", GlassDebug.noRootCache) { GlassDebug.noRootCache = it }
-    }
-    Footer("Her anahtarı tek başına açıp bir klasör açın; klasörün arkasında ana ekran simgeleri bulanık görünüyor mu bakın. Uygulama yeniden açılınca anahtarlar kapanır.")
     Group("Kaydırma ölçümü") {
         Text(FrameStats.text, color = Fg, fontSize = 15.sp, modifier = Modifier.padding(16.dp))
     }
