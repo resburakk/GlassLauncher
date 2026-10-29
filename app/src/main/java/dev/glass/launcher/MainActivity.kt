@@ -121,12 +121,11 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                 LocalWindowBlur provides ::setWallpaperBlur,
                 LocalTextStyle provides LocalTextStyle.current.copy(fontFamily = AppFont),
             ) {
-                val hide by androidx.compose.animation.core.animateFloatAsState(
-                    if (homeHidden) 1f else 0f,
-                    if (homeHidden) androidx.compose.animation.core.tween(110)
-                    else androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 380f),
-                    label = "homeHide",
-                )
+                // Son uygulamalar ekranı açılırken ana ekran ANINDA gizlenir, dönüşte anında gelir (animasyon yok).
+                // Honor/MagicOS üçüncü parti launcher'larda Android'in yedek son uygulamalar ekranını kullanır ve bu ekran
+                // takılarak çalışır; önceki soldurma ve yaylı büyüme animasyonları sistemin geçişiyle aynı anda ekran
+                // kartını meşgul ediyordu. Gizliyken ana ekran hiç çizilmez (saydamlık 0 olan katman atlanır).
+                val hide = if (homeHidden) 1f else 0f
                 HomeScreen(
                     vm, isDefault,
                     onRequestDefault = ::requestHomeRole,
@@ -166,6 +165,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         runCatching { window.removeOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener) }
         // Launcher bir uygulama/pencere açmadan arka plana geçiyor: büyük olasılıkla son uygulamalar ekranı.
         if (!LaunchTracker.recent() && !isChangingConfigurations) homeHidden = true
+        // Arka plandayken (son uygulamalar, açılan uygulama) saniye ibresi ve sallanma gibi sürekli animasyonlar durur.
+        dev.glass.launcher.ui.LiveMotion.background = true
     }
 
     override fun startActivity(intent: Intent?, options: Bundle?) {
@@ -190,6 +191,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         runCatching { window.addOnFrameMetricsAvailableListener(dev.glass.launcher.ui.FrameStats.listener, metricsHandler) }
         homeHidden = false
         coveredByApp = false
+        dev.glass.launcher.ui.LiveMotion.background = false
         // Sistem çağrıları (bazıları yavaş: duvar kâğıdı renk hesabı) ana iş parçacığını meşgul etmesin;
         // uygulamadan alttan kaydırarak dönerken sistemin geçişi launcher'ı beklerken takılıyordu.
         bg.execute {

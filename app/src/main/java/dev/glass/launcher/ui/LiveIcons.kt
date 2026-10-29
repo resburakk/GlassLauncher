@@ -53,7 +53,9 @@ object LiveMotion {
      * değişen tek bir simge, bulunduğu sayfayı, sayfanın bulanık kopyasını ve panel camını her karede baştan
      * hesaplatıyordu (klasörde kaydırma ve menü açılışı 60 Hz'e düşüyordu). Arka bulanık olduğu için fark edilmez.
      */
-    val covered: Boolean get() = overlay || plus
+    val covered: Boolean get() = overlay || plus || background
+    /** Launcher arka planda (son uygulamalar ekranı ya da açılan bir uygulama): hiçbir sürekli animasyon çalışmaz. */
+    var background by androidx.compose.runtime.mutableStateOf(false)
     val paused: Boolean get() = scrolling || transition || covered
 }
 

@@ -283,6 +283,8 @@ fun HomeScreen(
     // Ana ekran bir katmanın ("+" menüsü, klasör, menü) arkasında bulanık kalırken simgeler sallanmaz: sallanan simgeler
     // arkadaki bulanıklığı her karede baştan hesaplatıyordu ("+" menüsü 59 Hz). Katman kapanınca sallanma sürer.
     val jiggle: State<Float> = remember(jiggleRaw) { derivedStateOf { if (LiveMotion.covered) 0f else jiggleRaw.value } }
+    // Klasör / arşiv kategorisi içi: yalnızca launcher arka plandayken (son uygulamalar) durur.
+    val jiggleInner: State<Float> = remember(jiggleRaw) { derivedStateOf { if (LiveMotion.background) 0f else jiggleRaw.value } }
     LaunchedEffect(overlay) { LiveMotion.overlay = overlay != Overlay.None }
 
     fun closeOverlay() {
@@ -976,7 +978,7 @@ fun HomeScreen(
                     vm = vm,
                     settings = settings,
                     drag = drag,
-                    jiggle = jiggleRaw, // klasörün kendi simgeleri sallanır (arkadaki ana ekran durur)
+                    jiggle = jiggleInner, // klasörün kendi simgeleri sallanır (arkadaki ana ekran durur)
                     edit = editMode,
                     initialPage = folderPages[f.id] ?: 0,
                     onPageChanged = { folderPages[f.id] = it },
@@ -1012,7 +1014,7 @@ fun HomeScreen(
                     compositingStrategy = if (glassRegions.regions.isNotEmpty()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
                 LibraryGroupOverlay(
-                    group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggleRaw,
+                    group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggleInner,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
                     onClose = { closeOverlay() },
                 )
