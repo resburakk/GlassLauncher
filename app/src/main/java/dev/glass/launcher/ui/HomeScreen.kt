@@ -675,6 +675,14 @@ fun HomeScreen(
         Box(
             Modifier
                 .fillMaxSize()
+                // Klasör / menü / arama paneli açıkken (bulanık alan varken) ana ekran katmanı TEK hazır görüntü olarak
+                // tutulur. Ölçüm: klasörde sayfa kaydırırken bu katmanın hiçbir parçası değişmediği halde her karede
+                // baştan oynatılıyordu (alanların kenar yumuşatmalı silme yolları ve ara katman dahil), ekran kartı
+                // ~11 ms. Artık yalnızca bir kez çizilir; kaydırmada tek bir tam ekran görüntü olarak birleştirilir.
+                .graphicsLayer {
+                    compositingStrategy = if (glassRegions.regions.isNotEmpty() || glassRegions.rootRegions.isNotEmpty())
+                        CompositingStrategy.Offscreen else CompositingStrategy.Auto
+                }
                 // Görünmez yapmak yetmiyordu: katman çizim hattında her karede yine hazırlanıyordu. Artık içerik
                 // çizim listesine hiç girmez (alt katmanlar hazır kalır; kapanırken anında geri gelir).
                 .drawWithContent { DrawCount.hit("Kök içerik"); if (!settingsCovering) drawContent() }

@@ -126,6 +126,8 @@ fun FolderOverlay(
         val bottomPad = u * 15f
         // Bildirim rozetinin simgenin üstüne taşan payı (sayfa görüntüsünün içinde kalsın diye).
         val badgeRoom = u * 12f
+        // Sayfaların kırpıldığı çerçevenin panel kenarından içerideki payı.
+        val edgeIn = u * 6f
         val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
         val panelShape = appShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
         val pages = folder.keys.chunked(9)
@@ -214,15 +216,20 @@ fun FolderOverlay(
         // Açık tonlu buzlu cam: ince beyaz dolgu + parlak ince kenar. İçerikten AYRI katmanda (arkada) çizilir: önceden
         // sayfalar camın yumuşak kenarlı kırpma katmanının içindeydi; sayfa kaydırırken bu panel boyu katman her
         // karede baştan çiziliyordu. Şimdi cam hazır kalır, sayfaları kaydırıcının kendi kırpması sınırlar.
-        Box(Modifier.matchParentSize().drawBehind { DrawCount.hit("Klasör camı") }.lightGlass(panelShape, 0.75f, 0.35f))
+        Box(Modifier.matchParentSize().lightGlass(panelShape, 0.75f, 0.35f).drawBehind { DrawCount.hit("Klasör camı") })
         Column(
             Modifier
                 .width(panelW)
                 .onGloballyPositioned { panelRect = it.boundsInRoot() }
                 .pointerInput(Unit) { detectTapGestures { } }
+                // Kayan simgeler camın kenarının biraz İÇİNDE, yuvarlak köşeyi izleyerek kaybolur (iOS gibi): önceden
+                // panelin dış kenarında düz bir çizgiyle kesiliyor, kenarın üstünden dışarı taşıyor gibi görünüyordu.
+                // (Yuvarlak köşeli kırpma telefonun hızlı yolunu kullanır: ek katman ya da her karede yol çizimi yok.)
+                .padding(edgeIn)
+                .clip(RoundedCornerShape((panelCorner - edgeIn).coerceAtLeast(0.dp)))
                 // Üst boşluğun bir kısmı sayfanın içine alınır (badgeRoom): bildirim rozeti simgenin üstüne taşar,
                 // sayfa hazır görüntüsünün sınırında kesiliyordu. Simgelerin yeri değişmez.
-                .padding(top = topPad - badgeRoom, bottom = bottomPad),
+                .padding(top = topPad - badgeRoom - edgeIn, bottom = bottomPad - edgeIn),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             MeasureFrames(pagerState.isScrollInProgress, "Son kaydırma (klasör)")
@@ -249,7 +256,7 @@ fun FolderOverlay(
                 ) {
                     keys.chunked(3).forEach { row ->
                         Row(
-                            Modifier.height(rowH).padding(start = sidePad),
+                            Modifier.height(rowH).padding(start = sidePad - edgeIn),
                             horizontalArrangement = Arrangement.spacedBy(pitch - icon),
                         ) {
                             row.forEach { k ->
