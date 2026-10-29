@@ -163,6 +163,52 @@ fun FolderOverlay(
             }
         }
 
+        // Sürüklerken iOS gibi: başka bir simgenin üstünde kısa süre durunca simgeler yer açar (anında yeniden
+        // sıralanır); panelin sol/sağ kenarında bekleyince önceki/sonraki sayfaya geçilir. Önceden yalnızca tam bir
+        // simgenin üstüne bırakınca sıralanıyordu, kenarda sayfa geçişi hiç yoktu.
+        val keysNow by rememberUpdatedState(folder.keys)
+        val reorderNow by rememberUpdatedState(onReorder)
+        val pageScope = androidx.compose.runtime.rememberCoroutineScope()
+        val edgePx = with(androidx.compose.ui.platform.LocalDensity.current) { (u * 22f).toPx() }
+        LaunchedEffect(drag.key) {
+            val k = drag.key ?: return@LaunchedEffect
+            if (k !in keysNow) return@LaunchedEffect
+            var edgeSince = 0L
+            var hoverId: String? = null
+            var hoverSince = 0L
+            while (drag.key == k) {
+                androidx.compose.runtime.withFrameMillis { now ->
+                    val p = drag.pos
+                    val r = panelRect
+                    if (r == Rect.Zero || !r.contains(p) || k !in keysNow) { edgeSince = 0L; hoverId = null; return@withFrameMillis }
+                    val dir = when {
+                        p.x < r.left + edgePx -> -1
+                        p.x > r.right - edgePx -> 1
+                        else -> 0
+                    }
+                    val target = pagerState.currentPage + dir
+                    if (dir != 0 && target in 0 until pages.size) {
+                        hoverId = null
+                        if (edgeSince == 0L) edgeSince = now
+                        else if (now - edgeSince > 550L && !pagerState.isScrollInProgress) {
+                            pageScope.launch { pagerState.animateScrollToPage(target) }
+                            edgeSince = now + 350L // sayfa geçerken bir sonraki geçiş için kısa bekleme
+                        }
+                        return@withFrameMillis
+                    }
+                    edgeSince = 0L
+                    if (pagerState.isScrollInProgress) return@withFrameMillis
+                    val hit = drag.targetsIn(DragLayer.Folder)
+                        .firstOrNull { it.itemId != k && it.itemId in keysNow && it.cellRect.contains(p) }?.itemId
+                    if (hit != hoverId) { hoverId = hit; hoverSince = now }
+                    else if (hit != null && now - hoverSince > 180L) {
+                        reorderNow(k, keysNow.indexOf(hit))
+                        hoverId = null
+                    }
+                }
+            }
+        }
+
         fun reorderAt(key: String, pos: Offset) {
             // Bırakılan noktadaki hücrenin yerine geçer; boş alana bırakılırsa sona gider.
             val hit = drag.targetsIn(DragLayer.Folder).firstOrNull { it.cellRect.contains(pos) }?.id

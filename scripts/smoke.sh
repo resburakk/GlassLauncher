@@ -107,6 +107,18 @@ for n in 3 4; do
   adb shell input motionevent UP $fx $fy; step "klasör içi menü $n" 2
   shot 04c$n-klasor-menu-$n
 done
+# Klasör içinde sıralama: ikinci simgeyi (Photos) basılı tutup ilk simgenin (Calendar) yerine sürükle.
+adb shell input tap $((W/2)) $((H*8/100)); step "menüyü kapat (sıralama)" 2
+gx=$((W*50/100))
+adb shell input motionevent DOWN $gx $fy; sleep 1.3
+for f in 1 2 3 4 5 6 7 8; do adb shell input motionevent MOVE $((gx + (fx-gx)*f/8)) $fy; sleep 0.12; done
+sleep 0.8
+shot 04e0-klasor-surukleme
+adb shell input motionevent UP $fx $fy; step "klasör içinde bırak" 2
+shot 04e-klasor-siralama
+adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+order=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -oE 'text="(Calendar|Photos)"[^/]*bounds="\[[0-9]+' | sed -E 's/text="([A-Za-z]+)".*\[([0-9]+)/\2 \1/' | sort -n | awk '{print $2}' | tr '\n' ' ')
+echo "::notice::Klasör içi sıra (soldan sağa): $order"
 adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
 
