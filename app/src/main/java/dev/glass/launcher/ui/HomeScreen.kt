@@ -976,7 +976,7 @@ fun HomeScreen(
                     vm = vm,
                     settings = settings,
                     drag = drag,
-                    jiggle = jiggle,
+                    jiggle = jiggleRaw, // klasörün kendi simgeleri sallanır (arkadaki ana ekran durur)
                     edit = editMode,
                     initialPage = folderPages[f.id] ?: 0,
                     onPageChanged = { folderPages[f.id] = it },
@@ -1012,7 +1012,7 @@ fun HomeScreen(
                     compositingStrategy = if (glassRegions.regions.isNotEmpty()) CompositingStrategy.Offscreen else CompositingStrategy.Auto
                 }.glassRegionBlur(glassRegions, (if (clearGlass) 9.dp else 30.dp) * settings.glassBlur, strongRadius = strongBlurR, menuRadius = 40.dp * settings.menuBlur)) {
                 LibraryGroupOverlay(
-                    group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggle,
+                    group = g, vm = vm, settings = settings, drag = drag, jiggle = jiggleRaw,
                     onDrop = { key, p, h -> bridge.home?.invoke(key, p, h) },
                     onClose = { closeOverlay() },
                 )
