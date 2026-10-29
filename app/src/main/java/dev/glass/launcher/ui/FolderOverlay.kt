@@ -294,10 +294,10 @@ fun FolderOverlay(
             // da içerikle birlikte kayıyor, tek sayfalı klasörde simgeler panelin dışına taşıyordu).
             // Kenarlarda yumuşak kaybolma (uygulama arşivindeki gibi): kayan simgeler kenara yaklaştıkça solar; keskin
             // kesik yok. Durağan sayfada simgeler bu bandın içine girmez (yan boşluk daha geniş).
-            // Solma bandı kaydırırken geniş ve yumuşak (iOS gibi uzun bir geçiş); dururken simgelere dokunmayacak kadar dar.
-            val fadeNow = androidx.compose.animation.core.animateFloatAsState(
-                if (folderMoving) fadeWide.value else fadeW.value, androidx.compose.animation.core.tween(220), label = "folderFade",
-            )
+            // Solma bandı sayfanın ne kadar kaydığıyla orantılı: kayarken geniş ve yumuşak, sayfa yerine oturduğu AN dar
+            // (dururken simgelere dokunmaz). Önceden süreyle daralıyordu; kaydırma bitince kenardaki simgeler bir an soluk
+            // kalıyordu (silik iz).
+            val rubberRefPx = with(androidx.compose.ui.platform.LocalDensity.current) { (u * 40f).toPx() }
             Box(
                 Modifier.fillMaxWidth().height(rowH * 3 + badgeRoom).clipToBounds()
                     .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
@@ -305,7 +305,12 @@ fun FolderOverlay(
                         drawContent()
                         val w = size.width
                         if (w <= 0f) return@drawWithContent
-                        val f = (fadeNow.value.dp.toPx() / w).coerceIn(0f, 0.3f)
+                        val k = maxOf(
+                            kotlin.math.abs(pagerState.currentPageOffsetFraction) * 3f,
+                            kotlin.math.abs(rubber.value) / rubberRefPx,
+                        ).coerceIn(0f, 1f)
+                        val bandDp = fadeW.value + (fadeWide.value - fadeW.value) * k
+                        val f = (bandDp.dp.toPx() / w).coerceIn(0f, 0.3f)
                         drawRect(
                             Brush.horizontalGradient(0f to Color.Transparent, f to Color.Black, (1f - f) to Color.Black, 1f to Color.Transparent),
                             blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
