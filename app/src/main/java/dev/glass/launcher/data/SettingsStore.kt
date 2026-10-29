@@ -39,7 +39,7 @@ data class LauncherSettings(
     val rows: Int = 6,
     val showLabels: Boolean = true,
     val hSpacing: Float = 1f,
-    val vSpacing: Float = 1f,
+    val vSpacing: Float = 0.97f,
     /** Etiketin simgeye uzaklığı (pt). */
     val labelGap: Float = 5f,
     /** Etiket yazı boyutu (pt; iOS'ta 12). */
@@ -62,7 +62,7 @@ data class LauncherSettings(
     val lockedApps: Set<String> = emptySet(),
     val tintColor: Int = 0xFF64D2FF.toInt(),
     /** Simge köşe yarıçapı / simge boyu. iOS 26 ekran görüntüsünden ölçüldü: %26,2 (sürekli köşe, %60 yumuşaklık). */
-    val iconCorner: Float = 0.262f,
+    val iconCorner: Float = 0.275f,
     /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
     val cornerSmoothing: Float = 0.6f,
     /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
@@ -71,12 +71,12 @@ data class LauncherSettings(
     /** Simge alt gölgesi: widget ve klasörlerin alt temas gölgesiyle aynı (0,5). */
     val iconShadow: Float = 0.5f,
     /** Simge renk canlılığı (doygunluk çarpanı; 1 = orijinal). Çizimde uygulanır, simge görüntüsü değişmez. */
-    val iconSaturation: Float = 1.15f,
+    val iconSaturation: Float = 1.23f,
     val iconGlass: Boolean = true,
     /** Uygulama anahtarı → özel simge dosya adı (filesDir/icons altında). */
     val customIcons: Map<String, String> = emptyMap(),
     // Dock
-    val dockHeight: Float = 1f,
+    val dockHeight: Float = 0.94f,
     val dockWidth: Float = 1f,
     val dockOpacity: Float = 1f,
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
@@ -84,11 +84,11 @@ data class LauncherSettings(
     /**
      * Dock köşe yuvarlaklığı (yüksekliğe oran; 0.5 = hap şekli). Negatif: iOS 26 ölçüsü (%37,8).
      */
-    val dockCorner: Float = -1f,
+    val dockCorner: Float = 0.415f,
     /** Arama düğmesi boyut çarpanı. */
-    val pillScale: Float = 1f,
+    val pillScale: Float = 1.03f,
     /** Arama düğmesinin ortalanmış konumdan yukarı (+) / aşağı (−) kayması (pt). */
-    val pillOffset: Float = -10f,
+    val pillOffset: Float = -8f,
     // Klasörler
     val folderOpacity: Float = 1f,
     /** Açık klasör panelinin ekran genişliğine oranı. */
@@ -167,7 +167,7 @@ data class LauncherSettings(
     /** Ana ekran telefon yan çevrilince dönsün mü (kapalı: iOS'taki gibi hep dikey). */
     val allowRotation: Boolean = false,
     /** Hava durumu uygulamasının simgesinde canlı sıcaklık. */
-    val weatherIcon: Boolean = true,
+    val weatherIcon: Boolean = false,
     /** Cam yüzeylere duvar kâğıdının vurgu renginden hafif ton (0 kapalı … 1 belirgin). */
     val glassAccent: Float = 0f,
     /** Arama öneri panelinin köşesi (dock yüksekliğine oranla; dock köşesinden bağımsız). */
