@@ -182,8 +182,6 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     override fun onResume() {
         super.onResume()
         applyNavHandle()
-        // Bildirim paneli: MagicOS dinleyiciyi arka planda kapattıysa yeniden bağlan.
-        dev.glass.launcher.service.NotifCenter.ensureBound(this)
         // Launcher varsayılan ana ekran yapılınca kısayollar okunabilir hale gelir; ön plana her gelişte tazele.
         vm.refreshPinned()
         dev.glass.launcher.ui.AppLock.attach(this)
