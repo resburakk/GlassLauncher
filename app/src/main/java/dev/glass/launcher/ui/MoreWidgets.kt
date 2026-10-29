@@ -115,7 +115,7 @@ private fun PermissionPrompt(glyph: Glyph, text: String, button: String, onClick
  */
 @Composable
 fun SuggestionsWidget(w: WidgetItem, vm: LauncherViewModel, strength: Float) {
-    val apps by vm.suggestedApps.collectAsStateWithLifecycle()
+    val apps by vm.widgetSuggestions.collectAsStateWithLifecycle()
     val st = LocalLauncherSettings.current
     val ink = LocalWidgetInk.current
     val cols = if (w.spanX >= 4) 4 else 2

@@ -176,6 +176,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(viewModelScope, eager, emptyList())
 
     /**
+     * "Uygulama Önerileri" widget'ı (en çok 16): önce bu saatin önerileri, sonra son kullanılanlar; geçmiş azsa
+     * kalan yerler en çok kullanılan (yoksa alfabetik ilk) uygulamalarla dolar, widget hiç boş kalmaz.
+     */
+    val widgetSuggestions: StateFlow<List<AppInfo>> = combine(shownApps, suggestedApps, recentApps) { all, sug, recent ->
+        val pool = all.filter { !it.isShortcut }
+        (sug + recent + pool).distinctBy { it.key }.take(16)
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(viewModelScope, eager, emptyList())
+
+    /**
      * Uygulama Arşivi grupları: Öneriler (son kullanılanlar), Son Eklenenler, ardından kategoriler.
      * Boş kategoriler gösterilmez.
      */

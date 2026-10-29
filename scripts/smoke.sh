@@ -420,7 +420,13 @@ add_builtin() {
   tap_text "Widget Ekle"; step "galeri" 5
   # Kendi widget'larımız listenin başında, "Glass Launcher Widget'ları" başlığı altında.
   shot 26g-galeri-baslik
-  tap_text "$1" && { step "$1" 3; tap_text "Widget Ekle"; step "eklendi" 3; }
+  # Liste ekrana sığmayabilir: bulunamazsa galeri yukarı kaydırılıp yeniden aranır.
+  found=0
+  for t in 1 2 3; do
+    if tap_text "$1"; then found=1; break; fi
+    adb shell input swipe $cx $((H*80/100)) $cx $((H*40/100)) 400; step "galeri kaydır" 2
+  done
+  [ $found = 1 ] && { step "$1" 3; tap_text "Widget Ekle"; step "eklendi" 3; }
   adb shell input keyevent KEYCODE_BACK; step "geri" 1
   adb shell input keyevent KEYCODE_BACK; step "düzenlemeden çık" 2
 }
