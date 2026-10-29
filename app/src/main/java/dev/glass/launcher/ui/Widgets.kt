@@ -156,6 +156,10 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                         WidgetKind.Calendar -> CalendarWidget(w)
                         WidgetKind.Battery -> BatteryWidget(w)
                         WidgetKind.Weather -> WeatherWidget(w)
+                        WidgetKind.Suggestions -> SuggestionsWidget(w, vm, strength)
+                        WidgetKind.Events -> EventsWidget(w)
+                        WidgetKind.Music -> MusicWidget(w)
+                        WidgetKind.Prayer -> PrayerWidget(w)
                         else -> Unit
                     }
                 }
@@ -465,6 +469,10 @@ fun rememberWidgetCaption(w: WidgetItem, vm: LauncherViewModel): String {
             WidgetKind.Battery -> "Pil"
             WidgetKind.Photo -> "Fotoğraf"
             WidgetKind.Weather -> "Hava Durumu"
+            WidgetKind.Suggestions -> "Öneriler"
+            WidgetKind.Events -> "Takvim"
+            WidgetKind.Music -> "Müzik"
+            WidgetKind.Prayer -> "Namaz Vakitleri"
             WidgetKind.System -> runCatching {
                 val info = vm.widgetHost.info(w.appWidgetId)
                 val pm = ctx.packageManager

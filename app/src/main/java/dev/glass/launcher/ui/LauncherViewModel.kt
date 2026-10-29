@@ -277,6 +277,17 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_GALLERY))
                     ?: byName("galeri", "gallery", "fotograf", "photos")
             WidgetKind.Weather -> byName("hava durumu", "weather")
+            WidgetKind.Events ->
+                byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR))
+                    ?: byName("takvim", "calendar")
+            WidgetKind.Music -> {
+                // Çalan bir şey varsa onu açan uygulama; yoksa telefonun müzik uygulaması.
+                if (dev.glass.launcher.service.NowPlaying.open(ctx)) return
+                byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_MUSIC))
+                    ?: byName("muzik", "music", "spotify")
+            }
+            WidgetKind.Prayer -> byName("vakit", "namaz", "ezan")
+            WidgetKind.Suggestions -> return
             else -> null
         }
         if (app != null) { launchFrom(app, view, rect); return }

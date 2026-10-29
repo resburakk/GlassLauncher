@@ -114,6 +114,10 @@ private val GlassBuiltins = listOf(
     Triple("b:photo", "Fotoğraf", WidgetKind.Photo),
     Triple("b:weather", "Hava Durumu", WidgetKind.Weather),
     Triple("b:glassclock", "Cam Saat", WidgetKind.GlassClock),
+    Triple("b:suggest", "Uygulama Önerileri", WidgetKind.Suggestions),
+    Triple("b:events", "Yaklaşan Etkinlikler", WidgetKind.Events),
+    Triple("b:music", "Şimdi Çalıyor", WidgetKind.Music),
+    Triple("b:prayer", "Namaz Vakitleri", WidgetKind.Prayer),
 )
 
 /**
@@ -489,6 +493,10 @@ private fun BuiltinPreview(kind: WidgetKind, w: Dp) {
         WidgetKind.Photo -> GlyphIcon(Glyph.Wallpaper, Color.White, w * 0.3f)
         WidgetKind.Weather -> SkyGlyph(dev.glass.launcher.data.Sky.PartlyCloudy, true, w * 0.4f)
         WidgetKind.GlassClock -> Text("9:41", color = Color.White.copy(alpha = 0.85f), fontSize = big * 1.3f, fontWeight = FontWeight.Bold)
+        WidgetKind.Suggestions -> GlyphIcon(Glyph.Grid, Color.White, w * 0.32f)
+        WidgetKind.Events -> Text("09:30", color = Color(0xFFFF453A), fontSize = big, fontWeight = FontWeight.SemiBold)
+        WidgetKind.Music -> GlyphIcon(Glyph.Mic, Color.White, w * 0.32f)
+        WidgetKind.Prayer -> Text("Akşam", color = Color(0xFF30D158), fontSize = big * 0.9f, fontWeight = FontWeight.SemiBold)
         else -> GlyphIcon(Glyph.Widget, Color.White, w * 0.3f)
     }
 }

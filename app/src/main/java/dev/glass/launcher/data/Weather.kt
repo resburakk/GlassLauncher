@@ -87,6 +87,18 @@ object WeatherRepo {
             }
         }
 
+    /** Telefonun yaklaşık konumu (son bilinen; yoksa tek seferlik). Namaz vakitleri widget'ı da kullanır. */
+    suspend fun locate(ctx: Context): android.location.Location? {
+        if (!hasPermission(ctx)) return null
+        val lm = ctx.getSystemService(LocationManager::class.java) ?: return null
+        return runCatching {
+            @Suppress("MissingPermission")
+            listOf(LocationManager.NETWORK_PROVIDER, LocationManager.FUSED_PROVIDER, LocationManager.GPS_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                .mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
+                .maxByOrNull { it.time }
+        }.getOrNull() ?: currentLocation(lm)
+    }
+
     private suspend fun refreshInner(ctx: Context, force: Boolean) = withContext(Dispatchers.IO) {
         if (!loadedCache) {
             loadedCache = true
@@ -96,13 +108,7 @@ object WeatherRepo {
         val cur = _now.value
         if (!force && cur != null && System.currentTimeMillis() - cur.updatedAt < 30 * 60_000L) return@withContext
         if (!hasPermission(ctx)) return@withContext
-        val lm = ctx.getSystemService(LocationManager::class.java) ?: return@withContext
-        val loc = runCatching {
-            @Suppress("MissingPermission")
-            listOf(LocationManager.NETWORK_PROVIDER, LocationManager.FUSED_PROVIDER, LocationManager.GPS_PROVIDER, LocationManager.PASSIVE_PROVIDER)
-                .mapNotNull { p -> runCatching { lm.getLastKnownLocation(p) }.getOrNull() }
-                .maxByOrNull { it.time }
-        }.getOrNull() ?: currentLocation(lm) ?: return@withContext
+        val loc = locate(ctx) ?: return@withContext
         val lat = "%.3f".format(Locale.US, loc.latitude)
         val lon = "%.3f".format(Locale.US, loc.longitude)
         val url = "https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon" +

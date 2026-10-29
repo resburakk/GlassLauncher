@@ -427,6 +427,14 @@ add_builtin() {
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 add_builtin "Takvim"
 add_builtin "Hava Durumu"
+# Yeni widget'lar: her biri eklendiği sayfada görüntülenir.
+n=1
+for wname in "Uygulama Önerileri" "Yaklaşan Etkinlikler" "Şimdi Çalıyor" "Namaz Vakitleri"; do
+  add_builtin "$wname"
+  shot 26n$n-yeni-widget
+  n=$((n+1))
+done
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 shot 26a-widgetlar
 adb shell input motionevent DOWN $((W*80/100)) $((H*55/100)); sleep 0.1
