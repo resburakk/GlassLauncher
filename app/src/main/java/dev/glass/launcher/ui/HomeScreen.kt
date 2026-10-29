@@ -272,7 +272,7 @@ fun HomeScreen(
     var lockReason by remember { mutableStateOf(LockReason.Lock) }
 
     // Sallanma animasyonu yalnızca düzenleme modunda çalışır (pil).
-    val jiggle: State<Float> = if (editMode) {
+    val jiggleRaw: State<Float> = if (editMode) {
         rememberInfiniteTransition(label = "jiggle").animateFloat(
             initialValue = -1.6f,
             targetValue = 1.6f,
@@ -280,6 +280,10 @@ fun HomeScreen(
             label = "jiggleAngle",
         )
     } else remember { mutableStateOf(0f) }
+    // Ana ekran bir katmanın ("+" menüsü, klasör, menü) arkasında bulanık kalırken simgeler sallanmaz: sallanan simgeler
+    // arkadaki bulanıklığı her karede baştan hesaplatıyordu ("+" menüsü 59 Hz). Katman kapanınca sallanma sürer.
+    val jiggle: State<Float> = remember(jiggleRaw) { derivedStateOf { if (LiveMotion.covered) 0f else jiggleRaw.value } }
+    LaunchedEffect(overlay) { LiveMotion.overlay = overlay != Overlay.None }
 
     fun closeOverlay() {
         // Klasör kapanınca bir sonraki açılışta ve küçük simgede ilk sayfa görünür (iOS 26).
@@ -1151,6 +1155,7 @@ fun HomeScreen(
         // Sayfaları Düzenle / Özelleştir açıkken düzenleme düğmeleri gizlenir (üstlerine binmesin).
         val showEditBar = editMode && overlay == Overlay.None && !wallpaperSheet && !pagesEditor && !customizeSheet
         var plusMenu by remember { mutableStateOf(false) }
+        LaunchedEffect(plusMenu, showEditBar) { LiveMotion.plus = plusMenu && showEditBar }
         LaunchedEffect(showEditBar) { if (!showEditBar) plusMenu = false }
         // "Seç" / "Bu Sayfayı Sil": düzenleme modunda "Ara" düğmesinin YERİNDE (Ara düğmesi o sırada gizlenir).
         var confirmDeletePage by remember { mutableStateOf<List<String>?>(null) }

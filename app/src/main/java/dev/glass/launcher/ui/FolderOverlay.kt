@@ -45,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -128,6 +129,8 @@ fun FolderOverlay(
         val badgeRoom = u * 12f
         // Sayfaların kırpıldığı çerçevenin panel kenarından içerideki payı.
         val edgeIn = u * 6f
+        // Kenardaki yumuşak kaybolma bandının genişliği.
+        val fadeW = u * 14f
         val panelW = (pitch * 2f + icon + sidePad * 2f).coerceAtMost(maxWidth - 16.dp)
         val panelShape = appShape((u * settings.folderCorner).coerceAtMost(panelW / 2f))
         val pages = folder.keys.chunked(9)
@@ -235,7 +238,22 @@ fun FolderOverlay(
             MeasureFrames(pagerState.isScrollInProgress, "Son kaydırma (klasör)")
             // Sayfalar panelin içinde kırpılır; çerçeve SABİT kalır, esneme yalnızca içeriği kaydırır (önceden kırpma
             // da içerikle birlikte kayıyor, tek sayfalı klasörde simgeler panelin dışına taşıyordu).
-            Box(Modifier.fillMaxWidth().height(rowH * 3 + badgeRoom).clipToBounds()) {
+            // Kenarlarda yumuşak kaybolma (uygulama arşivindeki gibi): kayan simgeler kenara yaklaştıkça solar; keskin
+            // kesik yok. Durağan sayfada simgeler bu bandın içine girmez (yan boşluk daha geniş).
+            Box(
+                Modifier.fillMaxWidth().height(rowH * 3 + badgeRoom).clipToBounds()
+                    .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        val w = size.width
+                        if (w <= 0f) return@drawWithContent
+                        val f = (fadeW.toPx() / w).coerceIn(0f, 0.3f)
+                        drawRect(
+                            Brush.horizontalGradient(0f to Color.Transparent, f to Color.Black, (1f - f) to Color.Black, 1f to Color.Transparent),
+                            blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                        )
+                    }
+            ) {
             HorizontalPager(
                 state = pagerState,
                 // Tek sayfada kaydırılacak yer yok: çekmeyi aşağıdaki esnek çekme karşılar.

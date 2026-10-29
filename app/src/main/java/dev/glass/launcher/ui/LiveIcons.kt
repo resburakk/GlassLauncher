@@ -44,7 +44,17 @@ private val TR_DAYS = arrayOf("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt")
 object LiveMotion {
     var scrolling by androidx.compose.runtime.mutableStateOf(false)
     var transition by androidx.compose.runtime.mutableStateOf(false)
-    val paused: Boolean get() = scrolling || transition
+    /** Ana ekranın üstünde bir katman (klasör, menü, arama, galeri…) açık. */
+    var overlay by androidx.compose.runtime.mutableStateOf(false)
+    /** Düzenleme modundaki "+" menüsü açık. */
+    var plus by androidx.compose.runtime.mutableStateOf(false)
+    /**
+     * Ana ekran bir katmanın arkasında (bulanık) kalıyor. Bu sırada saniye ibresi ve sallanma durur: her karede
+     * değişen tek bir simge, bulunduğu sayfayı, sayfanın bulanık kopyasını ve panel camını her karede baştan
+     * hesaplatıyordu (klasörde kaydırma ve menü açılışı 60 Hz'e düşüyordu). Arka bulanık olduğu için fark edilmez.
+     */
+    val covered: Boolean get() = overlay || plus
+    val paused: Boolean get() = scrolling || transition || covered
 }
 
 /**
