@@ -93,6 +93,67 @@ private class MenuAction(
 )
 
 /** Kısayol simgesi türü: 0 = boş/bembeyaz (uygulama simgesi kullanılır), 1 = tek renkli çizim (yazı rengine boyanır), 2 = renkli. */
+/**
+ * Kısayol simgesinden menü sembolü (yalnızca şekil; renk sonra yazı rengiyle verilir). Uyarlanabilir simgede tek renk
+ * katmanı (Android 13+) ya da ön katman kullanılır, zemin atılır. Düz resimde köşedeki zemin rengi bulunur, her pikselin
+ * bu zeminden farkı şeklin saydamlığı olur: beyaz kare/daire içindeki koyu ya da renkli sembol tek renk kalır.
+ * (Önceden simgeler zeminleriyle çiziliyordu; menüde etraflarında beyaz kutular görünüyordu.)
+ */
+private fun menuGlyph(d: android.graphics.drawable.Drawable, px: Int): android.graphics.Bitmap? {
+    val src: android.graphics.Bitmap
+    if (d is android.graphics.drawable.AdaptiveIconDrawable) {
+        val layer = (if (android.os.Build.VERSION.SDK_INT >= 33) d.monochrome else null) ?: d.foreground ?: return null
+        // Ön katman 108 birimlik tuvaldir, görünen alan ortadaki 72 birim: ortası büyütülerek alınır.
+        val big = (px * 1.5f).toInt()
+        val full = android.graphics.Bitmap.createBitmap(big, big, android.graphics.Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(full)
+        layer.setBounds(0, 0, big, big); layer.draw(c)
+        val off = (big - px) / 2
+        src = android.graphics.Bitmap.createBitmap(full, off, off, px, px)
+        // Ön katmanda zemin yoksa doğrudan saydamlık kullanılır.
+        return alphaMask(src, opaqueBg = cornerOpaque(src))
+    }
+    src = d.toBitmap(px, px, android.graphics.Bitmap.Config.ARGB_8888)
+    return alphaMask(src, opaqueBg = cornerOpaque(src))
+}
+
+private fun cornerOpaque(b: android.graphics.Bitmap): Boolean {
+    val pts = listOf(b.width / 2 to 1, 1 to b.height / 2, b.width - 2 to b.height / 2, b.width / 2 to b.height - 2)
+    return pts.count { (x, y) -> android.graphics.Color.alpha(b.getPixel(x, y)) > 200 } >= 3
+}
+
+private fun alphaMask(b: android.graphics.Bitmap, opaqueBg: Boolean): android.graphics.Bitmap? {
+    val w = b.width; val h = b.height
+    val px = IntArray(w * h); b.getPixels(px, 0, w, 0, 0, w, h)
+    val out = IntArray(w * h)
+    if (!opaqueBg) {
+        for (i in px.indices) out[i] = (android.graphics.Color.alpha(px[i]) shl 24) or 0xFFFFFF
+    } else {
+        // Zemin rengi: kenar ortalarının ortalaması (yuvarlak köşeler saydam olabilir, köşelerin kendisi alınmaz).
+        val samples = listOf(px[w / 2 + w], px[w * (h / 2) + 1], px[w * (h / 2) + w - 2], px[w * (h - 2) + w / 2])
+        val br = samples.map { android.graphics.Color.red(it) }.average().toFloat()
+        val bg = samples.map { android.graphics.Color.green(it) }.average().toFloat()
+        val bb = samples.map { android.graphics.Color.blue(it) }.average().toFloat()
+        var maxD = 1f
+        val dist = FloatArray(px.size)
+        for (i in px.indices) {
+            val c = px[i]; val a = android.graphics.Color.alpha(c)
+            if (a < 30) continue
+            val dr = android.graphics.Color.red(c) - br; val dg = android.graphics.Color.green(c) - bg; val db = android.graphics.Color.blue(c) - bb
+            val dd = kotlin.math.sqrt(dr * dr + dg * dg + db * db) * (a / 255f)
+            dist[i] = dd; if (dd > maxD) maxD = dd
+        }
+        if (maxD < 40f) return null // zeminden ayırt edilebilir şekil yok
+        for (i in px.indices) {
+            val al = ((dist[i] / maxD - 0.12f) / 0.6f).coerceIn(0f, 1f)
+            out[i] = ((al * 255f).toInt() shl 24) or 0xFFFFFF
+        }
+    }
+    // Neredeyse boşsa (görünmez sembol) kullanılmaz.
+    if (out.count { (it ushr 24) > 60 } < w * h * 0.02f) return null
+    return android.graphics.Bitmap.createBitmap(out, w, h, android.graphics.Bitmap.Config.ARGB_8888)
+}
+
 private fun classifyIcon(b: android.graphics.Bitmap): Int {
     var total = 0; var opaque = 0; var white = 0; var satSum = 0f
     var y = 0
@@ -167,9 +228,10 @@ fun ContextMenuOverlay(
         if (app == null || app.isShortcut) return@produceState
         val px = with(density) { 24.dp.roundToPx() }
         value = vm.shortcuts(app).map { s ->
-            val bmp = vm.shortcutIcon(s, ctx.resources.displayMetrics.densityDpi)?.toBitmap(px, px)
-            val kind = bmp?.let { runCatching { classifyIcon(it) }.getOrDefault(2) } ?: 0
-            Triple(s, if (kind == 0) null else bmp?.asImageBitmap(), kind)
+            // iOS gibi tek renk sembol: simgenin zemini (beyaz kare/daire) atılır, yalnızca şekli yazı rengine boyanır.
+            val d = vm.shortcutIcon(s, ctx.resources.displayMetrics.densityDpi)
+            val glyph = d?.let { runCatching { menuGlyph(it, px) }.getOrNull() }
+            Triple(s, glyph?.asImageBitmap(), if (glyph == null) 0 else 1)
         }
     }
 
@@ -189,6 +251,7 @@ fun ContextMenuOverlay(
     val menuSettings = LocalLauncherSettings.current
     // iOS 26 gibi sade menü: sık kullanılanlar görünür, az kullanılanlar "Diğer" alt menüsünde (menünün içinde açılır).
     var moreOpen by remember { mutableStateOf(false) }
+    var shortcutsOpen by remember { mutableStateOf(false) }
     fun MutableList<MenuAction>.addMore(more: List<MenuAction>) {
         if (more.isEmpty()) return
         add(MenuAction("Diğer", Glyph.Grid, keepOpen = true, trailing = if (moreOpen) "⌃" else "›") { moreOpen = !moreOpen })
@@ -319,7 +382,7 @@ fun ContextMenuOverlay(
         // Son bildirimler (Pixel / One UI gibi): menünün simgeye en yakın ucunda, en çok 2 tane.
         val previewMap by dev.glass.launcher.service.Badges.previews.collectAsState()
         val notifs = if (app != null && !app.isShortcut && st.showBadges) previewMap[app.packageName].orEmpty().take(2) else emptyList()
-        val n = shortcuts.size + actions.size
+        val n = (if (shortcuts.isEmpty()) 0 else 1 + if (shortcutsOpen) shortcuts.size else 0) + actions.size
         val padV = with(density) { (u * 12f).toPx() }
         val rowPx0 = with(density) { (u * st.menuRowHeight).toPx() }
         // Bildirim satırı iki satır yazı taşır (~1,5 satır yüksekliği): toplam yükseklik hesabına eklenir.
@@ -348,21 +411,32 @@ fun ContextMenuOverlay(
                     }
                 }
             }
-            shortcuts.forEach { (info, icon, kind) ->
+            // Uygulamanın kısayolları tek satırda toplanır ("Diğer" gibi): dokununca menünün içinde açılır.
+            if (shortcuts.isNotEmpty()) {
                 add { pt, pb ->
                     MenuRow(
-                        title = info.shortLabel?.toString() ?: "",
+                        title = "Kısayollar",
                         color = textColor,
                         rowH = rowH, padTop = pt, padBottom = pb,
-                        leading = {
-                            when {
-                                icon == null -> AppIconImage(app!!, vm, 22.dp, false, 0f, badge = false)
-                                kind == 1 -> Image(icon, null, Modifier.size(22.dp), colorFilter = ColorFilter.tint(textColor))
-                                else -> Image(icon, null, Modifier.size(22.dp).clip(RoundedCornerShape(5.dp)))
-                            }
-                        },
-                        onClick = { vm.startShortcut(info); onClose() },
+                        leading = { GlyphIcon(Glyph.Grid, textColor, 20.dp) },
+                        trailing = if (shortcutsOpen) "⌃" else "›",
+                        onClick = { shortcutsOpen = !shortcutsOpen },
                     )
+                }
+                if (shortcutsOpen) shortcuts.forEach { (info, icon, _) ->
+                    add { pt, pb ->
+                        MenuRow(
+                            title = info.shortLabel?.toString() ?: "",
+                            color = textColor.copy(alpha = 0.85f),
+                            rowH = rowH, padTop = pt, padBottom = pb,
+                            leading = {
+                                if (icon == null) GlyphIcon(Glyph.Grid, textColor.copy(alpha = 0.85f), 18.dp)
+                                else Image(icon, null, Modifier.size(20.dp), colorFilter = ColorFilter.tint(textColor.copy(alpha = 0.85f)))
+                            },
+                            indent = u * 14f,
+                            onClick = { vm.startShortcut(info); onClose() },
+                        )
+                    }
                 }
             }
             actions.forEach { a ->

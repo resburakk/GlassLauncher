@@ -41,6 +41,20 @@ tap_text() {
   echo "::warning::Ekranda bulunamadı: $want"; return 1
 }
 
+# Ekrandaki bir yazının merkezine basılı tut (uzun basma: menü açılır)
+press_text() {
+  adb shell rm -f /sdcard/ui.xml
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F "text=\"$1\"" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 | grep -oE '[0-9]+')
+  set -- $b
+  if [ -n "$4" ]; then
+    x=$(( ($1+$3)/2 )); y=$(( $2 - ($4-$2)*2 ))
+    [ $y -lt 0 ] && y=$(( ($2+$4)/2 ))
+    adb shell input motionevent DOWN $x $y; sleep 1.2; adb shell input motionevent UP $x $y; return 0
+  fi
+  echo "::warning::Basılı tutulacak öğe bulunamadı"; return 1
+}
+
 # Ekrandaki bir öğeye erişilebilirlik açıklamasından dokun
 tap_desc() {
   adb shell rm -f /sdcard/ui.xml
@@ -121,6 +135,16 @@ order=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -oE 'text="(Calendar|P
 echo "::notice::Klasör içi sıra (soldan sağa): $order"
 adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "geri"
+
+# Uygulama kısayolları: menüde tek satırda ("Kısayollar"), dokununca açılır; simgeler tek renk, zeminsiz olmalı.
+for app in Gmail Clock Maps Camera; do
+  if press_text "$app"; then
+    step "$app menüsü" 2
+    tap_text "Kısayollar" && step "kısayollar açıldı" 2
+    shot 04k-kisayol-$app
+    adb shell input keyevent KEYCODE_BACK; step "menüyü kapat" 2
+  fi
+done
 
 # 4) Sayfalar, arama
 adb shell input swipe $((W*8/10)) $cy $((W*2/10)) $cy 250; step "sonraki sayfa"
