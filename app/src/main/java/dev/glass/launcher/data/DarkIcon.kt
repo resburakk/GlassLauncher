@@ -252,11 +252,11 @@ object DarkIcon {
         val invertDark = darkCount > 0.02f * fgCount && darkCount < 0.10f * total
         // Açık (beyaz/gri) zeminli düz simgede logonun çevresindeki renksiz açık halka (tema gölgesi/parlaması,
         // kenar yumuşatması) zemine katılır: koyu zeminde logonun etrafında beyaz çizgi bırakıyordu.
-        val w0 = w
-        // Düz simgelerde kenar şeridi için kesin ayrıştırma (zemin ve logo rengi bilinerek); ardından kalan kenar temizliği.
-        val matted = if (bgPx == null) matteEdges(fg, w0, n) else null
-        val wEff = matted?.first ?: w0
-        val src = decontaminate(matted?.second ?: fg, wEff, n)
+        // Düz simgeler: zemin rengi bilinerek logo yeniden ayrıştırılır (kenar, gölge, açık renkli parçalar; hepsi için
+        // aynı kural). Uyarlanabilir simgede ön plan katmanının kendi saydamlığı doğrudur: yalnızca kenar temizliği.
+        val refined = if (bgPx == null) refineFlat(fg, w, n) else null
+        val wEff = refined?.first ?: w
+        val src = refined?.second ?: decontaminate(fg, w, n)
         val out = IntArray(total)
         for (y in 0 until n) {
             val t = y / (n - 1f)
@@ -293,137 +293,179 @@ object DarkIcon {
         return createBitmap(n, n).also { it.setPixels(out, 0, n, 0, 0, n, n) }
     }
 
+
+
     /**
-     * Kenar şeridi ayrıştırması (düz simgeler, hepsi için aynı): şeridin her pikseli zemin rengi B ile logonun gerçek
-     * rengi F'nin karışımıdır (F: hemen içerideki tam logo pikseli). Pikselin B–F doğrusu üzerindeki yeri logo payını
-     * (saydamlığı) verir; renk F olur. Böylece zeminin (beyaz plaka, gölge, parlama) hiçbir izi kenarda kalmaz.
+     * Düz simgede logonun zeminden ayrıştırılması (TÜM düz simgeler için aynı kural):
+     * - Zemin rengi B bilinir; ondan belirgin farklı her renk logodur (krem, şeftali gibi açık renkler dahil).
+     * - Zemine değen kenar pikseli, yakındaki en belirgin logo rengi F ile B'nin karışımıysa (renk B→F doğrusu üzerinde)
+     *   ayrıştırılır: saydamlık = doğru üzerindeki yeri, renk = F. Karışım değilse kendi rengiyle kalır.
+     * - Tema gölgesi (açık zeminin biraz koyu, renksiz tonu) ve plakanın dış kenarındaki ışık/yumuşatma zemine katılır.
+     * - Logonun İÇİNDE kalan küçük zemin renkli bölgeler (ayar çarkındaki noktalar) ve iki logo parçası arasındaki
+     *   ince ek yeri (Dosyalar'daki kağıt ile klasör arası) zemin sayılmaz: koyu delik/çerçeve oluşmaz.
      */
-    private fun matteEdges(fg: IntArray, w: FloatArray, n: Int): Pair<FloatArray, IntArray>? {
+    private fun refineFlat(fg: IntArray, w: FloatArray, n: Int): Pair<FloatArray, IntArray>? {
         val total = n * n
-        // Zemin: ağırlığı ~0 olan opak pikseller; rengi bunların ortalaması.
         var sr = 0f; var sg = 0f; var sb = 0f; var cnt = 0
         for (p in 0 until total) {
             val c = fg[p]
-            if (w[p] < 0.06f && (c ushr 24) > 200) { sr += (c shr 16) and 0xff; sg += (c shr 8) and 0xff; sb += c and 0xff; cnt++ }
+            if (w[p] < 0.06f && (c ushr 24) > 220) { sr += (c shr 16) and 0xff; sg += (c shr 8) and 0xff; sb += c and 0xff; cnt++ }
         }
         if (cnt < total * 0.05f) return null
         sr /= cnt; sg /= cnt; sb /= cnt
-        // Zemine uzaklık (BFS, 4 komşu).
-        // Dar şerit: kenar yumuşatması ve tema gölgesi 1–3 piksel. Daha genişi açık renkli logo parçalarını yiyordu.
-        val band = maxOf(2, n / 64)
-        val dist = IntArray(total) { Int.MAX_VALUE }
-        val q = IntArray(total); var h = 0; var t = 0
-        for (p in 0 until total) if (w[p] < 0.06f) { dist[p] = 0; q[t++] = p }
-        val dx = intArrayOf(1, -1, 0, 0); val dy = intArrayOf(0, 0, 1, -1)
-        while (h < t) {
-            val p = q[h++]; val d = dist[p]
-            if (d > band + 1) continue
-            val x = p % n; val y = p / n
-            for (k in 0 until 4) {
-                val xx = x + dx[k]; val yy = y + dy[k]
-                if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue
-                val r = yy * n + xx
-                if (dist[r] <= d + 1) continue
-                dist[r] = d + 1; q[t++] = r
-            }
-        }
-        // Çekirdek (şeridin içi, tam logo): renk şeride doğru yayılır (en yakın çekirdek rengi).
-        val core = IntArray(total) { -1 }
-        h = 0; t = 0
-        for (p in 0 until total) if (dist[p] > band && w[p] >= 0.9f) { core[p] = p; q[t++] = p }
-        if (t == 0) return null
-        while (h < t) {
-            val p = q[h++]
-            val x = p % n; val y = p / n
-            for (k in 0 until 4) {
-                val xx = x + dx[k]; val yy = y + dy[k]
-                if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue
-                val r = yy * n + xx
-                if (core[r] >= 0 || dist[r] == 0 || dist[r] > band) continue
-                core[r] = core[p]; q[t++] = r
-            }
-        }
-        val wOut = w.copyOf(); val cOut = fg.copyOf()
-        val rad = band + 2
+        val lumB = (0.2126f * sr + 0.7152f * sg + 0.0722f * sb) / 255f
+        // Gölge/parlama yalnızca açık ve RENKSİZ zeminde aranır: renkli zemindeki (WhatsApp yeşili) beyaz sembol logodur.
+        val bgMax = maxOf(sr, sg, sb); val bgMin = minOf(sr, sg, sb)
+        val lightBg = lumB > 0.6f && (bgMax - bgMin) / maxOf(1f, bgMax) < 0.12f
+        val d = FloatArray(total)
+        val bgM = BooleanArray(total)   // zemin benzeri (zemin rengi, gölge, saydam)
+        val shadow = BooleanArray(total)
+        val clear = BooleanArray(total) // plakanın dışı (saydam)
+        val hsv = FloatArray(3)
         for (p in 0 until total) {
-            val d = dist[p]
-            if (d == 0 || d > band) continue
-            if (core[p] < 0) continue // ince çizgi: çekirdeği yok, normal temizlik
-            val c = fg[p]
-            val px0 = p % n; val py0 = p / n
-            // Yakındaki çekirdek (tam logo) renkleri: piksel bunlardan biriyle AYNI renkteyse logonun parçasıdır
-            // (açık renkli kâğıt, şeftali yarım kalp vb.) ve dokunulmaz. Değilse zemin–logo karışımıdır: en iyi
-            // uyan logo rengiyle ayrıştırılır.
-            var same = false
-            var bestF = -1; var bestRes = Float.MAX_VALUE
-            val cr = ((c shr 16) and 0xff).toFloat(); val cg = ((c shr 8) and 0xff).toFloat(); val cb = (c and 0xff).toFloat()
-            for (yy in maxOf(0, py0 - rad)..minOf(n - 1, py0 + rad)) {
-                for (xx in maxOf(0, px0 - rad)..minOf(n - 1, px0 + rad)) {
-                    val qq = yy * n + xx
-                    if (core[qq] != qq) continue
-                    val f = fg[qq]
-                    val ffr = ((f shr 16) and 0xff).toFloat(); val ffg = ((f shr 8) and 0xff).toFloat(); val ffb = (f and 0xff).toFloat()
-                    val dd = (cr - ffr) * (cr - ffr) + (cg - ffg) * (cg - ffg) + (cb - ffb) * (cb - ffb)
-                    if (dd < 26f * 26f) { same = true; break }
-                    // Zemin–logo doğrusuna uzaklık (karışım olma olasılığı).
-                    val vr = ffr - sr; val vg = ffg - sg; val vb = ffb - sb
-                    val l2 = vr * vr + vg * vg + vb * vb
-                    if (l2 < 400f) continue
-                    val a = (((cr - sr) * vr + (cg - sg) * vg + (cb - sb) * vb) / l2).coerceIn(0f, 1f)
-                    val er = cr - (sr + a * vr); val eg = cg - (sg + a * vg); val eb = cb - (sb + a * vb)
-                    val res = er * er + eg * eg + eb * eb
-                    if (res < bestRes) { bestRes = res; bestF = qq }
-                }
-                if (same) break
+            val c = fg[p]; val a = (c ushr 24) / 255f
+            clear[p] = a < 0.5f
+            val dr = ((c shr 16) and 0xff) - sr; val dg = ((c shr 8) and 0xff) - sg; val db = (c and 0xff) - sb
+            d[p] = sqrt(dr * dr + dg * dg + db * db)
+            // Gölge/parlama adayı: zemine yakın, renksiz, biraz koyu ya da açık ton.
+            if (lightBg && !clear[p] && d[p] >= 12f) {
+                toHsv(c, hsv); val l = lum(c)
+                shadow[p] = hsv[1] < 0.08f && l >= 0.80f * lumB && l <= lumB + 0.10f
             }
-            if (same || bestF < 0 || bestRes > 34f * 34f) continue
-            val f = fg[bestF]
-            val fr = ((f shr 16) and 0xff) - sr; val fgr = ((f shr 8) and 0xff) - sg; val fb = (f and 0xff) - sb
-            val len2 = fr * fr + fgr * fgr + fb * fb
-            if (len2 < 400f) continue // logo zemine çok yakın renkte: ayrıştırılamaz
+        }
+        // Gölge/parlama ince ya da kademeli bir banttır; tek renk KALIN bölge ise logonun açık gri/beyaz parçasıdır (korunur).
+        val t0 = maxOf(2, n / 96)
+        val thick = BooleanArray(total)
+        val sq = IntArray(total)
+        for (y in 0 until n) for (x in 0 until n) {
+            val p = y * n + x
+            if (!shadow[p]) continue
+            var all = true
+            loop@ for (yy in y - t0..y + t0) for (xx in x - t0..x + t0) {
+                // Düz dolgu olmalı: yumuşak gölge zemine doğru kademeli açılır, logo parçası tek renktir.
+                if (xx !in 0 until n || yy !in 0 until n || !shadow[yy * n + xx] || dist(fg[yy * n + xx], fg[p]) > 3.5f) { all = false; break@loop }
+            }
+            thick[p] = all
+        }
+        run {
+            var h = 0; var t = 0
+            val seedC = IntArray(total)
+            for (p in 0 until total) if (thick[p]) { sq[t++] = p; seedC[p] = fg[p] }
+            while (h < t) {
+                val p = sq[h++]; val x = p % n; val y = p / n
+                for (dy in -1..1) for (dx in -1..1) {
+                    val xx = x + dx; val yy = y + dy
+                    if (xx !in 0 until n || yy !in 0 until n) continue
+                    val q = yy * n + xx
+                    // Yalnızca başlangıç rengine yakın pikseller (kademeli gölgeye yayılmaz).
+                    if (shadow[q] && !thick[q] && dist(fg[q], seedC[p]) < 4f) { thick[q] = true; seedC[q] = seedC[p]; sq[t++] = q }
+                }
+            }
+        }
+        for (p in 0 until total) {
+            if (thick[p]) shadow[p] = false
+            bgM[p] = clear[p] || d[p] < 12f || shadow[p]
+        }
+        // Plakanın dış kenarı (saydam bölgeye 2 piksel yakın): logo değil, plakanın yumuşatma/ışık şeridi.
+        val rim = maxOf(2, n / 96)
+        val nearClear = BooleanArray(total)
+        for (y in 0 until n) for (x in 0 until n) {
+            if (!clear[y * n + x]) continue
+            for (yy in maxOf(0, y - rim)..minOf(n - 1, y + rim)) for (xx in maxOf(0, x - rim)..minOf(n - 1, x + rim)) nearClear[yy * n + xx] = true
+        }
+        for (p in 0 until total) if (nearClear[p]) bgM[p] = true
+        // Dış zemine bağlı zemin bölgesi; bağlı olmayan küçük bölgeler logonun parçasıdır.
+        val outer = BooleanArray(total)
+        val queue = IntArray(total)
+        var head = 0; var tail = 0
+        fun push(p: Int) { if (bgM[p] && !outer[p]) { outer[p] = true; queue[tail++] = p } }
+        for (k in 0 until n) { push(k); push((n - 1) * n + k); push(k * n); push(k * n + n - 1) }
+        for (p in 0 until total) if (clear[p]) push(p)
+        while (head < tail) {
+            val p = queue[head++]; val x = p % n; val y = p / n
+            // 8 yönlü: kenar yumuşatmasındaki köşegen boşluklar ayrı "iç bölge" sanılmasın.
+            for (dy in -1..1) for (dx in -1..1) {
+                val xx = x + dx; val yy = y + dy
+                if ((dx != 0 || dy != 0) && xx in 0 until n && yy in 0 until n) push(yy * n + xx)
+            }
+        }
+        val keep = BooleanArray(total)
+        val seen = BooleanArray(total)
+        val comp = IntArray(total)
+        val small = (total * 0.006f).toInt()
+        for (s0 in 0 until total) {
+            if (!bgM[s0] || outer[s0] || seen[s0]) continue
+            var h = 0; var t = 0
+            seen[s0] = true; comp[t++] = s0
+            while (h < t) {
+                val p = comp[h++]; val x = p % n; val y = p / n
+                fun go(q: Int) { if (bgM[q] && !outer[q] && !seen[q]) { seen[q] = true; comp[t++] = q } }
+                if (x > 0) go(p - 1); if (x < n - 1) go(p + 1); if (y > 0) go(p - n); if (y < n - 1) go(p + n)
+            }
+            // Gerçek bir iç bölge (nokta, delik) olmalı: içinde zemin renginde birkaç piksel bulunur.
+            var core = 0
+            for (i in 0 until t) if (!clear[comp[i]]) core++
+            if (t <= small && t >= 6 && core >= 6) for (i in 0 until t) keep[comp[i]] = true
+        }
+        fun logo(p: Int) = !bgM[p] || keep[p]
+        val wOut = FloatArray(total); val cOut = fg.copyOf()
+        // İki logo parçası arasındaki ince ek yeri: komşu logo rengiyle doldurulur.
+        val gap = maxOf(2, n / 96)
+        for (y in 0 until n) for (x in 0 until n) {
+            val p = y * n + x
+            if (!bgM[p] || keep[p] || nearClear[p]) continue
+            var fill = -1
+            for ((dx, dy) in arrayOf(1 to 0, 0 to 1, 1 to 1, 1 to -1)) {
+                var i = 1; var lp = -1
+                while (i <= gap + 1) { val xx = x - dx * i; val yy = y - dy * i; if (xx !in 0 until n || yy !in 0 until n) break; val q = yy * n + xx; if (logo(q)) { lp = q; break }; i++ }
+                if (lp < 0) continue
+                var j = 1; var rp = -1
+                while (j <= gap + 1) { val xx = x + dx * j; val yy = y + dy * j; if (xx !in 0 until n || yy !in 0 until n) break; val q = yy * n + xx; if (logo(q)) { rp = q; break }; j++ }
+                if (rp < 0 || i + j - 1 > gap) continue
+                fill = if (i <= j) lp else rp; break
+            }
+            if (fill >= 0) { wOut[p] = 1f; cOut[p] = (0xff shl 24) or (fg[fill] and 0x00ffffff) }
+        }
+        val r = maxOf(3, n / 48)
+        for (y in 0 until n) for (x in 0 until n) {
+            val p = y * n + x
+            if (wOut[p] > 0f) continue // ek yeri
+            val c = fg[p]
+            val alpha = (c ushr 24) / 255f
+            if (keep[p]) { wOut[p] = alpha; continue }
+            if (bgM[p]) continue
+            // Yakında zemin var mı, en belirgin logo rengi hangisi, tek başına bir benek mi?
+            var best = -1; var bestD = -1f; var nearBg = false; var mates = 0
+            for (yy in maxOf(0, y - r)..minOf(n - 1, y + r)) for (xx in maxOf(0, x - r)..minOf(n - 1, x + r)) {
+                val q = yy * n + xx
+                if (q == p) continue
+                val close = abs(xx - x) <= 1 && abs(yy - y) <= 1
+                if (bgM[q] && !keep[q]) { if (abs(xx - x) <= 2 && abs(yy - y) <= 2) nearBg = true; continue }
+                if (close) mates++
+                if (d[q] > bestD) { bestD = d[q]; best = q }
+            }
+            if (mates == 0) continue // tek piksellik benek
+            if (!nearBg || best < 0 || bestD <= d[p]) { wOut[p] = alpha; continue }
+            // Düz renkli bölge (komşuların çoğu aynı renk): kenar geçişi değil, logonun kendi dolgusu.
+            var same = 0
+            for (yy in maxOf(0, y - 1)..minOf(n - 1, y + 1)) for (xx in maxOf(0, x - 1)..minOf(n - 1, x + 1)) {
+                val q = yy * n + xx
+                if (q != p && dist(fg[q], c) < 10f) same++
+            }
+            if (same >= 5) { wOut[p] = alpha; continue }
+            val f = fg[best]
+            val vr = ((f shr 16) and 0xff) - sr; val vg = ((f shr 8) and 0xff) - sg; val vb = (f and 0xff) - sb
+            val l2 = vr * vr + vg * vg + vb * vb
             val pr = ((c shr 16) and 0xff) - sr; val pg = ((c shr 8) and 0xff) - sg; val pb = (c and 0xff) - sb
-            val a = ((pr * fr + pg * fgr + pb * fb) / len2).coerceIn(0f, 1f) * ((c ushr 24) / 255f)
-            // Yumuşak kenar korunur, zemin payı atılır.
-            wOut[p] = ((a - 0.08f) / 0.84f).coerceIn(0f, 1f)
+            val a = ((pr * vr + pg * vg + pb * vb) / l2).coerceIn(0f, 1f)
+            val er = pr - a * vr; val eg = pg - a * vg; val eb = pb - a * vb
+            val e = sqrt(er * er + eg * eg + eb * eb)
+            if (a < 0.08f && d[p] < 40f) continue // zemine yakın, logo yönünde değil: kenar taşması
+            if (e > 0.35f * d[p] + 6f) { wOut[p] = alpha; continue } // karışım değil: kendi renginde logo
+            wOut[p] = ((a - 0.06f) / 0.88f).coerceIn(0f, 1f) * alpha
             cOut[p] = (c and 0xff000000.toInt()) or (f and 0x00ffffff)
         }
         return wOut to cOut
-    }
-
-    /**
-     * Zemine bitişik, renksiz ve açık piksellerden oluşan ince halkayı (en çok n/40 piksel derinlik; yalnızca çok açık gri/beyaz) zemine katar.
-     * Zemine bağlı olmayan beyazlar (logonun içindeki beyaz halka, yazı) korunur.
-     */
-    private fun stripHalo(fg: IntArray, w: FloatArray, n: Int): FloatArray {
-        val out = w.copyOf()
-        val depth = IntArray(n * n) { -1 }
-        val queue = IntArray(n * n)
-        var head = 0; var tail = 0
-        for (p in 0 until n * n) if (w[p] < 0.06f) { depth[p] = 0; queue[tail++] = p }
-        val maxD = maxOf(2, n / 40)
-        val hsv = FloatArray(3)
-        fun haloLike(c: Int): Boolean {
-            if ((c ushr 24) < 30) return true
-            toHsv(c, hsv)
-            return hsv[1] < 0.20f && hsv[2] > 0.80f
-        }
-        while (head < tail) {
-            val p = queue[head++]
-            val d = depth[p]
-            if (d >= maxD) continue
-            val x = p % n; val y = p / n
-            for (k in 0 until 4) {
-                val xx = x + intArrayOf(1, -1, 0, 0)[k]; val yy = y + intArrayOf(0, 0, 1, -1)[k]
-                if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue
-                val q = yy * n + xx
-                if (depth[q] >= 0) continue
-                if (!haloLike(fg[q])) continue
-                depth[q] = d + 1
-                out[q] = 0f
-                queue[tail++] = q
-            }
-        }
-        return out
     }
 
     /**
