@@ -109,22 +109,26 @@ object DarkIcon {
         val queue = IntArray(n * n)
         var head = 0; var tail = 0
         val e0 = (n * 0.03f).toInt(); val e1 = (n * 0.08f).toInt()
-        fun seed(x: Int, y: Int) {
+        // Renk geçişli zemin (Notlar'ın sarısı gibi) de izlenebilsin: komşudan komşuya küçük adımlarla ilerlenir;
+        // başlangıç rengine olan uzaklık sınırı geniştir, logonun keskin kenarında ise adım büyük olduğu için durur.
+        fun seed(x: Int, y: Int, from: Int) {
             val p = y * n + x
             if (mask[p]) return
             val c = px[p]
-            if ((c ushr 24) > 200 && dist(c, med) < tol) { mask[p] = true; queue[tail++] = p }
+            if ((c ushr 24) <= 200) return
+            val ok = if (from < 0) dist(c, med) < tol else dist(c, px[from]) < 10f && dist(c, med) < tol * 2.2f
+            if (ok) { mask[p] = true; queue[tail++] = p }
         }
         for (k in 0 until n) for (e in e0..e1) {
-            seed(k, e); seed(k, n - 1 - e); seed(e, k); seed(n - 1 - e, k)
+            seed(k, e, -1); seed(k, n - 1 - e, -1); seed(e, k, -1); seed(n - 1 - e, k, -1)
         }
         while (head < tail) {
             val p = queue[head++]
             val x = p % n; val y = p / n
-            if (x > 0) seed(x - 1, y)
-            if (x < n - 1) seed(x + 1, y)
-            if (y > 0) seed(x, y - 1)
-            if (y < n - 1) seed(x, y + 1)
+            if (x > 0) seed(x - 1, y, p)
+            if (x < n - 1) seed(x + 1, y, p)
+            if (y > 0) seed(x, y - 1, p)
+            if (y < n - 1) seed(x, y + 1, p)
         }
         var count = 0
         for (m in mask) if (m) count++
@@ -238,14 +242,16 @@ object DarkIcon {
         // simge yanlış ayrışmıştır: orijinali korunur, hafifçe koyulaştırılır.
         var wsum = 0f
         for (a in w) wsum += a
-        if (fgCount < 30 || wsum < 0.05f * total) return scaled(orig, 0.86f)
+        if (fgCount < 30 || wsum < 0.025f * total) return scaled(orig, 0.86f)
         // Fotoğraf gibi büyük koyu alan (kamera lensi): yalnızca karart.
         if (darkCount.toFloat() / total > 0.30f) return scaled(orig, 0.72f)
         // Büyük beyaz şerit/plaka (idefix, Trendyol gibi): ince bir sembol değil tasarımın parçası. Zemin rengiyle
         // boyanırsa tasarım bozulur; orijinal görünüm korunur, hafifçe koyulaştırılır.
         val colorizeWanted = (forceColorize || (bg.colorful && bg.sat > 0.30f)) && lightCount > 0.4f * fgCount
-        if (colorizeWanted && (lightCount > 0.30f * total || lightBand(fg, w, n))) return scaled(orig, 0.86f)
-        val colorize = colorizeWanted
+        if (colorizeWanted && lightBand(fg, w, n)) return scaled(orig, 0.86f)
+        // Büyük açık renkli kart/plaka (İpuçları): zemin koyulaşır, kart kendi renginde kalır (boyanırsa tasarım
+        // bozulur, hiç dönüştürülmezse simge koyu temada açık turuncu kare olarak kalıyordu).
+        val colorize = colorizeWanted && lightCount <= 0.15f * total
         val bh = FloatArray(3)
         // Koyu sembolleri açığa çevirmek yalnızca ince yazı/çizgilerde (Arrows'taki oklar). Büyük koyu dolgu
         // (Trendyol'un siyah şeridi) çevrilmez; beyaza dönüp tasarımı bozuyordu.
@@ -271,7 +277,11 @@ object DarkIcon {
                     var fgc = ((c shr 8) and 0xff).toFloat()
                     var fb = (c and 0xff).toFloat()
                     toHsv(c, hsv); val l = lum(c)
-                    if (colorize && hsv[1] < 0.20f && l > 0.62f) {
+                    // Renklendirme ve koyu sembolü açma YUMUŞAK eşikle yapılır: eşiğin iki yanına düşen kenar pikselleri
+                    // (biri boyanıp komşusu boyanmayınca) logonun çevresinde açık/koyu tırtıklı çizgi bırakıyordu.
+                    val kc = if (colorize) (1f - smooth(0.06f, 0.14f, hsv[1])) * smooth(0.54f, 0.70f, l) else 0f
+                    val ki = if (invertDark) (1f - smooth(0.22f, 0.38f, hsv[1])) * (1f - smooth(0.32f, 0.48f, l)) else 0f
+                    if (kc > 0.001f) {
                         val src = bgPx?.get(p)
                         val rgb = if (src != null && (src ushr 24) > 120) {
                             // Zeminin bu noktadaki rengi: canlı ve parlak tutulur (koyu zeminde okunaklı).
@@ -280,10 +290,10 @@ object DarkIcon {
                         } else {
                             fromHsv(bg.hue, min(bg.sat * 1.05f, 0.85f), (l * 0.98f).coerceIn(0f, 1f))
                         }
-                        fr = rgb[0]; fgc = rgb[1]; fb = rgb[2]
-                    } else if (invertDark && hsv[1] < 0.30f && l < 0.40f) {
+                        fr = lerp(fr, rgb[0], kc); fgc = lerp(fgc, rgb[1], kc); fb = lerp(fb, rgb[2], kc)
+                    } else if (ki > 0.001f) {
                         val rgb = fromHsv(hsv[0], hsv[1] * 0.6f, (1f - hsv[2] * 0.85f).coerceIn(0f, 1f))
-                        fr = rgb[0]; fgc = rgb[1]; fb = rgb[2]
+                        fr = lerp(fr, rgb[0], ki); fgc = lerp(fgc, rgb[1], ki); fb = lerp(fb, rgb[2], ki)
                     }
                     r = r * (1 - a) + fr * a; g = g * (1 - a) + fgc * a; b = b * (1 - a) + fb * a
                 }
@@ -354,6 +364,7 @@ object DarkIcon {
         // Gölge/parlama yalnızca açık ve RENKSİZ zeminde aranır: renkli zemindeki (WhatsApp yeşili) beyaz sembol logodur.
         val bgMax = maxOf(sr, sg, sb); val bgMin = minOf(sr, sg, sb)
         val lightBg = lumB > 0.6f && (bgMax - bgMin) / maxOf(1f, bgMax) < 0.12f
+        val colorBg = !lightBg && lumB > 0.3f && (bgMax - bgMin) / maxOf(1f, bgMax) >= 0.12f
         val d = FloatArray(total)
         val bgM = BooleanArray(total)   // zemin benzeri (zemin rengi, gölge, saydam)
         val shadow = BooleanArray(total)
@@ -369,6 +380,14 @@ object DarkIcon {
                 toHsv(c, hsv); val l = lum(c)
                 val lb = (0.2126f * fr[p] + 0.7152f * fgr[p] + 0.0722f * fb[p]) / 255f
                 shadow[p] = hsv[1] < 0.08f && l >= 0.80f * lb && l <= lb + 0.10f
+            } else if (colorBg && !clear[p] && d[p] >= 12f) {
+                // Renkli zeminde gölge, zeminin aynı renginin biraz koyusudur (c ≈ k·B): logonun çevresinde koyu
+                // turuncu/yeşil çerçeve olarak kalıyordu.
+                val r0 = ((c shr 16) and 0xff).toFloat(); val g0 = ((c shr 8) and 0xff).toFloat(); val b0 = (c and 0xff).toFloat()
+                val bb2 = fr[p] * fr[p] + fgr[p] * fgr[p] + fb[p] * fb[p]
+                val k = (r0 * fr[p] + g0 * fgr[p] + b0 * fb[p]) / maxOf(1f, bb2)
+                val er = r0 - k * fr[p]; val eg = g0 - k * fgr[p]; val eb = b0 - k * fb[p]
+                shadow[p] = k in 0.68f..0.985f && er * er + eg * eg + eb * eb < 100f
             }
         }
         // Gölge/parlama ince ya da kademeli bir banttır; tek renk KALIN bölge ise logonun açık gri/beyaz parçasıdır (korunur).
@@ -491,18 +510,37 @@ object DarkIcon {
                 if (q != p && dist(fg[q], c) < 10f) same++
             }
             if (same >= 5) { wOut[p] = alpha; continue }
-            val f = fg[best]
+            // Zemin B ile hangi logo rengi F'nin karışımı? Yakındaki daha belirgin logo renklerinden B→F doğrusuna
+            // EN İYİ uyan seçilir (iki-üç rengin buluştuğu köşelerde en belirgin renk yanlış sonuç veriyordu).
             val br0 = fr[p]; val bg0 = fgr[p]; val bb0 = fb[p]
-            val vr = ((f shr 16) and 0xff) - br0; val vg = ((f shr 8) and 0xff) - bg0; val vb = (f and 0xff) - bb0
-            val l2 = vr * vr + vg * vg + vb * vb
             val pr = ((c shr 16) and 0xff) - br0; val pg = ((c shr 8) and 0xff) - bg0; val pb = (c and 0xff) - bb0
-            val a = ((pr * vr + pg * vg + pb * vb) / l2).coerceIn(0f, 1f)
-            val er = pr - a * vr; val eg = pg - a * vg; val eb = pb - a * vb
-            val e = sqrt(er * er + eg * eg + eb * eb)
-            if (a < 0.08f && d[p] < 40f) continue // zemine yakın, logo yönünde değil: kenar taşması
-            if (e > 0.35f * d[p] + 6f) { wOut[p] = alpha; continue } // karışım değil: kendi renginde logo
-            wOut[p] = ((a - 0.06f) / 0.88f).coerceIn(0f, 1f) * alpha
-            cOut[p] = (c and 0xff000000.toInt()) or (f and 0x00ffffff)
+            var fBest = -1; var eBest = Float.MAX_VALUE; var aBest = 0f
+            for (yy in maxOf(0, y - r)..minOf(n - 1, y + r)) for (xx in maxOf(0, x - r)..minOf(n - 1, x + r)) {
+                val q = yy * n + xx
+                if (q == p || (bgM[q] && !keep[q]) || d[q] < d[p] + 8f) continue
+                val f = fg[q]
+                val vr = ((f shr 16) and 0xff) - br0; val vg = ((f shr 8) and 0xff) - bg0; val vb = (f and 0xff) - bb0
+                val l2 = vr * vr + vg * vg + vb * vb
+                if (l2 < 100f) continue
+                val a = ((pr * vr + pg * vg + pb * vb) / l2).coerceIn(0f, 1f)
+                val er = pr - a * vr; val eg = pg - a * vg; val eb = pb - a * vb
+                val e = er * er + eg * eg + eb * eb
+                if (e < eBest) { eBest = e; fBest = q; aBest = a }
+            }
+            if (fBest < 0) { wOut[p] = alpha; continue }
+            val e = sqrt(eBest)
+            if (aBest < 0.08f && d[p] < 40f) continue // zemine yakın, logo yönünde değil: kenar taşması
+            if (e > 0.35f * d[p] + 6f) {
+                // Hiçbir tek renge uymuyor. Zemine logodan çok daha yakınsa birden çok rengin kenar karışımıdır:
+                // açık leke bırakmamak için en uygun logo renginde, zemine uzaklığı oranında saydam çizilir.
+                if (d[p] < 0.6f * bestD) {
+                    wOut[p] = (d[p] / bestD).coerceIn(0f, 1f) * alpha
+                    cOut[p] = (c and 0xff000000.toInt()) or (fg[fBest] and 0x00ffffff)
+                } else wOut[p] = alpha // kendi renginde logo
+                continue
+            }
+            wOut[p] = ((aBest - 0.06f) / 0.88f).coerceIn(0f, 1f) * alpha
+            cOut[p] = (c and 0xff000000.toInt()) or (fg[fBest] and 0x00ffffff)
         }
         return wOut to cOut
     }
