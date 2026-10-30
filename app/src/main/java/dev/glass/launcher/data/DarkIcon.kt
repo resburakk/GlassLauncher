@@ -313,6 +313,43 @@ object DarkIcon {
         }
         if (cnt < total * 0.05f) return null
         sr /= cnt; sg /= cnt; sb /= cnt
+        // Zemin çoğu zaman düz değil, renk geçişlidir (Notlar, Telefon, Honor Sağlık): her pikselin zemin rengi, zemin
+        // piksellerine oturtulan doğrusal bir geçişten (r = a + b·x + c·y) bulunur; uymayan pikseller (logonun açık
+        // renkli parçaları) dışlanıp yeniden oturtulur. Tek ortalama kullanılınca simgenin üst ve alt şeridi logo
+        // sanılıp renkli bant olarak kalıyordu.
+        val use = BooleanArray(total) { p -> w[p] < 0.06f && (fg[p] ushr 24) > 220 }
+        val coef = Array(3) { floatArrayOf(0f, 0f, 0f) }
+        coef[0][0] = sr; coef[1][0] = sg; coef[2][0] = sb
+        fun model(ch: Int, p: Int) = coef[ch][0] + coef[ch][1] * ((p % n) / n.toFloat() - 0.5f) + coef[ch][2] * ((p / n) / n.toFloat() - 0.5f)
+        fun chan(c: Int, ch: Int) = ((c shr (16 - 8 * ch)) and 0xff).toFloat()
+        repeat(3) { iter ->
+            if (iter > 0) for (p in 0 until total) if (use[p]) {
+                val c = fg[p]
+                val e0 = chan(c, 0) - model(0, p); val e1 = chan(c, 1) - model(1, p); val e2 = chan(c, 2) - model(2, p)
+                if (e0 * e0 + e1 * e1 + e2 * e2 > 18f * 18f) use[p] = false
+            }
+            // Normal denklemler (x, y merkezlenmiş): 3x3 sistem, her kanal için.
+            var s1 = 0.0; var sx = 0.0; var sy = 0.0; var sxx = 0.0; var syy = 0.0; var sxy = 0.0
+            val sv = DoubleArray(3); val sxv = DoubleArray(3); val syv = DoubleArray(3)
+            for (p in 0 until total) if (use[p]) {
+                val x = (p % n) / n.toDouble() - 0.5; val y = (p / n) / n.toDouble() - 0.5
+                s1 += 1; sx += x; sy += y; sxx += x * x; syy += y * y; sxy += x * y
+                for (ch in 0..2) { val v = chan(fg[p], ch).toDouble(); sv[ch] += v; sxv[ch] += x * v; syv[ch] += y * v }
+            }
+            if (s1 < total * 0.05) return@repeat
+            val m = arrayOf(doubleArrayOf(s1, sx, sy), doubleArrayOf(sx, sxx, sxy), doubleArrayOf(sy, sxy, syy))
+            fun det3(a: Array<DoubleArray>) = a[0][0] * (a[1][1] * a[2][2] - a[1][2] * a[2][1]) - a[0][1] * (a[1][0] * a[2][2] - a[1][2] * a[2][0]) + a[0][2] * (a[1][0] * a[2][1] - a[1][1] * a[2][0])
+            val dm = det3(m)
+            if (abs(dm) < 1e-9) return@repeat
+            for (ch in 0..2) {
+                val rhs = doubleArrayOf(sv[ch], sxv[ch], syv[ch])
+                for (k in 0..2) {
+                    val mk = Array(3) { r -> DoubleArray(3) { cI -> if (cI == k) rhs[r] else m[r][cI] } }
+                    coef[ch][k] = (det3(mk) / dm).toFloat()
+                }
+            }
+        }
+        val fr = FloatArray(total) { model(0, it) }; val fgr = FloatArray(total) { model(1, it) }; val fb = FloatArray(total) { model(2, it) }
         val lumB = (0.2126f * sr + 0.7152f * sg + 0.0722f * sb) / 255f
         // Gölge/parlama yalnızca açık ve RENKSİZ zeminde aranır: renkli zemindeki (WhatsApp yeşili) beyaz sembol logodur.
         val bgMax = maxOf(sr, sg, sb); val bgMin = minOf(sr, sg, sb)
@@ -325,12 +362,13 @@ object DarkIcon {
         for (p in 0 until total) {
             val c = fg[p]; val a = (c ushr 24) / 255f
             clear[p] = a < 0.5f
-            val dr = ((c shr 16) and 0xff) - sr; val dg = ((c shr 8) and 0xff) - sg; val db = (c and 0xff) - sb
+            val dr = ((c shr 16) and 0xff) - fr[p]; val dg = ((c shr 8) and 0xff) - fgr[p]; val db = (c and 0xff) - fb[p]
             d[p] = sqrt(dr * dr + dg * dg + db * db)
             // Gölge/parlama adayı: zemine yakın, renksiz, biraz koyu ya da açık ton.
             if (lightBg && !clear[p] && d[p] >= 12f) {
                 toHsv(c, hsv); val l = lum(c)
-                shadow[p] = hsv[1] < 0.08f && l >= 0.80f * lumB && l <= lumB + 0.10f
+                val lb = (0.2126f * fr[p] + 0.7152f * fgr[p] + 0.0722f * fb[p]) / 255f
+                shadow[p] = hsv[1] < 0.08f && l >= 0.80f * lb && l <= lb + 0.10f
             }
         }
         // Gölge/parlama ince ya da kademeli bir banttır; tek renk KALIN bölge ise logonun açık gri/beyaz parçasıdır (korunur).
@@ -454,9 +492,10 @@ object DarkIcon {
             }
             if (same >= 5) { wOut[p] = alpha; continue }
             val f = fg[best]
-            val vr = ((f shr 16) and 0xff) - sr; val vg = ((f shr 8) and 0xff) - sg; val vb = (f and 0xff) - sb
+            val br0 = fr[p]; val bg0 = fgr[p]; val bb0 = fb[p]
+            val vr = ((f shr 16) and 0xff) - br0; val vg = ((f shr 8) and 0xff) - bg0; val vb = (f and 0xff) - bb0
             val l2 = vr * vr + vg * vg + vb * vb
-            val pr = ((c shr 16) and 0xff) - sr; val pg = ((c shr 8) and 0xff) - sg; val pb = (c and 0xff) - sb
+            val pr = ((c shr 16) and 0xff) - br0; val pg = ((c shr 8) and 0xff) - bg0; val pb = (c and 0xff) - bb0
             val a = ((pr * vr + pg * vg + pb * vb) / l2).coerceIn(0f, 1f)
             val er = pr - a * vr; val eg = pg - a * vg; val eb = pb - a * vb
             val e = sqrt(er * er + eg * eg + eb * eb)
