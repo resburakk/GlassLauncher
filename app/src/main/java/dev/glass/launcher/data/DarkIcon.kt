@@ -252,8 +252,11 @@ object DarkIcon {
         val invertDark = darkCount > 0.02f * fgCount && darkCount < 0.10f * total
         // Açık (beyaz/gri) zeminli düz simgede logonun çevresindeki renksiz açık halka (tema gölgesi/parlaması,
         // kenar yumuşatması) zemine katılır: koyu zeminde logonun etrafında beyaz çizgi bırakıyordu.
-        val wEff = if (bgPx == null && bg.lum > 0.70f && bg.sat < 0.20f) stripHalo(fg, w, n) else w
-        val src = decontaminate(fg, wEff, n)
+        val w0 = if (bgPx == null && bg.lum > 0.70f && bg.sat < 0.20f) stripHalo(fg, w, n) else w
+        // Düz simgelerde kenar şeridi için kesin ayrıştırma (zemin ve logo rengi bilinerek); ardından kalan kenar temizliği.
+        val matted = if (bgPx == null) matteEdges(fg, w0, n) else null
+        val wEff = matted?.first ?: w0
+        val src = decontaminate(matted?.second ?: fg, wEff, n)
         val out = IntArray(total)
         for (y in 0 until n) {
             val t = y / (n - 1f)
@@ -288,6 +291,74 @@ object DarkIcon {
             }
         }
         return createBitmap(n, n).also { it.setPixels(out, 0, n, 0, 0, n, n) }
+    }
+
+    /**
+     * Kenar şeridi ayrıştırması (düz simgeler, hepsi için aynı): şeridin her pikseli zemin rengi B ile logonun gerçek
+     * rengi F'nin karışımıdır (F: hemen içerideki tam logo pikseli). Pikselin B–F doğrusu üzerindeki yeri logo payını
+     * (saydamlığı) verir; renk F olur. Böylece zeminin (beyaz plaka, gölge, parlama) hiçbir izi kenarda kalmaz.
+     */
+    private fun matteEdges(fg: IntArray, w: FloatArray, n: Int): Pair<FloatArray, IntArray>? {
+        val total = n * n
+        // Zemin: ağırlığı ~0 olan opak pikseller; rengi bunların ortalaması.
+        var sr = 0f; var sg = 0f; var sb = 0f; var cnt = 0
+        for (p in 0 until total) {
+            val c = fg[p]
+            if (w[p] < 0.06f && (c ushr 24) > 200) { sr += (c shr 16) and 0xff; sg += (c shr 8) and 0xff; sb += c and 0xff; cnt++ }
+        }
+        if (cnt < total * 0.05f) return null
+        sr /= cnt; sg /= cnt; sb /= cnt
+        // Zemine uzaklık (BFS, 4 komşu).
+        val band = maxOf(3, n / 36)
+        val dist = IntArray(total) { Int.MAX_VALUE }
+        val q = IntArray(total); var h = 0; var t = 0
+        for (p in 0 until total) if (w[p] < 0.06f) { dist[p] = 0; q[t++] = p }
+        val dx = intArrayOf(1, -1, 0, 0); val dy = intArrayOf(0, 0, 1, -1)
+        while (h < t) {
+            val p = q[h++]; val d = dist[p]
+            if (d > band + 1) continue
+            val x = p % n; val y = p / n
+            for (k in 0 until 4) {
+                val xx = x + dx[k]; val yy = y + dy[k]
+                if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue
+                val r = yy * n + xx
+                if (dist[r] <= d + 1) continue
+                dist[r] = d + 1; q[t++] = r
+            }
+        }
+        // Çekirdek (şeridin içi, tam logo): renk şeride doğru yayılır (en yakın çekirdek rengi).
+        val core = IntArray(total) { -1 }
+        h = 0; t = 0
+        for (p in 0 until total) if (dist[p] > band && w[p] >= 0.9f) { core[p] = p; q[t++] = p }
+        if (t == 0) return null
+        while (h < t) {
+            val p = q[h++]
+            val x = p % n; val y = p / n
+            for (k in 0 until 4) {
+                val xx = x + dx[k]; val yy = y + dy[k]
+                if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue
+                val r = yy * n + xx
+                if (core[r] >= 0 || dist[r] == 0 || dist[r] > band) continue
+                core[r] = core[p]; q[t++] = r
+            }
+        }
+        val wOut = w.copyOf(); val cOut = fg.copyOf()
+        for (p in 0 until total) {
+            val d = dist[p]
+            if (d == 0 || d > band) continue
+            val src = core[p]
+            if (src < 0) continue // ince çizgi: çekirdeği yok, normal temizlik
+            val c = fg[p]; val f = fg[src]
+            val fr = ((f shr 16) and 0xff) - sr; val fgr = ((f shr 8) and 0xff) - sg; val fb = (f and 0xff) - sb
+            val len2 = fr * fr + fgr * fgr + fb * fb
+            if (len2 < 400f) continue // logo zemine çok yakın renkte: ayrıştırılamaz
+            val pr = ((c shr 16) and 0xff) - sr; val pg = ((c shr 8) and 0xff) - sg; val pb = (c and 0xff) - sb
+            val a = ((pr * fr + pg * fgr + pb * fb) / len2).coerceIn(0f, 1f) * ((c ushr 24) / 255f)
+            // Yumuşak kenar korunur, zemin payı atılır.
+            wOut[p] = ((a - 0.08f) / 0.84f).coerceIn(0f, 1f)
+            cOut[p] = (c and 0xff000000.toInt()) or (f and 0x00ffffff)
+        }
+        return wOut to cOut
     }
 
     /**
