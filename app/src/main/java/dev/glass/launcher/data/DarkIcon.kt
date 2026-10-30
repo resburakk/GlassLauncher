@@ -252,7 +252,7 @@ object DarkIcon {
         val invertDark = darkCount > 0.02f * fgCount && darkCount < 0.10f * total
         // Açık (beyaz/gri) zeminli düz simgede logonun çevresindeki renksiz açık halka (tema gölgesi/parlaması,
         // kenar yumuşatması) zemine katılır: koyu zeminde logonun etrafında beyaz çizgi bırakıyordu.
-        val w0 = if (bgPx == null && bg.lum > 0.70f && bg.sat < 0.20f) stripHalo(fg, w, n) else w
+        val w0 = w
         // Düz simgelerde kenar şeridi için kesin ayrıştırma (zemin ve logo rengi bilinerek); ardından kalan kenar temizliği.
         val matted = if (bgPx == null) matteEdges(fg, w0, n) else null
         val wEff = matted?.first ?: w0
@@ -309,7 +309,8 @@ object DarkIcon {
         if (cnt < total * 0.05f) return null
         sr /= cnt; sg /= cnt; sb /= cnt
         // Zemine uzaklık (BFS, 4 komşu).
-        val band = maxOf(3, n / 36)
+        // Dar şerit: kenar yumuşatması ve tema gölgesi 1–3 piksel. Daha genişi açık renkli logo parçalarını yiyordu.
+        val band = maxOf(2, n / 64)
         val dist = IntArray(total) { Int.MAX_VALUE }
         val q = IntArray(total); var h = 0; var t = 0
         for (p in 0 until total) if (w[p] < 0.06f) { dist[p] = 0; q[t++] = p }
@@ -343,12 +344,40 @@ object DarkIcon {
             }
         }
         val wOut = w.copyOf(); val cOut = fg.copyOf()
+        val rad = band + 2
         for (p in 0 until total) {
             val d = dist[p]
             if (d == 0 || d > band) continue
-            val src = core[p]
-            if (src < 0) continue // ince çizgi: çekirdeği yok, normal temizlik
-            val c = fg[p]; val f = fg[src]
+            if (core[p] < 0) continue // ince çizgi: çekirdeği yok, normal temizlik
+            val c = fg[p]
+            val px0 = p % n; val py0 = p / n
+            // Yakındaki çekirdek (tam logo) renkleri: piksel bunlardan biriyle AYNI renkteyse logonun parçasıdır
+            // (açık renkli kâğıt, şeftali yarım kalp vb.) ve dokunulmaz. Değilse zemin–logo karışımıdır: en iyi
+            // uyan logo rengiyle ayrıştırılır.
+            var same = false
+            var bestF = -1; var bestRes = Float.MAX_VALUE
+            val cr = ((c shr 16) and 0xff).toFloat(); val cg = ((c shr 8) and 0xff).toFloat(); val cb = (c and 0xff).toFloat()
+            for (yy in maxOf(0, py0 - rad)..minOf(n - 1, py0 + rad)) {
+                for (xx in maxOf(0, px0 - rad)..minOf(n - 1, px0 + rad)) {
+                    val qq = yy * n + xx
+                    if (core[qq] != qq) continue
+                    val f = fg[qq]
+                    val ffr = ((f shr 16) and 0xff).toFloat(); val ffg = ((f shr 8) and 0xff).toFloat(); val ffb = (f and 0xff).toFloat()
+                    val dd = (cr - ffr) * (cr - ffr) + (cg - ffg) * (cg - ffg) + (cb - ffb) * (cb - ffb)
+                    if (dd < 26f * 26f) { same = true; break }
+                    // Zemin–logo doğrusuna uzaklık (karışım olma olasılığı).
+                    val vr = ffr - sr; val vg = ffg - sg; val vb = ffb - sb
+                    val l2 = vr * vr + vg * vg + vb * vb
+                    if (l2 < 400f) continue
+                    val a = (((cr - sr) * vr + (cg - sg) * vg + (cb - sb) * vb) / l2).coerceIn(0f, 1f)
+                    val er = cr - (sr + a * vr); val eg = cg - (sg + a * vg); val eb = cb - (sb + a * vb)
+                    val res = er * er + eg * eg + eb * eb
+                    if (res < bestRes) { bestRes = res; bestF = qq }
+                }
+                if (same) break
+            }
+            if (same || bestF < 0 || bestRes > 34f * 34f) continue
+            val f = fg[bestF]
             val fr = ((f shr 16) and 0xff) - sr; val fgr = ((f shr 8) and 0xff) - sg; val fb = (f and 0xff) - sb
             val len2 = fr * fr + fgr * fgr + fb * fb
             if (len2 < 400f) continue // logo zemine çok yakın renkte: ayrıştırılamaz
