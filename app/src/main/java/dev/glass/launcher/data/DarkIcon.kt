@@ -250,6 +250,7 @@ object DarkIcon {
         // Koyu sembolleri açığa çevirmek yalnızca ince yazı/çizgilerde (Arrows'taki oklar). Büyük koyu dolgu
         // (Trendyol'un siyah şeridi) çevrilmez; beyaza dönüp tasarımı bozuyordu.
         val invertDark = darkCount > 0.02f * fgCount && darkCount < 0.10f * total
+        val src = decontaminate(fg, w, n)
         val out = IntArray(total)
         for (y in 0 until n) {
             val t = y / (n - 1f)
@@ -259,7 +260,7 @@ object DarkIcon {
                 val a = w[p].coerceIn(0f, 1f)
                 var r = br; var g = bgG; var b = bb
                 if (a > 0.002f) {
-                    val c = fg[p]
+                    val c = src[p]
                     var fr = ((c shr 16) and 0xff).toFloat()
                     var fgc = ((c shr 8) and 0xff).toFloat()
                     var fb = (c and 0xff).toFloat()
@@ -284,6 +285,37 @@ object DarkIcon {
             }
         }
         return createBitmap(n, n).also { it.setPixels(out, 0, n, 0, 0, n, n) }
+    }
+
+    /**
+     * Kenar temizliği (TÜM simgeler için aynı): şeklin kenarındaki yarı saydam pikseller, orijinal simgede şeklin rengi
+     * ile (çoğu zaman beyaz) zeminin karışımıdır. Zemin koyuya dönünce bu karışık renk şeklin etrafında açık bir halka
+     * bırakıyordu. Kenar pikselinin rengi en yakın TAM şekil pikselinden alınır; saydamlığı (yumuşak kenar) korunur.
+     */
+    private fun decontaminate(fg: IntArray, w: FloatArray, n: Int): IntArray {
+        val out = fg.copyOf()
+        val solid = 0.92f
+        val maxR = maxOf(2, n / 48)
+        for (y in 0 until n) for (x in 0 until n) {
+            val p = y * n + x
+            val a = w[p]
+            if (a <= 0.002f || a >= solid) continue
+            var best = -1; var bestD = Int.MAX_VALUE
+            for (r in 1..maxR) {
+                val y0 = maxOf(0, y - r); val y1 = minOf(n - 1, y + r)
+                val x0 = maxOf(0, x - r); val x1 = minOf(n - 1, x + r)
+                for (yy in y0..y1) for (xx in x0..x1) {
+                    if (maxOf(abs(xx - x), abs(yy - y)) != r) continue // yalnızca bu halka
+                    val q = yy * n + xx
+                    if (w[q] < solid) continue
+                    val d = (xx - x) * (xx - x) + (yy - y) * (yy - y)
+                    if (d < bestD) { bestD = d; best = q }
+                }
+                if (best >= 0) break
+            }
+            if (best >= 0) out[p] = (fg[p] and 0xff000000.toInt()) or (fg[best] and 0x00ffffff)
+        }
+        return out
     }
 
     private fun analyze(samples: IntArray): Bg {
