@@ -250,14 +250,17 @@ object DarkIcon {
         // Koyu sembolleri açığa çevirmek yalnızca ince yazı/çizgilerde (Arrows'taki oklar). Büyük koyu dolgu
         // (Trendyol'un siyah şeridi) çevrilmez; beyaza dönüp tasarımı bozuyordu.
         val invertDark = darkCount > 0.02f * fgCount && darkCount < 0.10f * total
-        val src = decontaminate(fg, w, n)
+        // Açık (beyaz/gri) zeminli düz simgede logonun çevresindeki renksiz açık halka (tema gölgesi/parlaması,
+        // kenar yumuşatması) zemine katılır: koyu zeminde logonun etrafında beyaz çizgi bırakıyordu.
+        val wEff = if (bgPx == null && bg.lum > 0.70f && bg.sat < 0.20f) stripHalo(fg, w, n) else w
+        val src = decontaminate(fg, wEff, n)
         val out = IntArray(total)
         for (y in 0 until n) {
             val t = y / (n - 1f)
             val br = lerp(44f, 10f, t); val bgG = lerp(44f, 10f, t); val bb = lerp(46f, 12f, t)
             for (x in 0 until n) {
                 val p = y * n + x
-                val a = w[p].coerceIn(0f, 1f)
+                val a = wEff[p].coerceIn(0f, 1f)
                 var r = br; var g = bgG; var b = bb
                 if (a > 0.002f) {
                     val c = src[p]
@@ -285,6 +288,42 @@ object DarkIcon {
             }
         }
         return createBitmap(n, n).also { it.setPixels(out, 0, n, 0, 0, n, n) }
+    }
+
+    /**
+     * Zemine bitişik, renksiz ve açık piksellerden oluşan ince halkayı (en çok n/40 piksel derinlik; yalnızca çok açık gri/beyaz) zemine katar.
+     * Zemine bağlı olmayan beyazlar (logonun içindeki beyaz halka, yazı) korunur.
+     */
+    private fun stripHalo(fg: IntArray, w: FloatArray, n: Int): FloatArray {
+        val out = w.copyOf()
+        val depth = IntArray(n * n) { -1 }
+        val queue = IntArray(n * n)
+        var head = 0; var tail = 0
+        for (p in 0 until n * n) if (w[p] < 0.06f) { depth[p] = 0; queue[tail++] = p }
+        val maxD = maxOf(2, n / 40)
+        val hsv = FloatArray(3)
+        fun haloLike(c: Int): Boolean {
+            if ((c ushr 24) < 30) return true
+            toHsv(c, hsv)
+            return hsv[1] < 0.20f && hsv[2] > 0.80f
+        }
+        while (head < tail) {
+            val p = queue[head++]
+            val d = depth[p]
+            if (d >= maxD) continue
+            val x = p % n; val y = p / n
+            for (k in 0 until 4) {
+                val xx = x + intArrayOf(1, -1, 0, 0)[k]; val yy = y + intArrayOf(0, 0, 1, -1)[k]
+                if (xx < 0 || yy < 0 || xx >= n || yy >= n) continue
+                val q = yy * n + xx
+                if (depth[q] >= 0) continue
+                if (!haloLike(fg[q])) continue
+                depth[q] = d + 1
+                out[q] = 0f
+                queue[tail++] = q
+            }
+        }
+        return out
     }
 
     /**
