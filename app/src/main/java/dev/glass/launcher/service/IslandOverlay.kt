@@ -24,7 +24,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /** Kamera deliğinin konumu (piksel). Delik yoksa ekranın üst ortası. */
-data class IslandGeo(val cx: Int, val cy: Int, val cutW: Int, val cutH: Int, val screenW: Int)
+data class IslandGeo(val cx: Int, val cy: Int, val cutW: Int, val cutH: Int, val screenW: Int, val statusH: Int)
 
 /**
  * Dinamik Ada penceresi: "diğer uygulamaların üzerinde göster" izniyle bütün uygulamaların üstünde, kamera deliğinin
@@ -56,11 +56,11 @@ object IslandOverlay {
         val m = w.currentWindowMetrics
         val bounds = m.bounds
         val dm = ctx.resources.displayMetrics
-        val cut = m.windowInsets.displayCutout?.boundingRectTop?.takeIf { !it.isEmpty && it.top < bounds.height() / 4 }
-        if (cut != null) return IslandGeo(cut.centerX(), cut.centerY(), cut.width(), cut.height(), bounds.width())
-        // Delik yok: durum çubuğunun ortası.
         val sb = m.windowInsets.getInsets(android.view.WindowInsets.Type.statusBars()).top.takeIf { it > 0 } ?: (24 * dm.density).toInt()
-        return IslandGeo(bounds.width() / 2, sb / 2, 0, (sb * 0.6f).toInt(), bounds.width())
+        val cut = m.windowInsets.displayCutout?.boundingRectTop?.takeIf { !it.isEmpty && it.top < bounds.height() / 4 }
+        if (cut != null) return IslandGeo(cut.centerX(), cut.centerY(), cut.width(), cut.height(), bounds.width(), sb)
+        // Delik yok: durum çubuğunun ortası.
+        return IslandGeo(bounds.width() / 2, sb / 2, 0, (sb * 0.6f).toInt(), bounds.width(), sb)
     }
 
     @SuppressLint("ClickableViewAccessibility")

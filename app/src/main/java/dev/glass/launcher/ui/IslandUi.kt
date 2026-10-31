@@ -196,18 +196,21 @@ fun IslandRoot() {
     val baseH = max(34f, cutHdp.value + 12f) * s.heightScale
     val idleW = max(baseH * 3.2f, with(density) { geo.cutW.toDp() }.value + 70f) * s.widthScale
     val compactW = (idleW + 104f * s.widthScale).coerceAtMost(screenWdp.value - 100f)
-    val wideW = (idleW + 140f * s.widthScale).coerceAtMost(screenWdp.value - 60f)
     val bigW = (screenWdp.value - 22f).coerceAtMost(420f)
+    // Durum çubuğu (saat, pil) adanın üstünde çizilir: genişlemiş adanın içeriği durum çubuğunun altından başlar,
+    // simgeler adanın siyah üst şeridinde kalır.
+    val islandTopPx = (geo.cy - (baseH * density.density) / 2f + s.offsetY * density.density).coerceAtLeast(2f * density.density)
+    val topInset = ((geo.statusH - islandTopPx) / density.density).coerceIn(0f, 40f)
     val (tw, th) = when (mode) {
         IslandMode.Hidden -> 0f to 0f
         IslandMode.Idle -> idleW to baseH
-        is IslandMode.Compact -> (if (mode.a is IslandAct.Charging || mode.a is IslandAct.Ringer) wideW else compactW) to baseH
-        is IslandMode.Expanded -> bigW to when (mode.a) {
-            is IslandAct.Music -> 176f
-            is IslandAct.Call -> if (mode.a.incoming || mode.a.hangup != null) 132f else 96f
-            is IslandAct.Message -> 86f
-            is IslandAct.Timer -> 110f
-            else -> 104f
+        is IslandMode.Compact -> compactW to baseH
+        is IslandMode.Expanded -> bigW to topInset + when (mode.a) {
+            is IslandAct.Music -> 168f
+            is IslandAct.Call -> if (mode.a.incoming || mode.a.hangup != null) 128f else 88f
+            is IslandAct.Message -> 92f
+            is IslandAct.Timer -> 96f
+            else -> 96f
         }
     }
     val bubble = second != null && mode is IslandMode.Compact && transient == null
@@ -225,7 +228,7 @@ fun IslandRoot() {
         winW = wDp; winH = hDp
         if (wDp <= 0f || hDp <= 0f) { IslandOverlay.place(0, 0, 0, 0); return }
         val x = geo.cx - px(wDp) / 2
-        val y = geo.cy - px(baseH) / 2 + px(s.offsetY)
+        val y = (geo.cy - px(baseH) / 2 + px(s.offsetY)).coerceAtLeast(px(2f))
         IslandOverlay.place(x, y, px(wDp), px(hDp))
     }
     LaunchedEffect(tw, th, extra, geo, s.offsetY, baseH) {
@@ -295,7 +298,7 @@ fun IslandRoot() {
                 Box(Modifier.requiredSize(tw.dp, th.dp), contentAlignment = Alignment.Center) {
                     when (m) {
                         is IslandMode.Compact -> CompactContent(m.a, baseH.dp)
-                        is IslandMode.Expanded -> ExpandedContent(m.a, s.notifText)
+                        is IslandMode.Expanded -> Box(Modifier.fillMaxSize().padding(top = topInset.dp)) { ExpandedContent(m.a, s.notifText) }
                         else -> Unit
                     }
                 }
@@ -437,7 +440,7 @@ private fun Waveform(color: Color, playing: Boolean, size: Dp) {
 private fun ExpandedContent(a: IslandAct, showText: Boolean) {
     val ctx = LocalContext.current
     val now = rememberSecondTick(a is IslandAct.Call || a is IslandAct.Timer)
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 14.dp), verticalArrangement = Arrangement.Center) {
+    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 14.dp), verticalArrangement = Arrangement.Center) {
         when (a) {
             is IslandAct.Music -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
