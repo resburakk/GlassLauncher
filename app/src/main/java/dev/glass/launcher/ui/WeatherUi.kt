@@ -408,10 +408,21 @@ fun WeatherBackdrop(dark: Boolean, modifier: Modifier = Modifier) {
         onDrawBehind {
             drawRect(bg)
             // Güneş parıltısı (gündüz) ve gün batımı ışığı (alacakaranlık).
-            if (phase == SkyPhase.Day && (sky == Sky.Clear || sky == Sky.PartlyCloudy)) {
-                val sc = Offset(w * 0.86f, h * 0.12f)
-                drawCircle(Brush.radialGradient(listOf(Color(0x80FFF4C8), Color(0x00FFF4C8)), sc, m * 0.75f), m * 0.75f, sc)
-                drawCircle(Color(0xF2FFE9A0), m * 0.11f, sc)
+            // Güneş belirgin bir daire değil, ışık olarak: bulutların ardından sızan sıcak parıltı (önce), bulutun ışığa
+            // bakan kenarının parlaması ve hafif mercek parlaması (bulutlardan sonra, aşağıda).
+            val sunny = phase == SkyPhase.Day && (sky == Sky.Clear || sky == Sky.PartlyCloudy)
+            val sc = Offset(w * 0.80f, h * 0.10f)
+            fun glow(o: Offset, s: Float, col: Color, a: Float) {
+                // Gauss benzeri düşüş: kenarı olmayan yumuşak ışık.
+                val r = s * 2f
+                drawCircle(Brush.radialGradient(
+                    0f to col.copy(alpha = a), 0.25f to col.copy(alpha = a * 0.78f), 0.5f to col.copy(alpha = a * 0.37f),
+                    0.75f to col.copy(alpha = a * 0.10f), 1f to col.copy(alpha = 0f), center = o, radius = r,
+                ), r, o)
+            }
+            if (sunny) {
+                glow(sc, m * 0.5f, Color(0xFFFFE199), 0.5f)
+                glow(sc, m * 0.2f, Color(0xFFFFF5D1), 0.55f)
             }
             if (phase == SkyPhase.Dusk) {
                 val gc = Offset(w * 0.7f, h * 1.08f)
@@ -434,6 +445,14 @@ fun WeatherBackdrop(dark: Boolean, modifier: Modifier = Modifier) {
             val stormBolt = sky == Sky.Storm
             puffs.forEach { (o, r, a) ->
                 drawCircle(Brush.radialGradient(listOf(cloudCol.copy(alpha = a), cloudCol.copy(alpha = a * 0.55f), cloudCol.copy(alpha = 0f)), o, r), r, o)
+            }
+            if (sunny) {
+                glow(sc, m * 0.13f, Color(0xFFFFF7DB), 0.45f)
+                // Hafif mercek parlaması: ışıktan sol alta doğru birkaç soluk halka.
+                listOf(Triple(0.35f, 0.035f, 0.18f), Triple(0.55f, 0.02f, 0.14f), Triple(0.75f, 0.05f, 0.10f)).forEach { (k, rr, a) ->
+                    val o = Offset(sc.x + (w * 0.2f - sc.x) * k, sc.y + (h * 0.9f - sc.y) * k)
+                    glow(o, m * rr, Color(0xFFFFF2D9), a)
+                }
             }
             if (sky == Sky.Fog) {
                 // Sis: geniş, yumuşak ve yatay uzamış pus kütleleri (çizgi gibi görünmez).
