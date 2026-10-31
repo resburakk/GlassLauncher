@@ -198,7 +198,7 @@ fun LibraryPage(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 17.sp, fontFamily = AppFont, shadow = IosTextShadow),
+                        textStyle = TextStyle(color = ink(Color.White), fontSize = 17.sp, fontFamily = AppFont, shadow = IosTextShadow),
                         cursorBrush = SolidColor(Color.White),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
@@ -210,7 +210,7 @@ fun LibraryPage(
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
                                 if (query.isEmpty()) Text(
-                                    "Uygulama Arşivi", color = Color(0x99FFFFFF), fontSize = 17.sp, fontFamily = AppFont,
+                                    "Uygulama Arşivi", color = ink(Color(0x99FFFFFF)), fontSize = 17.sp, fontFamily = AppFont,
                                     style = TextStyle(shadow = IosTextShadow), maxLines = 1, softWrap = false,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -219,13 +219,13 @@ fun LibraryPage(
                         },
                     )
                 } else {
-                    Text("Uygulama Arşivi", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow), maxLines = 1, softWrap = false)
+                    Text("Uygulama Arşivi", color = ink(Color(0xB3FFFFFF)), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow), maxLines = 1, softWrap = false)
                 }
             }
             if (searching) {
                 Spacer(Modifier.width(12.dp))
                 Text(
-                    "İptal", color = Color.White, fontSize = 16.sp,
+                    "İptal", color = ink(Color.White), fontSize = 16.sp,
                     modifier = Modifier.clickable { endSearch() }.padding(vertical = 8.dp),
                 )
             }
@@ -322,7 +322,7 @@ private fun CategoryTile(
         }
         Text(
             // iOS 26: kategori adı küçük (≈12 pt) ve orta kalınlıkta.
-            g.title, color = Color.White, fontSize = (u.value * 12f).sp, fontWeight = FontWeight.Medium,
+            g.title, color = ink(Color.White), fontSize = (u.value * 12f).sp, fontWeight = FontWeight.Medium,
             fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
             maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = u * 5f).width(tile),
@@ -413,7 +413,7 @@ private fun LibrarySearchList(
     val rowH = u * 66f
     val textGap = u * 15.6f
     val showIndex = query.isBlank() && starts.size > 1
-    val sepColor = Color(0x2EFFFFFF)
+    val sepColor = ink(Color(0x2EFFFFFF))
 
     Box(
         Modifier
@@ -433,7 +433,7 @@ private fun LibrarySearchList(
                     // Sade harf başlığı (iOS gibi): ayrı bir bant/çubuk yok.
                     item(key = "h:$letter") {
                         Text(
-                            letter, color = Color(0x99FFFFFF), fontSize = (u.value * 13f).sp, fontWeight = FontWeight.SemiBold,
+                            letter, color = ink(Color(0x99FFFFFF)), fontSize = (u.value * 13f).sp, fontWeight = FontWeight.SemiBold,
                             fontFamily = AppFont,
                             modifier = Modifier.fillMaxWidth().padding(start = u * 4f, top = u * 12f, bottom = u * 2f),
                         )
@@ -459,7 +459,7 @@ private fun LibrarySearchList(
                         AppIconImage(app, vm, icon, settings.iconGlass, settings.glassStrength)
                         Spacer(Modifier.width(textGap))
                         Text(
-                            app.label, color = Color.White, fontSize = (u.value * 17f).sp, fontFamily = AppFont,
+                            app.label, color = ink(Color.White), fontSize = (u.value * 17f).sp, fontFamily = AppFont,
                             style = TextStyle(shadow = IosTextShadow), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
@@ -468,7 +468,7 @@ private fun LibrarySearchList(
             if (results.isEmpty()) {
                 item {
                     Text(
-                        "Sonuç bulunamadı", color = Color(0xCCFFFFFF), fontSize = (u.value * 17f).sp,
+                        "Sonuç bulunamadı", color = ink(Color(0xCCFFFFFF)), fontSize = (u.value * 17f).sp,
                         modifier = Modifier.padding(vertical = 16.dp),
                     )
                 }
@@ -540,7 +540,7 @@ private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    IndexLetters[shown.coerceIn(0, n - 1)], color = Color.White, fontSize = (u.value * 26f).sp,
+                    IndexLetters[shown.coerceIn(0, n - 1)], color = ink(Color.White), fontSize = (u.value * 26f).sp,
                     fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1,
                 )
             }
@@ -581,7 +581,7 @@ private fun AlphabetIndex(modifier: Modifier, onPick: (Char) -> Unit) {
         ) {
             IndexLetters.forEachIndexed { li, l ->
                 Box(Modifier.height(cell), contentAlignment = Alignment.Center) {
-                    Text(l, color = if (li == active) Color.White else Color(0xE6FFFFFF), fontSize = font, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
+                    Text(l, color = if (li == active) ink(Color.White) else ink(Color(0xE6FFFFFF)), fontSize = font, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
                 }
             }
         }
@@ -624,7 +624,7 @@ fun LibraryGroupOverlay(
         ) {
             item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
                 Text(
-                    group.title, color = Color.White, fontSize = (u.value * 34f).sp, fontWeight = FontWeight.Bold,
+                    group.title, color = ink(Color.White), fontSize = (u.value * 34f).sp, fontWeight = FontWeight.Bold,
                     fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier

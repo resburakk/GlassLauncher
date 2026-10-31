@@ -930,7 +930,8 @@ fun HomeScreen(
         Box(Modifier.fillMaxSize().drawBehind {
             // Aramaya çekerken arka plan da parmakla birlikte hafifçe kararır.
             val sc = maxOf(scrim, 0.10f * pull.value.coerceIn(0f, 1f))
-            if (sc > 0.001f) drawRect(Color.Black.copy(alpha = sc))
+            // Açık duvar kâğıdında (koyu yazılar) arka plan karartılmaz, hafifçe açılır (iOS açık görünüm).
+            if (sc > 0.001f) drawRect(if (HomeInk.light) Color.White.copy(alpha = sc * 0.9f) else Color.Black.copy(alpha = sc))
         })
 
         CompositionLocalProvider(LocalGlassRegions provides glassRegions) {

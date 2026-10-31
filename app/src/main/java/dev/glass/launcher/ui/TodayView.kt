@@ -262,12 +262,12 @@ fun TodayPage(
             if (widgets.isEmpty()) Column(Modifier.width(contentW).padding(top = u * 6f, bottom = u * 18f)) {
                 Text(
                     today.format(DateTimeFormatter.ofPattern("EEEE", tr)).replaceFirstChar { it.titlecase(tr) },
-                    color = Color(0xD9FFFFFF), fontSize = (u.value * 17f).sp, fontWeight = FontWeight.SemiBold,
+                    color = ink(Color(0xD9FFFFFF)), fontSize = (u.value * 17f).sp, fontWeight = FontWeight.SemiBold,
                     fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
                 )
                 Text(
                     today.format(DateTimeFormatter.ofPattern("d MMMM", tr)),
-                    color = Color.White, fontSize = (u.value * 34f).sp, fontWeight = FontWeight.Bold,
+                    color = ink(Color.White), fontSize = (u.value * 34f).sp, fontWeight = FontWeight.Bold,
                     fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
                 )
             }
@@ -282,13 +282,13 @@ fun TodayPage(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Text(
-                        "Henüz widget yok", color = Color.White, fontSize = (u.value * 17f).sp,
+                        "Henüz widget yok", color = ink(Color.White), fontSize = (u.value * 17f).sp,
                         fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
                     )
                     Spacer(Modifier.height(u * 6f))
                     Text(
                         "Saat, takvim, hava durumu gibi widget'ları buraya ekleyebilirsin.",
-                        color = Color(0xCCFFFFFF), fontSize = (u.value * 14f).sp, fontFamily = AppFont,
+                        color = ink(Color(0xCCFFFFFF)), fontSize = (u.value * 14f).sp, fontFamily = AppFont,
                     )
                     Spacer(Modifier.height(u * 14f))
                     TodayButton("Widget Ekle", settings) { onAddWidget() }
@@ -399,7 +399,7 @@ fun TodayPage(
         ) {
             SearchGlyph(Color(0xCCFFFFFF), u * 17f)
             Spacer(Modifier.width(8.dp))
-            Text("Ara", color = Color(0xB3FFFFFF), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
+            Text("Ara", color = ink(Color(0xB3FFFFFF)), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
         }
         }
     }
@@ -418,7 +418,7 @@ private fun TodayButton(text: String, settings: LauncherSettings, onClick: () ->
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text, color = Color.White, fontSize = (u.value * 15f).sp, fontWeight = FontWeight.SemiBold,
+            text, color = ink(Color.White), fontSize = (u.value * 15f).sp, fontWeight = FontWeight.SemiBold,
             fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow),
         )
     }

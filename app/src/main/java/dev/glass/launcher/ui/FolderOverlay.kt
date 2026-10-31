@@ -252,7 +252,7 @@ fun FolderOverlay(
             onValueChange = { name = it.take(30) },
             singleLine = true,
             // Açık klasörün adı, klasörün dışındaki etiketle aynı stilde.
-            textStyle = CellLabelStyle.copy(fontSize = (settings.openFolderTitleSize * u.value).sp),
+            textStyle = CellLabelStyle.copy(fontSize = (settings.openFolderTitleSize * u.value).sp).onWallpaper(),
             cursorBrush = SolidColor(Color.White),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
@@ -373,7 +373,7 @@ fun FolderOverlay(
                     repeat(pages.size) { i ->
                         Box(
                             Modifier.padding(3.dp).size(7.dp).clip(CircleShape)
-                                .background(if (i == pagerState.currentPage) Color.White else Color(0x66FFFFFF))
+                                .background(if (i == pagerState.currentPage) ink(Color.White) else ink(Color(0x66FFFFFF)))
                         )
                     }
                 }

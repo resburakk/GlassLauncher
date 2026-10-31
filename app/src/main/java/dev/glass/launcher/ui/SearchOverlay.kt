@@ -91,7 +91,8 @@ import dev.glass.launcher.data.SearchRanker
 import kotlinx.coroutines.delay
 
 /** Arama çubuğundaki yazının hafif gölgesi (okunurluk için, abartısız). */
-private val SearchTextShadow = androidx.compose.ui.graphics.Shadow(Color(0x55000000), androidx.compose.ui.geometry.Offset(0f, 1f), 3f)
+private val SearchTextShadow: androidx.compose.ui.graphics.Shadow
+    get() = if (HomeInk.light) androidx.compose.ui.graphics.Shadow.None else androidx.compose.ui.graphics.Shadow(Color(0x55000000), androidx.compose.ui.geometry.Offset(0f, 1f), 3f)
 
 /**
  * iOS tarzı arama: cam arama kutusu (temizle / mikrofon), adlı 4'lü öneri paneli (dock ölçüsünde, dört
@@ -213,14 +214,14 @@ fun SearchOverlay(
             // Başlık + sağda iOS'taki "Show More" gibi 4 ↔ 8 öneri geçişi (aşağı/yukarı çekmeyle aynı ayar).
             Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Öneriler", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    "Öneriler", color = ink(Color(0xCCFFFFFF)), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp).weight(1f),
                 )
                 if (suggestions.size > 4) {
                     val more = st.searchSuggestExpanded
                     Text(
                         if (more) "Daha Az" else "Daha Fazla",
-                        color = Color(0xE6FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                        color = ink(Color(0xE6FFFFFF)), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { vm.updateSettings { it.copy(searchSuggestExpanded = !more) } }
@@ -238,11 +239,11 @@ fun SearchOverlay(
                     Column(Modifier.fillMaxWidth().graphicsLayer { alpha = visibility().coerceIn(0f, 1f) }) {
                         Row(Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(
-                                "Son Aramalar", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                "Son Aramalar", color = ink(Color(0xCCFFFFFF)), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                                 fontFamily = AppFont, modifier = Modifier.padding(start = 6.dp).weight(1f),
                             )
                             Text(
-                                "Temizle", color = Color(0xE6FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                                "Temizle", color = ink(Color(0xE6FFFFFF)), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
                                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { clearRecent() }.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
@@ -255,7 +256,7 @@ fun SearchOverlay(
                             ) {
                                 SearchGlyph(Color(0xE6FFFFFF), 18.dp)
                                 Spacer(Modifier.width(12.dp))
-                                Text(r, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                                Text(r, color = ink(Color.White), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = SearchTextShadow))
                             }
                         }
@@ -311,7 +312,7 @@ fun SearchOverlay(
                     onValueChange = { query = it },
                     singleLine = true,
                     // Yazı biraz daha belirgin: hafif gölge (açık arka planda kaybolmasın).
-                    textStyle = TextStyle(color = Color.White, fontSize = fieldSize, fontFamily = AppFont, shadow = SearchTextShadow),
+                    textStyle = TextStyle(color = ink(Color.White), fontSize = fieldSize, fontFamily = AppFont, shadow = SearchTextShadow),
                     cursorBrush = SolidColor(Color.White),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
@@ -320,7 +321,7 @@ fun SearchOverlay(
                     modifier = Modifier.weight(1f).focusRequester(focus),
                     decorationBox = { inner ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (query.isEmpty()) Text("Ara", color = Color(0xD9FFFFFF), fontSize = fieldSize, fontFamily = AppFont,
+                            if (query.isEmpty()) Text("Ara", color = ink(Color(0xD9FFFFFF)), fontSize = fieldSize, fontFamily = AppFont,
                                 style = TextStyle(shadow = SearchTextShadow))
                             inner()
                         }
@@ -347,7 +348,7 @@ fun SearchOverlay(
                             runCatching { mic.launch(i) }
                         },
                         contentAlignment = Alignment.Center,
-                    ) { GlyphIcon(Glyph.Mic, Color(0xCCFFFFFF), 20.dp) }
+                    ) { GlyphIcon(Glyph.Mic, ink(Color(0xCCFFFFFF)), 20.dp) }
                 }
             }
             }
@@ -480,9 +481,9 @@ private fun ResultsList(
                         .clickable { clip.setText(AnnotatedString(v.result.substringBefore(' ').ifEmpty { v.result })); copied = true }
                         .padding(horizontal = 18.dp, vertical = 10.dp),
                 ) {
-                    Text(v.expression + " =", color = Color(0xB3FFFFFF), fontSize = rowSize, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(v.result, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(if (copied) "Kopyalandı" else "Kopyalamak için dokunun", color = Color(0x99FFFFFF), fontSize = 12.sp, fontFamily = AppFont)
+                    Text(v.expression + " =", color = ink(Color(0xB3FFFFFF)), fontSize = rowSize, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(v.result, color = ink(Color.White), fontSize = 34.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(if (copied) "Kopyalandı" else "Kopyalamak için dokunun", color = ink(Color(0x99FFFFFF)), fontSize = 12.sp, fontFamily = AppFont)
                 }
             }
         }
@@ -503,7 +504,7 @@ private fun ResultsList(
                 ) {
                     AppIconImage(top, vm, 48.dp, iconGlass, strength)
                     Spacer(Modifier.width(14.dp))
-                    Text(highlight(top.label, query), color = Color.White, fontSize = topSize, fontWeight = rowWeight, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(highlight(top.label, query), color = ink(Color.White), fontSize = topSize, fontWeight = rowWeight, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -518,7 +519,7 @@ private fun ResultsList(
                     ) {
                         AppIconImage(app, vm, 34.dp, iconGlass, strength)
                         Spacer(Modifier.width(12.dp))
-                        Text(highlight(app.label, query), color = Color.White, fontSize = rowSize, fontWeight = rowWeight, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(highlight(app.label, query), color = ink(Color.White), fontSize = rowSize, fontWeight = rowWeight, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }
@@ -536,11 +537,11 @@ private fun ResultsList(
                         .background(Color(0x1FFFFFFF))
                         .padding(14.dp)
                 ) {
-                    Text("Kişiler, mesajlar ve dosyalar da aransın mı?", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
+                    Text("Kişiler, mesajlar ve dosyalar da aransın mı?", color = ink(Color.White), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "İzin verirsen bunlar yalnızca telefonunda, çevrimdışı aranır; hiçbir şey dışarı gönderilmez.",
-                        color = Color(0xCCFFFFFF), fontSize = 13.sp, fontFamily = AppFont,
+                        color = ink(Color(0xCCFFFFFF)), fontSize = 13.sp, fontFamily = AppFont,
                     )
                     Spacer(Modifier.height(10.dp))
                     Row {
@@ -550,7 +551,7 @@ private fun ResultsList(
                         )
                         Spacer(Modifier.width(22.dp))
                         Text(
-                            "Şimdi değil", color = Color(0xCCFFFFFF), fontSize = 15.sp, fontFamily = AppFont,
+                            "Şimdi değil", color = ink(Color(0xCCFFFFFF)), fontSize = 15.sp, fontFamily = AppFont,
                             modifier = Modifier.clickable(onClick = onDismissCard).padding(vertical = 4.dp, horizontal = 2.dp),
                         )
                     }
@@ -577,12 +578,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.deviceSection(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x33FFFFFF)), contentAlignment = Alignment.Center) {
-                GlyphIcon(glyph, Color.White, 20.dp)
+                GlyphIcon(glyph, ink(Color.White), 20.dp)
             }
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(highlight(hit.title, query), color = Color.White, fontSize = LocalLauncherSettings.current.searchResultTextSize.sp, fontWeight = fontWeightOf(LocalLauncherSettings.current.searchResultWeight), fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(highlight(hit.subtitle, query), color = Color(0xB3FFFFFF), fontSize = 13.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(highlight(hit.title, query), color = ink(Color.White), fontSize = LocalLauncherSettings.current.searchResultTextSize.sp, fontWeight = fontWeightOf(LocalLauncherSettings.current.searchResultWeight), fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(highlight(hit.subtitle, query), color = ink(Color(0xB3FFFFFF)), fontSize = 13.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         }
@@ -592,7 +593,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.deviceSection(
 @Composable
 private fun SectionHeader(title: String) {
     Text(
-        title, color = Color(0xB3FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+        title, color = ink(Color(0xB3FFFFFF)), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
         modifier = Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp),
     )
 }
@@ -608,9 +609,9 @@ private fun ActionRow(glyph: Glyph, title: String, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) { GlyphIcon(glyph, Color.White, 22.dp) }
+        Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) { GlyphIcon(glyph, ink(Color.White), 22.dp) }
         Spacer(Modifier.width(12.dp))
-        Text(title, color = Color.White, fontSize = LocalLauncherSettings.current.searchResultTextSize.sp, fontWeight = fontWeightOf(LocalLauncherSettings.current.searchResultWeight), fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(title, color = ink(Color.White), fontSize = LocalLauncherSettings.current.searchResultTextSize.sp, fontWeight = fontWeightOf(LocalLauncherSettings.current.searchResultWeight), fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -623,7 +624,7 @@ private fun highlight(text: String, query: String): AnnotatedString {
     if (i < 0) return AnnotatedString(text)
     return buildAnnotatedString {
         append(text.substring(0, i))
-        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = Color.White)) { append(text.substring(i, i + q.length)) }
+        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = ink(Color.White))) { append(text.substring(i, i + q.length)) }
         append(text.substring(i + q.length))
     }
 }

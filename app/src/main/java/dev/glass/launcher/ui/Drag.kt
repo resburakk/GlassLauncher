@@ -433,7 +433,7 @@ internal fun DraggableCell(
                 Text(
                     label,
                     style = CellLabelStyle.copy(fontSize = (st.labelSize * pt.value).sp, fontWeight = fontWeightOf(st.labelWeight))
-                        .let { if (place == CellPlace.Grid) it.onWallpaper() else it },
+                        .let { if (place != CellPlace.Dock) it.onWallpaper() else it },
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,

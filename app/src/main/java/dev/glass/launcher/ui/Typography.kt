@@ -38,7 +38,7 @@ val AppFont: FontFamily = FontFamily(
  * (keskin bir kenar oluşturmaz; açık duvar kâğıtlarında okunurluğu korur).
  */
 val IosTextShadow: Shadow
-    get() = if (!TextShadowConfig.enabled) Shadow.None else Shadow(
+    get() = if (!TextShadowConfig.enabled || HomeInk.light) Shadow.None else Shadow(
         color = Color.Black.copy(alpha = TextShadowConfig.strength),
         offset = Offset(0f, 2f * TextShadowConfig.spread.coerceAtMost(1.5f)),
         blurRadius = 12f * TextShadowConfig.spread,
@@ -53,6 +53,13 @@ object HomeInk {
     val label = Color(0xF0242426)
     val soft = Color(0xB3242426)
 }
+
+/**
+ * Duvar kâğıdı üstündeki yazı/simge rengi (ana ekran, klasör, Uygulama Arşivi, arama, widget sayfası): açık duvar
+ * kâğıdında beyaz tonlar aynı saydamlıkta koyu griye çevrilir. Diğer renkler (kırmızı, mavi) değişmez.
+ */
+internal fun ink(c: Color): Color =
+    if (HomeInk.light && c.red > 0.85f && c.green > 0.85f && c.blue > 0.85f) Color(0.141f, 0.141f, 0.149f, c.alpha) else c
 
 /** Ana ekran (duvar kâğıdı üstü) etiket stili: açık duvar kâğıdında koyu, gölgesiz. */
 internal fun TextStyle.onWallpaper(): TextStyle = if (HomeInk.light) copy(color = HomeInk.label, shadow = Shadow.None) else this
