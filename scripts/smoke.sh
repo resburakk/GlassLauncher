@@ -480,6 +480,8 @@ fi
 # 30) Dinamik Ada: izin verilir, Ayarlar > Dinamik Ada'dan açılır; boşta, mesajda ve şarjda görüntülenir.
 adb shell appops set dev.glass.launcher SYSTEM_ALERT_WINDOW allow || true
 adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3
+# Ayarlar en son açık alt sayfada (Simgeler) açılabilir: önce ana listeye dön.
+tap_text "‹ Ayarlar" >/dev/null && step "ana liste" 2
 for i in 1 2 3 4; do tap_text "Dinamik Ada" && break; adb shell input swipe $cx $((H*75/100)) $cx $((H*30/100)) 300; sleep 1; done
 step "ada sayfası" 2
 shot 30a-ada-ayarlari
