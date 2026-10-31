@@ -477,6 +477,28 @@ if [ -f "$PACK" ]; then
   shot 29b-simge-paketi
 fi
 
+# 30) Dinamik Ada: izin verilir, Ayarlar > Dinamik Ada'dan açılır; boşta, mesajda ve şarjda görüntülenir.
+adb shell appops set dev.glass.launcher SYSTEM_ALERT_WINDOW allow || true
+adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3
+for i in 1 2 3 4; do tap_text "Dinamik Ada" && break; adb shell input swipe $cx $((H*75/100)) $cx $((H*30/100)) 300; sleep 1; done
+step "ada sayfası" 2
+shot 30a-ada-ayarlari
+# Sayfadaki son "Dinamik Ada" yazısı aç/kapat satırıdır (ilki sayfa başlığı); anahtar satırın sağında.
+adb shell rm -f /sdcard/ui.xml; adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -F 'text="Dinamik Ada"' | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | tail -1 | grep -oE '[0-9]+')
+set -- $b
+if [ -n "$4" ]; then adb shell input tap $((W*88/100)) $(( ($2+$4)/2 )); else echo "::warning::Ada anahtarı bulunamadı"; fi
+step "ada açıldı" 3
+shot 30b-ada-acik-ayarlar
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+shot 30c-ada-bos
+adb shell cmd notification post -S bigtext -t "Ayşe" ada1 "Akşam yemeğe geliyor musun?" >/dev/null 2>&1 || true
+sleep 1.5; shot 30d-ada-mesaj
+sleep 5
+adb shell dumpsys battery unplug; sleep 1; adb shell dumpsys battery set ac 1; sleep 1.5; shot 30e-ada-sarj
+adb shell dumpsys battery reset
+step "ada bitti" 3
+
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
 if grep -q "FATAL EXCEPTION" logcat.txt; then

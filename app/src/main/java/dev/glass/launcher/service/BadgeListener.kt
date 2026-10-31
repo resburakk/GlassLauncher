@@ -16,14 +16,29 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class BadgeListener : NotificationListenerService() {
 
-    override fun onListenerConnected() = recount()
+    override fun onListenerConnected() {
+        // Dinamik Ada bu dinleyici çalıştığı sürece yaşar (ayrı arka plan servisi gerekmez).
+        runCatching { IslandOverlay.sync(this) }
+        recount()
+    }
     override fun onListenerDisconnected() { Badges.set(emptyMap()) }
-    override fun onNotificationPosted(sbn: StatusBarNotification?) = recount()
-    override fun onNotificationRemoved(sbn: StatusBarNotification?) = recount()
+    override fun onNotificationPosted(sbn: StatusBarNotification?) {
+        if (sbn != null) runCatching {
+            val r = Ranking()
+            val imp = if (currentRanking?.getRanking(sbn.key, r) == true) r.importance else -1
+            Island.posted(this, sbn, imp)
+        }
+        recount()
+    }
+    override fun onNotificationRemoved(sbn: StatusBarNotification?) {
+        if (sbn != null) Island.removed(sbn.key)
+        recount()
+    }
     override fun onNotificationRankingUpdate(rankingMap: RankingMap?) = recount()
 
     private fun recount() {
         val active = runCatching { activeNotifications }.getOrNull() ?: return
+        runCatching { Island.rebuild(this, active) }
         val ranking = runCatching { currentRanking }.getOrNull()
         val r = Ranking()
         val out = HashMap<String, Int>()

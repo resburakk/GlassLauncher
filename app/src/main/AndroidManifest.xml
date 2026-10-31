@@ -4,6 +4,8 @@
 
     <!-- Yalnızca sistemin "Uygulamayı kaldır" onay penceresini açmak için (kaldırma kararını kullanıcı verir). -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Dinamik Ada: yalnızca kullanıcı açarsa, adayı diğer uygulamaların üstünde göstermek için. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Yalnızca kullanıcı "sistem duvar kâğıdı olarak da ayarla" seçerse kullanılır. -->
     <uses-permission android:name="android.permission.SET_WALLPAPER" />
     <!-- Üstten kaydırınca telefonun kendi Kontrol Merkezi'ni / bildirim gölgesini açmak için. -->

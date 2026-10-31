@@ -145,6 +145,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Animations("Animasyonlar", Glyph.Check, Color(0xFFFF9F0A)),
     Gestures("Hareketler", Glyph.Grid, Color(0xFF30D158)),
     Widgets("Widget'lar", Glyph.Widget, Color(0xFFFF375F)),
+    Island("Dinamik Ada", Glyph.Widget, Color(0xFF1C1C1E)),
     Library("Uygulama Arşivi", Glyph.Grid, Color(0xFFBF5AF2)),
     Privacy("Gizli ve Kilitli Uygulamalar", Glyph.Lock, Color(0xFF5856D6)),
     Backup("Yedekleme ve Geri Yükleme", Glyph.Folder, Color(0xFF8E8E93)),
@@ -264,6 +265,7 @@ fun SettingsScreen(
                         SettingsPage.Animations -> AnimationsPage(s, onChange)
                         SettingsPage.Gestures -> GesturesPage(s, onChange)
                         SettingsPage.Widgets -> WidgetsPage(s, onChange, onAddWidget)
+                        SettingsPage.Island -> IslandPage()
                         SettingsPage.Library -> LibraryPageSettings(s, onChange)
                         SettingsPage.Privacy -> PrivacyPage(vm, s)
                         SettingsPage.Backup -> BackupPage(vm)
@@ -423,7 +425,7 @@ private fun RootPage(isDefaultHome: Boolean, onRequestDefault: () -> Unit, open:
     val groups = listOf(
         listOf(SettingsPage.Home, SettingsPage.Icons, SettingsPage.Dock, SettingsPage.Folders, SettingsPage.Fonts),
         listOf(SettingsPage.Glass, SettingsPage.Menu, SettingsPage.Search, SettingsPage.Wallpaper, SettingsPage.Animations, SettingsPage.Gestures),
-        listOf(SettingsPage.Widgets, SettingsPage.Library, SettingsPage.Privacy),
+        listOf(SettingsPage.Widgets, SettingsPage.Island, SettingsPage.Library, SettingsPage.Privacy),
         listOf(SettingsPage.Backup, SettingsPage.Performance, SettingsPage.About),
     )
     groups.forEach { g ->
@@ -1396,6 +1398,100 @@ private fun SwipeChoices(selected: SwipeAction, onSelect: (SwipeAction) -> Unit)
     }
 }
 
+
+private val IDef = dev.glass.launcher.service.IslandSettings()
+
+/** Dinamik Ada: aç/kapat, izinler, konum ve boyut, etkinlikler, görünüm, davranış. Değişiklikler anında adaya yansır. */
+@Composable
+private fun IslandPage() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    dev.glass.launcher.service.Island.init(ctx)
+    val st by dev.glass.launcher.service.Island.settings.collectAsState()
+    var tick by remember { mutableStateOf(0) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        tick++
+        dev.glass.launcher.service.IslandOverlay.sync(ctx)
+    }
+    val overlayOk = remember(tick) { dev.glass.launcher.service.IslandOverlay.canDraw(ctx) }
+    val notifOk = remember(tick) { dev.glass.launcher.service.BadgeListener.isGranted(ctx) }
+    val set: (dev.glass.launcher.service.IslandSettings) -> Unit = { dev.glass.launcher.service.Island.update(ctx, it) }
+    fun open(i: android.content.Intent) = runCatching { ctx.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+
+    Group(null) {
+        ToggleRow("Dinamik Ada", st.enabled) { v ->
+            set(st.copy(enabled = v))
+            if (v && !dev.glass.launcher.service.IslandOverlay.canDraw(ctx)) {
+                open(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + ctx.packageName)))
+            }
+        }
+    }
+    Footer("Kamera deliğinin çevresinde, iOS 26'daki gibi: müzik, arama, zamanlayıcı, navigasyon, indirmeler, mesajlar, şarj ve sessiz mod. Bütün uygulamaların üstünde görünür. Bildirim içerikleri yalnızca telefonda, bellekte kalır.")
+    if (!overlayOk || !notifOk) {
+        Group("Gerekli izinler") {
+            if (!overlayOk) ActionRow("Diğer uygulamaların üzerinde göster: izin ver") {
+                open(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + ctx.packageName)))
+            }
+            if (!overlayOk && !notifOk) RowDivider()
+            if (!notifOk) ActionRow("Bildirim erişimi: aç") { open(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
+        }
+    }
+    Group("Kesintisiz çalışma") {
+        ActionRow("Pil optimizasyonundan muaf tut") { open(android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+    }
+    Footer("Honor bazen arka plandaki uygulamaları kapatır; ada kaybolursa listede Glass Launcher'ı \"İzin ver\" yap.")
+
+    Group("Konum ve boyut") {
+        SliderRow("Dikey konum", "${if (st.offsetY >= 0) "+" else ""}${st.offsetY.roundToInt()} pt", st.offsetY, -12f..30f, default = IDef.offsetY) { v -> set(st.copy(offsetY = v)) }
+        RowDivider()
+        SliderRow("Genişlik", pct(st.widthScale), st.widthScale, 0.75f..1.4f, default = IDef.widthScale) { v -> set(st.copy(widthScale = v)) }
+        RowDivider()
+        SliderRow("Yükseklik", pct(st.heightScale), st.heightScale, 0.8f..1.35f, default = IDef.heightScale) { v -> set(st.copy(heightScale = v)) }
+        RowDivider()
+        ToggleRow("Boştayken de göster", st.idleVisible, default = IDef.idleVisible) { v -> set(st.copy(idleVisible = v)) }
+        RowDivider()
+        ToggleRow("Yatay ekranda gizle", st.hideLandscape, default = IDef.hideLandscape) { v -> set(st.copy(hideLandscape = v)) }
+    }
+    Group("Etkinlikler") {
+        ToggleRow("Müzik ve medya", st.music, default = IDef.music) { v -> set(st.copy(music = v)) }
+        RowDivider()
+        ToggleRow("Aramalar", st.calls, default = IDef.calls) { v -> set(st.copy(calls = v)) }
+        RowDivider()
+        ToggleRow("Zamanlayıcı ve kronometre", st.timers, default = IDef.timers) { v -> set(st.copy(timers = v)) }
+        RowDivider()
+        ToggleRow("Navigasyon", st.navigation, default = IDef.navigation) { v -> set(st.copy(navigation = v)) }
+        RowDivider()
+        ToggleRow("İndirme ve yükleme", st.progress, default = IDef.progress) { v -> set(st.copy(progress = v)) }
+        RowDivider()
+        ToggleRow("Şarj", st.charging, default = IDef.charging) { v -> set(st.copy(charging = v)) }
+        RowDivider()
+        ToggleRow("Sessiz mod", st.ringer, default = IDef.ringer) { v -> set(st.copy(ringer = v)) }
+        RowDivider()
+        ToggleRow("Mesajlar ve bildirimler", st.notifications, default = IDef.notifications) { v -> set(st.copy(notifications = v)) }
+        if (st.notifications) {
+            RowDivider()
+            ToggleRow("Mesaj metnini göster", st.notifText, default = IDef.notifText) { v -> set(st.copy(notifText = v)) }
+        }
+    }
+    Group("Görünüm") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip("Siyah (iOS)", st.style == 0, Modifier.weight(1f)) { set(st.copy(style = 0)) }
+            Chip("Koyu cam", st.style == 1, Modifier.weight(1f)) { set(st.copy(style = 1)) }
+        }
+        RowDivider()
+        SliderRow("Animasyon hızı", pct(st.animSpeed), st.animSpeed, 0.5f..1.6f, default = IDef.animSpeed) { v -> set(st.copy(animSpeed = v)) }
+        RowDivider()
+        ToggleRow("Titreşim", st.haptics, default = IDef.haptics) { v -> set(st.copy(haptics = v)) }
+    }
+    Group("Davranış") {
+        ToggleRow("Dokununca genişlet", st.tapExpands, default = IDef.tapExpands) { v -> set(st.copy(tapExpands = v)) }
+        RowDivider()
+        SliderRow("Kısa bildirim süresi", "${"%.1f".format(Locale.US, st.transientSeconds)} sn", st.transientSeconds, 2f..8f, default = IDef.transientSeconds) { v -> set(st.copy(transientSeconds = v)) }
+    }
+    Footer(
+        if (st.tapExpands) "Dokun: ada genişler · Basılı tut: uygulama açılır · Yukarı kaydır: küçültür · Aşağı kaydır: genişletir · Yana kaydır: iki etkinlik arasında geçiş."
+        else "Dokun: uygulama açılır · Basılı tut: ada genişler · Yukarı kaydır: küçültür · Yana kaydır: iki etkinlik arasında geçiş."
+    )
+}
 
 /** Ayarlardaki kaydırmanın kare ölçümü (Ayarlar > Performans'ta "Son kaydırma (Ayarlar)"). */
 @Composable

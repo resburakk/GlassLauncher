@@ -50,6 +50,8 @@ class LauncherApp : Application(), androidx.lifecycle.ViewModelStoreOwner {
         wallpaperRepository = WallpaperRepository(this)
         widgetHost = WidgetHostManager(this)
         appRepository.start()
+        // Dinamik Ada (açıksa ve izin verilmişse): uygulama açılır açılmaz kamera deliğinin çevresinde.
+        runCatching { dev.glass.launcher.service.IslandOverlay.sync(this) }
     }
 
     /**
