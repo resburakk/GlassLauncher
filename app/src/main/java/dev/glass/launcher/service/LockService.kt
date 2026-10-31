@@ -15,18 +15,28 @@ import android.view.accessibility.AccessibilityEvent
 class LockService : AccessibilityService() {
     override fun onServiceConnected() {
         instance = this
+        // Dinamik Ada bu hizmetin katmanına taşınır: her uygulamanın ve durum çubuğunun üstünde.
+        runCatching { IslandOverlay.sync(this) }
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
     override fun onInterrupt() = Unit
 
+    override fun onUnbind(intent: android.content.Intent?): Boolean {
+        if (instance === this) { instance = null; runCatching { IslandOverlay.sync(applicationContext) } }
+        return super.onUnbind(intent)
+    }
+
     override fun onDestroy() {
-        if (instance === this) instance = null
+        if (instance === this) { instance = null; runCatching { IslandOverlay.sync(applicationContext) } }
         super.onDestroy()
     }
 
     companion object {
         @Volatile private var instance: LockService? = null
+
+        /** Hizmet çalışıyorsa onun bağlamı (erişilebilirlik katmanı penceresi için). */
+        fun context(): Context? = instance
 
         /** Kilitlediyse true; hizmet kapalıysa false. */
         fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true

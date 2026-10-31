@@ -1401,6 +1401,34 @@ private fun SwipeChoices(selected: SwipeAction, onSelect: (SwipeAction) -> Unit)
 
 private val IDef = dev.glass.launcher.service.IslandSettings()
 
+/** İnce ayarlı kaydırıcı: − / + ile 1 birim adım; [auto] ise değer otomatik (↺ ile otomatiğe dönülür). */
+@Composable
+private fun StepRow(
+    title: String, value: Float, range: ClosedFloatingPointRange<Float>, default: Float?, unit: String,
+    signed: Boolean = false, auto: Boolean = false, onAuto: (() -> Unit)? = null, onValue: (Float) -> Unit,
+) {
+    RegisterReset(default) { onValue(it) }
+    if (onAuto != null) RegisterReset(0f) { onAuto() }
+    val v = value.coerceIn(range.start, range.endInclusive)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = Fg, fontSize = 17.sp, modifier = Modifier.weight(1f))
+            if (default != null && kotlin.math.abs(value - default) > 0.05f) ResetButton { onValue(default) }
+            if (onAuto != null && !auto) ResetButton { onAuto() }
+            val n = v.roundToInt()
+            Text((if (signed && n > 0) "+" else "") + "$n $unit" + if (auto) " · otomatik" else "", color = Muted, fontSize = 17.sp)
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("−", color = Blue, fontSize = 24.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onValue((v.roundToInt() - 1f).coerceIn(range.start, range.endInclusive)) }.padding(horizontal = 10.dp, vertical = 2.dp))
+            Slider(
+                value = v, onValueChange = { onValue(it.roundToInt().toFloat()) }, valueRange = range, modifier = Modifier.weight(1f),
+                colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Blue, inactiveTrackColor = LocalSettingsPalette.current.sliderOff),
+            )
+            Text("+", color = Blue, fontSize = 24.sp, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onValue((v.roundToInt() + 1f).coerceIn(range.start, range.endInclusive)) }.padding(horizontal = 10.dp, vertical = 2.dp))
+        }
+    }
+}
+
 /** Dinamik Ada: aç/kapat, izinler, konum ve boyut, etkinlikler, görünüm, davranış. Değişiklikler anında adaya yansır. */
 @Composable
 private fun IslandPage() {
@@ -1414,39 +1442,76 @@ private fun IslandPage() {
     }
     val overlayOk = remember(tick) { dev.glass.launcher.service.IslandOverlay.canDraw(ctx) }
     val notifOk = remember(tick) { dev.glass.launcher.service.BadgeListener.isGranted(ctx) }
+    val a11yOk = remember(tick) { dev.glass.launcher.service.LockService.isEnabled(ctx) }
     val set: (dev.glass.launcher.service.IslandSettings) -> Unit = { dev.glass.launcher.service.Island.update(ctx, it) }
     fun open(i: android.content.Intent) = runCatching { ctx.startActivity(i.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
 
     Group(null) {
         ToggleRow("Dinamik Ada", st.enabled) { v ->
             set(st.copy(enabled = v))
-            if (v && !dev.glass.launcher.service.IslandOverlay.canDraw(ctx)) {
+            if (v && !dev.glass.launcher.service.IslandOverlay.canDraw(ctx) && !dev.glass.launcher.service.LockService.isEnabled(ctx)) {
                 open(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + ctx.packageName)))
             }
         }
     }
     Footer("Kamera deliğinin çevresinde, iOS 26'daki gibi: müzik, arama, zamanlayıcı, navigasyon, indirmeler, mesajlar, şarj ve sessiz mod. Bütün uygulamaların üstünde görünür. Bildirim içerikleri yalnızca telefonda, bellekte kalır.")
-    if (!overlayOk || !notifOk) {
+    val needOverlay = !overlayOk && !a11yOk
+    if (needOverlay || !notifOk) {
         Group("Gerekli izinler") {
-            if (!overlayOk) ActionRow("Diğer uygulamaların üzerinde göster: izin ver") {
+            if (needOverlay) ActionRow("Diğer uygulamaların üzerinde göster: izin ver") {
                 open(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + ctx.packageName)))
             }
-            if (!overlayOk && !notifOk) RowDivider()
+            if (needOverlay && !notifOk) RowDivider()
             if (!notifOk) ActionRow("Bildirim erişimi: aç") { open(android.content.Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }
         }
     }
+    Group("Her yerde göster") {
+        if (a11yOk) InfoRow("Erişilebilirlik katmanı", "Açık")
+        else ActionRow("Erişilebilirlik hizmetini aç") { open(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
+    }
+    Footer(
+        if (a11yOk) "Ada telefonun Ayarlar'ı dahil her ekranda ve durum çubuğunun üstünde görünür."
+        else "Telefonun Ayarlar'ı gibi bazı ekranlar normal katmanı gizler. Erişilebilirlik > Yüklü uygulamalar > \"Glass Launcher – Kilit ve Kontrol Merkezi\"ni açınca ada her yerde ve durum çubuğunun (saat, pil) üstünde görünür. Ekran içeriği okunmaz."
+    )
     Group("Kesintisiz çalışma") {
         ActionRow("Pil optimizasyonundan muaf tut") { open(android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
     }
     Footer("Honor bazen arka plandaki uygulamaları kapatır; ada kaybolursa listede Glass Launcher'ı \"İzin ver\" yap.")
 
-    Group("Konum ve boyut") {
-        SliderRow("Dikey konum", "${if (st.offsetY >= 0) "+" else ""}${st.offsetY.roundToInt()} pt", st.offsetY, -12f..30f, default = IDef.offsetY) { v -> set(st.copy(offsetY = v)) }
+    // Önizleme: bu sayfa açıkken ada seçilen hâlde görünür, ayarlar anında üzerinde görülür.
+    var prev by remember { mutableStateOf(2) }
+    DisposableEffect(Unit) { onDispose { dev.glass.launcher.service.Island.preview.value = 0 } }
+    LaunchedEffect(prev, st.enabled, tick) { dev.glass.launcher.service.Island.preview.value = if (st.enabled) prev else 0 }
+    // Ayarlardan çıkınca (ana ekran, başka uygulama) önizleme biter, ada gerçek hâline döner.
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_PAUSE) { dev.glass.launcher.service.Island.preview.value = 0 }
+    val geo = remember { dev.glass.launcher.service.IslandOverlay.geometry(ctx) }
+    val dims = islandDims(geo, ctx.resources.displayMetrics.density, st)
+    val screenDp = geo.screenW / ctx.resources.displayMetrics.density
+    Group("Önizleme") {
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Chip("Boşta", prev == 1, Modifier.weight(1f)) { prev = 1 }
+            Chip("Kompakt", prev == 2, Modifier.weight(1f)) { prev = 2 }
+            Chip("Genişlemiş", prev == 3, Modifier.weight(1f)) { prev = 3 }
+        }
+    }
+    Footer("Bu sayfa açıkken ada seçtiğin hâlde gösterilir; konum ve ölçüleri değiştirdikçe üstte canlı görürsün. − / + ile 1 pt'lik ince ayar yapılır.")
+    Group("Konum") {
+        StepRow("Dikey konum", st.offsetY, -60f..120f, IDef.offsetY, "pt", signed = true) { v -> set(st.copy(offsetY = v)) }
         RowDivider()
-        SliderRow("Genişlik", pct(st.widthScale), st.widthScale, 0.75f..1.4f, default = IDef.widthScale) { v -> set(st.copy(widthScale = v)) }
+        StepRow("Yatay konum", st.offsetX, -150f..150f, IDef.offsetX, "pt", signed = true) { v -> set(st.copy(offsetX = v)) }
+    }
+    Group("Ölçüler") {
+        StepRow("Yükseklik", dims.h, 16f..90f, null, "pt", auto = st.islandH <= 0f, onAuto = { set(st.copy(islandH = 0f)) }) { v -> set(st.copy(islandH = v)) }
         RowDivider()
-        SliderRow("Yükseklik", pct(st.heightScale), st.heightScale, 0.8f..1.35f, default = IDef.heightScale) { v -> set(st.copy(heightScale = v)) }
+        StepRow("Boştaki genişlik", dims.idleW, 20f..screenDp, null, "pt", auto = st.idleW <= 0f, onAuto = { set(st.copy(idleW = 0f)) }) { v -> set(st.copy(idleW = v)) }
         RowDivider()
+        StepRow("Kompakt genişlik", dims.compactW, 60f..screenDp, null, "pt", auto = st.compactW <= 0f, onAuto = { set(st.copy(compactW = 0f)) }) { v -> set(st.copy(compactW = v)) }
+        RowDivider()
+        StepRow("Genişlemiş genişlik", dims.expandedW, 160f..screenDp, null, "pt", auto = st.expandedW <= 0f, onAuto = { set(st.copy(expandedW = 0f)) }) { v -> set(st.copy(expandedW = v)) }
+        RowDivider()
+        SliderRow("Köşe yuvarlaklığı", pct(st.corner), st.corner, 0f..1f, default = IDef.corner) { v -> set(st.copy(corner = v)) }
+    }
+    Group(null) {
         ToggleRow("Boştayken de göster", st.idleVisible, default = IDef.idleVisible) { v -> set(st.copy(idleVisible = v)) }
         RowDivider()
         ToggleRow("Yatay ekranda gizle", st.hideLandscape, default = IDef.hideLandscape) { v -> set(st.copy(hideLandscape = v)) }

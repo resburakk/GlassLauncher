@@ -43,12 +43,31 @@ object IslandOverlay {
 
     fun canDraw(ctx: Context) = Settings.canDrawOverlays(ctx)
 
-    /** Ayarlara ve izne göre adayı açar/kapatır. Birden çok kez çağrılabilir. */
+    /** 0 yok, 1 uygulama katmanı (izinli), 2 erişilebilirlik katmanı (her yerde, durum çubuğunun da üstünde). */
+    private var host = 0
+
+    /** Ada durum çubuğunun üstünde mi (erişilebilirlik katmanı): saat ve simgeler adanın altında kalır. */
+    val aboveBars = mutableStateOf(false)
+
+    /**
+     * Ayarlara ve izne göre adayı açar/kapatır. Erişilebilirlik hizmeti açıksa ada onun katmanında durur: telefonun
+     * Ayarlar'ı dahil HER uygulamanın ve durum çubuğunun üstünde görünür (uygulama katmanını Ayarlar gizler).
+     */
     fun sync(ctx: Context) {
         val app = ctx.applicationContext
         Island.init(app)
-        val want = Island.settings.value.enabled && canDraw(app)
-        if (want && view == null) attach(app) else if (!want && view != null) detach(app)
+        val a11y = LockService.context()
+        val wantHost = when {
+            !Island.settings.value.enabled -> 0
+            a11y != null -> 2
+            canDraw(app) -> 1
+            else -> 0
+        }
+        if (wantHost == host && (host == 0) == (view == null)) return
+        if (view != null) detach(app)
+        host = 0
+        if (wantHost == 2 && a11y != null) attach(a11y, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY, 2)
+        else if (wantHost == 1) attach(app, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, 1)
     }
 
     fun geometry(ctx: Context): IslandGeo {
@@ -64,7 +83,7 @@ object IslandOverlay {
     }
 
     @SuppressLint("ClickableViewAccessibility")
-    private fun attach(ctx: Context) {
+    private fun attach(ctx: Context, type: Int, kind: Int) {
         val w = ctx.getSystemService(WindowManager::class.java) ?: return
         val o = OverlayOwner().also { it.start() }
         val v = ComposeView(ctx).apply {
@@ -78,7 +97,7 @@ object IslandOverlay {
         }
         val p = WindowManager.LayoutParams(
             1, 1,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
@@ -91,15 +110,16 @@ object IslandOverlay {
         }
         val ok = runCatching { w.addView(v, p); true }.getOrDefault(false)
         if (!ok) { o.stop(); return }
-        wm = w; view = v; lp = p; owner = o
-        NowPlaying.start(ctx)
-        Island.registerReceivers(ctx)
+        wm = w; view = v; lp = p; owner = o; host = kind
+        aboveBars.value = kind == 2
+        NowPlaying.start(ctx.applicationContext)
+        Island.registerReceivers(ctx.applicationContext)
     }
 
     private fun detach(ctx: Context) {
         runCatching { wm?.removeViewImmediate(view) }
         owner?.stop()
-        view = null; lp = null; owner = null; wm = null
+        view = null; lp = null; owner = null; wm = null; host = 0
         expanded.value = false
         Island.unregisterReceivers(ctx)
     }

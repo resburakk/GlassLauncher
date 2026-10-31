@@ -127,6 +127,20 @@ private fun appIcon(pkg: String): ImageBitmap? {
     }
 }
 
+/** Ada ölçüleri (dp): ayarda 0 olanlar kamera deliğine göre otomatik. */
+internal data class IslandDims(val idleW: Float, val compactW: Float, val h: Float, val expandedW: Float)
+
+internal fun islandDims(geo: dev.glass.launcher.service.IslandGeo, density: Float, s: dev.glass.launcher.service.IslandSettings): IslandDims {
+    val screen = geo.screenW / density
+    val autoH = max(34f, geo.cutH / density + 12f)
+    val h = if (s.islandH > 0f) s.islandH else autoH
+    val autoIdle = max(h * 3.2f, geo.cutW / density + 70f)
+    val idle = if (s.idleW > 0f) s.idleW else autoIdle
+    val compact = if (s.compactW > 0f) s.compactW else (idle + 104f).coerceAtMost(screen - 100f)
+    val big = if (s.expandedW > 0f) s.expandedW else (screen - 22f).coerceAtMost(420f)
+    return IslandDims(idle.coerceAtMost(screen), compact.coerceAtMost(screen), h, big.coerceAtMost(screen))
+}
+
 /**
  * Dinamik Ada (iOS 26 gibi): kamera deliğinin çevresinde siyah ada. Etkinliğe göre genişler (müzik, arama,
  * zamanlayıcı, navigasyon, indirme), dokununca büyür, basılı tutunca uygulamayı açar (ayarlanabilir), iki etkinlik
@@ -141,7 +155,11 @@ fun IslandRoot() {
     val s by Island.settings.collectAsStateWithLifecycle()
     val ongoing by Island.ongoing.collectAsStateWithLifecycle()
     val transientRaw by Island.transient.collectAsStateWithLifecycle()
-    val np by NowPlaying.state.collectAsStateWithLifecycle()
+    val npReal by NowPlaying.state.collectAsStateWithLifecycle()
+    val preview by Island.preview.collectAsStateWithLifecycle()
+    val aboveBars by IslandOverlay.aboveBars
+    // Önizlemede (Ayarlar > Dinamik Ada) örnek bir müzik etkinliği gösterilir.
+    val np = if (preview >= 2) dev.glass.launcher.service.NowPlayingState(ctx.packageName, "Önizleme", "Dinamik Ada", null, true) else npReal
     var expanded by IslandOverlay.expanded
     var swapped by remember { mutableStateOf(false) }
     val geo = remember(conf.orientation, conf.screenWidthDp) { IslandOverlay.geometry(ctx) }
@@ -175,6 +193,9 @@ fun IslandRoot() {
     // Gelen arama iOS'taki gibi kendiliğinden büyük gösterilir.
     val incoming = first is IslandAct.Call && first.incoming
     val mode: IslandMode = when {
+        preview == 1 -> IslandMode.Idle
+        preview == 2 && first != null -> IslandMode.Compact(first)
+        preview == 3 && first != null -> IslandMode.Expanded(first)
         landscapeHidden -> IslandMode.Hidden
         transient is IslandAct.Message -> IslandMode.Expanded(transient)
         transient != null -> IslandMode.Compact(transient)
@@ -191,16 +212,15 @@ fun IslandRoot() {
     }
 
     // ---- Boyutlar (dp)
-    val screenWdp = with(density) { geo.screenW.toDp() }
-    val cutHdp = with(density) { geo.cutH.toDp() }
-    val baseH = max(34f, cutHdp.value + 12f) * s.heightScale
-    val idleW = max(baseH * 3.2f, with(density) { geo.cutW.toDp() }.value + 70f) * s.widthScale
-    val compactW = (idleW + 104f * s.widthScale).coerceAtMost(screenWdp.value - 100f)
-    val bigW = (screenWdp.value - 22f).coerceAtMost(420f)
-    // Durum çubuğu (saat, pil) adanın üstünde çizilir: genişlemiş adanın içeriği durum çubuğunun altından başlar,
-    // simgeler adanın siyah üst şeridinde kalır.
+    val dims = islandDims(geo, density.density, s)
+    val baseH = dims.h
+    val idleW = dims.idleW
+    val compactW = dims.compactW
+    val bigW = dims.expandedW
+    // Uygulama katmanında durum çubuğu (saat, pil) adanın üstünde çizilir: genişlemiş adanın içeriği durum çubuğunun
+    // altından başlar. Erişilebilirlik katmanında ada durum çubuğunun da üstündedir: gerek yok.
     val islandTopPx = (geo.cy - (baseH * density.density) / 2f + s.offsetY * density.density).coerceAtLeast(2f * density.density)
-    val topInset = ((geo.statusH - islandTopPx) / density.density).coerceIn(0f, 40f)
+    val topInset = if (aboveBars) 0f else ((geo.statusH - islandTopPx) / density.density).coerceIn(0f, 40f)
     val (tw, th) = when (mode) {
         IslandMode.Hidden -> 0f to 0f
         IslandMode.Idle -> idleW to baseH
@@ -227,11 +247,11 @@ fun IslandRoot() {
     fun place(wDp: Float, hDp: Float) {
         winW = wDp; winH = hDp
         if (wDp <= 0f || hDp <= 0f) { IslandOverlay.place(0, 0, 0, 0); return }
-        val x = geo.cx - px(wDp) / 2
+        val x = geo.cx - px(wDp) / 2 + px(s.offsetX)
         val y = (geo.cy - px(baseH) / 2 + px(s.offsetY)).coerceAtLeast(px(2f))
         IslandOverlay.place(x, y, px(wDp), px(hDp))
     }
-    LaunchedEffect(tw, th, extra, geo, s.offsetY, baseH) {
+    LaunchedEffect(tw, th, extra, geo, s.offsetY, s.offsetX, baseH) {
         val targetWinW = if (tw <= 0f) 0f else tw + extra * 2
         // Büyürken pencere önce hedef boyuta açılır; küçülürken animasyon bitince daralır (tek seferlik boyut değişimi).
         if (targetWinW > 0f) place(max(targetWinW, winW), max(th, winH))
@@ -245,7 +265,7 @@ fun IslandRoot() {
     }
 
     if (winW <= 0f || aw.value <= 1f) return
-    val shapeR = (ah.value / 2f).coerceAtMost(if (mode is IslandMode.Expanded) 42f else 999f)
+    val shapeR = (ah.value / 2f).coerceAtMost(if (mode is IslandMode.Expanded) 42f else 999f) * s.corner.coerceIn(0f, 1f)
     val glass = s.style == 1
     val islandMod = Modifier
         .requiredSize(aw.value.dp, ah.value.dp)

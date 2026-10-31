@@ -18,10 +18,16 @@ import kotlinx.coroutines.flow.StateFlow
 /** Dinamik Ada ayarları (telefonda saklanır; ada servisi ve Ayarlar ekranı aynı değerleri okur). */
 data class IslandSettings(
     val enabled: Boolean = false,
-    /** Kamera deliğine göre dikey kaydırma (dp). */
+    /** Kamera deliğine göre dikey ve yatay kaydırma (dp). */
     val offsetY: Float = 0f,
-    val widthScale: Float = 1f,
-    val heightScale: Float = 1f,
+    val offsetX: Float = 0f,
+    /** Ölçüler (dp). 0 = otomatik (kamera deliğinin boyutuna göre). */
+    val idleW: Float = 0f,
+    val compactW: Float = 0f,
+    val islandH: Float = 0f,
+    val expandedW: Float = 0f,
+    /** Köşe yuvarlaklığı: 1 = tam yuvarlak (hap), 0 = köşeli. */
+    val corner: Float = 1f,
     /** Etkinlik yokken kamera deliğinin çevresinde küçük siyah hap. */
     val idleVisible: Boolean = true,
     /** 0 siyah (iOS), 1 koyu cam. */
@@ -52,8 +58,12 @@ data class IslandSettings(
             return IslandSettings(
                 enabled = p.getBoolean("enabled", d.enabled),
                 offsetY = p.getFloat("offsetY", d.offsetY),
-                widthScale = p.getFloat("widthScale", d.widthScale),
-                heightScale = p.getFloat("heightScale", d.heightScale),
+                offsetX = p.getFloat("offsetX", d.offsetX),
+                idleW = p.getFloat("idleW", d.idleW),
+                compactW = p.getFloat("compactW", d.compactW),
+                islandH = p.getFloat("islandH", d.islandH),
+                expandedW = p.getFloat("expandedW", d.expandedW),
+                corner = p.getFloat("corner", d.corner),
                 idleVisible = p.getBoolean("idleVisible", d.idleVisible),
                 style = p.getInt("style", d.style),
                 animSpeed = p.getFloat("animSpeed", d.animSpeed),
@@ -75,8 +85,10 @@ data class IslandSettings(
 
         fun save(ctx: Context, s: IslandSettings) {
             ctx.getSharedPreferences(P, Context.MODE_PRIVATE).edit()
-                .putBoolean("enabled", s.enabled).putFloat("offsetY", s.offsetY).putFloat("widthScale", s.widthScale)
-                .putFloat("heightScale", s.heightScale).putBoolean("idleVisible", s.idleVisible).putInt("style", s.style)
+                .putBoolean("enabled", s.enabled).putFloat("offsetY", s.offsetY).putFloat("offsetX", s.offsetX)
+                .putFloat("idleW", s.idleW).putFloat("compactW", s.compactW).putFloat("islandH", s.islandH)
+                .putFloat("expandedW", s.expandedW).putFloat("corner", s.corner)
+                .putBoolean("idleVisible", s.idleVisible).putInt("style", s.style)
                 .putFloat("animSpeed", s.animSpeed).putBoolean("haptics", s.haptics).putBoolean("tapExpands", s.tapExpands)
                 .putFloat("transientSeconds", s.transientSeconds).putBoolean("hideLandscape", s.hideLandscape)
                 .putBoolean("music", s.music).putBoolean("calls", s.calls).putBoolean("timers", s.timers)
@@ -137,6 +149,9 @@ object Island {
     private val _ongoing = MutableStateFlow<List<IslandAct>>(emptyList())
     /** Sürekli etkinlikler (bildirim kaynaklı), önceliğe göre. Müzik ayrıca [NowPlaying]'den eklenir. */
     val ongoing: StateFlow<List<IslandAct>> = _ongoing
+
+    /** Ayarlar > Dinamik Ada açıkken önizleme: 0 yok, 1 boşta, 2 kompakt, 3 genişlemiş. */
+    val preview = MutableStateFlow(0)
 
     private val _transient = MutableStateFlow<IslandAct?>(null)
     val transient: StateFlow<IslandAct?> = _transient
