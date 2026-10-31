@@ -134,7 +134,9 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
         else -> {
             val fill = widgetFill()
             val weather = w.kind == WidgetKind.Weather
-            val frame = if (fill == 0) {
+            // Google Play: her görünümde kendi oyun desenli zemini (yazılar beyaz).
+            val play = w.kind == WidgetKind.PlayStore
+            val frame = if (fill == 0 && !play) {
                 Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000))
             } else {
                 // iOS 26 dolu widget: hava durumu gökyüzü renginde, diğerleri açık (beyaz) ya da koyu zemin.
@@ -146,15 +148,17 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                 }
                 // Simge dizen widget'lar (Öneriler, Google Play) renkli görünümde düz beyaz/koyu değil, yarı saydam cam:
                 // simgeler düz beyaz zeminde sönük duruyordu.
-                if (w.kind == WidgetKind.Suggestions || w.kind == WidgetKind.PlayStore)
+                if (w.kind == WidgetKind.Suggestions)
                     Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true)
-                        .background(if (fill == 1) Color.White.copy(alpha = 0.45f) else Color(0xFF1C1C1E).copy(alpha = 0.55f))
+                        .background(if (fill == 1) Color.White.copy(alpha = 0.26f) else Color(0xFF1C1C1E).copy(alpha = 0.36f))
+                else if (play) Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape)
                 else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
             }
-            val ink = when { fill == 0 || weather -> GlassInk; fill == 1 -> LightInk; else -> DarkInk }
+            val ink = when { fill == 0 || weather || play -> GlassInk; fill == 1 -> LightInk; else -> DarkInk }
             androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
                 Box(frame) {
                     if (weather && fill != 0) WeatherBackdrop(dark = fill == 2)
+                    if (play) PlayBackdrop()
                     when (w.kind) {
                         WidgetKind.DigitalClock -> DigitalClockWidget(w)
                         WidgetKind.AnalogClock -> AnalogClockWidget(w)

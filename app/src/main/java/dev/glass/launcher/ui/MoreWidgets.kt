@@ -36,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -229,6 +231,17 @@ fun EventsWidget(w: WidgetItem) {
     val empty: @Composable () -> Unit = {
         Text("Yaklaşan etkinlik yok", color = ink.secondary, fontSize = 13.sp, fontFamily = AppFont)
     }
+    // Boş kalan alanda ince satır çizgileri (ajanda sayfası gibi): etkinlik az olduğunda widget boş görünmesin.
+    val lined: @Composable androidx.compose.foundation.layout.ColumnScope.(Dp) -> Unit = { row ->
+        Box(Modifier.fillMaxWidth().weight(1f).drawBehind {
+            val step = row.toPx(); val sw = 1.dp.toPx()
+            var y = step * 0.5f
+            while (y < size.height - sw) {
+                drawLine(ink.track, Offset(0f, y), Offset(size.width, y), sw)
+                y += step
+            }
+        })
+    }
     when {
         w.spanX < 4 -> Column(Modifier.fillMaxSize().padding(14.dp)) {
             header(false)
@@ -245,9 +258,10 @@ fun EventsWidget(w: WidgetItem) {
                 Spacer(Modifier.weight(1f))
                 Text(today.format(DateTimeFormatter.ofPattern("MMMM", TRL)), color = ink.dim, fontSize = 12.sp, fontFamily = AppFont)
             }
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Column(Modifier.weight(1f).fillMaxHeight()) {
                 if (events.isEmpty()) empty()
                 events.take(3).forEach { e -> EventRow(e, compact = true) }
+                this.lined(34.dp)
             }
         }
         else -> Column(Modifier.fillMaxSize().padding(16.dp)) {
@@ -266,6 +280,7 @@ fun EventsWidget(w: WidgetItem) {
                 }
                 EventRow(e, compact = false)
             }
+            this.lined(38.dp)
         }
     }
 }
@@ -490,6 +505,50 @@ fun PrayerWidget(w: WidgetItem) {
 // ---------------------------------------------------------------- Google Play
 
 private const val PLAY = "com.android.vending"
+
+/**
+ * Google Play widget'ının zemini: koyu lacivert-mor degrade, köşelerde mor ve turkuaz parıltı, üzerinde soluk oyun
+ * simgeleri deseni (oyun kolu, üçgen, daire, çarpı). Boyut değişmedikçe bir kez hazırlanır (önbellek).
+ */
+@Composable
+fun PlayBackdrop(modifier: Modifier = Modifier) {
+    Box(modifier.fillMaxSize().drawWithCache {
+        val w = size.width; val h = size.height; val m = size.minDimension
+        val bg = androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF33216F), Color(0xFF0D1440)))
+        val glowA = androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0x808C50FF), Color(0x008C50FF)), Offset(w * 0.88f, h * 0.12f), m * 0.6f)
+        val glowB = androidx.compose.ui.graphics.Brush.radialGradient(listOf(Color(0x5900B4FF), Color(0x0000B4FF)), Offset(w * 0.12f, h * 0.95f), m * 0.55f)
+        val ink = Color(0x2EFFFFFF)
+        val cell = m * 0.22f
+        val sw = m * 0.0075f
+        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+        val cols = (w / cell).toInt() + 2; val rows = (h / (cell * 0.92f)).toInt() + 2
+        onDrawBehind {
+            drawRect(bg)
+            drawRect(glowA); drawRect(glowB)
+            for (r in 0 until rows) for (c in 0 until cols) {
+                val k = (r * 3 + c) % 4
+                val cx = c * cell + (if (r % 2 == 1) cell * 0.5f else 0f) - cell * 0.15f
+                val cy = r * cell * 0.92f + cell * 0.2f
+                val s = cell * 0.26f
+                when (k) {
+                    0 -> { // oyun kolu
+                        drawRoundRect(ink, Offset(cx - s * 1.1f, cy - s * 0.55f), androidx.compose.ui.geometry.Size(s * 2.2f, s * 1.1f), androidx.compose.ui.geometry.CornerRadius(s * 0.55f), style = stroke)
+                        drawLine(ink, Offset(cx - s * 0.75f, cy), Offset(cx - s * 0.3f, cy), sw, androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(ink, Offset(cx - s * 0.525f, cy - s * 0.22f), Offset(cx - s * 0.525f, cy + s * 0.22f), sw, androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawCircle(ink, s * 0.11f, Offset(cx + s * 0.45f, cy - s * 0.12f), style = stroke)
+                        drawCircle(ink, s * 0.11f, Offset(cx + s * 0.72f, cy + s * 0.14f), style = stroke)
+                    }
+                    1 -> drawPath(Path().apply { moveTo(cx, cy - s * 0.8f); lineTo(cx + s * 0.85f, cy + s * 0.65f); lineTo(cx - s * 0.85f, cy + s * 0.65f); close() }, ink, style = stroke)
+                    2 -> drawCircle(ink, s * 0.72f, Offset(cx, cy), style = stroke)
+                    else -> {
+                        drawLine(ink, Offset(cx - s * 0.62f, cy - s * 0.62f), Offset(cx + s * 0.62f, cy + s * 0.62f), sw, androidx.compose.ui.graphics.StrokeCap.Round)
+                        drawLine(ink, Offset(cx + s * 0.62f, cy - s * 0.62f), Offset(cx - s * 0.62f, cy + s * 0.62f), sw, androidx.compose.ui.graphics.StrokeCap.Round)
+                    }
+                }
+            }
+        }
+    })
+}
 
 /** Google Play'in bir ekranını açar; olmazsa Play'in ana ekranı. */
 private fun openPlay(ctx: android.content.Context, intent: android.content.Intent?) {
