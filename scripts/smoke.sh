@@ -511,6 +511,9 @@ if grep -q "FATAL EXCEPTION" logcat.txt; then
 fi
 pid=$(adb shell pidof dev.glass.launcher)
 if [ -z "$pid" ]; then
+  # Neden kapandı: Android'in çıkış kaydı (sebep, açıklama) ve yerel çökme izi.
+  adb shell dumpsys activity exit-info dev.glass.launcher 2>/dev/null | grep -E "reason=|description=|status=|importance=" | head -12 | while IFS= read -r line; do echo "::error::EXIT $line"; done
+  adb logcat -d -b crash 2>/dev/null | head -30 | while IFS= read -r line; do echo "::error::NATIVE ${line//$'%'/%25}"; done
   echo "::error::Uygulama çalışmıyor (çökme kaydı bulunamadı)"
   exit 1
 fi
