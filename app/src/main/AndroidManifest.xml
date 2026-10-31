@@ -1,0 +1,197 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Yalnızca sistemin "Uygulamayı kaldır" onay penceresini açmak için (kaldırma kararını kullanıcı verir). -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+    <!-- Yalnızca kullanıcı "sistem duvar kâğıdı olarak da ayarla" seçerse kullanılır. -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER" />
+    <!-- Üstten kaydırınca telefonun kendi Kontrol Merkezi'ni / bildirim gölgesini açmak için. -->
+    <uses-permission android:name="android.permission.EXPAND_STATUS_BAR" />
+    <!-- Uygulama kilidi ve gizli uygulamalar: telefonun parmak izi / yüz / ekran kilidi penceresi (veri launcher'a gelmez). -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- Hava durumu widget'ı ve canlı simge: Open-Meteo'dan veri (yalnızca yaklaşık konum koordinatı gönderilir). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Android 15+ Özel Alan: varsayılan ana ekran uygulaması gizli profili listeleyebilsin (yalnızca Ayarlar içinde gösterilir). -->
+    <uses-permission android:name="android.permission.ACCESS_HIDDEN_PROFILES" />
+    <!-- Honor Takvim widget'ı kendi kodunu launcher içinde çalıştırır ve bu izinleri ister (yalnızca Honor verirse geçerli). -->
+    <uses-permission android:name="com.android.calendar.hihonor.permission.CALENDAR_RECESS" />
+    <uses-permission android:name="com.hihonor.calendar.permission.WRITE_CALENDAR_RECESS" />
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <!-- Arama: yalnızca kullanıcı izin verirse kişiler, mesajlar ve dosyalar cihazda, çevrimdışı aranır. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- İsteğe bağlı: belgeleri (PDF vb.) de aramak için kullanıcı ayarlardan "tüm dosyalara erişim" verebilir. -->
+    <uses-permission
+        android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+
+    <!-- Paket görünürlüğü: QUERY_ALL_PACKAGES yerine yalnızca başlatılabilir uygulamalar sorgulanır -->
+    <queries>
+        <!-- Arama: "internette ara", "Play Store'da ara" ve sesle yazma için açılacak uygulamayı bulmak -->
+        <intent>
+            <action android:name="android.intent.action.WEB_SEARCH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+        <!-- Dock varsayılanları: telefon, mesaj, tarayıcı, kamera -->
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="smsto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent><action android:name="android.media.action.STILL_IMAGE_CAMERA" /></intent>
+        <!-- Simge paketleri (Nova / ADW / Apex / GO uyumlu) -->
+        <intent><action android:name="org.adw.launcher.THEMES" /></intent>
+        <intent><action android:name="com.novalauncher.THEME" /></intent>
+        <intent><action android:name="com.gau.go.launcherex.theme" /></intent>
+        <intent><action android:name="com.anddoes.launcher.THEME" /></intent>
+        <intent><action android:name="com.teslacoilsw.launcher.THEME" /></intent>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="com.fede.launcher.THEME_ICONPACK" />
+        </intent>
+    </queries>
+
+    <application
+        android:name=".LauncherApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.GlassLauncher">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:resumeWhilePausing="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|fontScale|density"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- Simgelerdeki bildirim sayıları: yalnızca uygulama başına sayı tutulur, içerik okunmaz/gönderilmez. -->
+        <service
+            android:name=".service.BadgeListener"
+            android:exported="true"
+            android:label="Bildirim sayıları"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- Çift dokunarak kilitleme: yalnızca sistemin kilitleme eylemini çağırır, içerik okumaz. -->
+        <service
+            android:name=".service.LockService"
+            android:exported="false"
+            android:label="@string/lock_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/lock_service" />
+        </service>
+
+        <!-- Uygulamaların ana ekrana kısayol / widget ekleme isteği (Chrome "Ana ekrana ekle" vb.): onay kartı. -->
+        <activity
+            android:name=".AddItemActivity"
+            android:exported="true"
+            android:theme="@style/Theme.GlassLauncher.Import"
+            android:excludeFromRecents="true"
+            android:taskAffinity="dev.glass.launcher.additem"
+            android:launchMode="standard">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+                <action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" />
+            </intent-filter>
+        </activity>
+        <!-- Galeride bir görseli açıp ⋮ > "Farklı ayarla" (ATTACH_DATA) ile launcher duvar kâğıdı yapmak. -->
+        <activity
+            android:name=".WallpaperImportActivity"
+            android:exported="true"
+            android:label="@string/wallpaper_import_label"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@style/Theme.GlassLauncher.Import"
+            android:excludeFromRecents="true"
+            android:taskAffinity="dev.glass.launcher.import"
+            android:launchMode="standard">
+            <intent-filter android:label="@string/wallpaper_import_label">
+                <action android:name="android.intent.action.ATTACH_DATA" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Uygulama listesinde "Glass Ayarları" olarak görünür: ayarları açar (launcher varsayılan değilken de). -->
+        <!-- Ayarlar: ayrı uygulama ekranı (kendi görevi). Alttan kaydırma/geri onu kapatır; son uygulamalarda kart olur. -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings_label"
+            android:icon="@mipmap/ic_launcher"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"
+            android:launchMode="singleTask"
+            android:taskAffinity="dev.glass.launcher.settings"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|uiMode|fontScale|density"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- "Glass Ayarları" simgesi: launcher'ı ana ekran isteğiyle açan görünmez ara ekran (bkz. EntryActivity). -->
+        <activity
+            android:name=".EntryActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="dev.glass.launcher.entry" />
+
+        <activity-alias
+            android:name=".SettingsEntry"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/settings_label"
+            android:targetActivity=".EntryActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>
