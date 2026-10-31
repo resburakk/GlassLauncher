@@ -1,5 +1,7 @@
 package dev.glass.launcher.ui
 
+import androidx.compose.ui.text.TextStyle
+
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -41,6 +43,19 @@ val IosTextShadow: Shadow
         offset = Offset(0f, 2f * TextShadowConfig.spread.coerceAtMost(1.5f)),
         blurRadius = 12f * TextShadowConfig.spread,
     )
+
+/**
+ * Duvar kâğıdı açık renkliyse (koyu yazıyı destekliyorsa) ana ekrandaki uygulama ve widget adları ile "Ara" düğmesi
+ * iOS'taki gibi koyu olur, gölgesiz. Duvar kâğıdı değişince kendiliğinden güncellenir.
+ */
+object HomeInk {
+    var light by mutableStateOf(false)
+    val label = Color(0xF0242426)
+    val soft = Color(0xB3242426)
+}
+
+/** Ana ekran (duvar kâğıdı üstü) etiket stili: açık duvar kâğıdında koyu, gölgesiz. */
+internal fun TextStyle.onWallpaper(): TextStyle = if (HomeInk.light) copy(color = HomeInk.label, shadow = Shadow.None) else this
 
 /** Yazı gölgesi ayarları (ayarlardan güncellenir; okuyan yazılar otomatik yenilenir). */
 object TextShadowConfig {

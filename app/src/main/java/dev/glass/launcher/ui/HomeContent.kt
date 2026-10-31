@@ -655,7 +655,7 @@ internal fun HomeContent(
                                     val caption = rememberWidgetCaption(item, vm)
                                     Text(
                                         caption,
-                                        style = CellLabelStyle.copy(fontSize = (settings.labelSize * m.pt.value).sp, fontWeight = fontWeightOf(settings.labelWeight)),
+                                        style = CellLabelStyle.copy(fontSize = (settings.labelSize * m.pt.value).sp, fontWeight = fontWeightOf(settings.labelWeight)).onWallpaper(),
                                         maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.width(w).padding(top = m.pt * settings.labelGap, start = 2.dp, end = 2.dp)
                                             .graphicsLayer { alpha = if (drag.key == item.id) 0f else 1f }
@@ -779,13 +779,14 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: () -> Float, onCl
         val pt = m.pt.value
         val k = m.pillH / (m.pt * 29f) // arama düğmesi boyut çarpanı
         // iOS 26 ölçümü: büyüteç ve yazı ince, beyazın ~%80'i; büyüteç yazının yanında küçük.
-        SearchGlyph(Color.White.copy(alpha = 0.82f), m.pt * 9.5f * k)
+        val ink = if (HomeInk.light) HomeInk.soft else Color.White.copy(alpha = 0.82f)
+        SearchGlyph(ink, m.pt * 9.5f * k)
         Spacer(Modifier.width(m.pt * 5f * k))
         Text(
-            "Ara", color = Color.White.copy(alpha = 0.82f),
+            "Ara", color = ink,
             fontSize = (LocalLauncherSettings.current.pillTextSize * pt * k).sp,
             fontWeight = fontWeightOf(LocalLauncherSettings.current.pillTextWeight),
-            style = LocalTextStyle.current.copy(shadow = IosTextShadow),
+            style = LocalTextStyle.current.copy(shadow = if (HomeInk.light) androidx.compose.ui.graphics.Shadow.None else IosTextShadow),
         )
     }
 }

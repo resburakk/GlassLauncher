@@ -418,6 +418,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         dev.glass.launcher.ui.WallpaperAccent.update(colors)
         wallpaperDarkText = colors != null &&
             (colors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+        // Açık duvar kâğıdında ana ekran yazıları da koyu olur (iOS gibi).
+        dev.glass.launcher.ui.HomeInk.light = wallpaperDarkText
         applyCurrentBarTone()
     }
 
