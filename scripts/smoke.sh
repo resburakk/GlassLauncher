@@ -499,7 +499,15 @@ sleep 1.5; shot 30d-ada-mesaj
 sleep 5
 adb shell dumpsys battery unplug; sleep 1; adb shell dumpsys battery set ac 1; sleep 1.5; shot 30e-ada-sarj
 adb shell dumpsys battery reset
-step "ada bitti" 3
+step "ada şarj bitti" 3
+# Erişilebilirlik katmanı: ada durum çubuğunun üstüne taşınır (telefonun Ayarlar'ında da görünür).
+adb shell settings put secure enabled_accessibility_services dev.glass.launcher/dev.glass.launcher.service.LockService
+adb shell settings put secure accessibility_enabled 1
+step "erişilebilirlik" 4
+shot 30f-ada-erisilebilirlik
+adb shell am start -W -a android.settings.SETTINGS >/dev/null; step "telefon ayarları" 3
+shot 30g-ada-telefon-ayarlari
+adb shell input keyevent KEYCODE_HOME; step "ada bitti" 3
 
 adb logcat -d > logcat.txt
 grep "GlassDiag" logcat.txt | sed 's/^.*GlassDiag: //' | sort -u | head -20 | while IFS= read -r line; do echo "::notice::DIAG $line"; done
