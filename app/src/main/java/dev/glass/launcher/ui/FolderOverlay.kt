@@ -253,7 +253,7 @@ fun FolderOverlay(
             singleLine = true,
             // Açık klasörün adı, klasörün dışındaki etiketle aynı stilde.
             textStyle = CellLabelStyle.copy(fontSize = (settings.openFolderTitleSize * u.value).sp).onWallpaper(),
-            cursorBrush = SolidColor(Color.White),
+            cursorBrush = SolidColor(ink(Color.White)),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { keyboard?.hide() }),
             modifier = Modifier.width(panelW),

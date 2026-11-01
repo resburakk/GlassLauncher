@@ -247,14 +247,14 @@ fun SearchOverlay(
                                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { clearRecent() }.padding(horizontal = 6.dp, vertical = 2.dp),
                             )
                         }
-                        Box(Modifier.fillMaxWidth().padding(horizontal = 6.dp).height(0.5.dp).background(Color(0x40FFFFFF)))
+                        Box(Modifier.fillMaxWidth().padding(horizontal = 6.dp).height(0.5.dp).background(ink(Color(0x40FFFFFF))))
                         recent.forEach { r ->
                             Row(
                                 Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { query = r }
                                     .padding(horizontal = 6.dp, vertical = 11.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                SearchGlyph(Color(0xE6FFFFFF), 18.dp)
+                                SearchGlyph(ink(Color(0xE6FFFFFF)), 18.dp)
                                 Spacer(Modifier.width(12.dp))
                                 Text(r, color = ink(Color.White), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
                                     maxLines = 1, overflow = TextOverflow.Ellipsis, style = TextStyle(shadow = SearchTextShadow))
@@ -305,7 +305,7 @@ fun SearchOverlay(
                     .padding(start = 14.dp, end = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                SearchGlyph(Color(0xE6FFFFFF), 18.dp)
+                SearchGlyph(ink(Color(0xE6FFFFFF)), 18.dp)
                 Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = query,
@@ -313,7 +313,7 @@ fun SearchOverlay(
                     singleLine = true,
                     // Yazı biraz daha belirgin: hafif gölge (açık arka planda kaybolmasın).
                     textStyle = TextStyle(color = ink(Color.White), fontSize = fieldSize, fontFamily = AppFont, shadow = SearchTextShadow),
-                    cursorBrush = SolidColor(Color.White),
+                    cursorBrush = SolidColor(ink(Color.White)),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = {
                         results.firstOrNull()?.let { open(it) } ?: if (query.isNotBlank()) webSearch(query.trim()) else Unit
@@ -333,8 +333,8 @@ fun SearchOverlay(
                         Modifier.size(30.dp).clip(CircleShape).clickable { query = "" },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Box(Modifier.size(20.dp).clip(CircleShape).background(Color(0xCCFFFFFF)), contentAlignment = Alignment.Center) {
-                            GlyphIcon(Glyph.Close, Color(0xFF3A3A3C), 14.dp)
+                        Box(Modifier.size(20.dp).clip(CircleShape).background(ink(Color(0xCCFFFFFF))), contentAlignment = Alignment.Center) {
+                            GlyphIcon(Glyph.Close, if (HomeInk.light) Color.White else Color(0xFF3A3A3C), 14.dp)
                         }
                     }
                 } else {
@@ -534,7 +534,7 @@ private fun ResultsList(
                         .fillMaxWidth()
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0x1FFFFFFF))
+                        .background(ink(Color(0x1FFFFFFF)))
                         .padding(14.dp)
                 ) {
                     Text("Kişiler, mesajlar ve dosyalar da aransın mı?", color = ink(Color.White), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
@@ -577,7 +577,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.deviceSection(
             Modifier.fillMaxWidth().clickable { onOpen(hit) }.padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0x33FFFFFF)), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(38.dp).clip(CircleShape).background(ink(Color(0x33FFFFFF))), contentAlignment = Alignment.Center) {
                 GlyphIcon(glyph, ink(Color.White), 20.dp)
             }
             Spacer(Modifier.width(12.dp))
@@ -600,7 +600,7 @@ private fun SectionHeader(title: String) {
 
 @Composable
 private fun Hairline() {
-    Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(0.5.dp).background(Color(0x2EFFFFFF)))
+    Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(0.5.dp).background(ink(Color(0x2EFFFFFF))))
 }
 
 @Composable

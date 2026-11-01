@@ -191,7 +191,7 @@ fun LibraryPage(
                 // Aramada iOS gibi sola hizalı (yazı tek satır kalır); boştayken ortada.
                 horizontalArrangement = if (searching) Arrangement.Start else Arrangement.Center,
             ) {
-                SearchGlyph(Color(0xCCFFFFFF), LocalPt.current * 17f)
+                SearchGlyph(ink(Color(0xCCFFFFFF)), LocalPt.current * 17f)
                 Spacer(Modifier.width(8.dp))
                 if (searching) {
                     BasicTextField(
@@ -199,7 +199,7 @@ fun LibraryPage(
                         onValueChange = { query = it },
                         singleLine = true,
                         textStyle = TextStyle(color = ink(Color.White), fontSize = 17.sp, fontFamily = AppFont, shadow = IosTextShadow),
-                        cursorBrush = SolidColor(Color.White),
+                        cursorBrush = SolidColor(ink(Color.White)),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = {
                             SearchRanker.rank(query, allApps) { it.label }.firstOrNull()?.let {

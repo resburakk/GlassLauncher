@@ -397,7 +397,7 @@ fun TodayPage(
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SearchGlyph(Color(0xCCFFFFFF), u * 17f)
+            SearchGlyph(ink(Color(0xCCFFFFFF)), u * 17f)
             Spacer(Modifier.width(8.dp))
             Text("Ara", color = ink(Color(0xB3FFFFFF)), fontSize = 17.sp, fontFamily = AppFont, style = TextStyle(shadow = IosTextShadow))
         }
