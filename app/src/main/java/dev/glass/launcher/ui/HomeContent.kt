@@ -945,7 +945,7 @@ internal fun AppCell(
                     style = LabelStyle.copy(
                         fontWeight = fontWeightOf(labelWeight ?: LocalLauncherSettings.current.labelWeight),
                         fontSize = labelSize?.sp ?: LabelStyle.fontSize,
-                    ),
+                    ).onWallpaper(),
                     maxLines = 1,
                     softWrap = false,
                     overflow = TextOverflow.Ellipsis,

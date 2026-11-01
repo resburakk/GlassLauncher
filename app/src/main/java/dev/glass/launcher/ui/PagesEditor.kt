@@ -104,7 +104,7 @@ fun PagesEditor(
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Sayfaları Düzenle", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, modifier = Modifier.weight(1f))
+                Text("Sayfaları Düzenle", color = ink(Color.White), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, modifier = Modifier.weight(1f))
                 GlassButton("Bitti", strength, 34.dp) { apply() }
             }
             Text(

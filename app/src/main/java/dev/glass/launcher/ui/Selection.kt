@@ -118,7 +118,7 @@ fun SelectionBar(
                             0 -> "Simgelere dokunarak seç"
                             else -> "$count öğe seçildi"
                         },
-                        color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        color = ink(Color.White), fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f).padding(start = 6.dp),
                     )
                     Text(
@@ -129,14 +129,14 @@ fun SelectionBar(
                 if (count > 1) {
                     Text(
                         "Seçili bir simgeyi sürükleyince hepsi birlikte taşınır.",
-                        color = Color.White.copy(alpha = 0.6f), fontSize = 12.sp,
+                        color = ink(Color.White).copy(alpha = 0.6f), fontSize = 12.sp,
                         modifier = Modifier.fillMaxWidth().padding(start = 6.dp, bottom = 4.dp),
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 if (picking) {
                     Text(
-                        "Hangi klasöre?", color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp,
+                        "Hangi klasöre?", color = ink(Color.White).copy(alpha = 0.7f), fontSize = 13.sp,
                         modifier = Modifier.fillMaxWidth().padding(start = 6.dp, bottom = 6.dp),
                     )
                     Column(
@@ -178,9 +178,9 @@ private fun BarButton(
         Text(
             text, fontSize = 15.sp, maxLines = 1,
             color = when {
-                !enabled -> Color.White.copy(alpha = 0.3f)
+                !enabled -> ink(Color.White).copy(alpha = 0.3f)
                 destructive -> Color(0xFFFF453A)
-                else -> Color.White
+                else -> ink(Color.White)
             },
         )
     }

@@ -1416,7 +1416,7 @@ internal fun GlassButton(text: String, strength: Float, height: Dp = 30.dp, onCl
     ) {
         val st = LocalLauncherSettings.current
         Text(
-            text, color = Color.White, fontSize = st.editButtonTextSize.sp, fontWeight = fontWeightOf(st.editButtonWeight),
+            text, color = ink(Color.White), fontSize = st.editButtonTextSize.sp, fontWeight = fontWeightOf(st.editButtonWeight),
             style = LocalTextStyle.current.copy(shadow = IosTextShadow),
         )
     }

@@ -102,6 +102,7 @@ internal class WidgetInk(
     val face: Color, val hand: Color,
 )
 private val GlassInk = WidgetInk(Color.White, Color(0xCCFFFFFF), Color(0x99FFFFFF), Color(0x33FFFFFF), Color(0xF2FFFFFF), Color(0xFF1C1C1E))
+private val GlassLightInk = WidgetInk(Color(0xF0242426), Color(0xB3242426), Color(0x8C242426), Color(0x1F242426), Color(0xF2FFFFFF), Color(0xFF1C1C1E))
 private val LightInk = WidgetInk(Color(0xFF1C1C1E), Color(0x991C1C1E), Color(0x801C1C1E), Color(0x1F1C1C1E), Color(0xFFF2F2F7), Color(0xFF1C1C1E))
 private val DarkInk = WidgetInk(Color.White, Color(0xB3FFFFFF), Color(0x80FFFFFF), Color(0x33FFFFFF), Color(0xFF2C2C2E), Color.White)
 internal val LocalWidgetInk = androidx.compose.runtime.staticCompositionLocalOf { GlassInk }
@@ -154,7 +155,8 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                 else if (play) Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape)
                 else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
             }
-            val ink = when { fill == 0 || weather || play -> GlassInk; fill == 1 -> LightInk; else -> DarkInk }
+            // Şeffaf cam widget: açık duvar kâğıdında yazılar koyu (iOS). Hava durumu ve Google Play kendi koyu zemininde.
+            val ink = when { weather || play -> GlassInk; fill == 0 -> if (HomeInk.light) GlassLightInk else GlassInk; fill == 1 -> LightInk; else -> DarkInk }
             androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
                 Box(frame) {
                     if (weather && fill != 0) WeatherBackdrop(dark = fill == 2)
@@ -418,10 +420,10 @@ private fun PhotoWidget(w: WidgetItem, vm: LauncherViewModel, width: Dp, height:
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            GlyphIcon(Glyph.Wallpaper, Color.White, 34.dp)
+            GlyphIcon(Glyph.Wallpaper, ink(Color.White), 34.dp)
             Spacer(Modifier.height(8.dp))
             Text(
-                "Fotoğraf seçmek için basılı tutun", color = Color(0xCCFFFFFF), fontSize = 12.sp,
+                "Fotoğraf seçmek için basılı tutun", color = ink(Color(0xCCFFFFFF)), fontSize = 12.sp,
                 textAlign = TextAlign.Center,
             )
         }
