@@ -107,6 +107,16 @@
             </intent-filter>
         </activity>
 
+        <!-- Otomatik test: ayarları adb ile değiştirmek için (DUMP izni: yalnızca kabuk/sistem gönderebilir). -->
+        <receiver
+            android:name=".DebugSettingsReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="dev.glass.launcher.SET" />
+            </intent-filter>
+        </receiver>
+
         <!-- Simgelerdeki bildirim sayıları: yalnızca uygulama başına sayı tutulur, içerik okunmaz/gönderilmez. -->
         <service
             android:name=".service.BadgeListener"
