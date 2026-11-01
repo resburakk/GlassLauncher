@@ -50,6 +50,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
@@ -725,6 +726,9 @@ internal fun HomeContent(
             }
 
             if (libFraction < 0.98f) {
+                val dockBd = LocalDockBackdrop.current
+                val baseLook = LocalGlass.current
+                CompositionLocalProvider(LocalGlass provides if (dockBd != null) baseLook.copy(backdrop = dockBd, sharp = dockBd, sharpSoft = false) else baseLook) {
                 Box(
                     Modifier
                         .offset(x = m.dockMarginX, y = m.dockTop)
@@ -758,6 +762,7 @@ internal fun HomeContent(
                         }
                       }
                     }
+                }
                 }
             }
         }

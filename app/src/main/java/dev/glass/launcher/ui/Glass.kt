@@ -111,6 +111,8 @@ data class GlassLook(
 )
 
 val LocalGlass = staticCompositionLocalOf { GlassLook() }
+/** Dock'a özel bulanık kopya (Ayarlar > Dock > Bulanıklık genel değerden farklıysa). */
+val LocalDockBackdrop = staticCompositionLocalOf<dev.glass.launcher.data.Blurred?> { null }
 
 /**
  * Ana ekran sayfası: içindeki camlar (klasör simgeleri, widget'lar) arkalarındaki duvar kâğıdını sayfanın DURDUĞU

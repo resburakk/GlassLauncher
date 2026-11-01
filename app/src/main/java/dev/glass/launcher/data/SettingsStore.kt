@@ -79,6 +79,8 @@ data class LauncherSettings(
     val dockHeight: Float = 0.94f,
     val dockWidth: Float = 1f,
     val dockOpacity: Float = 1f,
+    /** Dock camının bulanıklığı (genel bulanıklık şiddetiyle çarpılır; 0 = net cam). */
+    val dockBlur: Float = 1f,
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
     val dockBottom: Float = 15f,
     /**
@@ -270,6 +272,7 @@ data class LauncherSettings(
         dockHeight = dockHeight.coerceIn(0.8f, 1.3f),
         dockWidth = dockWidth.coerceIn(0.85f, 1.05f),
         dockOpacity = dockOpacity.coerceIn(0f, 2f),
+        dockBlur = dockBlur.coerceIn(0f, 2f),
         dockBottom = dockBottom.coerceIn(0f, 60f),
         dockCorner = if (dockCorner < 0f) -1f else dockCorner.coerceIn(0.08f, 0.5f),
         pillScale = pillScale.coerceIn(0.7f, 1.5f),
@@ -317,7 +320,7 @@ data class LauncherSettings(
         put("iconCorner4", iconCorner.toDouble()); put("iconGlass", iconGlass)
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
-        put("dockOpacity", dockOpacity.toDouble()); put("folderOpacity", folderOpacity.toDouble())
+        put("dockOpacity", dockOpacity.toDouble()); put("dockBlur", dockBlur.toDouble()); put("folderOpacity", folderOpacity.toDouble())
         put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble()); put("folderCorner", folderCorner.toDouble())
         put("libraryTileCorner2", libraryTileCorner.toDouble()); put("libraryTileCornerDock", libraryTileCornerDock); put("libraryGroupCorner", libraryGroupCorner.toDouble())
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
@@ -394,6 +397,7 @@ data class LauncherSettings(
                 dockHeight = f("dockHeight", d.dockHeight),
                 dockWidth = f("dockWidth", d.dockWidth),
                 dockOpacity = f("dockOpacity", d.dockOpacity),
+                dockBlur = f("dockBlur", d.dockBlur),
                 folderOpacity = f("folderOpacity", d.folderOpacity),
                 glassStrength = f("glassStrength", d.glassStrength),
                 theme = runCatching { ThemeMode.valueOf(o.optString("theme")) }.getOrDefault(d.theme),

@@ -479,6 +479,22 @@ fun HomeScreen(
             }.getOrNull()
         }
     }
+    // Camların hazır bulanık kopyası "Bulanıklık şiddeti" ayarını izler (önceden sabitti: kaydırıcı yalnızca gerçek
+    // bulanıklıkta etkiliydi, dock hep aynı bulanıklıkta kalıyordu). 1 = eski görünüm; 0 = net.
+    val glassBlurStep = kotlin.math.round(settings.glassBlur * 10f) / 10f
+    val dockBlurStep = kotlin.math.round(settings.glassBlur * settings.dockBlur * 10f) / 10f
+    val baseSigmaPx = with(density) { 15.dp.toPx() }
+    suspend fun tuned(k: Float): dev.glass.launcher.data.Blurred? {
+        val w = wallpaper ?: return null
+        if (k < 0.05f || rootSize.width == 0) return null
+        return blurredWallpaperCopy(w, baseSigmaPx * k / 0.577f, rootSize)?.let { dev.glass.launcher.data.Blurred(it, w.width, w.height) }
+    }
+    val tunedBlur by produceState<dev.glass.launcher.data.Blurred?>(null, wallpaper, glassBlurStep, rootSize) {
+        value = if (kotlin.math.abs(glassBlurStep - 1f) < 0.05f) null else tuned(glassBlurStep)
+    }
+    val dockBlurred by produceState<dev.glass.launcher.data.Blurred?>(null, wallpaper, dockBlurStep, glassBlurStep, rootSize) {
+        value = if (kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f) null else tuned(dockBlurStep)
+    }
     // Tanı kaydı (yalnızca durum değişince): kalite düşürme nedenleri ve pencere bulanıklığı desteği.
     LaunchedEffect(reduced, powerSave, degraded) {
         android.util.Log.i(
@@ -511,6 +527,10 @@ fun HomeScreen(
         LocalMotion provides motion,
         LocalPt provides HomeMetrics.pt(LocalConfiguration.current.screenWidthDp.dp),
         LocalHomeMetrics provides homeMetrics,
+        // Dock'un kendi bulanıklığı (Ayarlar > Dock > Bulanıklık): farklıysa dock bu kopyayı büker.
+        LocalDockBackdrop provides (if (!useBackdrop || reduced || homeBackdrop != null) null
+            else if (kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f) null
+            else if (dockBlurStep < 0.05f) (softSharp ?: sharpBackdrop) else dockBlurred),
         LocalGlass provides GlassLook(
             dark = dark,
             reduced = reduced,
@@ -519,7 +539,7 @@ fun HomeScreen(
             // Ana ekran bulanıklığı açıkken şeffaf cam da net kopya yerine aynı oranda bulanık kopyayı kullanır.
             sharp = if (!useBackdrop || reduced) null else homeBackdrop ?: softSharp ?: sharpBackdrop,
             sharpSoft = homeBackdrop == null && softSharp != null,
-            backdrop = if (!useBackdrop) null else homeBackdrop ?: blurred,
+            backdrop = if (!useBackdrop) null else homeBackdrop ?: (if (glassBlurStep < 0.05f) softSharp ?: sharpBackdrop else tunedBlur) ?: blurred,
             rootW = rootSize.width.toFloat(),
             rootH = rootSize.height.toFloat(),
         ),

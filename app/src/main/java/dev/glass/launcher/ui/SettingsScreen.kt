@@ -845,6 +845,8 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         RowDivider()
         SliderRow("Cam yoğunluğu", pct(s.dockOpacity), s.dockOpacity, 0f..2f, default = Def.dockOpacity) { v -> onChange { it.copy(dockOpacity = v) } }
         RowDivider()
+        SliderRow("Bulanıklık", if (s.dockBlur < 0.05f) "Net" else pct(s.dockBlur), s.dockBlur, 0f..2f, default = Def.dockBlur) { v -> onChange { it.copy(dockBlur = v) } }
+        RowDivider()
         SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f, default = Def.dockBottom) { v -> onChange { it.copy(dockBottom = v) } }
         RowDivider()
         // Varsayılan (negatif): iOS 26 ölçüsü (%37,8).
