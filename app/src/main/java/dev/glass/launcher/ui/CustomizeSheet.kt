@@ -69,27 +69,32 @@ fun CustomizeSheet(
             enter = slideInVertically(motion.bouncy()) { it } + fadeIn(motion.tween(160)),
             exit = slideOutVertically(motion.tween(200)) { it } + fadeOut(motion.tween(160)),
         ) {
-            val shape = RoundedCornerShape(34.dp)
+            // Açılır menüyle aynı cam ve yazı rengi; köşeler dock ile aynı yarıçapta (bütünlük).
+            val st = LocalLauncherSettings.current
+            val dark = menuDarkNow()
+            val fg = menuInk(dark)
+            val corner = LocalHomeMetrics.current?.dockCorner ?: 34.dp
+            val shape = appShape(corner)
             Box(
                 Modifier
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(horizontal = 10.dp, vertical = 10.dp)
                     .fillMaxWidth()
             ) {
-                BlurBackdrop(34.dp, Modifier.matchParentSize(), menuBlur = true)
+                BlurBackdrop(corner, Modifier.matchParentSize(), menuBlur = true)
+                androidx.compose.runtime.CompositionLocalProvider(LocalSheetInk provides fg) {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .liquidGlass(shape, strength, 18.dp, panel = true)
-                        .background(Color(0x8C1C1C1E), shape)
+                        .menuGlass(shape, (st.menuOpacity + 0.15f).coerceAtMost(0.95f), dark)
                         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
-                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                        .padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Box(Modifier.width(36.dp).height(5.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.35f)))
-                    Spacer(Modifier.height(10.dp))
-                    Text("Özelleştir", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
-                    Spacer(Modifier.height(14.dp))
+                    Box(Modifier.width(36.dp).height(5.dp).clip(CircleShape).background(fg.copy(alpha = 0.3f)))
+                    Spacer(Modifier.height(12.dp))
+                    Text("Özelleştir", color = fg, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
+                    Spacer(Modifier.height(16.dp))
 
                     // Görünüm: açık ve koyu mod için birlikte (Varsayılan: açıkta orijinal, koyuda koyu — iOS gibi).
                     val cur = when {
@@ -131,7 +136,7 @@ fun CustomizeSheet(
                         }
                     }
 
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(14.dp))
                     // Boyut: Küçük (etiketli) / Büyük (iOS gibi etiketsiz, büyük simge).
                     val large = !settings.showLabels && settings.iconScale >= 1.2f
                     Label("Boyut")
@@ -141,34 +146,45 @@ fun CustomizeSheet(
                             else it.copy(showLabels = true, iconScale = if (it.iconScale >= 1.2f) 1.1f else it.iconScale)
                         }
                     }
-                    Spacer(Modifier.height(8.dp))
+                }
                 }
             }
         }
     }
 }
 
+/** Panel yazı rengi (açılır menüyle aynı: koyu menüde beyaz, açıkta koyu gri). */
+private val LocalSheetInk = androidx.compose.runtime.staticCompositionLocalOf { Color.White }
+
 @Composable
 private fun Label(t: String) {
-    Text(t, color = Color.White.copy(alpha = 0.7f), fontSize = 13.sp, fontFamily = AppFont, modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 6.dp))
+    Text(
+        t, color = LocalSheetInk.current.copy(alpha = 0.6f), fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont,
+        modifier = Modifier.fillMaxWidth().padding(start = 6.dp, bottom = 7.dp),
+    )
 }
 
 @Composable
 private fun Segmented(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+    val fg = LocalSheetInk.current
+    val dark = fg.red > 0.5f
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = 0.12f)).padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        Modifier.fillMaxWidth().height(42.dp).clip(RoundedCornerShape(21.dp)).background(fg.copy(alpha = 0.10f)).padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         options.forEach { (k, t) ->
             val sel = k == selected
             Box(
-                Modifier.weight(1f).clip(RoundedCornerShape(11.dp))
-                    .background(if (sel) Color.White.copy(alpha = 0.92f) else Color.Transparent)
-                    .clickable { onSelect(k) }
-                    .padding(vertical = 9.dp),
+                // Uzun adlar ("Varsayılan") daha geniş yer alır: yazı sıkışmaz, kesilmez.
+                Modifier.weight(0.9f + t.length * 0.09f).fillMaxSize().clip(RoundedCornerShape(18.dp))
+                    .background(if (sel) (if (dark) Color.White.copy(alpha = 0.92f) else Color.White) else Color.Transparent)
+                    .clickable { onSelect(k) },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(t, color = if (sel) Color.Black else Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, maxLines = 1, softWrap = false)
+                Text(
+                    t, color = if (sel) Color(0xFF1C1C1E) else fg, fontSize = if (options.size >= 5) 13.sp else 14.sp,
+                    fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium, fontFamily = AppFont, maxLines = 1, softWrap = false,
+                )
             }
         }
     }
@@ -178,7 +194,7 @@ private fun Segmented(options: List<Pair<String, String>>, selected: String, onS
 private fun Swatch(brush: Brush, selected: Boolean, label: String?, onClick: () -> Unit) {
     Box(
         Modifier.size(30.dp).clip(CircleShape).background(brush)
-            .then(if (selected) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+            .then(if (selected) Modifier.border(2.dp, LocalSheetInk.current, CircleShape) else Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { if (label != null) Text(label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold) }

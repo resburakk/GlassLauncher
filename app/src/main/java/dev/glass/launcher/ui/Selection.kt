@@ -104,7 +104,7 @@ fun SelectionBar(
             val st = LocalLauncherSettings.current
             val dark = menuDarkNow()
             val fg = menuInk(dark)
-            val shape = RoundedCornerShape((st.menuCorner + 6f).dp)
+            val shape = appShape(LocalHomeMetrics.current?.dockCorner ?: 30.dp)
             Column(
                 Modifier
                     .windowInsetsPadding(WindowInsets.navigationBars)
