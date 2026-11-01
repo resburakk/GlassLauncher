@@ -90,6 +90,10 @@ class WallpaperRepository(private val context: Context) {
     /** Launcher kopyası sistem duvar kâğıdından mı alındı (ikisi aynı görüntü mü)? */
     fun isFromSync(): Boolean = prefs.getBoolean("fromSync", false)
 
+    /** Son kopyalama sorunu: 0 yok, 1 izin yok, 2 hareketli duvar kâğıdı, 3 başka hata (ana ekrandaki uyarı kartı için). */
+    val syncProblem: Int get() = prefs.getInt("problem", 0)
+    private fun problem(c: Int) { prefs.edit().putInt("problem", c).apply() }
+
     /** Son kopyalama denemesinin sonucu (Ayarlar'da gösterilir). */
     val syncStatus: String get() = prefs.getString("status", null) ?: "Henüz denenmedi."
 
@@ -120,8 +124,12 @@ class WallpaperRepository(private val context: Context) {
 
     suspend fun syncFromSystem(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         // Android sürümüne göre biri ya da ikisi gerekir; hiçbiri yoksa denemeye gerek yok.
+        // Android 14+ (Samsung, Honor 400 ve diğerleri): sistem duvar kâğıdını okumak "Tüm dosyalara erişim" ister;
+        // Fotoğraflar izni tek başına yetmez (bazı üreticiler yine de verir, Honor 600 gibi). İzin yoksa denenir,
+        // güvenlik hatası gelirse kullanıcıya açıkça hangi iznin gerektiği söylenir.
         if (!hasPhotosPermission() && !hasAllFilesAccess()) {
-            status("İzin yok.")
+            status("İzin yok: Tüm dosyalara erişim gerekli.")
+            problem(1)
             return@withContext false
         }
         runCatching {
@@ -134,10 +142,11 @@ class WallpaperRepository(private val context: Context) {
                 // Eski kopya (sistemden alınmışsa) yanlış görüntü göstermesin; elle seçilen launcher duvar kâğıdına dokunma.
                 if (prefs.getBoolean("fromSync", false) && file.exists()) { file.delete(); _version.value++ }
                 prefs.edit().putInt("lastId", -1).apply()
+                problem(2)
                 return@runCatching false
             }
             val id = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
-            if (!force && id >= 0 && id == prefs.getInt("lastId", -1) && file.exists()) return@runCatching true
+            if (!force && id >= 0 && id == prefs.getInt("lastId", -1) && file.exists()) { problem(0); return@runCatching true }
             val tmp = File(context.filesDir, "wallpaper.tmp")
             // Önce orijinal dosya (tam çözünürlük); yoksa çizilebilir nesneden üret.
             val pfd = runCatching { wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
@@ -146,6 +155,7 @@ class WallpaperRepository(private val context: Context) {
             } else {
                 val d = wm.drawable ?: run {
                     status("Duvar kâğıdı görüntüsü alınamadı.")
+                    problem(3)
                     return@runCatching false
                 }
                 val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
@@ -159,6 +169,7 @@ class WallpaperRepository(private val context: Context) {
             if (file.exists() && file.length() == tmp.length() && sameBytes(file, tmp)) {
                 tmp.delete()
                 prefs.edit().putInt("lastId", id).apply()
+                problem(0)
                 return@runCatching true
             }
             if (!tmp.renameTo(file)) return@runCatching false
@@ -166,8 +177,12 @@ class WallpaperRepository(private val context: Context) {
             _version.value++
             val t = java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("tr")).format(java.util.Date())
             status("Kopyalandı ($t, ${file.length() / 1024} KB${if (pfd != null) ", orijinal dosya" else ""}).")
+            problem(0)
             true
-        }.onFailure { status("Hata: ${it.javaClass.simpleName} ${it.message ?: ""}".trim()) }
+        }.onFailure {
+            if (it is SecurityException) { status("İzin yok: Tüm dosyalara erişim gerekli."); problem(1) }
+            else { status("Hata: ${it.javaClass.simpleName} ${it.message ?: ""}".trim()); problem(3) }
+        }
             .getOrDefault(false)
     }
 

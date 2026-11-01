@@ -1328,6 +1328,15 @@ fun HomeScreen(
         )
         }
 
+        // Liquid Glass kurulumu: telefonun duvar kâğıdı okunamıyorsa (Samsung, diğer Honor modelleri: izin; hareketli
+        // duvar kâğıdı) cam düz görünür. Ne yapılacağını söyleyen bir kart gösterilir (kapatılınca o sorun için çıkmaz).
+        val glassProblem by vm.glassProblem.collectAsStateWithLifecycle()
+        if (glassProblem != 0 && overlay == Overlay.None && !editMode) {
+            GlassSetupCard(glassProblem, settings.glassStrength, Modifier.align(Alignment.BottomCenter).padding(bottom = (homeMetrics?.let { with(density) { (rootSize.height.toDp() - it.dockTop) } } ?: 120.dp) + 64.dp)) {
+                wallpaperSheet = true
+            }
+        }
+
         // Duvar kâğıdı paneli (düzenleme modunda "Duvar Kâğıdı" ile alttan açılır)
         WallpaperSheet(
             visible = wallpaperSheet,
@@ -1577,5 +1586,63 @@ private suspend fun blurredWallpaperCopy(
             small.prepareToDraw()
             small.asImageBitmap()
         }.getOrNull()
+    }
+}
+
+
+/**
+ * Liquid Glass kurulum kartı: cam için telefonun duvar kâğıdı gerekiyor ama okunamıyor. İzin eksikse izin ekranlarına,
+ * duvar kâğıdı hareketliyse ya da okunamıyorsa launcher'dan duvar kâğıdı seçmeye yönlendirir.
+ */
+@Composable
+private fun GlassSetupCard(problem: Int, strength: Float, modifier: Modifier, onPickWallpaper: () -> Unit) {
+    val ctx = LocalContext.current
+    val prefs = remember { ctx.getSharedPreferences("glass_banner", android.content.Context.MODE_PRIVATE) }
+    var dismissed by remember(problem) { mutableStateOf(prefs.getInt("dismissed", -1) == problem) }
+    if (dismissed) return
+    val la = ctx.applicationContext as dev.glass.launcher.LauncherApp
+    val photosPerm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    val dark = menuDarkNow()
+    val fg = menuInk(dark)
+    val shape = RoundedCornerShape(26.dp)
+    Column(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth()
+            .menuGlass(shape, 0.85f, dark)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+    ) {
+        Text("Liquid Glass tam çalışmıyor", color = fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            when (problem) {
+                1 -> "Cam, telefonun duvar kâğıdını görebilmek için \"Tüm dosyalara erişim\" iznine ihtiyaç duyuyor (Android 14+). Görüntü telefonda kalır."
+                2 -> "Hareketli (canlı) duvar kâğıdının görüntüsünü Android vermiyor. Sabit bir duvar kâğıdı seçersen cam bulanıklık ve kırılmayla çalışır."
+                else -> "Telefon duvar kâğıdının görüntüsünü vermedi. Duvar kâğıdını launcher'dan seçersen cam tam çalışır."
+            },
+            color = fg.copy(alpha = 0.75f), fontSize = 13.sp, lineHeight = 18.sp, fontFamily = AppFont,
+        )
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            @Composable
+            fun Btn(t: String, primary: Boolean, modifier: Modifier, onClick: () -> Unit) {
+                Box(
+                    modifier.height(38.dp).clip(RoundedCornerShape(19.dp))
+                        .background(if (primary) Color(0xFF0A84FF) else fg.copy(alpha = 0.10f)).clickable(onClick = onClick),
+                    contentAlignment = Alignment.Center,
+                ) { Text(t, color = if (primary) Color.White else fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1) }
+            }
+            Btn(if (problem == 1) "İzin ver" else "Duvar kâğıdı seç", true, Modifier.weight(1f)) {
+                if (problem == 1) {
+                    if (!la.wallpaperRepository.hasAllFilesAccess()) runCatching {
+                        ctx.startActivity(
+                            android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, android.net.Uri.parse("package:${ctx.packageName}"))
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    } else if (!la.wallpaperRepository.hasPhotosPermission()) photosPerm.launch(android.Manifest.permission.READ_MEDIA_IMAGES)
+                } else onPickWallpaper()
+            }
+            Btn("Daha sonra", false, Modifier.weight(0.8f)) {
+                prefs.edit().putInt("dismissed", problem).apply(); dismissed = true
+            }
+        }
     }
 }

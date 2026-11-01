@@ -406,13 +406,21 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      * Sistem duvar kâğıdını (izin varsa ve ayar açıksa) launcher kopyası yapar; değişmediyse bir şey yapmaz.
      * Açılışta, öne gelişte ve sistem duvar kâğıdı değişince çağrılır.
      */
+    /** Liquid Glass'ın tam çalışmasını engelleyen sorun (0 yok, 1 izin, 2 hareketli duvar kâğıdı, 3 hata). */
+    private val _glassProblem = MutableStateFlow(0)
+    val glassProblem: StateFlow<Int> = _glassProblem
+
     fun syncSystemWallpaper(force: Boolean = false) {
         viewModelScope.launch {
             val s = la.settingsStore.settings.first()
-            if (!s.syncSystemWallpaper) return@launch
-            if (la.wallpaperRepository.syncFromSystem(force) && !s.launcherWallpaper) {
+            if (!s.syncSystemWallpaper) { _glassProblem.value = 0; return@launch }
+            val ok = la.wallpaperRepository.syncFromSystem(force)
+            if (ok && !s.launcherWallpaper) {
                 la.settingsStore.update { it.copy(launcherWallpaper = true) }
             }
+            // Elle seçilmiş launcher duvar kâğıdı varken cam zaten tam çalışır: uyarı gösterilmez.
+            val manual = s.launcherWallpaper && !la.wallpaperRepository.isFromSync()
+            _glassProblem.value = if (ok || manual) 0 else la.wallpaperRepository.syncProblem
         }
     }
 
