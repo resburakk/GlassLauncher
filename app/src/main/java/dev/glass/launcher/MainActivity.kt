@@ -416,8 +416,17 @@ class MainActivity : ComponentActivity(), WidgetRequester {
 
     private fun applyBarTone(colors: WallpaperColors?) {
         dev.glass.launcher.ui.WallpaperAccent.update(colors)
-        wallpaperDarkText = colors != null &&
-            (colors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+        // Android'in "koyu yazı" işareti yalnızca neredeyse beyaz duvar kâğıtlarında verilir; açık lila/gri gibi
+        // tonlarda beyaz yazı okunmuyordu. Ayrıca duvar kâğıdının baskın renklerinin parlaklığına bakılır: koyu yazının
+        // karşıtlığı beyazınkinden fazlaysa (orta-açık tonlar) yazılar koyu olur.
+        val hint = colors != null && (colors.colorHints and WallpaperColors.HINT_SUPPORTS_DARK_TEXT) != 0
+        val lum = colors?.let { c ->
+            val p = c.primaryColor.luminance()
+            val s2 = c.secondaryColor?.luminance() ?: p
+            val t = c.tertiaryColor?.luminance() ?: s2
+            p * 0.6f + s2 * 0.25f + t * 0.15f
+        } ?: 0f
+        wallpaperDarkText = hint || lum > 0.40f
         // Açık duvar kâğıdında ana ekran yazıları da koyu olur (iOS gibi).
         dev.glass.launcher.ui.HomeInk.light = wallpaperDarkText
         applyCurrentBarTone()
