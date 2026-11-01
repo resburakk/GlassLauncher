@@ -149,6 +149,8 @@ fun WeatherWidget(w: WidgetItem) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val data = rememberWeather()
+    // Yazı renkleri widget görünümünden: şeffaf camda açık duvar kâğıdı üstünde koyu, renkli zeminde beyaz.
+    val wi = LocalWidgetInk.current
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok ->
         if (ok) scope.launch { WeatherRepo.refresh(ctx.applicationContext, force = true) }
     }
@@ -162,13 +164,13 @@ fun WeatherWidget(w: WidgetItem) {
             Spacer(Modifier.height(6.dp))
             if (!WeatherRepo.hasPermission(ctx)) {
                 Text(
-                    "Konum izni ver", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
-                    modifier = Modifier.clip(RoundedCornerShape(50)).background(Color(0x33FFFFFF))
+                    "Konum izni ver", color = wi.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                    modifier = Modifier.clip(RoundedCornerShape(50)).background(wi.track)
                         .clickable { perm.launch(Manifest.permission.ACCESS_COARSE_LOCATION) }
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                 )
             } else {
-                Text("Hava durumu alınıyor…", color = Color(0xCCFFFFFF), fontSize = 13.sp, fontFamily = AppFont)
+                Text("Hava durumu alınıyor…", color = wi.secondary, fontSize = 13.sp, fontFamily = AppFont)
             }
         }
         return
@@ -179,24 +181,24 @@ fun WeatherWidget(w: WidgetItem) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    data.city.ifEmpty { "Konumum" }, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                    data.city.ifEmpty { "Konumum" }, color = wi.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
                     fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                Text("${data.temp}°", color = Color.White, fontSize = if (wide) 44.sp else 40.sp, fontWeight = FontWeight.Light, fontFamily = AppFont)
+                Text("${data.temp}°", color = wi.primary, fontSize = if (wide) 44.sp else 40.sp, fontWeight = FontWeight.Light, fontFamily = AppFont)
             }
             if (wide) {
                 Column(horizontalAlignment = Alignment.End) {
                     SkyGlyph(data.sky, data.day, 26.dp)
-                    Text(data.sky.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont)
-                    Text("Y:${data.max}° D:${data.min}°", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont)
+                    Text(data.sky.title, color = wi.primary, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont)
+                    Text("Y:${data.max}° D:${data.min}°", color = wi.primary, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont)
                 }
             }
         }
         if (!wide) {
             Spacer(Modifier.weight(1f))
             SkyGlyph(data.sky, data.day, 22.dp)
-            Text(data.sky.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, maxLines = 1)
-            Text("Y:${data.max}° D:${data.min}°", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont)
+            Text(data.sky.title, color = wi.primary, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, maxLines = 1)
+            Text("Y:${data.max}° D:${data.min}°", color = wi.primary, fontSize = 13.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont)
             return@Column
         }
         Spacer(Modifier.weight(1f))
@@ -204,29 +206,29 @@ fun WeatherWidget(w: WidgetItem) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             data.hours.forEachIndexed { i, h ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(if (i == 0) "Şimdi" else "%02d".format(h.hour), color = Color(0xDDFFFFFF), fontSize = 12.sp, fontFamily = AppFont)
+                    Text(if (i == 0) "Şimdi" else "%02d".format(h.hour), color = wi.secondary, fontSize = 12.sp, fontFamily = AppFont)
                     Spacer(Modifier.height(4.dp))
                     SkyGlyph(h.sky, h.day, 22.dp)
                     Spacer(Modifier.height(4.dp))
-                    Text("${h.temp}°", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
+                    Text("${h.temp}°", color = wi.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
                 }
             }
         }
         if (big && data.days.size > 1) {
             Spacer(Modifier.height(12.dp))
-            Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color(0x40FFFFFF)))
+            Box(Modifier.fillMaxWidth().height(0.5.dp).background(wi.track))
             Spacer(Modifier.height(6.dp))
             val lo = data.days.minOf { it.min }
             val hi = data.days.maxOf { it.max }.coerceAtLeast(lo + 1)
             data.days.drop(1).take(5).forEach { d ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(TR_SHORT_DAYS[(d.dayOfWeek - 1).coerceIn(0, 6)], color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, modifier = Modifier.width(40.dp))
+                    Text(TR_SHORT_DAYS[(d.dayOfWeek - 1).coerceIn(0, 6)], color = wi.primary, fontSize = 14.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, modifier = Modifier.width(40.dp))
                     SkyGlyph(d.sky, true, 20.dp)
                     Spacer(Modifier.width(10.dp))
-                    Text("${d.min}°", color = Color(0xB3FFFFFF), fontSize = 14.sp, fontFamily = AppFont, modifier = Modifier.width(34.dp))
+                    Text("${d.min}°", color = wi.secondary, fontSize = 14.sp, fontFamily = AppFont, modifier = Modifier.width(34.dp))
                     // Sıcaklık aralığı çubuğu (iOS gibi).
                     Canvas(Modifier.weight(1f).height(5.dp)) {
-                        drawRoundRect(Color(0x33FFFFFF), cornerRadius = CornerRadius(size.height / 2))
+                        drawRoundRect(wi.track, cornerRadius = CornerRadius(size.height / 2))
                         val a = (d.min - lo).toFloat() / (hi - lo); val b = (d.max - lo).toFloat() / (hi - lo)
                         drawRoundRect(
                             Brush.horizontalGradient(listOf(Color(0xFF5AC8FA), Color(0xFFFFD23F), Color(0xFFFF9F0A))),
@@ -235,7 +237,7 @@ fun WeatherWidget(w: WidgetItem) {
                         )
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text("${d.max}°", color = Color.White, fontSize = 14.sp, fontFamily = AppFont)
+                    Text("${d.max}°", color = wi.primary, fontSize = 14.sp, fontFamily = AppFont)
                 }
             }
         }

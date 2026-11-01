@@ -127,7 +127,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
         WidgetKind.GlassClock -> GlassClockWidget(w, width, height)
         // Fotoğraf seçilmemişken diğer widget'lar gibi Liquid Glass cam; fotoğraf seçilince fotoğrafın kendisi.
         WidgetKind.Photo -> Box(
-            if (w.data.isEmpty()) Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000))
+            if (w.data.isEmpty()) Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(if (HomeInk.light) Color(0x38FFFFFF) else Color(0x26000000))
             else Modifier.size(width, height).clip(shape).background(Color(0x33000000))
         ) {
             PhotoWidget(w, vm, width, height)
@@ -138,7 +138,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
             // Google Play: her görünümde kendi oyun desenli zemini (yazılar beyaz).
             val play = w.kind == WidgetKind.PlayStore
             val frame = if (fill == 0 && !play) {
-                Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(Color(0x26000000))
+                Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(if (HomeInk.light) Color(0x38FFFFFF) else Color(0x26000000))
             } else {
                 // iOS 26 dolu widget: hava durumu gökyüzü renginde, diğerleri açık (beyaz) ya da koyu zemin.
                 val bg = when {
@@ -156,7 +156,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                 else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
             }
             // Şeffaf cam widget: açık duvar kâğıdında yazılar koyu (iOS). Hava durumu ve Google Play kendi koyu zemininde.
-            val ink = when { weather || play -> GlassInk; fill == 0 -> if (HomeInk.light) GlassLightInk else GlassInk; fill == 1 -> LightInk; else -> DarkInk }
+            val ink = when { (weather && fill != 0) || play -> GlassInk; fill == 0 -> if (HomeInk.light) GlassLightInk else GlassInk; fill == 1 -> LightInk; else -> DarkInk }
             androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
                 Box(frame) {
                     if (weather && fill != 0) WeatherBackdrop(dark = fill == 2)
