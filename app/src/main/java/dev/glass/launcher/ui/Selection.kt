@@ -100,14 +100,17 @@ fun SelectionBar(
             enter = slideInVertically(motion.bouncy()) { it } + fadeIn(motion.tween(160)),
             exit = slideOutVertically(motion.tween(200)) { it } + fadeOut(motion.tween(160)),
         ) {
-            val shape = RoundedCornerShape(30.dp)
+            // Açılır menüyle aynı cam (renk tonu, saydamlık, bulanıklık, köşe): düzenleme panelleri bir bütün.
+            val st = LocalLauncherSettings.current
+            val dark = menuDarkNow()
+            val fg = menuInk(dark)
+            val shape = RoundedCornerShape((st.menuCorner + 6f).dp)
             Column(
                 Modifier
                     .windowInsetsPadding(WindowInsets.navigationBars)
                     .padding(10.dp)
                     .fillMaxWidth()
-                    .shadow(18.dp, shape)
-                    .background(Color(0xFF1C1C1E), shape)
+                    .menuGlass(shape, (st.menuOpacity + 0.15f).coerceAtMost(0.95f), dark)
                     .clickable(interactionSource = androidx.compose.runtime.remember { MutableInteractionSource() }, indication = null) {}
                     .padding(horizontal = 14.dp, vertical = 12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -118,7 +121,7 @@ fun SelectionBar(
                             0 -> "Simgelere dokunarak seç"
                             else -> "$count öğe seçildi"
                         },
-                        color = ink(Color.White), fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
+                        color = fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.weight(1f).padding(start = 6.dp),
                     )
                     Text(
@@ -129,14 +132,14 @@ fun SelectionBar(
                 if (count > 1) {
                     Text(
                         "Seçili bir simgeyi sürükleyince hepsi birlikte taşınır.",
-                        color = ink(Color.White).copy(alpha = 0.6f), fontSize = 12.sp,
+                        color = fg.copy(alpha = 0.6f), fontSize = 12.sp,
                         modifier = Modifier.fillMaxWidth().padding(start = 6.dp, bottom = 4.dp),
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 if (picking) {
                     Text(
-                        "Hangi klasöre?", color = ink(Color.White).copy(alpha = 0.7f), fontSize = 13.sp,
+                        "Hangi klasöre?", color = fg.copy(alpha = 0.7f), fontSize = 13.sp,
                         modifier = Modifier.fillMaxWidth().padding(start = 6.dp, bottom = 6.dp),
                     )
                     Column(
@@ -144,18 +147,18 @@ fun SelectionBar(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         folders.forEach { (id, name) ->
-                            BarButton(name, Modifier.fillMaxWidth()) { picking = false; onMoveInto(id) }
+                            BarButton(name, Modifier.fillMaxWidth(), fg = fg) { picking = false; onMoveInto(id) }
                         }
                     }
                     Spacer(Modifier.height(6.dp))
-                    BarButton("Geri", Modifier.fillMaxWidth(), dim = true) { picking = false }
+                    BarButton("Geri", Modifier.fillMaxWidth(), dim = true, fg = fg) { picking = false }
                 } else {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        BarButton("Klasör Oluştur", Modifier.weight(1f), enabled = appCount >= 2, onClick = onCreateFolder)
-                        BarButton("Klasöre Taşı", Modifier.weight(1f), enabled = count > 0 && folders.isNotEmpty()) { picking = true }
+                        BarButton("Klasör Oluştur", Modifier.weight(1f), enabled = appCount >= 2, fg = fg, onClick = onCreateFolder)
+                        BarButton("Klasöre Taşı", Modifier.weight(1f), enabled = count > 0 && folders.isNotEmpty(), fg = fg) { picking = true }
                     }
                     Spacer(Modifier.height(6.dp))
-                    BarButton("Ana Ekrandan Kaldır", Modifier.fillMaxWidth(), enabled = count > 0, destructive = true, onClick = onRemove)
+                    BarButton("Ana Ekrandan Kaldır", Modifier.fillMaxWidth(), enabled = count > 0, destructive = true, fg = fg, onClick = onRemove)
                 }
             }
         }
@@ -165,12 +168,12 @@ fun SelectionBar(
 @Composable
 private fun BarButton(
     text: String, modifier: Modifier, enabled: Boolean = true, destructive: Boolean = false, dim: Boolean = false,
-    onClick: () -> Unit,
+    fg: Color = Color.White, onClick: () -> Unit,
 ) {
     Box(
         modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(Color.White.copy(alpha = if (dim) 0.06f else 0.12f))
+            .background(fg.copy(alpha = if (dim) 0.06f else 0.10f))
             .clickable(enabled = enabled, onClick = onClick)
             .padding(vertical = 12.dp, horizontal = 8.dp),
         contentAlignment = Alignment.Center,
@@ -178,9 +181,9 @@ private fun BarButton(
         Text(
             text, fontSize = 15.sp, maxLines = 1,
             color = when {
-                !enabled -> ink(Color.White).copy(alpha = 0.3f)
+                !enabled -> fg.copy(alpha = 0.3f)
                 destructive -> Color(0xFFFF453A)
-                else -> ink(Color.White)
+                else -> fg
             },
         )
     }
