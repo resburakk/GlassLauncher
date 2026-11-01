@@ -247,7 +247,8 @@ fun IslandRoot() {
     fun place(wDp: Float, hDp: Float) {
         winW = wDp; winH = hDp
         if (wDp <= 0f || hDp <= 0f) { IslandOverlay.place(0, 0, 0, 0); return }
-        val x = geo.cx - px(wDp) / 2 + px(s.offsetX)
+        // Ekran ortasına göre sabit kaydırma (kamera deliği ortada değilse onun konumu + kullanıcı kaydırması).
+        val x = geo.cx - geo.screenW / 2 + px(s.offsetX)
         val y = (geo.cy - px(baseH) / 2 + px(s.offsetY)).coerceAtLeast(px(2f))
         IslandOverlay.place(x, y, px(wDp), px(hDp))
     }

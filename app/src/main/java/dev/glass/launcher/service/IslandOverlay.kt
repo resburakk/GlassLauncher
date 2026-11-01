@@ -103,7 +103,10 @@ object IslandOverlay {
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.TOP or Gravity.START
+            // Ortadan hizalı: genişlik değişince pencere iki yana eşit büyür, konumu (x) hiç değişmez. Soldan
+            // hizalıyken x genişliğe göre yeniden hesaplanıyordu; Android konumu ve boyutu bazen bir kare arayla
+            // uyguladığı için ada büyüyüp küçülürken bir an sağa sola kayıyordu.
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             if (Build.VERSION.SDK_INT >= 30) layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             title = "GlassIsland"
             windowAnimations = 0
