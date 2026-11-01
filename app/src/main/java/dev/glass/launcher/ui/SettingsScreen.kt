@@ -847,6 +847,21 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
         RowDivider()
         SliderRow("Bulanıklık", if (s.dockBlur < 0.05f) "Net" else pct(s.dockBlur), s.dockBlur, 0f..2f, default = Def.dockBlur) { v -> onChange { it.copy(dockBlur = v) } }
         RowDivider()
+        // Kenar merceği yalnızca dock için (Liquid Glass'taki genel ayarlar diğer camlarda kalır).
+        val refr = if (s.dockRefraction >= 0f) s.dockRefraction else s.glassRefraction
+        SliderRow(
+            "Kenar kırılması",
+            (if (refr < 0.01f) "Kapalı" else pct(refr)) + if (s.dockRefraction < 0f) " · genel" else "",
+            refr, 0f..1f, default = if (s.dockRefraction < 0f) null else -1f,
+        ) { v -> onChange { it.copy(dockRefraction = v) } }
+        RowDivider()
+        val edge = if (s.dockEdgeWidth >= 0f) s.dockEdgeWidth else s.glassEdgeWidth
+        SliderRow(
+            "Kenar kalınlığı",
+            pct(edge / 0.6f) + if (s.dockEdgeWidth < 0f) " · genel" else "",
+            edge, 0.05f..0.6f, default = if (s.dockEdgeWidth < 0f) null else -1f,
+        ) { v -> onChange { it.copy(dockEdgeWidth = v) } }
+        RowDivider()
         SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f, default = Def.dockBottom) { v -> onChange { it.copy(dockBottom = v) } }
         RowDivider()
         // Varsayılan (negatif): iOS 26 ölçüsü (%37,8).

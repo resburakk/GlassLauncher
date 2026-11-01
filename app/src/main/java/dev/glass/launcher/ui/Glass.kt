@@ -447,14 +447,14 @@ fun Modifier.liquidGlass(
                         // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Yumuşatma geçişte de açık:
                         // kapatılınca kayarken cam içi keskin görünüp bırakınca birden bulanıklaşıyordu.
                         drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
-                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
+                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = st.glassEdgeWidth)
                     } else if (inPage && GlassMotion.listScrolling) {
                         // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
                     } else if (inPage || !(overlay && GlassMotion.moving)) {
                         // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
                         // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
                         drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
-                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f)
+                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = st.glassEdgeWidth)
                     }
                 }
             }
@@ -524,6 +524,7 @@ private fun DrawScope.drawBackdrop(
     ios: Boolean = false,
     /** Camın gerçek köşe yarıçapı (px); < 0: kısa kenarın %30'u. */
     lensRadius: Float = -1f,
+    edgeFraction: Float = GlassLens.edgeFrac,
 ) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
@@ -538,7 +539,7 @@ private fun DrawScope.drawBackdrop(
         bs.setLocalMatrix(m)
         lens.setInputShader("content", bs)
         val rad = if (lensRadius >= 0f) lensRadius else minOf(area.width, area.height) * 0.3f
-        GlassLens.configure(lens, area.width, area.height, rad, refraction, origin.x, origin.y, soft, ios)
+        GlassLens.configure(lens, area.width, area.height, rad, refraction, origin.x, origin.y, soft, ios, edgeFraction = edgeFraction)
         drawRect(androidx.compose.ui.graphics.ShaderBrush(lens), size = area)
         return
     }

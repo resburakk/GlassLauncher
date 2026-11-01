@@ -732,6 +732,11 @@ internal fun HomeContent(
                     LocalGlass provides if (dockBd != null) baseLook.copy(backdrop = dockBd, sharp = dockBd, sharpSoft = false) else baseLook,
                     // Kopya yoksa dock'un buzlu dolgusu Dock > Bulanıklık ile azalır (Net: şeffaf cam).
                     LocalGlassFrost provides LocalGlassFrost.current * settings.dockBlur,
+                    // Dock'un kendi mercek ayarları (Ayarlar > Dock): yalnızca dock'u etkiler.
+                    LocalLauncherSettings provides settings.copy(
+                        glassRefraction = if (settings.dockRefraction >= 0f) settings.dockRefraction else settings.glassRefraction,
+                        glassEdgeWidth = if (settings.dockEdgeWidth >= 0f) settings.dockEdgeWidth else settings.glassEdgeWidth,
+                    ),
                 ) {
                 Box(
                     Modifier

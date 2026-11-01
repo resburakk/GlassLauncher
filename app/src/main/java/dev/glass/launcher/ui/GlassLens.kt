@@ -130,6 +130,8 @@ object GlassLens {
         ios: Boolean = false,
         /** Camın düğüm içindeki konumu (panel kaydının kenar payı). */
         px: Float = 0f, py: Float = 0f,
+        /** Kenar bandının kısa kenara oranı (dock kendi değerini verebilir). */
+        edgeFraction: Float = edgeFrac,
     ) {
         val m = minOf(w, h)
         s.setFloatUniform("mode", if (ios) 1f else 0f)
@@ -139,7 +141,7 @@ object GlassLens {
         s.setFloatUniform("back", lightBack)
         if (ios) {
             // Kalın kenar: bant kısa kenarın ayarlanan oranı (en çok 44 dp), bükülme bandın ~%90'ı kadar dışarıdan.
-            val edgeI = minOf(m * edgeFrac, 44f * density)
+            val edgeI = minOf(m * edgeFraction, 44f * density)
             val a = amount.coerceIn(0.2f, 1.4f)
             s.setFloatUniform("size", w, h)
             s.setFloatUniform("origin", ox, oy)
