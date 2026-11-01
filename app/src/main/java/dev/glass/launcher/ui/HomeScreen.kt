@@ -528,8 +528,9 @@ fun HomeScreen(
         LocalPt provides HomeMetrics.pt(LocalConfiguration.current.screenWidthDp.dp),
         LocalHomeMetrics provides homeMetrics,
         // Dock'un kendi bulanıklığı (Ayarlar > Dock > Bulanıklık): farklıysa dock bu kopyayı büker.
-        LocalDockBackdrop provides (if (!useBackdrop || reduced || homeBackdrop != null) null
-            else if (kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f) null
+        // Her durumda geçerli (telefonun duvar kâğıdı, düşük güç, ana ekran bulanıklığı açık olsa da): dock kendi
+        // kopyasını büker, kaydırıcı her zaman etkili olur.
+        LocalDockBackdrop provides (if (wallpaper == null || kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f) null
             else if (dockBlurStep < 0.05f) (softSharp ?: sharpBackdrop) else dockBlurred),
         LocalGlass provides GlassLook(
             dark = dark,
