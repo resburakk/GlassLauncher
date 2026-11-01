@@ -255,7 +255,13 @@ fun IslandRoot() {
     LaunchedEffect(tw, th, extra, geo, s.offsetY, s.offsetX, baseH) {
         val targetWinW = if (tw <= 0f) 0f else tw + extra * 2
         // Büyürken pencere önce hedef boyuta açılır; küçülürken animasyon bitince daralır (tek seferlik boyut değişimi).
-        if (targetWinW > 0f) place(max(targetWinW, winW), max(th, winH))
+        if (targetWinW > 0f) {
+            val grow = targetWinW > winW + 0.5f || th > winH + 0.5f
+            place(max(targetWinW, winW), max(th, winH))
+            // Pencere büyürken Android yeni boyutu bir iki kare sonra uygular: animasyon hemen başlarsa ada henüz
+            // dar olan pencereye sığmayıp kenarı düz kesik görünüyordu. Pencere büyüyene kadar beklenir.
+            if (grow) { androidx.compose.runtime.withFrameNanos { }; androidx.compose.runtime.withFrameNanos { } }
+        }
         val j1 = launch { aw.animateTo(tw, spec) }
         val j2 = launch { ah.animateTo(th, spec) }
         j1.join(); j2.join()
