@@ -530,6 +530,8 @@ fun HomeScreen(
         // Dock'un kendi bulanıklığı (Ayarlar > Dock > Bulanıklık): farklıysa dock bu kopyayı büker.
         // Her durumda geçerli (telefonun duvar kâğıdı, düşük güç, ana ekran bulanıklığı açık olsa da): dock kendi
         // kopyasını büker, kaydırıcı her zaman etkili olur.
+        // Duvar kâğıdı kopyası yokken (telefonun kendi duvar kâğıdı) bulanıklık ayarı camın buzlu dolgusunu ayarlar.
+        LocalGlassFrost provides (if (useBackdrop) 1f else settings.glassBlur.coerceIn(0f, 2f)),
         LocalDockBackdrop provides (if (wallpaper == null || kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f) null
             else if (dockBlurStep < 0.05f) (softSharp ?: sharpBackdrop) else dockBlurred),
         LocalGlass provides GlassLook(

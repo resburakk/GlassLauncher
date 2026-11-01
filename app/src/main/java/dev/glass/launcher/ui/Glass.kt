@@ -111,6 +111,12 @@ data class GlassLook(
 )
 
 val LocalGlass = staticCompositionLocalOf { GlassLook() }
+/**
+ * Arkasında duvar kâğıdı kopyası olmayan camın (telefonun kendi duvar kâğıdı) buzlu dolgu çarpanı: bulanıklık
+ * kaydırıcıları burada camın sütlü beyazlığını azaltır (0 = net, şeffaf cam).
+ */
+val LocalGlassFrost = staticCompositionLocalOf { 1f }
+
 /** Dock'a özel bulanık kopya (Ayarlar > Dock > Bulanıklık genel değerden farklıysa). */
 val LocalDockBackdrop = staticCompositionLocalOf<dev.glass.launcher.data.Blurred?> { null }
 
@@ -324,7 +330,7 @@ fun Modifier.liquidGlass(
     // Gerçek arka plan varken dolgu daha ince; şeffaf camda neredeyse yok (arkası görünsün).
     val fill = when {
         bd != null || content != null -> if (clear) 0.2f else 0.55f
-        else -> if (clear) 0.6f else 1f
+        else -> (if (clear) 0.6f else 1f) * LocalGlassFrost.current
     }
     // Hafif yumuşatma yalnızca net kopyada; katman camlarının kopyası zaten bulanık (9 örneklik yumuşatma boşuna
     // ekran kartı yüküydü).

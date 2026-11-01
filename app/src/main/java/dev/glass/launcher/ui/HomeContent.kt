@@ -728,7 +728,11 @@ internal fun HomeContent(
             if (libFraction < 0.98f) {
                 val dockBd = LocalDockBackdrop.current
                 val baseLook = LocalGlass.current
-                CompositionLocalProvider(LocalGlass provides if (dockBd != null) baseLook.copy(backdrop = dockBd, sharp = dockBd, sharpSoft = false) else baseLook) {
+                CompositionLocalProvider(
+                    LocalGlass provides if (dockBd != null) baseLook.copy(backdrop = dockBd, sharp = dockBd, sharpSoft = false) else baseLook,
+                    // Kopya yoksa dock'un buzlu dolgusu Dock > Bulanıklık ile azalır (Net: şeffaf cam).
+                    LocalGlassFrost provides LocalGlassFrost.current * settings.dockBlur,
+                ) {
                 Box(
                     Modifier
                         .offset(x = m.dockMarginX, y = m.dockTop)
