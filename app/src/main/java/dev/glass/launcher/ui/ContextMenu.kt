@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.composed
@@ -659,14 +660,39 @@ internal fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opaci
     } else {
         Brush.verticalGradient(listOf(Color.White.copy(alpha = opacity), Color.White.copy(alpha = (opacity * 0.85f))))
     }
-    this
+    val reduced = LocalGlass.current.reduced
+    val accent = Color(LocalAccent.current)
+    val bright = st.glassBrightness
+    val base = this
         .shadow(24.dp, shape, clip = false, ambientColor = Color.Black.copy(alpha = 0.18f), spotColor = Color.Black.copy(alpha = 0.18f))
+    (if (reduced) base
         .smoothClip(shape)
         // Düşük güçte arkası hazır bulanık kopya (gerçek zamanlı bulanıklık kapalıyken menü okunur kalsın).
         .reducedBackdrop()
         .background(fill)
         .accentTint(st.glassAccent)
         .glassBrightness(st.glassBrightness)
+    else base
+        // Yarı saydam cam dolgusu ŞEKİLLE (kenar yumuşatmalı) doğrudan çizilir; ayrı (offscreen) katmanın içinde
+        // DEĞİL. Honor (Mali) ekran kartında katmanın yalnızca bir kısmı yeniden çizilince dolgu o dikdörtgende farklı
+        // tonda kalıyordu (menünün içinde köşeli bir kare). Katmanda artık yalnızca yazılar ve basılı vurgu var.
+        .drawWithCache {
+            val outline = shape.createOutline(size, layoutDirection, this)
+            val accentBrush = if (st.glassAccent > 0.01f) Brush.verticalGradient(
+                listOf(accent.copy(alpha = 0.22f * st.glassAccent), accent.copy(alpha = 0.12f * st.glassAccent))
+            ) else null
+            val brightColor = when {
+                bright > 0.01f -> Color.White.copy(alpha = 0.35f * bright)
+                bright < -0.01f -> Color.Black.copy(alpha = 0.35f * -bright)
+                else -> null
+            }
+            onDrawBehind {
+                drawOutline(outline, fill)
+                accentBrush?.let { drawOutline(outline, it) }
+                brightColor?.let { drawOutline(outline, it) }
+            }
+        }
+        .smoothClip(shape))
         .then(
             if (st.glassRimWidth > 0f && st.glassRimGlow > 0f) Modifier.border(
                 st.glassRimWidth.dp,
