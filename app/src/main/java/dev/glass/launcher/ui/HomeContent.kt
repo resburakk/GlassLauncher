@@ -978,7 +978,8 @@ internal fun Modifier.clearIconGlass(shape: androidx.compose.ui.graphics.Shape, 
         else -> androidx.compose.foundation.isSystemInDarkTheme()
     }
     if (st.clearSurface == "glass") this
-        .liquidGlass(shape, strength, 0.dp, ios = true, forceClear = true)
+        // İnce kırılma bandı: yalnızca kenar bükülür, ortası düz ve net kalır (iOS 26 Clear).
+        .liquidGlass(shape, strength, 0.dp, ios = true, forceClear = true, edgeFraction = 0.2f)
         .background(if (darkGlass) Color(0x33000000) else Color(0x14FFFFFF), shape)
     else this
         .liquidGlass(shape, strength * 0.8f, 0.dp, frosted = true, ios = true)

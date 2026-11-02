@@ -304,6 +304,8 @@ fun Modifier.liquidGlass(
     iconRim: Boolean = false,
     /** true: genel cam stili buzlu olsa da bu yüzey NET cam (Şeffaf simgelerin "Cam" yüzeyi). */
     forceClear: Boolean = false,
+    /** Kenar kırılma bandının kısa kenara oranı (null: genel "kenar genişliği" ayarı). */
+    edgeFraction: Float? = null,
 ): Modifier = composed {
     val look1 = LocalGlass.current.let { g -> if (forceClear && !g.reduced && g.sharp != null) g.copy(clear = true) else g }
     val ov = LocalOverlayBackdrop.current
@@ -449,14 +451,14 @@ fun Modifier.liquidGlass(
                         // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Yumuşatma geçişte de açık:
                         // kapatılınca kayarken cam içi keskin görünüp bırakınca birden bulanıklaşıyordu.
                         drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
-                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = st.glassEdgeWidth)
+                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth)
                     } else if (inPage && GlassMotion.listScrolling) {
                         // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
                     } else if (inPage || !(overlay && GlassMotion.moving)) {
                         // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
                         // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
                         drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
-                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = st.glassEdgeWidth)
+                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth)
                     }
                 }
             }

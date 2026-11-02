@@ -470,6 +470,7 @@ internal fun FolderIcon(
         Modifier.size(icon).liquidGlass(
             appShape(icon * LocalLauncherSettings.current.iconCorner), strength * 0.8f, 0.dp, ios = true,
             forceClear = LocalLauncherSettings.current.let { it.clearSurface == "glass" && it.iconStyle == dev.glass.launcher.data.IconStyle.Clear },
+            edgeFraction = if (LocalLauncherSettings.current.let { it.clearSurface == "glass" && it.iconStyle == dev.glass.launcher.data.IconStyle.Clear }) 0.2f else null,
         ),
         contentAlignment = Alignment.Center,
     ) {
