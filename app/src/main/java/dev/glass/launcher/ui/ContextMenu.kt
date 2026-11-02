@@ -693,7 +693,9 @@ internal fun Modifier.menuGlass(shape: androidx.compose.ui.graphics.Shape, opaci
                 brightColor?.let { drawOutline(outline, it) }
             }
         }
-        .smoothClip(shape))
+        // Ayrı (offscreen) katman yok: Honor'da katman kısmen yeniden çizilince yazıların çevresinde silik bir çizgi
+        // kalıyordu. Yazılar ve basılı vurgu normal kırpmayla şeklin içinde tutulur.
+        .clip(shape))
         .then(
             if (st.glassRimWidth > 0f && st.glassRimGlow > 0f) Modifier.border(
                 st.glassRimWidth.dp,
