@@ -506,14 +506,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      * Sayfaları Düzenle sonucu: [pages] (öğeler, gizli mi) yeni sıra; [deleted] silinen sayfaların öğeleri.
      * Silinen sayfadaki uygulama ve klasörler arşive geçer, widget'lar kaldırılır.
      */
-    fun applyPages(pages: List<Pair<List<HomeItem>, Boolean>>, deleted: List<HomeItem>) {
+    fun applyPages(pages: List<Pair<List<HomeItem>, Boolean>>, deleted: List<HomeItem>, home: Int) {
         deleted.filterIsInstance<WidgetItem>().flatMap { listOf(it) + it.stack }.forEach { w ->
             if (w.kind == WidgetKind.System && w.appWidgetId >= 0) la.widgetHost.delete(w.appWidgetId)
             if (w.kind == WidgetKind.Photo && w.data.isNotEmpty()) la.wallpaperRepository.deletePhoto(w.data)
         }
         val keys = deleted.flatMap { when (it) { is dev.glass.launcher.data.AppItem -> listOf(it.key); is dev.glass.launcher.data.FolderItem -> it.keys; else -> emptyList() } }
         editLayout { l ->
-            val n = l.withPages(pages)
+            val n = l.withPages(pages, home)
             n.copy(libraryOnly = (n.libraryOnly + keys.filter { !AppInfo.isShortcutKey(it) }).distinct())
         }
     }

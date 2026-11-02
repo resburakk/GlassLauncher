@@ -386,7 +386,7 @@ fun HomeScreen(
             closeOverlay()
             editMode = false
             today.close(todayScope)
-            bridge.goToPage?.invoke(0)
+            bridge.goToPage?.invoke(vm.layout.value.homePage.coerceIn(0, maxOf(bridge.homePageCount - 1, 0)))
         }
     }
 

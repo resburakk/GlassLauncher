@@ -450,6 +450,15 @@ internal fun HomeContent(
             else vm.editLayout { it.moveAppToGrid(id, idx).placeAt(id, page, row, col, m.columns, m.rows, visible) } // dock, klasör veya arşivden
         }
 
+        // Launcher açılınca seçili ana sayfadan başlar (Sayfaları Düzenle > ev simgesi).
+        var startPageDone by remember { mutableStateOf(false) }
+        LaunchedEffect(items.isNotEmpty()) {
+            if (startPageDone || items.isEmpty()) return@LaunchedEffect
+            startPageDone = true
+            val h = layout.homePage.coerceIn(0, maxOf(pageTotal - 1, 0))
+            if (h > 0) pagerState.scrollToPage(h)
+        }
+
         SideEffect {
             bridge.home = ::handleDrop
             bridge.goToPage = { p -> scope.launch { pagerState.animateScrollToPage(p.coerceIn(0, pagerState.pageCount - 1)) } }

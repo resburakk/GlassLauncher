@@ -89,6 +89,8 @@ data class HomeLayout(
     val today: List<WidgetItem> = emptyList(),
     /** Gizlenmiş sayfalar: ana ekranda görünmez; içindeki uygulamalar arşivde durur, Sayfaları Düzenle'den açılır. */
     val hiddenPages: List<HiddenPage> = emptyList(),
+    /** Ana sayfa: ana tuşuna basınca ve launcher açılınca gidilen görünür sayfanın sırası (0 = ilk sayfa). */
+    val homePage: Int = 0,
 ) {
 
     /** Ana ekranda (ızgara, klasör veya dock) görünen tüm uygulama anahtarları. */
@@ -163,7 +165,7 @@ data class HomeLayout(
      * Sayfaları Düzenle sonucu: [pages] tüm sayfalar (sırasıyla) ve gizli olup olmadıkları. Görünen sayfalar
      * aralarında sayfa sonuyla yeniden dizilir; gizliler sıralarıyla saklanır.
      */
-    fun withPages(pages: List<Pair<List<HomeItem>, Boolean>>): HomeLayout {
+    fun withPages(pages: List<Pair<List<HomeItem>, Boolean>>, home: Int = homePage): HomeLayout {
         val out = ArrayList<HomeItem>()
         val hidden = ArrayList<HiddenPage>()
         pages.forEachIndexed { i, (pg, isHidden) ->
@@ -173,7 +175,7 @@ data class HomeLayout(
                 out += pg
             }
         }
-        return copy(items = out, hiddenPages = hidden).normalized()
+        return copy(items = out, hiddenPages = hidden, homePage = home.coerceAtLeast(0)).normalized()
     }
 
     /**
@@ -481,6 +483,7 @@ data class HomeLayout(
             .put("dock", JSONArray(dock))
             .put("lib", JSONArray(libraryOnly))
             .put("today", JSONArray().also { a -> today.forEach { a.put(widgetJson(it)) } })
+            .put("home", homePage)
     }
 
     private fun itemJson(item: HomeItem): JSONObject = when (item) {
@@ -515,6 +518,7 @@ data class HomeLayout(
                 items, List(da.length()) { da.getString(it) }, List(la.length()) { la.getString(it) },
                 List(ta.length()) { widgetFrom(ta.getJSONObject(it)) },
                 hidden,
+                o.optInt("home", 0).coerceAtLeast(0),
             )
         } catch (e: Exception) {
             null

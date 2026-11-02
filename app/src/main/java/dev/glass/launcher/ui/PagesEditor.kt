@@ -1,6 +1,7 @@
 package dev.glass.launcher.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -28,6 +29,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,8 +43,9 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -65,7 +69,8 @@ private class PageEntry(val key: String, val items: List<HomeItem>, hidden: Bool
 
 /**
  * iOS "Sayfaları Düzenle": ana ekran sayfaları küçük önizlemeler olarak görünür. Onay işaretiyle sayfa
- * gizlenir/gösterilir, basılı tutup sürükleyerek sıralanır, gizli sayfa "−" ile silinir. "Bitti" ile uygulanır.
+ * gizlenir/gösterilir, basılı tutup sürükleyerek canlı sıralanır, ev simgesiyle ana sayfa seçilir, gizli sayfa "−" ile
+ * silinir. "Bitti" ile uygulanır.
  */
 @Composable
 fun PagesEditor(
@@ -87,62 +92,98 @@ fun PagesEditor(
     }
     val deleted = remember { mutableStateListOf<HomeItem>() }
     var confirmDelete by remember { mutableStateOf<PageEntry?>(null) }
-    val bounds = remember { HashMap<String, Rect>() }
+    // Ana sayfa: kayıtlı sıradaki görünür sayfa (sayfa sürüklense de seçim sayfayla birlikte gider).
+    var homeKey by remember {
+        mutableStateOf(entries.filter { !it.hidden }.let { v -> v.getOrNull(layout.homePage) ?: v.firstOrNull() }?.key)
+    }
     var dragKey by remember { mutableStateOf<String?>(null) }
-    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var dragIndex by remember { mutableIntStateOf(-1) }
+    var dragStart by remember { mutableStateOf(Offset.Zero) }   // sürüklenen sayfanın başladığı yuvanın merkezi
+    var dragTotal by remember { mutableStateOf(Offset.Zero) }   // parmağın toplam hareketi
 
     fun apply() {
-        vm.applyPages(entries.map { it.items to it.hidden }, deleted.toList())
+        val visibleKeys = entries.filter { !it.hidden }.map { it.key }
+        val home = visibleKeys.indexOf(homeKey).coerceAtLeast(0)
+        vm.applyPages(entries.map { it.items to it.hidden }, deleted.toList(), home)
         onClose()
     }
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.82f))
+            .background(Color.Black.copy(alpha = 0.9f))
             .pointerInput(Unit) { detectTapGestures { } },
     ) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Sayfaları Düzenle", color = ink(Color.White), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, modifier = Modifier.weight(1f))
+                Text("Sayfaları Düzenle", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, modifier = Modifier.weight(1f))
                 GlassButton("Bitti", strength, 34.dp) { apply() }
             }
             Text(
-                "İşareti kaldırınca sayfa gizlenir. Sıralamak için basılı tutup sürükle. Gizli sayfa \"−\" ile silinebilir.",
+                "Basılı tutup sürükleyerek sayfaların yerini değiştir. Ev simgesiyle ana sayfayı seç. İşareti kaldırınca sayfa gizlenir, gizli sayfa \"−\" ile silinir.",
                 color = Color(0xCCFFFFFF), fontSize = 13.sp, fontFamily = AppFont,
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
             Spacer(Modifier.height(12.dp))
-            Column(
-                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+            val scroll = rememberScrollState()
+            BoxWithConstraints(
+                Modifier.fillMaxWidth().verticalScroll(scroll, enabled = dragKey == null).padding(horizontal = 24.dp, vertical = 8.dp),
             ) {
-                entries.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        pair.forEach { e ->
+                val density = LocalDensity.current
+                val gapX = 20.dp
+                val cellW = (maxWidth - gapX) / 2
+                val thumbH = cellW * 2f
+                val rowH = thumbH + 10.dp + 28.dp + 22.dp
+                val cellWpx = with(density) { cellW.toPx() }
+                val gapXpx = with(density) { gapX.toPx() }
+                val rowHpx = with(density) { rowH.toPx() }
+                val thumbHpx = with(density) { thumbH.toPx() }
+                fun slotOrigin(i: Int) = Offset((i % 2) * (cellWpx + gapXpx), (i / 2) * rowHpx)
+                fun slotAt(p: Offset): Int {
+                    val col = if (p.x < cellWpx + gapXpx / 2f) 0 else 1
+                    val row = (p.y / rowHpx).toInt().coerceAtLeast(0)
+                    return (row * 2 + col).coerceIn(0, entries.size - 1)
+                }
+                val rowsCount = (entries.size + 1) / 2
+                Box(Modifier.fillMaxWidth().height(rowH * rowsCount + 40.dp)) {
+                    entries.forEachIndexed { index, e ->
+                        key(e.key) {
                             val dragging = dragKey == e.key
                             val dim by animateFloatAsState(if (e.hidden) 0.45f else 1f, label = "pageDim")
+                            // Diğer sayfalar yeni yuvalarına kayarak geçer; sürüklenen sayfa parmağı izler.
+                            val target = slotOrigin(index)
+                            val animated by animateIntOffsetAsState(
+                                IntOffset(target.x.roundToInt(), target.y.roundToInt()), label = "pageSlot",
+                            )
+                            val isHome = homeKey == e.key && !e.hidden
                             Column(
                                 Modifier
-                                    .weight(1f)
+                                    .width(cellW)
                                     .zIndex(if (dragging) 1f else 0f)
-                                    .offset { if (dragging) IntOffset(dragOffset.x.roundToInt(), dragOffset.y.roundToInt()) else IntOffset.Zero }
-                                    .graphicsLayer { if (dragging) { scaleX = 1.05f; scaleY = 1.05f } }
-                                    .onGloballyPositioned { bounds[e.key] = it.boundsInRoot() }
+                                    .offset {
+                                        if (dragging) {
+                                            val c = dragStart + dragTotal
+                                            IntOffset((c.x - cellWpx / 2f).roundToInt(), (c.y - thumbHpx / 2f).roundToInt())
+                                        } else animated
+                                    }
+                                    .graphicsLayer { if (dragging) { scaleX = 1.06f; scaleY = 1.06f; shadowElevation = 24f } }
                                     .pointerInput(e.key) {
                                         detectDragGesturesAfterLongPress(
-                                            onDragStart = { dragKey = e.key; dragOffset = Offset.Zero },
-                                            onDragEnd = {
-                                                val from = entries.indexOfFirst { it.key == e.key }
-                                                val center = bounds[e.key]?.center?.plus(dragOffset)
-                                                val to = center?.let { c ->
-                                                    entries.indexOfFirst { o -> o.key != e.key && bounds[o.key]?.contains(c) == true }
-                                                } ?: -1
-                                                if (from >= 0 && to >= 0) entries.add(to, entries.removeAt(from))
-                                                dragKey = null; dragOffset = Offset.Zero
+                                            onDragStart = {
+                                                val i = entries.indexOfFirst { it.key == e.key }
+                                                dragKey = e.key; dragIndex = i; dragTotal = Offset.Zero
+                                                dragStart = slotOrigin(i) + Offset(cellWpx / 2f, thumbHpx / 2f)
                                             },
-                                            onDragCancel = { dragKey = null; dragOffset = Offset.Zero },
-                                        ) { change, d -> change.consume(); dragOffset += d }
+                                            onDragEnd = { dragKey = null; dragIndex = -1; dragTotal = Offset.Zero },
+                                            onDragCancel = { dragKey = null; dragIndex = -1; dragTotal = Offset.Zero },
+                                        ) { change, d ->
+                                            change.consume()
+                                            dragTotal += d
+                                            // Parmak başka bir yuvaya gelince sayfalar canlı yer değiştirir (iOS gibi).
+                                            val to = slotAt(dragStart + dragTotal)
+                                            val from = entries.indexOfFirst { it.key == e.key }
+                                            if (from >= 0 && to != from) { entries.add(to, entries.removeAt(from)); dragIndex = to }
+                                        }
                                     },
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
@@ -155,25 +196,42 @@ fun PagesEditor(
                                             contentAlignment = Alignment.Center,
                                         ) { Box(Modifier.width(11.dp).height(2.5.dp).background(Color.Black)) }
                                     }
+                                    if (isHome) {
+                                        Text(
+                                            "Ana Sayfa", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+                                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp).clip(RoundedCornerShape(50))
+                                                .background(Color(0xFF0A84FF)).padding(horizontal = 9.dp, vertical = 3.dp),
+                                        )
+                                    }
                                 }
                                 Spacer(Modifier.height(10.dp))
-                                // Onay işareti: görünür / gizli
-                                Box(
-                                    Modifier.size(28.dp).clip(CircleShape)
-                                        .then(if (e.hidden) Modifier.border(2.dp, Color.White, CircleShape) else Modifier.background(Color(0xFF0A84FF)))
-                                        .clickable {
-                                            // En az bir sayfa görünür kalmalı.
-                                            if (!e.hidden && entries.count { !it.hidden } <= 1) return@clickable
-                                            e.hidden = !e.hidden
-                                        },
-                                    contentAlignment = Alignment.Center,
-                                ) { if (!e.hidden) GlyphIcon(Glyph.Check, Color.White, 16.dp) }
+                                Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    // Onay işareti: görünür / gizli
+                                    Box(
+                                        Modifier.size(28.dp).clip(CircleShape)
+                                            .then(if (e.hidden) Modifier.border(2.dp, Color.White, CircleShape) else Modifier.background(Color(0xFF0A84FF)))
+                                            .clickable {
+                                                // En az bir sayfa görünür kalmalı.
+                                                if (!e.hidden && entries.count { !it.hidden } <= 1) return@clickable
+                                                e.hidden = !e.hidden
+                                                // Ana sayfa gizlenirse ilk görünür sayfa ana sayfa olur.
+                                                if (e.hidden && homeKey == e.key) homeKey = entries.firstOrNull { !it.hidden }?.key
+                                            },
+                                        contentAlignment = Alignment.Center,
+                                    ) { if (!e.hidden) GlyphIcon(Glyph.Check, Color.White, 16.dp) }
+                                    // Ana sayfa yap (ev simgesi)
+                                    if (!e.hidden) Box(
+                                        Modifier.size(28.dp).clip(CircleShape)
+                                            .then(if (isHome) Modifier.background(Color.White) else Modifier.border(2.dp, Color(0x99FFFFFF), CircleShape))
+                                            .clickable { homeKey = e.key }
+                                            .semantics { contentDescription = if (isHome) "Ana sayfa" else "Ana sayfa yap" },
+                                        contentAlignment = Alignment.Center,
+                                    ) { HouseGlyph(if (isHome) Color(0xFF0A84FF) else Color.White, 15.dp) }
+                                }
                             }
                         }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
                     }
                 }
-                Spacer(Modifier.height(40.dp))
             }
         }
     }
@@ -187,6 +245,24 @@ fun PagesEditor(
             ),
             onDismiss = { confirmDelete = null },
         )
+    }
+}
+
+/** Ev simgesi (ana sayfa). */
+@Composable
+private fun HouseGlyph(color: Color, size: androidx.compose.ui.unit.Dp) {
+    androidx.compose.foundation.Canvas(Modifier.size(size)) {
+        val w = this.size.width; val h = this.size.height
+        val sw = w * 0.13f
+        val roof = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.08f, h * 0.48f); lineTo(w * 0.5f, h * 0.1f); lineTo(w * 0.92f, h * 0.48f)
+        }
+        drawPath(roof, color, style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+        val body = androidx.compose.ui.graphics.Path().apply {
+            moveTo(w * 0.22f, h * 0.42f); lineTo(w * 0.22f, h * 0.9f); lineTo(w * 0.42f, h * 0.9f); lineTo(w * 0.42f, h * 0.64f)
+            lineTo(w * 0.58f, h * 0.64f); lineTo(w * 0.58f, h * 0.9f); lineTo(w * 0.78f, h * 0.9f); lineTo(w * 0.78f, h * 0.42f)
+        }
+        drawPath(body, color, style = androidx.compose.ui.graphics.drawscope.Stroke(sw, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
     }
 }
 
