@@ -50,6 +50,26 @@ val IosTextShadow: Shadow
  */
 object HomeInk {
     var light by mutableStateOf(false)
+    /**
+     * Duvar kâğıdının GERÇEK ortalama parlaklığından verilen karar (görüntü okunabiliyorsa). Android'in "koyu yazıya
+     * uygun" işareti ve baskın renkleri bazı duvar kâğıtlarında (mavi, açık turkuaz bölgeli) yanıltıcıydı.
+     */
+    var measured by mutableStateOf<Boolean?>(null)
+
+    /** Görüntünün ekranda görünen (ortadan kırpılmış) kısmının ortalama göreli parlaklığı (0..1). */
+    fun meanLuminance(b: android.graphics.Bitmap, screenW: Int, screenH: Int): Float {
+        val sw = screenW.coerceAtLeast(1).toFloat(); val sh = screenH.coerceAtLeast(1).toFloat()
+        val scale = maxOf(sw / b.width, sh / b.height)
+        val cw = (sw / scale).toInt().coerceIn(1, b.width); val ch = (sh / scale).toInt().coerceIn(1, b.height)
+        val cx = (b.width - cw) / 2; val cy = (b.height - ch) / 2
+        val src = if (b.config == android.graphics.Bitmap.Config.HARDWARE) b.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else b
+        val small = android.graphics.Bitmap.createScaledBitmap(android.graphics.Bitmap.createBitmap(src, cx, cy, cw, ch), 24, 48, true)
+        val px = IntArray(24 * 48); small.getPixels(px, 0, 24, 0, 0, 24, 48)
+        fun lin(v: Int): Double { val c = v / 255.0; return if (c <= 0.04045) c / 12.92 else Math.pow((c + 0.055) / 1.055, 2.4) }
+        var sum = 0.0
+        for (p in px) sum += 0.2126 * lin((p shr 16) and 255) + 0.7152 * lin((p shr 8) and 255) + 0.0722 * lin(p and 255)
+        return (sum / px.size).toFloat()
+    }
     val label = Color(0xF0242426)
     val soft = Color(0xB3242426)
 }

@@ -413,6 +413,15 @@ class MainActivity : ComponentActivity(), WidgetRequester {
      */
     /** Duvar kâğıdına göre son hesaplanan ton (koyu yazı mı). */
     private var wallpaperDarkText = false
+    private var colorsDarkText = false
+
+    /** Ana ekran duvar kâğıdının ölçülen parlaklığını uygular (null: Android'in renk bilgisine dön). */
+    fun applyMeasuredTone(light: Boolean?) {
+        dev.glass.launcher.ui.HomeInk.measured = light
+        wallpaperDarkText = light ?: colorsDarkText
+        dev.glass.launcher.ui.HomeInk.light = wallpaperDarkText
+        applyCurrentBarTone()
+    }
 
     private fun applyBarTone(colors: WallpaperColors?) {
         dev.glass.launcher.ui.WallpaperAccent.update(colors)
@@ -426,7 +435,10 @@ class MainActivity : ComponentActivity(), WidgetRequester {
             val t = c.tertiaryColor?.luminance() ?: s2
             p * 0.6f + s2 * 0.25f + t * 0.15f
         } ?: 0f
-        wallpaperDarkText = hint || lum > 0.40f
+        colorsDarkText = hint || lum > 0.40f
+        // Duvar kâğıdı okunabiliyorsa gerçek ortalama parlaklığı karar verir (iOS gibi: yalnızca gerçekten açık
+        // duvar kâğıdında yazılar koyu olur).
+        wallpaperDarkText = dev.glass.launcher.ui.HomeInk.measured ?: colorsDarkText
         // Açık duvar kâğıdında ana ekran yazıları da koyu olur (iOS gibi).
         dev.glass.launcher.ui.HomeInk.light = wallpaperDarkText
         applyCurrentBarTone()

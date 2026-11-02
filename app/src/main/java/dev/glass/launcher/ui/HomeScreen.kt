@@ -174,6 +174,20 @@ fun HomeScreen(
     val groups by vm.libraryGroups.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     val wallpaper by vm.wallpaper.collectAsStateWithLifecycle()
+    // Yazı rengi (açık/koyu) duvar kâğıdının gerçek ortalama parlaklığına göre.
+    val toneActivity = androidx.compose.ui.platform.LocalContext.current as? dev.glass.launcher.MainActivity
+    LaunchedEffect(wallpaper) {
+        val w = wallpaper
+        val light = if (w == null) null else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            runCatching {
+                val dm = toneActivity?.resources?.displayMetrics
+                val lum = HomeInk.meanLuminance(w.asAndroidBitmap(), dm?.widthPixels ?: w.width, dm?.heightPixels ?: w.height)
+                android.util.Log.d("GlassDiag", "yazıTonu parlaklık=${"%.2f".format(lum)} koyuYazı=${lum > 0.40f}")
+                lum > 0.40f
+            }.getOrNull()
+        }
+        toneActivity?.applyMeasuredTone(light)
+    }
     val blurred by vm.blurredWallpaper.collectAsStateWithLifecycle()
     val degraded by vm.degraded.collectAsStateWithLifecycle()
     val powerSave = rememberPowerSaveMode()
