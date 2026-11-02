@@ -377,6 +377,12 @@ tap_text "Simgeler" && { step "simgeler sayfası" 2
   shot 22a0-simge-ayari
   adb shell input keyevent KEYCODE_HOME; step "ana ekran" 4
   shot 22a-seffaf-simgeler
+  # Şeffaf simgelerin "Cam" yüzeyi (iOS 26 Clear: arkası net duvar kâğıdı).
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key clearSurface --es value glass >/dev/null
+  step "cam yüzey" 4
+  shot 22a1-cam-simgeler
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key clearSurface --es value frost >/dev/null
+  step "buzlu yüzey" 2
   adb shell am start -W -n dev.glass.launcher/.SettingsEntry; step "ayarlar" 3
   tap_text "Renkli" && step "renkli simge" 2
   adb shell input keyevent KEYCODE_HOME; step "ana ekran" 4

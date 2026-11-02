@@ -302,8 +302,10 @@ fun Modifier.liquidGlass(
     brightRim: Boolean = false,
     /** Widget'lar: simgelerle birebir aynı kenar ışığı (ince, soluk, üst/alt ortada; köşede söner). */
     iconRim: Boolean = false,
+    /** true: genel cam stili buzlu olsa da bu yüzey NET cam (Şeffaf simgelerin "Cam" yüzeyi). */
+    forceClear: Boolean = false,
 ): Modifier = composed {
-    val look1 = LocalGlass.current
+    val look1 = LocalGlass.current.let { g -> if (forceClear && !g.reduced && g.sharp != null) g.copy(clear = true) else g }
     val ov = LocalOverlayBackdrop.current
     val look0 = if (overlay && !look1.reduced) {
         val b = ov ?: look1.backdrop

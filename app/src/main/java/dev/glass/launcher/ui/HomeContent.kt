@@ -849,11 +849,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
         val liveShape = appShape(icon * st.iconCorner)
         Box(
             Modifier.fillMaxSize().then(
-                if (liveLook == LiveLook.Clear) Modifier.liquidGlass(liveShape, strength * 0.8f, 0.dp, frosted = true, ios = true)
-                    .background(
-                        if (when (st.clearTone) { "dark" -> true; "light" -> false; else -> androidx.compose.foundation.isSystemInDarkTheme() }) Color(0x61000000)
-                        else Color(0x38FFFFFF)
-                    )
+                if (liveLook == LiveLook.Clear) Modifier.clearIconGlass(liveShape, strength)
                 else Modifier.glassIcon(liveShape, glass, strength, st.iconRimGlow, rimW)
             )
         ) {
@@ -869,16 +865,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
     Box(Modifier.size(icon)) {
         Box(
             Modifier.fillMaxSize().then(
-                if (clear) {
-                    // Şeffaf cam tonu (iOS 26): açık cam hafif beyaz, koyu cam hafif siyah tülle.
-                    val darkGlass = when (st.clearTone) {
-                        "dark" -> true
-                        "light" -> false
-                        else -> androidx.compose.foundation.isSystemInDarkTheme()
-                    }
-                    Modifier.liquidGlass(appShape(icon * st.iconCorner), strength * 0.8f, 0.dp, frosted = true, ios = true)
-                        .background(if (darkGlass) Color(0x61000000) else Color(0x38FFFFFF))
-                }
+                if (clear) Modifier.clearIconGlass(appShape(icon * st.iconCorner), strength)
                 else Modifier.glassIcon(appShape(icon * st.iconCorner), glass, strength, st.iconRimGlow, rimW)
             )
         ) {
@@ -975,4 +962,24 @@ internal fun AppCell(
             }
         }
     }
+}
+
+
+/**
+ * iOS 26 "Şeffaf" simge zemini. Buzlu: arkası bulanık cam + açık/koyu tül. Cam: arkası NET duvar kâğıdı, kenarda
+ * mercek kırılması ve parlama, çok ince tül (iOS 26 Clear simgeleri gibi; duvar kâğıdı simgenin içinden görünür).
+ */
+internal fun Modifier.clearIconGlass(shape: androidx.compose.ui.graphics.Shape, strength: Float): Modifier = androidx.compose.ui.composed {
+    val st = LocalLauncherSettings.current
+    val darkGlass = when (st.clearTone) {
+        "dark" -> true
+        "light" -> false
+        else -> androidx.compose.foundation.isSystemInDarkTheme()
+    }
+    if (st.clearSurface == "glass") this
+        .liquidGlass(shape, strength, 0.dp, ios = true, forceClear = true)
+        .background(if (darkGlass) Color(0x33000000) else Color(0x14FFFFFF), shape)
+    else this
+        .liquidGlass(shape, strength * 0.8f, 0.dp, frosted = true, ios = true)
+        .background(if (darkGlass) Color(0x61000000) else Color(0x38FFFFFF))
 }

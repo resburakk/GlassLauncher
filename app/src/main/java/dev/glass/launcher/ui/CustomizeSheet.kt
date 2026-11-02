@@ -121,6 +121,12 @@ fun CustomizeSheet(
                         Segmented(listOf("light" to "Açık", "dark" to "Koyu", "auto" to "Otomatik"), settings.clearTone) { k ->
                             onChange { it.copy(clearTone = k) }
                         }
+                        Spacer(Modifier.height(12.dp))
+                        Label("Yüzey")
+                        // Buzlu: arkası bulanık. Cam: iOS 26 Clear gibi arkası net, duvar kâğıdı simgenin içinden görünür.
+                        Segmented(listOf("frost" to "Buzlu", "glass" to "Cam"), settings.clearSurface) { k ->
+                            onChange { it.copy(clearSurface = k) }
+                        }
                     }
                     if (cur == IconStyle.Tinted.name) {
                         Spacer(Modifier.height(12.dp))

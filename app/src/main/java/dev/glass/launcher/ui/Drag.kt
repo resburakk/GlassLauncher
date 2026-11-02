@@ -466,7 +466,11 @@ internal fun FolderIcon(
     Box(
         // Gölgesiz: yarı saydam camın altındaki gölge içeriden kare gibi görünüyordu.
         // Köşe, uygulama simgeleriyle aynı "Köşe yuvarlaklığı" ayarını izler.
-        Modifier.size(icon).liquidGlass(appShape(icon * LocalLauncherSettings.current.iconCorner), strength * 0.8f, 0.dp, ios = true),
+        // "Şeffaf" simgelerin "Cam" yüzeyinde klasör de net cam (iOS 26 Clear).
+        Modifier.size(icon).liquidGlass(
+            appShape(icon * LocalLauncherSettings.current.iconCorner), strength * 0.8f, 0.dp, ios = true,
+            forceClear = LocalLauncherSettings.current.let { it.clearSurface == "glass" && it.iconStyle == dev.glass.launcher.data.IconStyle.Clear },
+        ),
         contentAlignment = Alignment.Center,
     ) {
         Column(Modifier.size(block), verticalArrangement = Arrangement.spacedBy(gap)) {
