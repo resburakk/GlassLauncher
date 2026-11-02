@@ -72,6 +72,7 @@ import android.app.ActivityOptions
 import dev.glass.launcher.data.HomeItem
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -969,7 +970,7 @@ internal fun AppCell(
  * iOS 26 "Şeffaf" simge zemini. Buzlu: arkası bulanık cam + açık/koyu tül. Cam: arkası NET duvar kâğıdı, kenarda
  * mercek kırılması ve parlama, çok ince tül (iOS 26 Clear simgeleri gibi; duvar kâğıdı simgenin içinden görünür).
  */
-internal fun Modifier.clearIconGlass(shape: androidx.compose.ui.graphics.Shape, strength: Float): Modifier = androidx.compose.ui.composed {
+internal fun Modifier.clearIconGlass(shape: androidx.compose.ui.graphics.Shape, strength: Float): Modifier = composed {
     val st = LocalLauncherSettings.current
     val darkGlass = when (st.clearTone) {
         "dark" -> true
