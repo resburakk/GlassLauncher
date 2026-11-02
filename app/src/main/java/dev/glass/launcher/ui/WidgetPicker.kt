@@ -175,7 +175,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                         GalleryWidget(
                             k, t, null, kind,
                             if (kind == WidgetKind.Photo) listOf(Span(2, 2), Span(4, 2), Span(4, 4))
-                            else if (kind == WidgetKind.Overview) listOf(Span(4, 3), Span(4, 4)).filter { it.x <= m.columns && it.y <= m.rows }
+                            else if (kind == WidgetKind.Overview) listOf(Span(4, 3), Span(4, 4), Span(4, 5)).filter { it.x <= m.columns && it.y <= m.rows }
                             else WidgetSize.entries.map { Span(it.spanX, it.spanY) }.filter { it.x <= m.columns && it.y <= m.rows },
                         )
                     ),

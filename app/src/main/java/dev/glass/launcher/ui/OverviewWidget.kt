@@ -100,11 +100,12 @@ fun OverviewWidget(w: WidgetItem) {
     val today = remember(tick) { LocalDate.now() }
     val hour = remember(tick) { LocalTime.now().hour }
     val big = w.spanY >= 4
+    val huge = w.spanY >= 5
 
     var granted by remember { mutableStateOf(UpcomingEvents.granted(ctx)) }
     val perm = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
     val events by produceState<List<CalEvent>>(emptyList(), tick, granted) {
-        value = if (granted) UpcomingEvents.load(ctx, 3).orEmpty() else emptyList()
+        value = if (granted) UpcomingEvents.load(ctx, if (huge) 5 else 3).orEmpty() else emptyList()
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp)) {
@@ -153,6 +154,25 @@ fun OverviewWidget(w: WidgetItem) {
                         hj, color = ink.secondary, fontSize = 10.sp, fontFamily = AppFont, maxLines = 1,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(ink.track).padding(horizontal = 8.dp, vertical = 2.dp),
                     )
+                }
+            }
+        }
+
+        // ---- 4×5: önümüzdeki saatler
+        if (huge && weather != null && weather.hours.isNotEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(ink.track).padding(vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                weather.hours.take(6).forEachIndexed { i, h ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(if (i == 0) "Şimdi" else "%02d".format(h.hour), color = ink.secondary, fontSize = 11.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, maxLines = 1)
+                        Spacer(Modifier.height(3.dp))
+                        SkyGlyph(h.sky, h.day, 20.dp)
+                        Spacer(Modifier.height(3.dp))
+                        Text("${h.temp}°", color = ink.primary, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont, maxLines = 1)
+                    }
                 }
             }
         }
