@@ -290,6 +290,16 @@ if [ -n "$mid" ]; then
   adb shell input motionevent UP $ix $iy; step "menü" 2
   shot 15b-cam-menu
   adb shell input keyevent KEYCODE_BACK; step "geri"
+  # Güç tasarrufunda (telefonda pil azken) menü hazır bulanık kopyayla çizilir: içinde köşeli bir kare kalıyor muydu?
+  adb shell cmd power set-mode 1 >/dev/null 2>&1 || adb shell settings put global low_power 1
+  step "güç tasarrufu" 4
+  adb shell input motionevent DOWN $ix $iy; sleep 1.2
+  adb shell input motionevent UP $ix $iy; step "menü (tasarruf)" 2
+  shot 15f-cam-menu-tasarruf
+  sleep 2; shot 15g-cam-menu-tasarruf-2sn
+  adb shell input keyevent KEYCODE_BACK; step "geri"
+  adb shell cmd power set-mode 0 >/dev/null 2>&1 || adb shell settings put global low_power 0
+  step "tasarruf kapandı" 3
 fi
 
 # 17) Bildirim sayıları: erişim izni + örnek bildirim (çökme olmamalı)
