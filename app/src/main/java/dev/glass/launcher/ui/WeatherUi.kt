@@ -56,7 +56,7 @@ private val TR_SHORT_DAYS = arrayOf("Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "
 
 /** Hava durumu verisi: ekrandayken (launcher öndeyken) yenilenir; yenileme kendi içinde 30 dk ile sınırlı. */
 @Composable
-private fun rememberWeather(): WeatherNow? {
+internal fun rememberWeather(): WeatherNow? {
     val ctx = LocalContext.current
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(owner) {

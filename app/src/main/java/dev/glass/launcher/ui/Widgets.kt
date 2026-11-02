@@ -168,6 +168,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                         WidgetKind.Battery -> BatteryWidget(w)
                         WidgetKind.Weather -> WeatherWidget(w)
                         WidgetKind.Suggestions -> SuggestionsWidget(w, vm, strength)
+                        WidgetKind.Overview -> OverviewWidget(w)
                         WidgetKind.Events -> EventsWidget(w)
                         WidgetKind.Music -> MusicWidget(w)
                         WidgetKind.Prayer -> PrayerWidget(w)
@@ -294,18 +295,20 @@ private fun CalendarWidget(w: WidgetItem) {
 }
 
 @Composable
-private fun MonthGrid(today: LocalDate, modifier: Modifier) {
+internal fun MonthGrid(today: LocalDate, modifier: Modifier, header: Boolean = true) {
     val ym = YearMonth.from(today)
     val first = ym.atDay(1)
     val offset = (first.dayOfWeek.value - 1) // Pazartesi başlangıçlı
     val days = ym.lengthOfMonth()
     val ink = LocalWidgetInk.current
     Column(modifier) {
-        Text(
-            ym.month.getDisplayName(TextStyle.FULL, TR).uppercase(TR),
-            color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
-        )
-        Spacer(Modifier.height(6.dp))
+        if (header) {
+            Text(
+                ym.month.getDisplayName(TextStyle.FULL, TR).uppercase(TR),
+                color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            )
+            Spacer(Modifier.height(6.dp))
+        }
         val names = listOf("Pt", "Sa", "Ça", "Pe", "Cu", "Ct", "Pz")
         Row(Modifier.fillMaxWidth()) {
             names.forEach {
@@ -482,6 +485,7 @@ fun rememberWidgetCaption(w: WidgetItem, vm: LauncherViewModel): String {
             WidgetKind.Photo -> "Fotoğraf"
             WidgetKind.Weather -> "Hava Durumu"
             WidgetKind.Suggestions -> "Öneriler"
+            WidgetKind.Overview -> "Gün Özeti"
             WidgetKind.Events -> "Takvim"
             WidgetKind.Music -> "Müzik"
             WidgetKind.Prayer -> "Namaz Vakitleri"

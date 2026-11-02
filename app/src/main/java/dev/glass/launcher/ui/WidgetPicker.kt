@@ -119,6 +119,7 @@ private val GlassBuiltins = listOf(
     Triple("b:music", "Şimdi Çalıyor", WidgetKind.Music),
     Triple("b:prayer", "Namaz Vakitleri", WidgetKind.Prayer),
     Triple("b:play", "Google Play", WidgetKind.PlayStore),
+    Triple("b:overview", "Gün Özeti", WidgetKind.Overview),
 )
 
 /**
@@ -174,6 +175,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                         GalleryWidget(
                             k, t, null, kind,
                             if (kind == WidgetKind.Photo) listOf(Span(2, 2), Span(4, 2), Span(4, 4))
+                            else if (kind == WidgetKind.Overview) listOf(Span(4, 3), Span(4, 4)).filter { it.x <= m.columns && it.y <= m.rows }
                             else WidgetSize.entries.map { Span(it.spanX, it.spanY) }.filter { it.x <= m.columns && it.y <= m.rows },
                         )
                     ),
@@ -499,6 +501,7 @@ private fun BuiltinPreview(kind: WidgetKind, w: Dp) {
         WidgetKind.Music -> GlyphIcon(Glyph.Mic, Color.White, w * 0.32f)
         WidgetKind.Prayer -> Text("Akşam", color = Color(0xFF30D158), fontSize = big * 0.9f, fontWeight = FontWeight.SemiBold)
         WidgetKind.PlayStore -> GlyphIcon(Glyph.Bag, Color.White, w * 0.32f)
+        WidgetKind.Overview -> GlyphIcon(Glyph.Doc, Color.White, w * 0.32f)
         else -> GlyphIcon(Glyph.Widget, Color.White, w * 0.3f)
     }
 }

@@ -242,6 +242,7 @@ fun ContextMenuOverlay(
         val w = widget ?: return@remember emptyList()
         val info = if (w.kind == WidgetKind.System) vm.widgetHost.info(w.appWidgetId) else null
         if (info != null && hm != null) WidgetSizing.sizeOptions(info, hm, dens)
+        else if (w.kind == WidgetKind.Overview) listOf(Span(4, 3), Span(4, 4))
         else WidgetSize.entries.map { Span(it.spanX, it.spanY) }
     }
 

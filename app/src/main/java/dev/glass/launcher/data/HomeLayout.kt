@@ -51,7 +51,8 @@ enum class WidgetKind(val code: String, val title: String) {
     Events("events", "Yaklaşan"),
     Music("music", "Şimdi Çalıyor"),
     Prayer("prayer", "Namaz Vakitleri"),
-    PlayStore("play", "Google Play");
+    PlayStore("play", "Google Play"),
+    Overview("overview", "Gün Özeti");
 
     companion object {
         fun of(code: String) = entries.firstOrNull { it.code == code } ?: System

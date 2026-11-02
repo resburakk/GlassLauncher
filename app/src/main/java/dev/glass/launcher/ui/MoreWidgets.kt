@@ -74,7 +74,7 @@ private val WRed = Color(0xFFFF453A)
 
 /** Launcher öndeyken her dakika başında artan sayaç (widget'lar zamana göre yenilensin; saniyelik çizim yok). */
 @Composable
-private fun rememberMinuteTick(): Int {
+internal fun rememberMinuteTick(): Int {
     var tick by remember { mutableIntStateOf(0) }
     val owner = LocalLifecycleOwner.current
     LaunchedEffect(owner) {
@@ -90,7 +90,7 @@ private fun rememberMinuteTick(): Int {
 }
 
 @Composable
-private fun PermissionPrompt(glyph: Glyph, text: String, button: String, onClick: () -> Unit) {
+internal fun PermissionPrompt(glyph: Glyph, text: String, button: String, onClick: () -> Unit) {
     val ink = LocalWidgetInk.current
     Column(
         Modifier.fillMaxSize().padding(14.dp),

@@ -286,7 +286,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_GALLERY))
                     ?: byName("galeri", "gallery", "fotograf", "photos")
             WidgetKind.Weather -> byName("hava durumu", "weather")
-            WidgetKind.Events ->
+            WidgetKind.Events, WidgetKind.Overview ->
                 byIntent(android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_APP_CALENDAR))
                     ?: byName("takvim", "calendar")
             WidgetKind.Music -> {
