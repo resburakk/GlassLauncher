@@ -113,7 +113,7 @@ private fun PermissionPrompt(glyph: Glyph, text: String, button: String, onClick
 
 /**
  * iOS Siri Önerileri gibi: o saatte en çok açtığın uygulamalar (launcher'ın kendi kullanım istatistiği; dışarı gitmez).
- * Küçük 2×2 simge, orta 4×2, büyük 4×4 (adlarıyla).
+ * Küçük 2×2: 4 simge, orta 4×2: 8, büyük 4×4: 16 (Uygulama Arşivi kutusu ölçülerinde).
  */
 @Composable
 fun SuggestionsWidget(w: WidgetItem, vm: LauncherViewModel, strength: Float) {
@@ -122,7 +122,6 @@ fun SuggestionsWidget(w: WidgetItem, vm: LauncherViewModel, strength: Float) {
     val ink = LocalWidgetInk.current
     val cols = if (w.spanX >= 4) 4 else 2
     val rows = if (w.spanY >= 4) 4 else 2
-    val labels = w.spanY >= 4
     val list = apps.take(cols * rows)
     if (list.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(14.dp), contentAlignment = Alignment.Center) {
@@ -131,27 +130,26 @@ fun SuggestionsWidget(w: WidgetItem, vm: LauncherViewModel, strength: Float) {
         }
         return
     }
-    BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = 10.dp, vertical = 12.dp)) {
-        val cellW = maxWidth / cols
-        val cellH = maxHeight / rows
-        val labelH = if (labels) 16.dp else 0.dp
-        val icon = minOf(cellW * 0.80f, (cellH - labelH) * 0.86f)
-        Column(Modifier.fillMaxSize()) {
+    // Uygulama Arşivi kutusuyla aynı oranlar: her 2×2'lik blokta iç boşluk %8,5, büyük simgeler arası %7,3; mini simge yok.
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val block = minOf(maxWidth / (cols / 2), maxHeight / (rows / 2))
+        val pad = block * 0.085f
+        val gap = block * 0.073f
+        val icon = (block - pad * 2f - gap) / 2f
+        Column(
+            Modifier.fillMaxSize().padding(pad),
+            verticalArrangement = if (rows == 2) Arrangement.spacedBy(gap, Alignment.CenterVertically) else Arrangement.SpaceBetween,
+        ) {
             repeat(rows) { r ->
-                Row(Modifier.fillMaxWidth().weight(1f)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (cols == 2) Arrangement.spacedBy(gap, Alignment.CenterHorizontally) else Arrangement.SpaceBetween,
+                ) {
                     repeat(cols) { c ->
                         val a = list.getOrNull(r * cols + c)
-                        Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.Center) {
-                            if (a != null) Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                modifier = Modifier.clickable(remember { MutableInteractionSource() }, null) { vm.launch(a) },
-                            ) {
+                        Box(Modifier.size(icon)) {
+                            if (a != null) Box(Modifier.clickable(remember { MutableInteractionSource() }, null) { vm.launch(a) }) {
                                 AppIconImage(a, vm, icon, st.iconGlass, strength, badge = false)
-                                if (labels) Text(
-                                    a.label, color = ink.primary, fontSize = 11.sp, fontFamily = AppFont, maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis, modifier = Modifier.width(cellW).padding(top = 3.dp),
-                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                )
                             }
                         }
                     }
