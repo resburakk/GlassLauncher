@@ -581,16 +581,9 @@ fun Modifier.glassIcon(shape: Shape, enabled: Boolean, strength: Float, rimGlow:
     // Malzeme ve kenar ışığı her boyut/şekil için bir kez hazır görüntü olarak üretilir, her karede yalnızca
     // kopyalanır (her simge için her karede şekil çizgisi hesaplamak 120 Hz'i 60'a düşürüyordu).
     if (!enabled) this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosIconOverlay(shape, rimGlow, rimWidth)
+    // Üst yarıdaki beyaz parlama kaldırıldı: iOS 26 simgelerinde yok (ekran görüntüsüyle karşılaştırıldı; koyu
+    // simgeleri griye çekip soluk gösteriyordu).
     else this.contactShadow(shape, GlassLens.iconShadow).clip(shape).iosIconOverlay(shape, rimGlow, rimWidth)
-        .drawWithContent {
-            drawContent()
-            drawRect(
-                Brush.verticalGradient(
-                    listOf(white(0.22f * strength), Color.Transparent),
-                    endY = size.height * 0.5f,
-                )
-            )
-        }
 
 @Composable
 fun SearchGlyph(color: Color, glyphSize: Dp) {
@@ -1051,8 +1044,9 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // Simgelerde parıltı çizgisi çok hafif, neredeyse fark edilmez (kullanıcı isteği; önceden %50).
             // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
             // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
-            val aTop = ((if (material) 0.34f else 0.26f) * rimGlow).coerceIn(0f, 1f)
-            val aBot = ((if (material) 0.52f else 0.42f) * rimGlow).coerceIn(0f, 1f)
+            // Simgelerde iOS gibi neredeyse fark edilmeyen ince çizgi; widget/dock'ta altta belirgin.
+            val aTop = ((if (material) 0.10f else 0.26f) * rimGlow).coerceIn(0f, 1f)
+            val aBot = ((if (material) 0.14f else 0.42f) * rimGlow).coerceIn(0f, 1f)
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
             // Simge: kısa kenarın ~%1,2'si (iOS'taki ince ama görünür çizgi), "kenar kalınlığı" ayarıyla ölçeklenir.
             // Widget/dock: çok ince (~0,5 dp; önceki 1,1 dp kalın duruyordu).
@@ -1068,7 +1062,7 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
                 p.strokeWidth = width
                 c.drawPath(path, p)
             }
-            if (material) glow(0.35f, w * 5f) // içeri doğru yumuşak hale
+            if (material) glow(0.2f, w * 4f) // içeri doğru yumuşak hale
             glow(1f, w * 2f)    // kenardaki parlak çizgi (yarısı şeklin içinde)
         }
         bmp.prepareToDraw()

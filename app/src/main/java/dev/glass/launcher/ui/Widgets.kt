@@ -276,16 +276,23 @@ private fun CalendarWidget(w: WidgetItem) {
     val today = now.toLocalDate()
     val ink = LocalWidgetInk.current
     if (w.spanX < 4 && w.spanY < 4) {
+        // iOS 26: beyaz takvim widget'ının alt kenarına doğru yumuşak gri gölge (derinlik).
+        if (ink.primary.red < 0.5f) Box(
+            Modifier.fillMaxSize().background(
+                Brush.verticalGradient(0.62f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.06f))
+            )
+        )
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             Text(
                 today.dayOfWeek.getDisplayName(TextStyle.FULL, TR).uppercase(TR),
                 color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
             )
             // Gün rakamı iOS 26 ölçüsünde (ekran görüntüsüyle karşılaştırıldı: önceden 44 ince, ~%35 büyüktü).
-            Text("${today.dayOfMonth}", color = ink.primary, fontSize = 34.sp, fontWeight = FontWeight.Normal, lineHeight = 38.sp)
-            Spacer(Modifier.weight(1f))
-            // iOS gibi: bugünün sıradaki etkinliği, yoksa "Bugün etkinlik yok" (takvim izni yoksa ay ve yıl).
+            Text("${today.dayOfMonth}", color = ink.primary, fontSize = 34.sp, fontWeight = FontWeight.Medium, lineHeight = 38.sp)
+            // iOS gibi: etkinlik satırı widget'ın ortasında (altta değil); sıradaki etkinlik, yoksa "Bugün etkinlik yok".
+            Spacer(Modifier.weight(0.8f))
             CalendarNextLine(today, ink.primary, ink.secondary)
+            Spacer(Modifier.weight(1.2f))
         }
     } else {
         MonthGrid(today, Modifier.fillMaxSize().padding(14.dp))

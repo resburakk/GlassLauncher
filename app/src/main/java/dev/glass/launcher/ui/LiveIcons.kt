@@ -171,15 +171,16 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         val r = s * 0.42f
         // Rakamlar boyut/renk değişince bir kez ölçülür (her karede değil).
         val numStyle = TextStyle(
-            color = p.clockInk, fontFamily = AppFont, fontWeight = FontWeight.Bold,
-            fontSize = (s * 0.17f).toSp(), letterSpacing = 0.sp,
+            // iOS 26 Saat simgesi: rakamlar küçük ve normal kalınlıkta (kalın ve büyük değil).
+            color = p.clockInk, fontFamily = AppFont, fontWeight = FontWeight.Normal,
+            fontSize = (s * 0.125f).toSp(), letterSpacing = 0.sp,
         )
         val nums = listOf(12, 3, 6, 9).map { h ->
             val a = Math.toRadians(h * 30.0 - 90.0)
             val m = measurer.measure(h.toString(), numStyle)
             m to Offset(
-                c.x + r * 0.66f * cos(a).toFloat() - m.size.width / 2f,
-                c.y + r * 0.66f * sin(a).toFloat() - m.size.height / 2f,
+                c.x + r * 0.70f * cos(a).toFloat() - m.size.width / 2f,
+                c.y + r * 0.70f * sin(a).toFloat() - m.size.height / 2f,
             )
         }
         // iOS 26 Saat simgesi: kenarda 60 çizgi (saat başları kalın), rakamlar içeride, turuncu saniye ibresi.
@@ -206,11 +207,13 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         val sec = cal.get(Calendar.SECOND) + ms / 1000f
         val min = cal.get(Calendar.MINUTE) + sec / 60f
         val hr = (cal.get(Calendar.HOUR) + min / 60f)
-        hand(c, hr * 30f, r * 0.45f, s * 0.07f, p.clockInk, tail = 0f)
-        hand(c, min * 6f, r * 0.68f, s * 0.05f, p.clockInk, tail = 0f)
+        // iOS 26: ince akrep ve yelkovan (yelkovan çizgilere kadar), ince uzun turuncu saniye ibresi.
+        hand(c, hr * 30f, r * 0.50f, s * 0.045f, p.clockInk, tail = r * 0.08f)
+        hand(c, min * 6f, r * 0.86f, s * 0.032f, p.clockInk, tail = r * 0.08f)
         if (seconds) {
-            hand(c, sec * 6f, r * 0.70f, s * 0.018f, p.clockRed, tail = r * 0.18f)
-            drawCircle(p.clockRed, s * 0.04f, c)
+            hand(c, sec * 6f, r * 0.94f, s * 0.012f, p.clockRed, tail = r * 0.22f)
+            drawCircle(p.clockRed, s * 0.03f, c)
+            drawCircle(p.clockBg, s * 0.011f, c)
         } else {
             drawCircle(p.clockInk, s * 0.045f, c)
         }
