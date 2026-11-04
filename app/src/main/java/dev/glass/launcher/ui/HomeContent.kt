@@ -732,22 +732,11 @@ internal fun HomeContent(
                     )
                 }
                 // Görünürlük çizimde okunur: sayfa kaydırılırken noktalar/hap geçişi ana ekranı yeniden oluşturmasın.
-                SearchPill(m, settings.glassStrength, { (1f - dotsAlpha) * (1f - libFraction) * pillShown }, onOpenSearch)
+                DockGlass { SearchPill(m, settings.glassStrength, { (1f - dotsAlpha) * (1f - libFraction) * pillShown }, onOpenSearch) }
             }
 
             if (libFraction < 0.98f) {
-                val dockBd = LocalDockBackdrop.current
-                val baseLook = LocalGlass.current
-                CompositionLocalProvider(
-                    LocalGlass provides if (dockBd != null) baseLook.copy(backdrop = dockBd, sharp = dockBd, sharpSoft = true) else baseLook,
-                    // Kopya yoksa dock'un buzlu dolgusu Dock > Bulanıklık ile azalır (Net: şeffaf cam).
-                    LocalGlassFrost provides LocalGlassFrost.current * settings.dockBlur,
-                    // Dock'un kendi mercek ayarları (Ayarlar > Dock): yalnızca dock'u etkiler.
-                    LocalLauncherSettings provides settings.copy(
-                        glassRefraction = if (settings.dockRefraction >= 0f) settings.dockRefraction else settings.glassRefraction,
-                        glassEdgeWidth = if (settings.dockEdgeWidth >= 0f) settings.dockEdgeWidth else settings.glassEdgeWidth,
-                    ),
-                ) {
+                DockGlass(force = true) {
                 Box(
                     Modifier
                         .offset(x = m.dockMarginX, y = m.dockTop)
@@ -793,7 +782,11 @@ private fun SearchPill(m: HomeMetrics, strength: Float, alpha: () -> Float, onCl
             .graphicsLayer { this.alpha = alpha() }
             .width(m.pillW)
             .height(m.pillH)
-            .liquidGlass(CircleShape, strength * 0.8f, 6.dp)
+            .then(
+                // Ayarlar > Dock > "Klasörler ve Ara dock gibi": dock ile aynı cam (aynı bulanıklık, kırılma, kenar ışığı).
+                if (LocalLauncherSettings.current.glassLikeDock) Modifier.liquidGlass(CircleShape, strength * LocalLauncherSettings.current.dockOpacity, 6.dp, ios = true, brightRim = true, iconRim = true)
+                else Modifier.liquidGlass(CircleShape, strength * 0.8f, 6.dp)
+            )
             .clickable { if (alpha() > 0.5f) onClick() },
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
@@ -984,4 +977,28 @@ internal fun Modifier.clearIconGlass(shape: androidx.compose.ui.graphics.Shape, 
     else this
         .liquidGlass(shape, strength * 0.8f, 0.dp, frosted = true, ios = true)
         .background(if (darkGlass) Color(0x61000000) else Color(0x38FFFFFF))
+}
+
+
+/**
+ * Dock'un cam ortamı: dock'un kendi bulanık kopyası, Dock > Bulanıklık ve dock'un mercek ayarları. [force] false ise
+ * yalnızca "Klasörler ve Ara dock gibi" açıkken uygulanır (ana ekran klasörleri ve Ara düğmesi dock ile aynı görünür).
+ */
+@Composable
+internal fun DockGlass(force: Boolean = false, content: @Composable () -> Unit) {
+    val settings = LocalLauncherSettings.current
+    if (!force && !settings.glassLikeDock) { content(); return }
+    val dockBd = LocalDockBackdrop.current
+    val baseLook = LocalGlass.current
+    CompositionLocalProvider(
+        LocalGlass provides if (dockBd != null) baseLook.copy(backdrop = dockBd, sharp = dockBd, sharpSoft = true) else baseLook,
+        // Kopya yoksa dock'un buzlu dolgusu Dock > Bulanıklık ile azalır (Net: şeffaf cam).
+        LocalGlassFrost provides LocalGlassFrost.current * settings.dockBlur,
+        // Dock'un kendi mercek ayarları (Ayarlar > Dock).
+        LocalLauncherSettings provides settings.copy(
+            glassRefraction = if (settings.dockRefraction >= 0f) settings.dockRefraction else settings.glassRefraction,
+            glassEdgeWidth = if (settings.dockEdgeWidth >= 0f) settings.dockEdgeWidth else settings.glassEdgeWidth,
+        ),
+        content = content,
+    )
 }

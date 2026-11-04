@@ -84,6 +84,8 @@ data class LauncherSettings(
     /** Dock'un kendi kenar kırılması ve kenar kalınlığı (< 0: Liquid Glass'taki genel değer). */
     val dockRefraction: Float = -1f,
     val dockEdgeWidth: Float = -1f,
+    /** Ana ekrandaki klasörler ve Ara düğmesi dock ile aynı cam (bulanıklık, kırılma, kenar ışığı). */
+    val glassLikeDock: Boolean = true,
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
     val dockBottom: Float = 15f,
     /**
@@ -327,7 +329,7 @@ data class LauncherSettings(
         put("iconCorner4", iconCorner.toDouble()); put("iconGlass", iconGlass)
         put("customIcons", JSONObject(customIcons as Map<*, *>))
         put("dockHeight", dockHeight.toDouble()); put("dockWidth", dockWidth.toDouble())
-        put("dockOpacity", dockOpacity.toDouble()); put("dockBlur", dockBlur.toDouble()); put("dockRefraction", dockRefraction.toDouble()); put("dockEdgeWidth", dockEdgeWidth.toDouble()); put("folderOpacity", folderOpacity.toDouble())
+        put("dockOpacity", dockOpacity.toDouble()); put("dockBlur", dockBlur.toDouble()); put("dockRefraction", dockRefraction.toDouble()); put("dockEdgeWidth", dockEdgeWidth.toDouble()); put("glassLikeDock", glassLikeDock); put("folderOpacity", folderOpacity.toDouble())
         put("dockBottom", dockBottom.toDouble()); put("folderSize", folderSize.toDouble()); put("folderCorner", folderCorner.toDouble())
         put("libraryTileCorner2", libraryTileCorner.toDouble()); put("libraryTileCornerDock", libraryTileCornerDock); put("libraryGroupCorner", libraryGroupCorner.toDouble())
         put("glassRimWidth", glassRimWidth.toDouble()); put("openFolderTitleSize", openFolderTitleSize.toDouble())
@@ -407,6 +409,7 @@ data class LauncherSettings(
                 dockBlur = f("dockBlur", d.dockBlur),
                 dockRefraction = f("dockRefraction", d.dockRefraction),
                 dockEdgeWidth = f("dockEdgeWidth", d.dockEdgeWidth),
+                glassLikeDock = o.optBoolean("glassLikeDock", d.glassLikeDock),
                 folderOpacity = f("folderOpacity", d.folderOpacity),
                 glassStrength = f("glassStrength", d.glassStrength),
                 theme = runCatching { ThemeMode.valueOf(o.optString("theme")) }.getOrDefault(d.theme),

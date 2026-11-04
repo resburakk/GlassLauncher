@@ -862,6 +862,9 @@ private fun DockPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Launc
             edge, 0.05f..0.6f, default = if (s.dockEdgeWidth < 0f) null else -1f,
         ) { v -> onChange { it.copy(dockEdgeWidth = v) } }
         RowDivider()
+        // Kapatınca klasörler ve Ara düğmesi eski (genel Liquid Glass) camına döner.
+        ToggleRow("Klasörler ve Ara dock gibi", s.glassLikeDock, default = Def.glassLikeDock) { v -> onChange { it.copy(glassLikeDock = v) } }
+        RowDivider()
         SliderRow("Alt boşluk", "${s.dockBottom.toInt()} pt", s.dockBottom, 0f..60f, default = Def.dockBottom) { v -> onChange { it.copy(dockBottom = v) } }
         RowDivider()
         // Varsayılan (negatif): iOS 26 ölçüsü (%37,8).

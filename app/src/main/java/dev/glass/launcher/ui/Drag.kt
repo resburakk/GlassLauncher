@@ -462,6 +462,8 @@ internal fun FolderIcon(
     val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
     // Klasör rozeti: içindeki uygulamaların toplam bildirim sayısı (iOS gibi).
     val folderBadge = badgeCount(folder.keys.mapNotNull { byKey[it]?.takeIf { a -> !a.isShortcut }?.packageName })
+    // Ana ekran klasörü dock ile aynı cam ortamında (ayar açıksa).
+    DockGlass {
     Box(Modifier.size(icon)) {
     Box(
         // Gölgesiz: yarı saydam camın altındaki gölge içeriden kare gibi görünüyordu.
@@ -471,6 +473,8 @@ internal fun FolderIcon(
             appShape(icon * LocalLauncherSettings.current.iconCorner), strength * 0.8f, 0.dp, ios = true,
             forceClear = LocalLauncherSettings.current.let { it.clearSurface == "glass" && it.iconStyle == dev.glass.launcher.data.IconStyle.Clear },
             edgeFraction = if (LocalLauncherSettings.current.let { it.clearSurface == "glass" && it.iconStyle == dev.glass.launcher.data.IconStyle.Clear }) 0.2f else null,
+            // Ayarlar > Dock > "Klasörler ve Ara dock gibi": dock ile aynı kenar ışığı.
+            brightRim = LocalLauncherSettings.current.glassLikeDock, iconRim = LocalLauncherSettings.current.glassLikeDock,
         ),
         contentAlignment = Alignment.Center,
     ) {
@@ -487,6 +491,7 @@ internal fun FolderIcon(
         }
     }
     NotificationBadge(folderBadge, icon)
+    }
     }
 }
 
