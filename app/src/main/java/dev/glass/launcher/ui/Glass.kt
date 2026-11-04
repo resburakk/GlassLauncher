@@ -1047,11 +1047,12 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
         if (rimGlow > 0.01f && rimPx > 0.05f) {
             // Simge: iOS ölçüsü (%50). Widget/dock: önceki ince, soluk kenar (%30, hale yok).
             // Simgelerde parıltı çizgisi çok hafif, neredeyse fark edilmez (kullanıcı isteği; önceden %50).
-            val aTop = ((if (material) 0.15f else 0.30f) * rimGlow).coerceIn(0f, 1f)
-            val aBot = aTop * 0.6f
+            // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
+            val aTop = ((if (material) 0.16f else 0.30f) * rimGlow).coerceIn(0f, 1f)
+            val aBot = if (material) (0.34f * rimGlow).coerceIn(0f, 1f) else aTop * 0.6f
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
             val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density).let { if (material) it else minOf(it, 0.8f * density) }
-            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), floatArrayOf(0.06f, 0.24f, 0.78f, 0.94f), android.graphics.Shader.TileMode.CLAMP)
+            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), (if (material) floatArrayOf(0f, 0.12f, 0.88f, 1f) else floatArrayOf(0.06f, 0.24f, 0.78f, 0.94f)), android.graphics.Shader.TileMode.CLAMP)
             fun glow(scale: Float, width: Float) {
                 val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
                     intArrayOf(tint(aTop * scale), tint(aTop * scale * 0.15f), 0, tint(aBot * scale * 0.15f), tint(aBot * scale)),

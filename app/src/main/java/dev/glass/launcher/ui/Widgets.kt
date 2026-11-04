@@ -284,10 +284,8 @@ private fun CalendarWidget(w: WidgetItem) {
             // Gün rakamı biraz küçük (önceden 52).
             Text("${today.dayOfMonth}", color = ink.primary, fontSize = 44.sp, fontWeight = FontWeight.Light)
             Spacer(Modifier.weight(1f))
-            Text(
-                today.month.getDisplayName(TextStyle.FULL, TR) + " " + today.year,
-                color = ink.secondary, fontSize = 13.sp,
-            )
+            // iOS gibi: bugünün sıradaki etkinliği, yoksa "Bugün etkinlik yok" (takvim izni yoksa ay ve yıl).
+            CalendarNextLine(today, ink.primary, ink.secondary)
         }
     } else {
         MonthGrid(today, Modifier.fillMaxSize().padding(14.dp))
@@ -495,6 +493,39 @@ fun rememberWidgetCaption(w: WidgetItem, vm: LauncherViewModel): String {
                 val pm = ctx.packageManager
                 info?.provider?.packageName?.let { pm.getApplicationLabel(pm.getApplicationInfo(it, 0)).toString() }
             }.getOrNull() ?: "Widget"
+        }
+    }
+}
+
+
+@Composable
+private fun CalendarNextLine(today: LocalDate, primary: Color, secondary: Color) {
+    val ctx = LocalContext.current
+    val granted = remember { dev.glass.launcher.data.UpcomingEvents.granted(ctx) }
+    if (!granted) {
+        Text(today.month.getDisplayName(TextStyle.FULL, TR) + " " + today.year, color = secondary, fontSize = 13.sp)
+        return
+    }
+    val tick = rememberMinuteTick()
+    val next by androidx.compose.runtime.produceState<dev.glass.launcher.data.CalEvent?>(null, tick, today) {
+        val now = System.currentTimeMillis()
+        value = dev.glass.launcher.data.UpcomingEvents.load(ctx, 6).orEmpty()
+            .firstOrNull { it.day == today && (it.allDay || it.end > now) }
+    }
+    val e = next
+    if (e == null) {
+        Text("Bugün etkinlik yok", color = secondary, fontSize = 13.sp, maxLines = 2)
+    } else {
+        Column {
+            Text(e.title.ifBlank { "Etkinlik" }, color = primary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            val f = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+            val z = java.time.ZoneId.systemDefault()
+            Text(
+                if (e.allDay) "Tüm gün" else java.time.Instant.ofEpochMilli(e.begin).atZone(z).format(f) + "–" +
+                    java.time.Instant.ofEpochMilli(e.end).atZone(z).format(f),
+                color = secondary, fontSize = 12.sp, maxLines = 1,
+            )
         }
     }
 }

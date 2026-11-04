@@ -93,11 +93,11 @@ private class LivePalette(
 
 private val LightPalette = LivePalette(
     calBg = Color.White, calRed = Color(0xFFFF3B30), calInk = Color.Black,
-    clockBg = Color.White, clockInk = Color(0xFF1E1E1E), clockRed = Color(0xFFE63946),
+    clockBg = Color.White, clockInk = Color(0xFF1E1E1E), clockRed = Color(0xFFFF9500),
 )
 private val DarkPalette = LivePalette(
     calBg = Color(0xFF1C1C1E), calRed = Color(0xFFFF453A), calInk = Color.White,
-    clockBg = Color(0xFF1C1C1E), clockInk = Color.White, clockRed = Color(0xFFFF5C5C),
+    clockBg = Color(0xFF1C1C1E), clockInk = Color.White, clockRed = Color(0xFFFF9F0A),
 )
 
 /** Canlı simgenin görünümü: seçili simge görünümüyle aynı (açık, koyu, renkli, şeffaf). */
@@ -178,18 +178,29 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
             val a = Math.toRadians(h * 30.0 - 90.0)
             val m = measurer.measure(h.toString(), numStyle)
             m to Offset(
-                c.x + r * 0.80f * cos(a).toFloat() - m.size.width / 2f,
-                c.y + r * 0.80f * sin(a).toFloat() - m.size.height / 2f,
+                c.x + r * 0.66f * cos(a).toFloat() - m.size.width / 2f,
+                c.y + r * 0.66f * sin(a).toFloat() - m.size.height / 2f,
             )
         }
-        val dots = listOf(1, 2, 4, 5, 7, 8, 10, 11).map { h ->
-            val a = Math.toRadians(h * 30.0 - 90.0)
-            Offset(c.x + r * 0.82f * cos(a).toFloat(), c.y + r * 0.82f * sin(a).toFloat())
+        // iOS 26 Saat simgesi: kenarda 60 çizgi (saat başları kalın), rakamlar içeride, turuncu saniye ibresi.
+        val ticks = (0 until 60).map { i ->
+            val a = Math.toRadians(i * 6.0 - 90.0)
+            val major = i % 5 == 0
+            val outer = r * 1.06f
+            val inner = if (major) r * 0.90f else r * 0.97f
+            Triple(
+                Offset(c.x + inner * cos(a).toFloat(), c.y + inner * sin(a).toFloat()),
+                Offset(c.x + outer * cos(a).toFloat(), c.y + outer * sin(a).toFloat()),
+                major,
+            )
         }
         onDrawBehind {
         drawRect(p.clockBg)
         nums.forEach { (m, o) -> drawText(m, topLeft = o) }
-        dots.forEach { drawCircle(p.clockInk, s * 0.016f, it) }
+        ticks.forEach { (a, b, major) ->
+            drawLine(if (major) p.clockInk else p.clockInk.copy(alpha = 0.55f), a, b,
+                strokeWidth = if (major) s * 0.018f else s * 0.008f, cap = StrokeCap.Butt)
+        }
         val cal = Calendar.getInstance().apply { timeInMillis = now() }
         val ms = cal.get(Calendar.MILLISECOND)
         val sec = cal.get(Calendar.SECOND) + ms / 1000f
