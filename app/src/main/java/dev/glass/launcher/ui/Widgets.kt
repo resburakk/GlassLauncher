@@ -281,8 +281,8 @@ private fun CalendarWidget(w: WidgetItem) {
                 today.dayOfWeek.getDisplayName(TextStyle.FULL, TR).uppercase(TR),
                 color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
             )
-            // Gün rakamı biraz küçük (önceden 52).
-            Text("${today.dayOfMonth}", color = ink.primary, fontSize = 44.sp, fontWeight = FontWeight.Light)
+            // Gün rakamı iOS 26 ölçüsünde (ekran görüntüsüyle karşılaştırıldı: önceden 44 ince, ~%35 büyüktü).
+            Text("${today.dayOfMonth}", color = ink.primary, fontSize = 34.sp, fontWeight = FontWeight.Normal, lineHeight = 38.sp)
             Spacer(Modifier.weight(1f))
             // iOS gibi: bugünün sıradaki etkinliği, yoksa "Bugün etkinlik yok" (takvim izni yoksa ay ve yıl).
             CalendarNextLine(today, ink.primary, ink.secondary)
