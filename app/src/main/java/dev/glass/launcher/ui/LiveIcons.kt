@@ -173,22 +173,29 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         val numStyle = TextStyle(
             // iOS 26 Saat simgesi: rakamlar küçük ve normal kalınlıkta (kalın ve büyük değil).
             color = p.clockInk, fontFamily = AppFont, fontWeight = FontWeight.Normal,
-            fontSize = (s * 0.125f).toSp(), letterSpacing = 0.sp,
+            fontSize = (s * 0.15f).toSp(), letterSpacing = 0.sp,
         )
         val nums = listOf(12, 3, 6, 9).map { h ->
             val a = Math.toRadians(h * 30.0 - 90.0)
             val m = measurer.measure(h.toString(), numStyle)
             m to Offset(
-                c.x + r * 0.70f * cos(a).toFloat() - m.size.width / 2f,
-                c.y + r * 0.70f * sin(a).toFloat() - m.size.height / 2f,
+                c.x + s * 0.27f * cos(a).toFloat() - m.size.width / 2f,
+                c.y + s * 0.27f * sin(a).toFloat() - m.size.height / 2f,
             )
         }
         // iOS 26 Saat simgesi: kenarda 60 çizgi (saat başları kalın), rakamlar içeride, turuncu saniye ibresi.
+        // iOS 26: çizgiler daire üzerinde değil, simgenin yuvarlatılmış kare şeklini izler (köşelerde daha uzaktadır).
+        // Merkezden her yöne süperelips (n≈4.5) kenarına olan uzaklık; saat başları uzun ve kalın, dakikalar kısa.
+        fun edge(a: Double, h: Float): Float {
+            val n = 4.5
+            val cs = kotlin.math.abs(cos(a)); val sn = kotlin.math.abs(sin(a))
+            return (h / Math.pow(Math.pow(cs, n) + Math.pow(sn, n), 1.0 / n)).toFloat()
+        }
         val ticks = (0 until 60).map { i ->
             val a = Math.toRadians(i * 6.0 - 90.0)
             val major = i % 5 == 0
-            val outer = r * 1.06f
-            val inner = if (major) r * 0.90f else r * 0.97f
+            val outer = edge(a, s * 0.445f)
+            val inner = outer - if (major) s * 0.105f else s * 0.042f
             Triple(
                 Offset(c.x + inner * cos(a).toFloat(), c.y + inner * sin(a).toFloat()),
                 Offset(c.x + outer * cos(a).toFloat(), c.y + outer * sin(a).toFloat()),
@@ -199,8 +206,8 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         drawRect(p.clockBg)
         nums.forEach { (m, o) -> drawText(m, topLeft = o) }
         ticks.forEach { (a, b, major) ->
-            drawLine(if (major) p.clockInk else p.clockInk.copy(alpha = 0.55f), a, b,
-                strokeWidth = if (major) s * 0.018f else s * 0.008f, cap = StrokeCap.Butt)
+            drawLine(if (major) p.clockInk else p.clockInk.copy(alpha = 0.45f), a, b,
+                strokeWidth = if (major) s * 0.022f else s * 0.009f, cap = StrokeCap.Butt)
         }
         val cal = Calendar.getInstance().apply { timeInMillis = now() }
         val ms = cal.get(Calendar.MILLISECOND)

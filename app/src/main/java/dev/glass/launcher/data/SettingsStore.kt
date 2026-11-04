@@ -188,7 +188,7 @@ data class LauncherSettings(
     /** Işığın karşı kenardaki zayıf yansıması (iOS'taki çapraz köşe parlaması): 0 yok … 1 eşit. */
     val glassLightBack: Float = 0.3f,
     /** Camın alt kenarındaki ince temas gölgesi (iOS 26/27): 0 yok … 1 belirgin. */
-    val glassContactShadow: Float = 0.5f,
+    val glassContactShadow: Float = 0f,
     /** iOS 27 tarzı koyu derinlik kenarı: 0 kapalı … 1 belirgin. */
     val glassEdgeDark: Float = 0f,
     /** Genel şeffaflık (iOS 27 / MagicOS 11 kaydırıcısı): 0 çok şeffaf … 0.5 dengeli … 1 renkli. */

@@ -1045,13 +1045,13 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
             // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
             // Simgelerde iOS gibi neredeyse fark edilmeyen ince çizgi; widget/dock'ta altta belirgin.
-            val aTop = ((if (material) 0.10f else 0.26f) * rimGlow).coerceIn(0f, 1f)
-            val aBot = ((if (material) 0.14f else 0.42f) * rimGlow).coerceIn(0f, 1f)
+            val aTop = ((if (material) 0.12f else 0.30f) * rimGlow).coerceIn(0f, 1f)
+            val aBot = ((if (material) 0.18f else 0.52f) * rimGlow).coerceIn(0f, 1f)
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
             // Simge: kısa kenarın ~%1,2'si (iOS'taki ince ama görünür çizgi), "kenar kalınlığı" ayarıyla ölçeklenir.
             // Widget/dock: çok ince (~0,5 dp; önceki 1,1 dp kalın duruyordu).
             val w = if (material) (minOf(wPx, hPx) * 0.012f * (rimPx / (1.2f * density)).coerceIn(0.3f, 2.5f)).coerceIn(1.2f, 4f * density)
-                else (0.5f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
+                else (0.8f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
             // Kenar boyunca köşelere kadar (iOS'ta parlak çizgi köşe kavsine de döner); yalnızca en uçta söner.
             val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0x66000000, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0x66000000), floatArrayOf(0f, 0.10f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP)
             fun glow(scale: Float, width: Float) {
@@ -1062,7 +1062,14 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
                 p.strokeWidth = width
                 c.drawPath(path, p)
             }
-            if (material) glow(0.2f, w * 4f) // içeri doğru yumuşak hale
+            if (material) {
+                // iOS 26: simgenin DÖRT kenarı boyunca (yanlar dahil) eşit, çok ince açık çerçeve (~1 px).
+                p.shader = null
+                p.color = android.graphics.Color.argb(((0.16f * rimGlow).coerceIn(0f, 1f) * 255).toInt(), 255, 255, 255)
+                p.strokeWidth = (1.1f * density).coerceAtLeast(2f) * (rimPx / (1.2f * density)).coerceIn(0.5f, 2.5f)
+                c.drawPath(path, p)
+                glow(0.2f, w * 4f) // içeri doğru yumuşak hale
+            }
             glow(1f, w * 2f)    // kenardaki parlak çizgi (yarısı şeklin içinde)
         }
         bmp.prepareToDraw()
