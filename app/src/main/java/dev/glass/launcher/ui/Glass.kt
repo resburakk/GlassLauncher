@@ -1016,7 +1016,9 @@ internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp)
 
 /** Hazır görüntü olarak çizilen üst katman: [material] simge malzemesi + kenar parıltısı; false: yalnızca parıltı. */
 private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp, material: Boolean): Modifier = this.drawWithCache {
-    if (size.minDimension < 44.dp.toPx() || size.width < 1f || size.height < 1f) return@drawWithCache onDrawWithContent { drawContent() }
+    // Çok küçük simgelerde (klasör içi mini) çizilmez. Önceki 44 dp sınırı bazı telefonlarda ana ekran simgelerini de
+    // dışarıda bırakıyordu: kenar ışığı hiç çizilmiyor, ayarı değiştirmek de etkisiz kalıyordu.
+    if (size.minDimension < 26.dp.toPx() || size.width < 1f || size.height < 1f) return@drawWithCache onDrawWithContent { drawContent() }
     val wPx = size.width.toInt().coerceAtLeast(1)
     val hPx = size.height.toInt().coerceAtLeast(1)
     val rimPx = rimWidth.toPx()
@@ -1049,10 +1051,13 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // Simgelerde parıltı çizgisi çok hafif, neredeyse fark edilmez (kullanıcı isteği; önceden %50).
             // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
             // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
-            val aTop = ((if (material) 0.30f else 0.34f) * rimGlow).coerceIn(0f, 1f)
-            val aBot = ((if (material) 0.46f else 0.58f) * rimGlow).coerceIn(0f, 1f)
+            val aTop = ((if (material) 0.34f else 0.26f) * rimGlow).coerceIn(0f, 1f)
+            val aBot = ((if (material) 0.52f else 0.42f) * rimGlow).coerceIn(0f, 1f)
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
-            val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density).let { if (material) it else minOf(it, 1.1f * density) }
+            // Simge: kısa kenarın ~%1,2'si (iOS'taki ince ama görünür çizgi), "kenar kalınlığı" ayarıyla ölçeklenir.
+            // Widget/dock: çok ince (~0,5 dp; önceki 1,1 dp kalın duruyordu).
+            val w = if (material) (minOf(wPx, hPx) * 0.012f * (rimPx / (1.2f * density)).coerceIn(0.3f, 2.5f)).coerceIn(1.2f, 4f * density)
+                else (0.5f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
             // Kenar boyunca köşelere kadar (iOS'ta parlak çizgi köşe kavsine de döner); yalnızca en uçta söner.
             val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0x66000000, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0x66000000), floatArrayOf(0f, 0.10f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP)
             fun glow(scale: Float, width: Float) {
