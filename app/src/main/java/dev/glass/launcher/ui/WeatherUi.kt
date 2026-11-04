@@ -315,20 +315,23 @@ private fun nowMinute(): Int = java.util.Calendar.getInstance().let { it.get(jav
 
 private fun c(v: Long) = Color(v)
 
+/** Hava durumu widget'ında bulut/yağmur/güneş sahnesi çizilsin mi (false: iOS gibi yalnızca renk geçişi). */
+private const val WEATHER_SCENE = false
+
 /** Gökyüzü degradesi (üst, alt): hava türü × gün evresi. */
 private fun skyGradient(sky: Sky, phase: SkyPhase): Pair<Color, Color> = when (sky) {
     Sky.Clear -> when (phase) {
-        SkyPhase.Day -> c(0xFF2A7BDE) to c(0xFF6CB6F5)
+        SkyPhase.Day -> c(0xFF3F6FB3) to c(0xFF5B8FD1)
         SkyPhase.Dusk -> c(0xFF33427F) to c(0xFFE58A5F)
         SkyPhase.Night -> c(0xFF0A1433) to c(0xFF22386A)
     }
     Sky.PartlyCloudy -> when (phase) {
-        SkyPhase.Day -> c(0xFF3A80D2) to c(0xFF84B3E2)
+        SkyPhase.Day -> c(0xFF4572B0) to c(0xFF6A93C9)
         SkyPhase.Dusk -> c(0xFF3F4677) to c(0xFFC98468)
         SkyPhase.Night -> c(0xFF101A35) to c(0xFF2B3B60)
     }
     Sky.Cloudy -> when (phase) {
-        SkyPhase.Day -> c(0xFF627790) to c(0xFF97A7BA)
+        SkyPhase.Day -> c(0xFF566C88) to c(0xFF7489A3)
         SkyPhase.Dusk -> c(0xFF4D5270) to c(0xFF8E7676)
         SkyPhase.Night -> c(0xFF1B2231) to c(0xFF363F52)
     }
@@ -338,7 +341,7 @@ private fun skyGradient(sky: Sky, phase: SkyPhase): Pair<Color, Color> = when (s
         SkyPhase.Night -> c(0xFF252A33) to c(0xFF444A54)
     }
     Sky.Drizzle, Sky.Rain -> when (phase) {
-        SkyPhase.Day -> c(0xFF4A5E74) to c(0xFF7A8EA3)
+        SkyPhase.Day -> c(0xFF3E4D63) to c(0xFF5A6A80)
         SkyPhase.Dusk -> c(0xFF3D4460) to c(0xFF736571)
         SkyPhase.Night -> c(0xFF121925) to c(0xFF2A3647)
     }
@@ -409,6 +412,8 @@ fun WeatherBackdrop(dark: Boolean, modifier: Modifier = Modifier) {
         }
         onDrawBehind {
             drawRect(bg)
+            // iOS 26 gibi (kullanıcı seçimi B): havaya göre düz renk geçişi, sahne çizilmez.
+            if (!WEATHER_SCENE) return@onDrawBehind
             // Güneş parıltısı (gündüz) ve gün batımı ışığı (alacakaranlık).
             // Güneş belirgin bir daire değil, ışık olarak: bulutların ardından sızan sıcak parıltı (önce), bulutun ışığa
             // bakan kenarının parlaması ve hafif mercek parlaması (bulutlardan sonra, aşağıda).
