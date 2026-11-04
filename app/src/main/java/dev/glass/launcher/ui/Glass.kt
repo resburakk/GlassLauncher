@@ -1045,7 +1045,8 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
             // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
             // Simgelerde iOS gibi neredeyse fark edilmeyen ince çizgi; widget/dock'ta altta belirgin.
-            val aTop = ((if (material) 0.12f else 0.30f) * rimGlow).coerceIn(0f, 1f)
+            // Simge: üstteki çizgi alttakiyle AYNI (kullanıcı isteği). Widget/dock: üst hafif, alt belirgin.
+            val aTop = ((if (material) 0.18f else 0.30f) * rimGlow).coerceIn(0f, 1f)
             val aBot = ((if (material) 0.18f else 0.52f) * rimGlow).coerceIn(0f, 1f)
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
             // Simge: kısa kenarın ~%1,2'si (iOS'taki ince ama görünür çizgi), "kenar kalınlığı" ayarıyla ölçeklenir.
