@@ -1048,11 +1048,13 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // Simge: iOS ölçüsü (%50). Widget/dock: önceki ince, soluk kenar (%30, hale yok).
             // Simgelerde parıltı çizgisi çok hafif, neredeyse fark edilmez (kullanıcı isteği; önceden %50).
             // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
-            val aTop = ((if (material) 0.16f else 0.30f) * rimGlow).coerceIn(0f, 1f)
-            val aBot = if (material) (0.34f * rimGlow).coerceIn(0f, 1f) else aTop * 0.6f
+            // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
+            val aTop = ((if (material) 0.30f else 0.34f) * rimGlow).coerceIn(0f, 1f)
+            val aBot = ((if (material) 0.46f else 0.58f) * rimGlow).coerceIn(0f, 1f)
             fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
-            val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density).let { if (material) it else minOf(it, 0.8f * density) }
-            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0), (if (material) floatArrayOf(0f, 0.12f, 0.88f, 1f) else floatArrayOf(0.06f, 0.24f, 0.78f, 0.94f)), android.graphics.Shader.TileMode.CLAMP)
+            val w = (minOf(wPx, hPx) * 0.011f).coerceIn(1.5f, 2.2f * density).let { if (material) it else minOf(it, 1.1f * density) }
+            // Kenar boyunca köşelere kadar (iOS'ta parlak çizgi köşe kavsine de döner); yalnızca en uçta söner.
+            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0x66000000, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0x66000000), floatArrayOf(0f, 0.10f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP)
             fun glow(scale: Float, width: Float) {
                 val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
                     intArrayOf(tint(aTop * scale), tint(aTop * scale * 0.15f), 0, tint(aBot * scale * 0.15f), tint(aBot * scale)),
@@ -1126,4 +1128,12 @@ fun Modifier.downsampledBlur(amount: () -> Float, radiusPx: () -> Float): Modifi
         nc.drawRenderNode(blurNode)
         nc.restore()
     }
+}
+
+
+/** Dolu (beyaz / koyu / hava durumu) widget'ların iOS 26 kenar ışığı: altta belirgin, üstte hafif ince parlak çizgi. */
+@Composable
+fun Modifier.widgetRim(shape: Shape): Modifier {
+    val st = LocalLauncherSettings.current
+    return this.iosRim(shape, st.iconRimGlow, (1.2f * st.iconRimWidth).dp)
 }

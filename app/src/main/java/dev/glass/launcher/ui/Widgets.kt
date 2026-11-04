@@ -152,8 +152,8 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                 if (w.kind == WidgetKind.Suggestions)
                     Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true)
                         .background(if (fill == 1) Color.White.copy(alpha = 0.26f) else Color(0xFF1C1C1E).copy(alpha = 0.36f))
-                else if (play) Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape)
-                else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg)
+                else if (play) Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).widgetRim(shape)
+                else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg).widgetRim(shape)
             }
             // Şeffaf cam widget: açık duvar kâğıdında yazılar koyu (iOS). Hava durumu ve Google Play kendi koyu zemininde.
             val ink = when { (weather && fill != 0) || play -> GlassInk; fill == 0 -> if (HomeInk.light) GlassLightInk else GlassInk; fill == 1 -> LightInk; else -> DarkInk }
