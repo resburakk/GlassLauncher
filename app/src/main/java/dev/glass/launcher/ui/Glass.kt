@@ -1048,10 +1048,11 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // Simge: üstteki çizgi alttakiyle AYNI (kullanıcı isteği). Widget/dock: üst hafif, alt belirgin.
             // Kullanıcı isteği (simge ve widget'ların hepsi): ince beyaz çizgi YALNIZCA üst ve alt kenarda, ikisi aynı;
             // kenarın ortasında en kalın, sağa sola doğru incelerek köşelere varmadan söner (köşe kavsine dönmez).
-            val a = ((if (material) 0.30f else 0.48f) * rimGlow).coerceIn(0f, 1f)
+            // Parlaklık ve en kalın yer önceki sürümle aynı (kullanıcı: "şu anki kalınlıkta, daha kalın olmasın").
+            val a = ((if (material) 0.18f else 0.52f) * rimGlow).coerceIn(0f, 1f)
             fun tint(x: Float) = android.graphics.Color.argb((x * 255).toInt(), 235, 248, 255)
             val w = if (material) (minOf(wPx, hPx) * 0.012f * (rimPx / (1.2f * density)).coerceIn(0.3f, 2.5f)).coerceIn(1.2f, 4f * density)
-                else (0.9f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
+                else (0.8f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
             // Köşe kavsi bitmeden (yarıçap kadar içeride) tamamen söner; ortaya doğru artar.
             val rr = (shapeRadiusPx(shape, Size(wPx.toFloat(), hPx.toFloat()), layoutDirection, this) / wPx).coerceIn(0.08f, 0.32f)
             fun taper(start: Float) = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f,
@@ -1065,9 +1066,9 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
                 p.strokeWidth = width
                 c.drawPath(path, p)
             }
-            // İki çizgi üst üste: kalın olan daha kısa, ince olan daha uzun → ortada kalın, uçlara doğru incelir.
-            line(a * 0.55f, w * 2.6f, rr + 0.12f)
-            line(a, w * 1.3f, rr)
+            // Ortada önceki kalınlık (w×2), uçlara doğru yarı kalınlığa iner ve söner: kısa kalın + uzun ince çizgi.
+            line(a, w * 2f, rr + 0.10f)
+            line(a, w * 1f, rr)
         }
         bmp.prepareToDraw()
         bmp.asImageBitmap()
