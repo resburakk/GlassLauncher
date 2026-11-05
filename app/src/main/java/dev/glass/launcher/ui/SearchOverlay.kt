@@ -231,7 +231,7 @@ fun SearchOverlay(
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .height(62.dp)
+                        .height(72.dp)
                         .graphicsLayer {
                             val v = visibility().coerceIn(0f, 1f)
                             translationY = -(1f - (1f - (1f - v) * (1f - v))) * dropPx
@@ -247,14 +247,15 @@ fun SearchOverlay(
                         value = query,
                         onValueChange = { query = it },
                         singleLine = true,
-                        textStyle = TextStyle(color = Color.White, fontSize = 19.sp, fontFamily = AppFont),
+                        textStyle = TextStyle(color = Color.White, fontSize = 21.sp, fontFamily = AppFont),
                         cursorBrush = SolidColor(Color.White),
                         // Tamamlama yazının hemen arkasında gri görünür (imleç yazının sonunda kalır).
                         visualTransformation = if (completion.isEmpty()) androidx.compose.ui.text.input.VisualTransformation.None
                         else androidx.compose.ui.text.input.VisualTransformation { t ->
                             val shown = buildAnnotatedString {
                                 append(t.text)
-                                withStyle(SpanStyle(color = Color(0x99FFFFFF))) { append(completion) }
+                                // iOS: tamamlanan kısım seçili gibi açık bir zeminde.
+                                withStyle(SpanStyle(color = Color(0xE6FFFFFF), background = Color(0x40FFFFFF))) { append(completion) }
                             }
                             androidx.compose.ui.text.input.TransformedText(shown, object : androidx.compose.ui.text.input.OffsetMapping {
                                 override fun originalToTransformed(offset: Int) = offset
@@ -270,7 +271,7 @@ fun SearchOverlay(
                         modifier = Modifier.weight(1f).focusRequester(focus),
                         decorationBox = { inner ->
                             Box(contentAlignment = Alignment.CenterStart) {
-                                if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = 19.sp, fontFamily = AppFont, maxLines = 1)
+                                if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = 21.sp, fontFamily = AppFont, maxLines = 1)
                                 inner()
                             }
                         },
@@ -881,6 +882,10 @@ private fun IosResults(
                     }
                     item { IosFooter(title) }
                 }
+            item { IosDivider() }
+            item { IosRow(title = "“$query”", subtitle = "İnternette ara", leading = { IosGlyphTile(Glyph.Globe, Color(0xFF0A84FF)) }, onClick = onWeb) }
+            item { IosRow(title = "“$query”", subtitle = "Play Store'da ara", leading = { IosGlyphTile(Glyph.Bag, Color(0xFF34C759)) }, onClick = onStore) }
+            item { IosFooter("Daha Fazla") }
             if (showPermissionCard) {
                 item { IosDivider() }
                 item {
@@ -889,10 +894,6 @@ private fun IosResults(
                 }
                 item { IosFooter("Telefonda Ara", action = "Şimdi değil", onAction = onDismissCard) }
             }
-            item { IosDivider() }
-            item { IosRow(title = "“$query”", subtitle = "İnternette ara", leading = { IosGlyphTile(Glyph.Globe, Color(0xFF0A84FF)) }, onClick = onWeb) }
-            item { IosRow(title = "“$query”", subtitle = "Play Store'da ara", leading = { IosGlyphTile(Glyph.Bag, Color(0xFF34C759)) }, onClick = onStore) }
-            item { IosFooter("Daha Fazla") }
         }
     }
 }
