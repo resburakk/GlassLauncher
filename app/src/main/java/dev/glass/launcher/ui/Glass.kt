@@ -1049,7 +1049,8 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // Kullanıcı isteği (simge ve widget'ların hepsi): ince beyaz çizgi YALNIZCA üst ve alt kenarda, ikisi aynı;
             // kenarın ortasında en kalın, sağa sola doğru incelerek köşelere varmadan söner (köşe kavsine dönmez).
             // Parlaklık ve en kalın yer önceki sürümle aynı (kullanıcı: "şu anki kalınlıkta, daha kalın olmasın").
-            val a = ((if (material) 0.18f else 0.52f) * rimGlow).coerceIn(0f, 1f)
+            // Simgelerde de widget'larla aynı parlaklık (önceki %18 telefonda hiç görünmüyordu).
+            val a = ((if (material) 0.50f else 0.52f) * rimGlow).coerceIn(0f, 1f)
             fun tint(x: Float) = android.graphics.Color.argb((x * 255).toInt(), 235, 248, 255)
             val w = if (material) (minOf(wPx, hPx) * 0.012f * (rimPx / (1.2f * density)).coerceIn(0.3f, 2.5f)).coerceIn(1.2f, 4f * density)
                 else (0.8f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
