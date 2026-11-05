@@ -1055,9 +1055,11 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
                 else (0.8f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
             // Köşe kavsi bitmeden (yarıçap kadar içeride) tamamen söner; ortaya doğru artar.
             val rr = (shapeRadiusPx(shape, Size(wPx.toFloat(), hPx.toFloat()), layoutDirection, this) / wPx).coerceIn(0.08f, 0.32f)
+            // Kenarın büyük kısmında tam parlak; yalnızca uçlara yakın %16'lık bölümde söner (önceki sürüm ortadan itibaren
+            // sönüyordu, çizgi çok kısa görünüyordu).
             fun taper(start: Float) = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f,
-                intArrayOf(0, 0, android.graphics.Color.BLACK, 0, 0),
-                floatArrayOf(0f, start, 0.5f, 1f - start, 1f), android.graphics.Shader.TileMode.CLAMP)
+                intArrayOf(0, 0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0, 0),
+                floatArrayOf(0f, start, start + 0.16f, 1f - start - 0.16f, 1f - start, 1f), android.graphics.Shader.TileMode.CLAMP)
             val band = (w * 3f / hPx).coerceIn(0.02f, 0.12f)
             fun line(alpha: Float, width: Float, start: Float) {
                 val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
@@ -1067,8 +1069,8 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
                 c.drawPath(path, p)
             }
             // Ortada önceki kalınlık (w×2), uçlara doğru yarı kalınlığa iner ve söner: kısa kalın + uzun ince çizgi.
-            line(a, w * 2f, rr + 0.10f)
-            line(a, w * 1f, rr)
+            line(a, w * 2f, rr * 0.55f + 0.06f)
+            line(a, w * 1f, rr * 0.55f)
         }
         bmp.prepareToDraw()
         bmp.asImageBitmap()
