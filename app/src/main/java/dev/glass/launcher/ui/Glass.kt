@@ -1046,32 +1046,28 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
             // Simgelerde iOS gibi neredeyse fark edilmeyen ince çizgi; widget/dock'ta altta belirgin.
             // Simge: üstteki çizgi alttakiyle AYNI (kullanıcı isteği). Widget/dock: üst hafif, alt belirgin.
-            val aTop = ((if (material) 0.18f else 0.30f) * rimGlow).coerceIn(0f, 1f)
-            val aBot = ((if (material) 0.18f else 0.52f) * rimGlow).coerceIn(0f, 1f)
-            fun tint(a: Float) = android.graphics.Color.argb((a * 255).toInt(), 225, 250, 255)
-            // Simge: kısa kenarın ~%1,2'si (iOS'taki ince ama görünür çizgi), "kenar kalınlığı" ayarıyla ölçeklenir.
-            // Widget/dock: çok ince (~0,5 dp; önceki 1,1 dp kalın duruyordu).
+            // Kullanıcı isteği (simge ve widget'ların hepsi): ince beyaz çizgi YALNIZCA üst ve alt kenarda, ikisi aynı;
+            // kenarın ortasında en kalın, sağa sola doğru incelerek köşelere varmadan söner (köşe kavsine dönmez).
+            val a = ((if (material) 0.30f else 0.48f) * rimGlow).coerceIn(0f, 1f)
+            fun tint(x: Float) = android.graphics.Color.argb((x * 255).toInt(), 235, 248, 255)
             val w = if (material) (minOf(wPx, hPx) * 0.012f * (rimPx / (1.2f * density)).coerceIn(0.3f, 2.5f)).coerceIn(1.2f, 4f * density)
-                else (0.8f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
-            // Kenar boyunca köşelere kadar (iOS'ta parlak çizgi köşe kavsine de döner); yalnızca en uçta söner.
-            val fade = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f, intArrayOf(0x66000000, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0x66000000), floatArrayOf(0f, 0.10f, 0.90f, 1f), android.graphics.Shader.TileMode.CLAMP)
-            fun glow(scale: Float, width: Float) {
+                else (0.9f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
+            // Köşe kavsi bitmeden (yarıçap kadar içeride) tamamen söner; ortaya doğru artar.
+            val rr = (shapeRadiusPx(shape, Size(wPx.toFloat(), hPx.toFloat()), layoutDirection, this) / wPx).coerceIn(0.08f, 0.32f)
+            fun taper(start: Float) = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f,
+                intArrayOf(0, 0, android.graphics.Color.BLACK, 0, 0),
+                floatArrayOf(0f, start, 0.5f, 1f - start, 1f), android.graphics.Shader.TileMode.CLAMP)
+            val band = (w * 3f / hPx).coerceIn(0.02f, 0.12f)
+            fun line(alpha: Float, width: Float, start: Float) {
                 val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
-                    intArrayOf(tint(aTop * scale), tint(aTop * scale * 0.15f), 0, tint(aBot * scale * 0.15f), tint(aBot * scale)),
-                    floatArrayOf(0f, 0.07f, 0.5f, 0.93f, 1f), android.graphics.Shader.TileMode.CLAMP)
-                p.shader = android.graphics.ComposeShader(vert, fade, android.graphics.PorterDuff.Mode.DST_IN)
+                    intArrayOf(tint(alpha), 0, 0, tint(alpha)), floatArrayOf(0f, band, 1f - band, 1f), android.graphics.Shader.TileMode.CLAMP)
+                p.shader = android.graphics.ComposeShader(vert, taper(start), android.graphics.PorterDuff.Mode.DST_IN)
                 p.strokeWidth = width
                 c.drawPath(path, p)
             }
-            if (material) {
-                // iOS 26: simgenin DÖRT kenarı boyunca (yanlar dahil) eşit, çok ince açık çerçeve (~1 px).
-                p.shader = null
-                p.color = android.graphics.Color.argb(((0.16f * rimGlow).coerceIn(0f, 1f) * 255).toInt(), 255, 255, 255)
-                p.strokeWidth = (1.1f * density).coerceAtLeast(2f) * (rimPx / (1.2f * density)).coerceIn(0.5f, 2.5f)
-                c.drawPath(path, p)
-                glow(0.2f, w * 4f) // içeri doğru yumuşak hale
-            }
-            glow(1f, w * 2f)    // kenardaki parlak çizgi (yarısı şeklin içinde)
+            // İki çizgi üst üste: kalın olan daha kısa, ince olan daha uzun → ortada kalın, uçlara doğru incelir.
+            line(a * 0.55f, w * 2.6f, rr + 0.12f)
+            line(a, w * 1.3f, rr)
         }
         bmp.prepareToDraw()
         bmp.asImageBitmap()
