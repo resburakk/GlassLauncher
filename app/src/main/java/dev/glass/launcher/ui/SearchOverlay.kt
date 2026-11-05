@@ -208,6 +208,11 @@ fun SearchOverlay(
         val top = results.firstOrNull()
         // Otomatik tamamlama: en iyi uygulama yazılanla başlıyorsa çubukta "Sağlık — Aç" (kalan harfler gri).
         val qn = AppCategorizer.normalize(query.trim())
+        // Yazılan harfler uygulamanın asıl yazımıyla gösterilir ("sağ" → "Sağ"lık), uzunluk aynı kalır.
+        val shownPrefix = if (top != null && query.isNotBlank() && AppCategorizer.normalize(top.label).startsWith(qn) &&
+            AppCategorizer.normalize(top.label).length == top.label.length && query.length <= top.label.length &&
+            AppCategorizer.normalize(query) == AppCategorizer.normalize(top.label.substring(0, query.length))
+        ) top.label.substring(0, query.length) else null
         val completion = if (top != null && qn.isNotEmpty() && query.isNotBlank()) {
             val ln = AppCategorizer.normalize(top.label)
             if (ln.startsWith(qn) && ln.length == top.label.length) top.label.substring(query.trimEnd().length.coerceAtMost(top.label.length)) + " — Aç"
@@ -253,7 +258,7 @@ fun SearchOverlay(
                         visualTransformation = if (completion.isEmpty()) androidx.compose.ui.text.input.VisualTransformation.None
                         else androidx.compose.ui.text.input.VisualTransformation { t ->
                             val shown = buildAnnotatedString {
-                                append(t.text)
+                                append(shownPrefix?.takeIf { it.length == t.text.length } ?: t.text)
                                 // iOS: tamamlanan kısım seçili gibi açık bir zeminde.
                                 withStyle(SpanStyle(color = Color(0xE6FFFFFF), background = Color(0x40FFFFFF))) { append(completion) }
                             }
@@ -813,7 +818,7 @@ private fun IosResults(
             Modifier
                 .fillMaxWidth()
                 .liquidGlass(shape, strength, 0.dp, panel = true, overlay = true)
-                .background(Color.White.copy(alpha = 0.06f), shape)
+                .background(Color.White.copy(alpha = 0.10f), shape)
                 .nestedScroll(rb.connection)
                 .pointerInput(Unit) { detectTapGestures { } },
             contentPadding = PaddingValues(top = 14.dp, bottom = 10.dp),
@@ -862,7 +867,17 @@ private fun IosResults(
                 }
                 appSettings.forEach { a ->
                     item {
-                        IosRow(title = a.label, subtitle = "Uygulama ayarları", leading = { AppIconImage(a, vm, 44.dp, iconGlass, strength, badge = false) }) {
+                        IosRow(title = a.label, subtitle = "Uygulama ayarları", leading = {
+                            // iOS: Ayarlar grubundaki uygulama simgesinin sağ altında küçük ayar rozeti.
+                            Box {
+                                AppIconImage(a, vm, 44.dp, iconGlass, strength, badge = false)
+                                Box(
+                                    Modifier.align(Alignment.BottomEnd).offset(4.dp, 4.dp).size(18.dp).clip(CircleShape)
+                                        .background(Color(0xFF8E8E93)).border(1.5.dp, Color(0xCC1C1C1E), CircleShape),
+                                    contentAlignment = Alignment.Center,
+                                ) { GlyphIcon(Glyph.Gear, Color.White, 12.dp) }
+                            }
+                        }) {
                             onLaunch(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + a.packageName)))
                         }
                     }
