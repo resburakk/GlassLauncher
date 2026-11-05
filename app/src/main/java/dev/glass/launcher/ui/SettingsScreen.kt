@@ -534,9 +534,6 @@ private fun SearchPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Lau
     fun status(ok: Boolean) = if (ok) "İzin verildi" else "İzin yok"
 
     Group("Görünüm") {
-        // Kapatınca eski (klasik) arama ekranı: çubuk altta, klavyenin üstünde.
-        ToggleRow("iOS 26 görünümü (çubuk üstte)", s.searchIos, default = Def.searchIos) { v -> onChange { it.copy(searchIos = v) } }
-        RowDivider()
         ToggleRow("Önerilerde uygulama adları", s.searchShowLabels, default = Def.searchShowLabels) { v -> onChange { it.copy(searchShowLabels = v) } }
         RowDivider()
         ToggleRow("Sonuç paneli: nötr renk", s.searchNeutral, default = Def.searchNeutral) { v -> onChange { it.copy(searchNeutral = v) } }
