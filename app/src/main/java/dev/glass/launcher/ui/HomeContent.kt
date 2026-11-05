@@ -849,6 +849,7 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
         ) {
             LiveIcon(live, icon, st.liveClockSeconds, liveLook, Color(look.tint))
         }
+        if (liveLook != LiveLook.Clear) Spacer(Modifier.matchParentSize().clip(liveShape).iconRim(liveShape, st.iconRimGlow, rimW))
         if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
         }
         return
@@ -875,6 +876,8 @@ internal fun AppIconImage(app: AppInfo, vm: LauncherViewModel, icon: Dp, glass: 
             }
             bmp?.let { Image(it, contentDescription = null, modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.High, colorFilter = vivid) }
         }
+        // Kenar ışığı simgenin ÜSTÜNDE ayrı katman (üst ve alt kenarda, yanlara doğru incelerek söner).
+        if (!clear) Spacer(Modifier.matchParentSize().clip(appShape(icon * st.iconCorner)).iconRim(appShape(icon * st.iconCorner), st.iconRimGlow, rimW))
         if (badge && !app.isShortcut) NotificationBadge(badgeCount(listOf(app.packageName)), icon)
     }
 }

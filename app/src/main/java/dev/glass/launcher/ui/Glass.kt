@@ -993,8 +993,6 @@ fun Modifier.outsideShadow(shape: Shape, elevation: Dp): Modifier = this.drawWit
 
 
 /** Simge üst katmanlarının (malzeme + kenar ışığı) hazır görüntüleri: boyut, şekil ve parlaklığa göre. */
-private object IconRimDiag { var logged = 0 }
-
 private object IconOverlayCache {
     private val map = object : LinkedHashMap<String, androidx.compose.ui.graphics.ImageBitmap>(16, 0.75f, true) {
         override fun removeEldestEntry(e: MutableMap.MutableEntry<String, androidx.compose.ui.graphics.ImageBitmap>?) = size > 24
@@ -1007,21 +1005,22 @@ private object IconOverlayCache {
  * 44 dp'den küçük simgelerde çizilmez.
  */
 internal fun Modifier.iosIconOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp): Modifier =
-    cachedGlassOverlay(shape, rimGlow, rimWidth, material = true)
+    // Kenar ışığı burada çizilmez (simge katmanının içinde görünmüyordu); simgenin ÜSTÜNE ayrı katman: [iconRim].
+    cachedGlassOverlay(shape, 0f, rimWidth, material = true)
+
+/** Simgenin üst ve alt kenarındaki ince ışık; simge görüntüsünün üstüne ayrı bir katman olarak çizilir. */
+internal fun Modifier.iconRim(shape: Shape, rimGlow: Float, rimWidth: Dp): Modifier =
+    cachedGlassOverlay(shape, rimGlow, rimWidth, material = true, rimOnly = true)
 
 /** Hazır görüntü olarak çizilen üst katman: [material] simge malzemesi + kenar parıltısı; false: yalnızca parıltı. */
-private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp, material: Boolean): Modifier = this.drawWithCache {
+private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: Dp, material: Boolean, rimOnly: Boolean = false): Modifier = this.drawWithCache {
     // Çok küçük simgelerde (klasör içi mini) çizilmez. Önceki 44 dp sınırı bazı telefonlarda ana ekran simgelerini de
     // dışarıda bırakıyordu: kenar ışığı hiç çizilmiyor, ayarı değiştirmek de etkisiz kalıyordu.
     if (size.minDimension < 26.dp.toPx() || size.width < 1f || size.height < 1f) return@drawWithCache onDrawWithContent { drawContent() }
     val wPx = size.width.toInt().coerceAtLeast(1)
     val hPx = size.height.toInt().coerceAtLeast(1)
     val rimPx = rimWidth.toPx()
-    val key = "$wPx x $hPx|${shape.hashCode()}|${(rimGlow * 100).toInt()}|${(rimPx * 10).toInt()}|$material"
-    if (material && IconRimDiag.logged < 3) {
-        IconRimDiag.logged++
-        android.util.Log.d("GlassDiag", "simgeKenar boyut=${wPx}x$hPx kalınlıkPx=${"%.1f".format(rimPx)} parlaklık=${"%.2f".format(rimGlow)}")
-    }
+    val key = "$wPx x $hPx|${shape.hashCode()}|${(rimGlow * 100).toInt()}|${(rimPx * 10).toInt()}|$material|$rimOnly"
     val img = IconOverlayCache.get(key) {
         val bmp = android.graphics.Bitmap.createBitmap(wPx, hPx, android.graphics.Bitmap.Config.ARGB_8888)
         val c = android.graphics.Canvas(bmp)
@@ -1029,14 +1028,14 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
         val path = Path().apply { addOutline(outline) }.asAndroidPath()
         c.clipPath(path)
         val p = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
-        if (material) {
+        if (material && !rimOnly) {
             // Malzeme: üstten alta hafif koyulaşma + kenarda yumuşak iç gölge.
             p.shader = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(), intArrayOf(0, 0, 0x09000000), floatArrayOf(0f, 0.35f, 1f), android.graphics.Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, wPx.toFloat(), hPx.toFloat(), p)
             p.shader = null
         }
         p.style = android.graphics.Paint.Style.STROKE
-        if (material) {
+        if (material && !rimOnly) {
             val mw = minOf(wPx, hPx) * 0.014f
             // Koyu kenar biraz daha silik (kullanıcı isteği: önceden 0x09 / 0x0D).
             p.color = 0x07000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
