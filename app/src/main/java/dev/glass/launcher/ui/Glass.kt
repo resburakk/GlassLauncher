@@ -993,6 +993,8 @@ fun Modifier.outsideShadow(shape: Shape, elevation: Dp): Modifier = this.drawWit
 
 
 /** Simge üst katmanlarının (malzeme + kenar ışığı) hazır görüntüleri: boyut, şekil ve parlaklığa göre. */
+private object IconRimDiag { var logged = 0 }
+
 private object IconOverlayCache {
     private val map = object : LinkedHashMap<String, androidx.compose.ui.graphics.ImageBitmap>(16, 0.75f, true) {
         override fun removeEldestEntry(e: MutableMap.MutableEntry<String, androidx.compose.ui.graphics.ImageBitmap>?) = size > 24
@@ -1016,6 +1018,10 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
     val hPx = size.height.toInt().coerceAtLeast(1)
     val rimPx = rimWidth.toPx()
     val key = "$wPx x $hPx|${shape.hashCode()}|${(rimGlow * 100).toInt()}|${(rimPx * 10).toInt()}|$material"
+    if (material && IconRimDiag.logged < 3) {
+        IconRimDiag.logged++
+        android.util.Log.d("GlassDiag", "simgeKenar boyut=${wPx}x$hPx kalınlıkPx=${"%.1f".format(rimPx)} parlaklık=${"%.2f".format(rimGlow)}")
+    }
     val img = IconOverlayCache.get(key) {
         val bmp = android.graphics.Bitmap.createBitmap(wPx, hPx, android.graphics.Bitmap.Config.ARGB_8888)
         val c = android.graphics.Canvas(bmp)

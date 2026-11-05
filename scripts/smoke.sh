@@ -280,6 +280,14 @@ if [ -n "$mid" ]; then
   tap_text "Ana ekran"; step "launcher duvar kâğıdı" 5
   adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
   shot 15a-cam-dock
+  # Simge kenar ışığı en yüksekte: simgelerde çizgi görünüyor mu (telefonda görünmüyordu).
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key iconRimGlow --es value 2 >/dev/null
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key iconRimWidth --es value 3 >/dev/null
+  step "simge kenarı en yüksek" 4
+  shot 15h-simge-kenar-max
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key iconRimGlow --es value 1 >/dev/null
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key iconRimWidth --es value 1 >/dev/null
+  step "simge kenarı varsayılan" 2
   # Dock bulanıklık ve mercek ayarları gerçekten etkili mi (aynı yerden karşılaştırma görüntüleri).
   setk() { adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key "$1" --es value "$2" >/dev/null; }
   setk dockBlur 0; step "dock net" 3; shot 15c-dock-net
