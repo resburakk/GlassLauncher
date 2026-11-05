@@ -19,6 +19,11 @@ import android.speech.RecognizerIntent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -189,6 +194,137 @@ fun SearchOverlay(
     val neutral = if (st.searchNeutral) Modifier.background(Color(0x38E5E5EA)) else Modifier
 
     val fieldSize = st.searchFieldTextSize.sp
+
+    // ---------------------------------------------------------------- iOS 26 düzeni (Ayarlar > Arama)
+    if (st.searchIos) {
+        // iOS 26 Spotlight: durum çubuğu gizlenir, koyu arama çubuğu en üstte (Dinamik Ada hizasında).
+        val activity = ctx as? android.app.Activity
+        androidx.compose.runtime.DisposableEffect(activity) {
+            val w = activity?.window
+            val c = w?.let { androidx.core.view.WindowCompat.getInsetsController(it, it.decorView) }
+            c?.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            onDispose { c?.show(androidx.core.view.WindowInsetsCompat.Type.statusBars()) }
+        }
+        val top = results.firstOrNull()
+        // Otomatik tamamlama: en iyi uygulama yazılanla başlıyorsa çubukta "Sağlık — Aç" (kalan harfler gri).
+        val qn = AppCategorizer.normalize(query.trim())
+        val completion = if (top != null && qn.isNotEmpty() && query.isNotBlank()) {
+            val ln = AppCategorizer.normalize(top.label)
+            if (ln.startsWith(qn) && ln.length == top.label.length) top.label.substring(query.trimEnd().length.coerceAtMost(top.label.length)) + " — Aç"
+            else " — " + top.label
+        } else ""
+        val rb = rememberRubberBand()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) { detectTapGestures(onTap = { close() }) }
+                .rubberDrag(rb)
+        ) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars))
+                    .padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            ) {
+                // Arama çubuğu: neredeyse siyah hap, ince ışıklı kenar; açılışta yukarıdan iner.
+                val dropPx = with(LocalDensity.current) { 40.dp.toPx() }
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(62.dp)
+                        .graphicsLayer {
+                            val v = visibility().coerceIn(0f, 1f)
+                            translationY = -(1f - (1f - (1f - v) * (1f - v))) * dropPx
+                        }
+                        .clip(CircleShape)
+                        .background(Brush.verticalGradient(listOf(Color(0xF2141416), Color(0xF7000000))))
+                        .border(0.8.dp, Brush.verticalGradient(listOf(Color(0x33FFFFFF), Color(0x14FFFFFF), Color(0x4DFFFFFF))), CircleShape)
+                        .pointerInput(Unit) { detectTapGestures { focus.requestFocus(); keyboard?.show() } }
+                        .padding(start = 26.dp, end = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    BasicTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        singleLine = true,
+                        textStyle = TextStyle(color = Color.White, fontSize = 19.sp, fontFamily = AppFont),
+                        cursorBrush = SolidColor(Color.White),
+                        // Tamamlama yazının hemen arkasında gri görünür (imleç yazının sonunda kalır).
+                        visualTransformation = if (completion.isEmpty()) androidx.compose.ui.text.input.VisualTransformation.None
+                        else androidx.compose.ui.text.input.VisualTransformation { t ->
+                            val shown = buildAnnotatedString {
+                                append(t.text)
+                                withStyle(SpanStyle(color = Color(0x99FFFFFF))) { append(completion) }
+                            }
+                            androidx.compose.ui.text.input.TransformedText(shown, object : androidx.compose.ui.text.input.OffsetMapping {
+                                override fun originalToTransformed(offset: Int) = offset
+                                override fun transformedToOriginal(offset: Int) = offset.coerceAtMost(t.text.length)
+                            })
+                        },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+                        keyboardActions = KeyboardActions(onGo = {
+                            top?.let { open(it) } ?: if (query.isNotBlank()) webSearch(query.trim()) else Unit
+                        }, onSearch = {
+                            top?.let { open(it) } ?: if (query.isNotBlank()) webSearch(query.trim()) else Unit
+                        }),
+                        modifier = Modifier.weight(1f).focusRequester(focus),
+                        decorationBox = { inner ->
+                            Box(contentAlignment = Alignment.CenterStart) {
+                                if (query.isEmpty()) Text("Ara", color = Color(0x99FFFFFF), fontSize = 19.sp, fontFamily = AppFont, maxLines = 1)
+                                inner()
+                            }
+                        },
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    if (top != null && query.isNotBlank()) {
+                        // Yazarken sağda en iyi sonucun simgesi (dokununca açılır).
+                        Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).clickable { open(top) }, contentAlignment = Alignment.Center) {
+                            AppIconImage(top, vm, 34.dp, iconGlass, strength, badge = false)
+                        }
+                    } else {
+                        Box(
+                            Modifier.size(40.dp).clip(CircleShape).clickable {
+                                val i = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE, "tr-TR")
+                                    .putExtra(RecognizerIntent.EXTRA_PROMPT, "Ara")
+                                runCatching { mic.launch(i) }
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { GlyphIcon(Glyph.Mic, Color(0xCCFFFFFF), 22.dp) }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    Modifier.fillMaxWidth().weight(1f, fill = false).graphicsLayer {
+                        val v = visibility().coerceIn(0f, 1f)
+                        alpha = v
+                        translationY = rb.value - (1f - v) * dropPx * 0.6f
+                    },
+                    contentAlignment = Alignment.TopCenter,
+                ) {
+                    if (query.isBlank()) {
+                        // Boşken: çubuğun hemen altında 4 öneri (cam kart).
+                        SuggestionsPanel(vm, suggestions.take(4), strength, iconGlass, true, neutral, visibility, ::open)
+                    } else {
+                        IosResults(
+                            rb = rb, vm = vm, query = query.trim(), apps = results, device = device,
+                            iconGlass = iconGlass, strength = strength, visibility = visibility,
+                            showPermissionCard = missing.isNotEmpty() && st.searchDeviceCard,
+                            onAskPermission = { permLauncher.launch(missing.toTypedArray()) },
+                            onDismissCard = { vm.updateSettings { it.copy(searchDeviceCard = false) } },
+                            onOpenApp = ::open,
+                            onOpenHit = { launch(it.intent) },
+                            onWeb = { webSearch(query.trim()) },
+                            onStore = { storeSearch(query.trim()) },
+                            onLaunch = { launch(it) },
+                        )
+                    }
+                }
+            }
+        }
+        return
+    }
     // iOS 26 düzeni: arka plan hafif kararır; öneriler hep üstte, sonuçlar ortada, arama kutusu altta
     // klavyenin hemen üstünde (safeDrawing klavye yüksekliğini de kapsar).
     // iOS gibi esnek: boş alanda ya da sonuç listesinin başında/sonunda çekince öneriler ve sonuçlar direnç artarak
@@ -634,3 +770,168 @@ private fun highlight(text: String, query: String): AnnotatedString {
  * Öneri paneli ve arama çubuğu, camlarında duvar kâğıdını karartılmadan gösterdiği için aynı oranda
  * koyulaştırılır; böylece çevreleriyle uyumlu, dock ile aynı ayarda görünürler.
  */
+
+
+/**
+ * iOS 26 Spotlight sonuçları: tek büyük cam kart. Üstte uygulamalar büyük simgeleriyle (altında "Uygulamalar"),
+ * sonra satırlar (simge, kalın başlık, gri alt başlık) ve her grubun ALTINDA gri başlığı (iOS'taki gibi), sağda
+ * isteğe bağlı bağlantı ("Uygulamada Ara").
+ */
+@Composable
+private fun IosResults(
+    rb: RubberBand,
+    vm: LauncherViewModel,
+    query: String,
+    apps: List<AppInfo>,
+    device: List<DeviceHit>,
+    iconGlass: Boolean,
+    strength: Float,
+    visibility: () -> Float,
+    showPermissionCard: Boolean,
+    onAskPermission: () -> Unit,
+    onDismissCard: () -> Unit,
+    onOpenApp: (AppInfo) -> Unit,
+    onOpenHit: (DeviceHit) -> Unit,
+    onWeb: () -> Unit,
+    onStore: () -> Unit,
+    onLaunch: (Intent) -> Unit,
+) {
+    val hm = LocalHomeMetrics.current
+    val ctx = LocalContext.current
+    val quick = remember(query) { dev.glass.launcher.data.QuickAnswers.compute(query) }
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    var copied by remember(query) { mutableStateOf(false) }
+    val contacts = device.filter { it.kind == DeviceHitKind.Contact }
+    val messages = device.filter { it.kind == DeviceHitKind.Message }
+    val files = device.filter { it.kind == DeviceHitKind.File }
+    val links = quick.filterIsInstance<dev.glass.launcher.data.QuickAnswer.SettingLink>()
+    val shape = RoundedCornerShape(30.dp)
+    Box(Modifier.fillMaxWidth()) {
+        BlurBackdrop(30.dp, Modifier.matchParentSize(), shape = shape, alpha = visibility)
+        LazyColumn(
+            Modifier
+                .fillMaxWidth()
+                .liquidGlass(shape, strength, 0.dp, panel = true, overlay = true)
+                .background(Color.White.copy(alpha = 0.06f), shape)
+                .nestedScroll(rb.connection)
+                .pointerInput(Unit) { detectTapGestures { } },
+            contentPadding = PaddingValues(top = 14.dp, bottom = 10.dp),
+        ) {
+            quick.filterIsInstance<dev.glass.launcher.data.QuickAnswer.Value>().firstOrNull()?.let { v ->
+                item {
+                    Column(
+                        Modifier.fillMaxWidth()
+                            .clickable { clip.setText(AnnotatedString(v.result.substringBefore(' ').ifEmpty { v.result })); copied = true }
+                            .padding(horizontal = 20.dp, vertical = 6.dp),
+                    ) {
+                        Text(v.expression + " =", color = Color(0xB3FFFFFF), fontSize = 16.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(v.result, color = Color.White, fontSize = 34.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                item { IosFooter(if (copied) "Kopyalandı" else "Hesap Makinesi") }
+                item { IosDivider() }
+            }
+            if (apps.isNotEmpty()) {
+                // Üstte en çok 4 uygulama, ana ekran simgesi boyutunda ve adlarıyla.
+                item {
+                    val icon = hm?.dockIcon ?: 60.dp
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), horizontalArrangement = Arrangement.Start) {
+                        apps.take(4).forEach { a ->
+                            Column(
+                                Modifier.weight(1f).clip(RoundedCornerShape(14.dp)).clickable { onOpenApp(a) }.padding(vertical = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                AppIconImage(a, vm, icon, iconGlass, strength, badge = false)
+                                Spacer(Modifier.height(5.dp))
+                                Text(a.label, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Medium, fontFamily = AppFont,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            }
+                        }
+                        repeat((4 - apps.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+                item { IosFooter("Uygulamalar") }
+            }
+            // Ayarlar: telefon ayar sayfaları + bulunan uygulamaların ayarları (iOS'taki "Sağlık — Uygulamalar").
+            val appSettings = apps.take(2)
+            if (links.isNotEmpty() || appSettings.isNotEmpty()) {
+                item { IosDivider() }
+                links.forEach { l ->
+                    item { IosRow(title = l.title, subtitle = "Ayarlar", leading = { IosGlyphTile(Glyph.Gear, Color(0xFF8E8E93)) }) { onLaunch(l.intent) } }
+                }
+                appSettings.forEach { a ->
+                    item {
+                        IosRow(title = a.label, subtitle = "Uygulama ayarları", leading = { AppIconImage(a, vm, 44.dp, iconGlass, strength, badge = false) }) {
+                            onLaunch(Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + a.packageName)))
+                        }
+                    }
+                }
+                item {
+                    IosFooter("Ayarlar", action = "Uygulamada Ara") {
+                        onLaunch(Intent(android.provider.Settings.ACTION_SETTINGS))
+                    }
+                }
+            }
+            listOf(Triple("Kişiler", Glyph.Person, contacts), Triple("Mesajlar", Glyph.Message, messages), Triple("Dosyalar", Glyph.Doc, files))
+                .filter { it.third.isNotEmpty() }
+                .forEach { (title, glyph, hits) ->
+                    item { IosDivider() }
+                    hits.forEach { h ->
+                        item { IosRow(title = h.title, subtitle = h.subtitle, leading = { IosGlyphTile(glyph, Color(0xFF636366)) }) { onOpenHit(h) } }
+                    }
+                    item { IosFooter(title) }
+                }
+            if (showPermissionCard) {
+                item { IosDivider() }
+                item {
+                    IosRow(title = "Kişiler, mesajlar ve dosyalar da aransın mı?", subtitle = "Dokun: izin ver · yalnızca telefonda aranır",
+                        leading = { IosGlyphTile(Glyph.Lock, Color(0xFF0A84FF)) }, onClick = onAskPermission)
+                }
+                item { IosFooter("Telefonda Ara", action = "Şimdi değil", onAction = onDismissCard) }
+            }
+            item { IosDivider() }
+            item { IosRow(title = "“$query”", subtitle = "İnternette ara", leading = { IosGlyphTile(Glyph.Globe, Color(0xFF0A84FF)) }, onClick = onWeb) }
+            item { IosRow(title = "“$query”", subtitle = "Play Store'da ara", leading = { IosGlyphTile(Glyph.Bag, Color(0xFF34C759)) }, onClick = onStore) }
+            item { IosFooter("Daha Fazla") }
+        }
+    }
+}
+
+@Composable
+private fun IosRow(title: String, subtitle: String, leading: @Composable () -> Unit, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 18.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { leading() }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (subtitle.isNotEmpty()) Text(subtitle, color = Color(0xB3FFFFFF), fontSize = 14.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun IosGlyphTile(glyph: Glyph, color: Color) {
+    Box(Modifier.size(40.dp).clip(RoundedCornerShape(10.dp)).background(color), contentAlignment = Alignment.Center) {
+        GlyphIcon(glyph, Color.White, 22.dp)
+    }
+}
+
+/** iOS 26: grup başlığı grubun ALTINDA, gri; sağda isteğe bağlı bağlantı. */
+@Composable
+private fun IosFooter(title: String, action: String? = null, onAction: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 18.dp, top = 6.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, color = Color(0xD9FFFFFF), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, modifier = Modifier.weight(1f))
+        if (action != null) Text(
+            "$action ↗", color = Color(0xD9FFFFFF), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAction?.invoke() }.padding(horizontal = 4.dp, vertical = 2.dp),
+        )
+    }
+}
+
+@Composable
+private fun IosDivider() {
+    Box(Modifier.fillMaxWidth().padding(horizontal = 18.dp).height(0.5.dp).background(Color(0x40FFFFFF)))
+}

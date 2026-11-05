@@ -249,7 +249,8 @@ fun HomeScreen(
     // Arama (iOS Spotlight) arkası çok daha bulanık: bu kat sayı son açılan tam bulanık katmana göre tutulur
     // (kapanırken birden düşmesin).
     var blurBoost by remember { mutableFloatStateOf(1f) }
-    LaunchedEffect(overlay) { if (overlay in FullBlurOverlays) blurBoost = if (overlay == Overlay.Search) 2.2f else 1f }
+    // iOS 26 aramasında arkadaki ana ekran yalnızca hafif bulanır (simgeler seçilir); klasik aramada çok bulanık.
+    LaunchedEffect(overlay, settings.searchIos) { if (overlay in FullBlurOverlays) blurBoost = if (overlay == Overlay.Search) (if (settings.searchIos) 0.7f else 2.2f) else 1f }
     val scrim by animateFloatAsState(
         when {
             // Klasör iOS'taki gibi açık tonlu: arka plan bulanık ama neredeyse karartılmaz.
@@ -257,7 +258,7 @@ fun HomeScreen(
             // Arşiv kategorisi tam ekran açılır: iOS 26'daki gibi arka plan bulanık ve biraz koyulaşmış.
             overlay == Overlay.Group -> 0.22f
             // Arama (iOS Spotlight gibi): koyuluk bulanıklıktan gelir, karartma çok hafif.
-            overlay == Overlay.Search -> 0.16f
+            overlay == Overlay.Search -> if (settings.searchIos) 0.03f else 0.16f
             fullBlur -> 0.28f
             // Basılı tutma menüsü: karartma yok (açılıp kapanırken ekran kararıp aydınlanıyor gibi görünüyordu).
             overlay == Overlay.Menu -> 0f

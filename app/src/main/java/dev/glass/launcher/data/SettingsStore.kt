@@ -218,6 +218,8 @@ data class LauncherSettings(
     val searchResultTextSize: Float = 14f,
     val searchResultWeight: Float = 300f,
     val searchResultsPanel: Boolean = false,
+    /** Arama ekranı iOS 26 düzeninde: koyu arama çubuğu en üstte, sonuçlar tek cam kartta (kapalı: klasik, çubuk altta). */
+    val searchIos: Boolean = true,
     /** Arama paneli ve çubuğunun cam parlaklığı (karartılmış arka planla uyum için varsayılan biraz koyu). */
     val searchGlassBrightness: Float = 0f,
     /** Yazı gölgesi (iOS tarzı dağınık gölge): açık/kapalı, yoğunluk ve yayılma. */
@@ -353,7 +355,7 @@ data class LauncherSettings(
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
         put("searchDeviceCard", searchDeviceCard)
         put("searchFieldTextSize", searchFieldTextSize.toDouble()); put("searchResultTextSize", searchResultTextSize.toDouble())
-        put("searchResultWeight", searchResultWeight.toDouble()); put("searchResultsPanel", searchResultsPanel)
+        put("searchResultWeight", searchResultWeight.toDouble()); put("searchResultsPanel", searchResultsPanel); put("searchIos", searchIos)
         put("searchGlassBrightness2", searchGlassBrightness.toDouble())
         put("textShadow", textShadow); put("textShadowStrength", textShadowStrength.toDouble()); put("textShadowSpread", textShadowSpread.toDouble())
         put("settingsTheme", settingsTheme); put("labelWeight", labelWeight.toDouble())
@@ -496,6 +498,7 @@ data class LauncherSettings(
                 searchResultTextSize = f("searchResultTextSize", d.searchResultTextSize),
                 searchResultWeight = f("searchResultWeight", d.searchResultWeight),
                 searchResultsPanel = o.optBoolean("searchResultsPanel", d.searchResultsPanel),
+                searchIos = o.optBoolean("searchIos", d.searchIos),
                 searchGlassBrightness = f("searchGlassBrightness2", d.searchGlassBrightness),
                 textShadow = o.optBoolean("textShadow", d.textShadow),
                 textShadowStrength = f("textShadowStrength", d.textShadowStrength),

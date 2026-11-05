@@ -155,13 +155,13 @@ shot 05k-sag-kaydirma
 adb shell cmd statusbar collapse; step "paneli kapat" 2
 adb shell input keyevent KEYCODE_BACK; step "klavyeyi kapat" 1
 adb shell input keyevent KEYCODE_BACK; step "aramayı kapat" 2
-adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 2
+tap_text "Ara" || adb shell input tap $cx $((H*81/100)); step "arama (Ara düğmesi)" 3
 shot 05-arama
 tap_text "Daha Fazla" && { step "öneriler: daha fazla" 2; sleep 3; shot 05a-oneri-8; tap_text "Daha Az" && step "öneriler: daha az" 1; }
-adb shell input text "c"; step "arama yaz" 2
+adb shell input text "cal"; step "arama yaz" 3
 shot 05b-arama-sonuc
-adb shell input text "c"; step "arama yaz" 2
-shot 05b-arama-sonuc
+adb shell input keyevent KEYCODE_DEL KEYCODE_DEL KEYCODE_DEL; adb shell input text "pil"; step "ayar araması" 3
+shot 05c-arama-ayar
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; step "geri"
 
 # 5) Çift dokunma (izin penceresi)
