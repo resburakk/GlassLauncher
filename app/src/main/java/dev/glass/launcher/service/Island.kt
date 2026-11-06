@@ -19,12 +19,12 @@ import kotlinx.coroutines.flow.StateFlow
 data class IslandSettings(
     val enabled: Boolean = false,
     /** Kamera deliğine göre dikey ve yatay kaydırma (dp). */
-    val offsetY: Float = 0f,
+    val offsetY: Float = 8f,
     val offsetX: Float = 0f,
     /** Ölçüler (dp). 0 = otomatik (kamera deliğinin boyutuna göre). */
-    val idleW: Float = 0f,
-    val compactW: Float = 0f,
-    val islandH: Float = 0f,
+    val idleW: Float = 99f,
+    val compactW: Float = 127f,
+    val islandH: Float = 33f,
     val expandedW: Float = 0f,
     /** Köşe yuvarlaklığı: 1 = tam yuvarlak (hap), 0 = köşeli. */
     val corner: Float = 1f,

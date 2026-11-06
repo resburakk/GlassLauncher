@@ -39,7 +39,7 @@ data class LauncherSettings(
     val rows: Int = 6,
     val showLabels: Boolean = true,
     val hSpacing: Float = 1f,
-    val vSpacing: Float = 0.97f,
+    val vSpacing: Float = 0.98f,
     /** Etiketin simgeye uzaklığı (pt). */
     val labelGap: Float = 5f,
     /** Etiket yazı boyutu (pt; iOS'ta 12). */
@@ -66,36 +66,36 @@ data class LauncherSettings(
     /** iOS sürekli köşe (squircle) yumuşaklığı: 0 = düz yuvarlak köşe, 0.6 = iOS. */
     val cornerSmoothing: Float = 0.6f,
     /** Simgelerin üst/sol kenar ışığı (iOS 26 cam kabarıklığı): 0 = eski görünüm. */
-    val iconRimGlow: Float = 1f,
+    val iconRimGlow: Float = 0.8f,
     /** Simgenin altındaki ince temas gölgesi. iOS 26 ölçümü: yok (0). */
     /** Simge alt gölgesi: widget ve klasörlerin alt temas gölgesiyle aynı (0,5). */
-    val iconShadow: Float = 0.5f,
+    val iconShadow: Float = 0.09f,
     /** Simge renk canlılığı (doygunluk çarpanı; 1 = orijinal). Çizimde uygulanır, simge görüntüsü değişmez. */
-    val iconSaturation: Float = 1.23f,
+    val iconSaturation: Float = 1f,
     val iconGlass: Boolean = true,
     /** Uygulama anahtarı → özel simge dosya adı (filesDir/icons altında). */
     val customIcons: Map<String, String> = emptyMap(),
     // Dock
-    val dockHeight: Float = 0.94f,
+    val dockHeight: Float = 0.96f,
     val dockWidth: Float = 1f,
     val dockOpacity: Float = 1f,
     /** Dock camının bulanıklığı (genel bulanıklık şiddetiyle çarpılır; 0 = net cam). */
-    val dockBlur: Float = 1f,
+    val dockBlur: Float = 0.11f,
     /** Dock'un kendi kenar kırılması ve kenar kalınlığı (< 0: Liquid Glass'taki genel değer). */
     val dockRefraction: Float = -1f,
     val dockEdgeWidth: Float = -1f,
     /** Ana ekrandaki klasörler ve Ara düğmesi dock ile aynı cam (bulanıklık, kırılma, kenar ışığı). */
     val glassLikeDock: Boolean = true,
     /** Dock'un ekranın altına uzaklığı (pt; iOS'ta 15). */
-    val dockBottom: Float = 15f,
+    val dockBottom: Float = 18f,
     /**
      * Dock köşe yuvarlaklığı (yüksekliğe oran; 0.5 = hap şekli). Negatif: iOS 26 ölçüsü (%37,8).
      */
-    val dockCorner: Float = 0.415f,
+    val dockCorner: Float = 0.375f,
     /** Arama düğmesi boyut çarpanı. */
     val pillScale: Float = 1.03f,
     /** Arama düğmesinin ortalanmış konumdan yukarı (+) / aşağı (−) kayması (pt). */
-    val pillOffset: Float = -8f,
+    val pillOffset: Float = -3f,
     // Klasörler
     val folderOpacity: Float = 1f,
     /** Açık klasör panelinin ekran genişliğine oranı. */
@@ -158,7 +158,7 @@ data class LauncherSettings(
     /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
     val liveIcons: Boolean = true,
     /** Simge kenarındaki ince beyaz çizginin (iOS kenar ışığı) kalınlığı, dp. */
-    val iconRimWidth: Float = 1f,
+    val iconRimWidth: Float = 2f,
     /** Duvar kâğıdı seçilince sistemde nereye uygulanır: "home", "lock", "both". */
     val wallpaperTarget: String = "both",
     /** Canlı saat simgesinde saniye ibresi. */
@@ -190,7 +190,7 @@ data class LauncherSettings(
     /** Işığın karşı kenardaki zayıf yansıması (iOS'taki çapraz köşe parlaması): 0 yok … 1 eşit. */
     val glassLightBack: Float = 0.3f,
     /** Camın alt kenarındaki ince temas gölgesi (iOS 26/27): 0 yok … 1 belirgin. */
-    val glassContactShadow: Float = 0f,
+    val glassContactShadow: Float = 0.1f,
     /** iOS 27 tarzı koyu derinlik kenarı: 0 kapalı … 1 belirgin. */
     val glassEdgeDark: Float = 0f,
     /** Genel şeffaflık (iOS 27 / MagicOS 11 kaydırıcısı): 0 çok şeffaf … 0.5 dengeli … 1 renkli. */
