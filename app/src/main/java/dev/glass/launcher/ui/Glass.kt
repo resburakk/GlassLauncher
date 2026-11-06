@@ -1075,8 +1075,10 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
                 c.drawPath(path, p)
             }
             // Ortada önceki kalınlık (w×2), uçlara doğru yarı kalınlığa iner ve söner: kısa kalın + uzun ince çizgi.
-            line(a, w * 2f, rr * 0.55f + 0.06f)
-            line(a, w * 1f, rr * 0.55f)
+            // Simgelerde çizgi köşelere biraz daha yakın uzanır (kullanıcı isteği); widget'lar aynı kalır.
+            val st0 = if (material) rr * 0.28f else rr * 0.55f
+            line(a, w * 2f, st0 + 0.05f)
+            line(a, w * 1f, st0)
         }
         bmp.prepareToDraw()
         bmp.asImageBitmap()
