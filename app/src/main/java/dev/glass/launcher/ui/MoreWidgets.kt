@@ -11,6 +11,8 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -558,8 +560,8 @@ private fun openPlay(ctx: android.content.Context, intent: android.content.Inten
 private fun playUrl(url: String) = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)).setPackage(PLAY)
 
 /**
- * Google Play widget'ı: arama, Uygulamalarım (güncellemeler), Oyunlar, Uygulamalar; büyük boyutta son yüklediğin
- * uygulamalar (dokununca Play sayfası açılır: güncelleme, değerlendirme).
+ * Google Play widget'ı: başlık ve sağda eğik, kenarlardan taşan uygulama simgesi duvarı (dokununca o uygulamanın
+ * Play sayfası; boş yere dokununca Play Store).
  */
 @Composable
 fun PlayStoreWidget(w: WidgetItem, vm: LauncherViewModel, strength: Float) {
@@ -574,88 +576,49 @@ fun PlayStoreWidget(w: WidgetItem, vm: LauncherViewModel, strength: Float) {
         }
         return
     }
-    val search = { openPlay(ctx, playUrl("https://play.google.com/store/search?q=&c=apps")) }
-    val myApps = {
-        openPlay(ctx, android.content.Intent("com.google.android.finsky.VIEW_MY_DOWNLOADS").setPackage(PLAY))
+    // Kullanıcı seçimi (D): arama çubuğu ve düğmeler yok; başlık + sağ yarıda eğik, kenarlardan taşan simge duvarı.
+    // Simgeler yüklü uygulamalardan (en son yüklenenler önce); dokununca o uygulamanın Play sayfası, boş yere
+    // dokununca Play Store açılır.
+    val wall = remember(all) {
+        val user = all.filter { !it.isShortcut && !it.isSystem && it.packageName != PLAY }.sortedByDescending { it.installTime }.distinctBy { it.packageName }
+        (user + all.filter { !it.isShortcut && it.isSystem && it.packageName != PLAY }.distinctBy { it.packageName }).take(20)
     }
-    val header: @Composable (Dp) -> Unit = { icon ->
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AppIconImage(play, vm, icon, st.iconGlass, strength, badge = false)
+    val small = w.spanX < 4
+    BoxWithConstraints(
+        Modifier.fillMaxSize().clickable(remember { MutableInteractionSource() }, null) {
+            openPlay(ctx, ctx.packageManager.getLaunchIntentForPackage(PLAY) ?: playUrl("https://play.google.com/store/apps"))
+        }
+    ) {
+        val icon = if (small) maxHeight * 0.30f else minOf(maxHeight * 0.34f, 62.dp)
+        val px = icon * 1.17f
+        val py = icon * 1.06f
+        val cols = if (small) 3 else 4
+        val rows = ((maxHeight + icon) / py).toInt() + 2
+        val startX = if (small) maxWidth * 0.36f else maxWidth * 0.55f
+        // Simge duvarı (önce çizilir; başlık üstte kalır).
+        var n = 0
+        for (r in 0 until rows) for (c in 0 until cols) {
+            val a = wall.getOrNull((n++) % maxOf(wall.size, 1)) ?: continue
+            val x = startX + px * c + (if (r % 2 == 1) px * 0.5f else 0.dp)
+            val y = -icon * 0.55f + py * r
+            androidx.compose.runtime.key(r * 100 + c) { Box(
+                Modifier.offset(x, y).size(icon)
+                    .graphicsLayer { rotationZ = -20f }
+                    .clickable(remember { MutableInteractionSource() }, null) {
+                        openPlay(ctx, android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${a.packageName}")).setPackage(PLAY))
+                    }
+            ) { AppIconImage(a, vm, icon, st.iconGlass, strength, badge = false) } }
+        }
+        if (small) Column(Modifier.padding(14.dp)) {
+            AppIconImage(play, vm, 44.dp, st.iconGlass, strength, badge = false)
+            Spacer(Modifier.height(6.dp))
+            Text("Google Play", color = ink.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
+        } else Row(Modifier.padding(start = 18.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+            AppIconImage(play, vm, 46.dp, st.iconGlass, strength, badge = false)
             Spacer(Modifier.width(10.dp))
             Column {
-                Text("Google Play", color = ink.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
-                if (w.spanX >= 4) Text("Uygulamalar ve oyunlar", color = ink.secondary, fontSize = 12.sp, fontFamily = AppFont, maxLines = 1)
-            }
-        }
-    }
-    val pill: @Composable () -> Unit = {
-        Row(
-            Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(50)).background(ink.track).clickable { search() }.padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            SearchGlyph(ink.secondary, 15.dp)
-            Spacer(Modifier.width(7.dp))
-            Text("Uygulama ve oyun ara", color = ink.secondary, fontSize = 13.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-    @Composable
-    fun Chip(text: String, modifier: Modifier, onClick: () -> Unit) {
-        Box(
-            modifier.height(34.dp).clip(RoundedCornerShape(12.dp)).background(ink.track).clickable { onClick() },
-            contentAlignment = Alignment.Center,
-        ) { Text(text, color = ink.primary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1) }
-    }
-    val chips: @Composable () -> Unit = {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip("Uygulamalarım", Modifier.weight(1.3f)) { myApps() }
-            Chip("Oyunlar", Modifier.weight(1f)) { openPlay(ctx, playUrl("https://play.google.com/store/games")) }
-            Chip("Uygulamalar", Modifier.weight(1.1f)) { openPlay(ctx, playUrl("https://play.google.com/store/apps")) }
-        }
-    }
-    when {
-        w.spanX < 4 -> Column(Modifier.fillMaxSize().padding(14.dp)) {
-            AppIconImage(play, vm, 48.dp, st.iconGlass, strength, badge = false)
-            Spacer(Modifier.height(6.dp))
-            Text("Google Play", color = ink.primary, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
-            Spacer(Modifier.weight(1f))
-            Row(
-                Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(50)).background(ink.track).clickable { search() }.padding(horizontal = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                SearchGlyph(ink.secondary, 14.dp)
-                Spacer(Modifier.width(6.dp))
-                Text("Ara", color = ink.secondary, fontSize = 13.sp, fontFamily = AppFont)
-            }
-        }
-        w.spanY < 4 -> Column(Modifier.fillMaxSize().padding(14.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            header(36.dp)
-            pill()
-            chips()
-        }
-        else -> Column(Modifier.fillMaxSize().padding(16.dp)) {
-            header(44.dp)
-            Spacer(Modifier.height(12.dp))
-            pill()
-            Spacer(Modifier.height(10.dp))
-            chips()
-            Spacer(Modifier.height(14.dp))
-            Text("Son yüklediklerin", color = ink.secondary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont)
-            Spacer(Modifier.height(6.dp))
-            val recent = remember(all) { all.filter { !it.isShortcut && !it.isSystem && it.installTime > 0 && it.packageName != PLAY }.sortedByDescending { it.installTime }.distinctBy { it.packageName }.take(4) }
-            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-                val icon = minOf(maxWidth / 4f * 0.72f, maxHeight * 0.62f)
-                Row(Modifier.fillMaxSize()) {
-                    recent.forEach { a ->
-                        Column(
-                            Modifier.weight(1f).clickable(remember { MutableInteractionSource() }, null) { openPlay(ctx, android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=${a.packageName}")).setPackage(PLAY)) },
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            AppIconImage(a, vm, icon, st.iconGlass, strength, badge = false)
-                            Text(a.label, color = ink.primary, fontSize = 11.sp, fontFamily = AppFont, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 3.dp, start = 2.dp, end = 2.dp))
-                        }
-                    }
-                    repeat(4 - recent.size) { Spacer(Modifier.weight(1f)) }
-                }
+                Text("Google Play", color = ink.primary, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, fontFamily = AppFont, maxLines = 1)
+                Text("Uygulamalar ve oyunlar", color = ink.secondary, fontSize = 12.sp, fontFamily = AppFont, maxLines = 1)
             }
         }
     }
