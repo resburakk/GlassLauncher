@@ -280,6 +280,14 @@ if [ -n "$mid" ]; then
   tap_text "Ana ekran"; step "launcher duvar kâğıdı" 5
   adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
   shot 15a-cam-dock
+  # Yatay ana ekran (iPhone Duo gibi dock sağda dikey).
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key allowRotation --es value true >/dev/null
+  adb shell settings put system accelerometer_rotation 0; adb shell settings put system user_rotation 1
+  step "yatay" 5
+  shot 15i-yatay
+  adb shell settings put system user_rotation 0
+  adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key allowRotation --es value false >/dev/null
+  step "dikey" 4
   # Simge kenar ışığı en yüksekte: simgelerde çizgi görünüyor mu (telefonda görünmüyordu).
   adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key iconRimGlow --es value 2 >/dev/null
   adb shell am broadcast -a dev.glass.launcher.SET -n dev.glass.launcher/.DebugSettingsReceiver --es key iconRimWidth --es value 3 >/dev/null

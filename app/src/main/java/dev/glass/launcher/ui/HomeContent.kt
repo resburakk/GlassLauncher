@@ -178,11 +178,13 @@ internal fun HomeContent(
                 when {
                     k == null || drag.hoverId != null -> null
                     pagerState.currentPage >= libIndex -> null
-                    dockRect.height > 0f && drag.pos.y >= dockRect.top - with(density) { 12.dp.toPx() } -> {
+                    dockRect.height > 0f && (if (m.dockVertical) drag.pos.x >= dockRect.left - with(density) { 12.dp.toPx() }
+                        else drag.pos.y >= dockRect.top - with(density) { 12.dp.toPx() }) -> {
                         val dockPitchPx = with(density) { m.dockPitch.toPx() }
                         val dockIconPx = with(density) { m.dockIcon.toPx() }
-                        val first = dockRect.left + with(density) { m.dockInnerStart.toPx() }
-                        val slot = floor((drag.pos.x - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx).toInt().coerceIn(0, 3)
+                        val first = (if (m.dockVertical) dockRect.top else dockRect.left) + with(density) { m.dockInnerStart.toPx() }
+                        val along = if (m.dockVertical) drag.pos.y else drag.pos.x
+                        val slot = floor((along - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx).toInt().coerceIn(0, 3)
                         Cell(-1, 0, slot)
                     }
                     else -> {
@@ -398,12 +400,13 @@ internal fun HomeContent(
             val topLevel = cur.items.any { it.id == id }
 
             // 1) Dock bölgesi
-            if (dockRect.height > 0f && pos.y >= dockRect.top - with(density) { 12.dp.toPx() }) {
+            if (dockRect.height > 0f && (if (m.dockVertical) pos.x >= dockRect.left - with(density) { 12.dp.toPx() }
+                    else pos.y >= dockRect.top - with(density) { 12.dp.toPx() })) {
                 if (!isApp) return // klasörler dock'a konmaz
                 val dockPitchPx = with(density) { m.dockPitch.toPx() }
                 val dockIconPx = with(density) { m.dockIcon.toPx() }
-                val first = dockRect.left + with(density) { m.dockInnerStart.toPx() }
-                val slot = floor((pos.x - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx)
+                val first = (if (m.dockVertical) dockRect.top else dockRect.left) + with(density) { m.dockInnerStart.toPx() }
+                val slot = floor(((if (m.dockVertical) pos.y else pos.x) - first + (dockPitchPx - dockIconPx) / 2f) / dockPitchPx)
                     .toInt().coerceIn(0, 3)
                 vm.editLayout { it.moveToDock(id, slot) }
                 return
@@ -713,7 +716,7 @@ internal fun HomeContent(
             // Hap: simge dizisinin altı ile dock'un üstü arasında tam ortada.
             Box(
                 Modifier
-                    .fillMaxWidth()
+                    .width(m.contentW)
                     .height(m.pillH)
                     .offset(y = m.pillCenterY - m.pillH / 2f),
                 contentAlignment = Alignment.Center,
@@ -739,9 +742,10 @@ internal fun HomeContent(
                 DockGlass(force = true) {
                 Box(
                     Modifier
-                        .offset(x = m.dockMarginX, y = m.dockTop)
-                        .width(dockW)
-                        .height(m.dockH)
+                        // Yatayda (iPhone Duo gibi) dock sağ kenarda dikey.
+                        .offset(x = if (m.dockVertical) m.dockLeft else m.dockMarginX, y = m.dockTop)
+                        .width(if (m.dockVertical) m.dockH else dockW)
+                        .height(if (m.dockVertical) m.dockLen else m.dockH)
                         .onGloballyPositioned { dockRect = it.boundsInRoot() }
                         .liquidGlass(appShape(m.dockCorner), settings.glassStrength * settings.dockOpacity, 14.dp, ios = true, brightRim = true, iconRim = true)
                 ) {
@@ -752,8 +756,8 @@ internal fun HomeContent(
                             val dx by animateDpAsState(m.dockInnerStart + m.dockPitch * i.toFloat(), motion.reflow(), label = "dx")
                             Box(
                                 Modifier
-                                    .align(Alignment.CenterStart)
-                                    .offset { IntOffset(dx.roundToPx(), 0) }
+                                    .align(if (m.dockVertical) Alignment.TopCenter else Alignment.CenterStart)
+                                    .offset { if (m.dockVertical) IntOffset(0, dx.roundToPx()) else IntOffset(dx.roundToPx(), 0) }
                             ) {
                                 DraggableCell(
                                     id = dk, place = CellPlace.Dock,

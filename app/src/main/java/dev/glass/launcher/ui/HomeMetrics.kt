@@ -51,6 +51,13 @@ data class HomeMetrics(
     val pillH: Dp,
     /** Arama hapının merkezinin ekran tepesine uzaklığı. */
     val pillCenterY: Dp,
+    /** Yatay (iPhone Duo gibi): dock sağ kenarda dikey; simgeler yukarıdan aşağı dizilir. */
+    val dockVertical: Boolean = false,
+    /** Dikey dock'un sol kenarı ve boyu (dockH = kalınlığı). */
+    val dockLeft: Dp = 0.dp,
+    val dockLen: Dp = 0.dp,
+    /** Simge dizisinin ve arama hapının yerleştiği alanın genişliği (yatayda dock'un solu). */
+    val contentW: Dp = 0.dp,
 ) {
     val perPage: Int get() = columns * rows
 
@@ -84,6 +91,7 @@ data class HomeMetrics(
             // ekranı kaplıyordu.
             val ref = min(width, height)
             val u = pt(ref)
+            if (width > height * 1.1f) return landscape(width, height, statusTop, s, navButtons, u)
             val cols = s.columns
             val f = 4f / cols
 
@@ -128,7 +136,55 @@ data class HomeMetrics(
             return HomeMetrics(
                 u, cols, rows, icon, pitchX, pitchY, marginX, firstTop, gridBottom,
                 dockH, dockMarginX, dockTop, dockIcon, dockPitch, dockInnerStart, dockCornerR,
+                pillW, pillH, pillCenterY, contentW = width,
+            )
+        }
+
+        /**
+         * Yatay ana ekran (iPhone Duo gibi): dock sağ kenarda dikey (4 simge yukarıdan aşağı), simgeler dock'un solundaki
+         * alanda; sütun sayısı alana göre artar (sığdığı kadar, en çok 8), satırlar yüksekliğe sığdığı kadar. Arama hapı
+         * simge alanının altında ortada. Ölçüler dikeydeki genişliğe (kısa kenar) göre.
+         */
+        private fun landscape(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp, u: Dp): HomeMetrics {
+            val pc = s.columns
+            val f = 4f / pc
+            val basePitchX = u * 92f * f
+            val icon = (u * 65f * f * s.iconScale).coerceAtMost(basePitchX * 0.96f)
+            val labelBlock = if (s.showLabels) u * (s.labelGap + s.labelSize * 1.25f) else 0.dp
+
+            val dockIcon = (u * 65f * s.iconScale).coerceAtMost(u * 90f * 0.96f)
+            val dockT = dockIcon * 1.62f * s.dockHeight
+            val dockInset = (dockT - dockIcon) / 2f
+            val sideGap = u * (s.dockBottom * 0.8f).coerceAtLeast(8f)
+            val dockLeft = width - sideGap - dockT
+            val top = statusTop + u * 8f
+            val bottomGap = max(u * 10f, navButtons + u * 6f)
+            val dockLen = height - top - bottomGap
+            val dockPitch = max((dockLen - dockInset * 2f - dockIcon) / 3f, dockIcon + 2.dp)
+
+            val gridW = dockLeft - u * 6f
+            val wantPitch = basePitchX * s.hSpacing
+            val cols = (((gridW - icon - u * 24f) / wantPitch).toInt() + 1).coerceIn(pc, 8)
+            val pitchX = max(min((gridW - icon - u * 24f) / (cols - 1).coerceAtLeast(1).toFloat(), wantPitch * 1.5f), icon + 2.dp)
+            val marginX = (gridW - icon - pitchX * (cols - 1).toFloat()) / 2f
+
+            val pillW = u * 77f * s.pillScale
+            val pillH = u * 29f * s.pillScale
+            val pillCenterY = height - bottomGap - pillH / 2f
+            val firstTop = top + u * 4f
+            val pitchY = max(u * 92f * s.vSpacing, icon + labelBlock + u * 4f)
+            val avail = pillCenterY - pillH / 2f - u * 8f - firstTop - icon - labelBlock
+            val rows = ((avail / pitchY).toInt() + 1).coerceIn(1, s.rows)
+            val gridBottom = firstTop + pitchY * (rows - 1).toFloat() + icon + labelBlock
+            val dockCornerR = dockT * (if (s.dockCorner < 0f) 0.378f else s.dockCorner)
+            // dockMarginX: arama önerileri paneli gibi dock genişliğini kullanan yerler dikeydeki genişlikte kalsın.
+            val ref = min(width, height)
+            val dockMarginX = u * 16.5f + (width - ref) / 2f
+            return HomeMetrics(
+                u, cols, rows, icon, pitchX, pitchY, marginX, firstTop, gridBottom,
+                dockT, dockMarginX, top, dockIcon, dockPitch, dockInset, dockCornerR,
                 pillW, pillH, pillCenterY,
+                dockVertical = true, dockLeft = dockLeft, dockLen = dockLen, contentW = gridW,
             )
         }
     }
