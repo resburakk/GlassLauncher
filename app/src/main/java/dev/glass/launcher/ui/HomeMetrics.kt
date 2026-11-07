@@ -61,6 +61,8 @@ data class HomeMetrics(
     val contentW: Dp = 0.dp,
     /** Bu alanın sol kenarı (yatayda kamera deliği soldaysa onun sağı). */
     val contentX: Dp = 0.dp,
+    /** Yatayda dock'un sağ kenarı ile ekran kenarı arası (uygulama arşivi bu hizaya kadar uzanır). */
+    val edgeRight: Dp = 0.dp,
 ) {
     val perPage: Int get() = columns * rows
 
@@ -68,7 +70,9 @@ data class HomeMetrics(
      * iOS 26'da widget simge sütunlarının dış kenarından her yanda simgenin ~%5,5'i kadar taşar (iki widget
      * arasındaki boşluk simgeler arasındakinden dardır). Widget bu kadar sola/yukarı kaydırılarak çizilir.
      */
-    val widgetBleed: Dp get() = icon * 0.055f
+    // Yatayda taşma yok: widget yanındaki simgelerin üst ve alt kenarıyla aynı hizada kalır (yazısı simge
+    // yazılarıyla aynı çizgiye oturur; önceden alttan taşıp alttaki simgeye çarpıyordu).
+    val widgetBleed: Dp get() = if (dockVertical) 0.dp else icon * 0.055f
 
     /** [spanX]×[spanY] hücrelik widget'ın boyutu (simge kenarları + iOS taşma payı). */
     /** Widget adımı: yatayda sütunlar seyrek, satırlar sık; widget satıra sığsın ve oranı bozulmasın diye küçüğü alınır. */
@@ -200,6 +204,7 @@ data class HomeMetrics(
                 dockT, dockMarginX, top, dockIcon, dockPitch, dockInset, dockCornerR,
                 pillW, pillH, pillCenterY,
                 dockVertical = true, dockLeft = dockLeft, dockLen = dockLen, contentW = gridW, contentX = gridX,
+                edgeRight = width - dockLeft - dockT,
             )
         }
     }

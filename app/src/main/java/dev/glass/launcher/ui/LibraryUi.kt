@@ -175,9 +175,14 @@ fun LibraryPage(
 
     val u = LocalPt.current
     val side = u * 29f
+    // Yatayda arşiv ana ekranla aynı hizada: solda ilk simge sütununun kenarı (kamera deliğinden uzak),
+    // sağda dock'un sağ kenarı.
+    val lhm = LocalHomeMetrics.current
+    val landL = if (lhm?.dockVertical == true) (lhm.marginX - side).coerceAtLeast(0.dp) else 0.dp
+    val landR = if (lhm?.dockVertical == true) (lhm.edgeRight - side).coerceAtLeast(0.dp) else 0.dp
     // Kenar boşluğu arama çubuğu ve kartlara ayrı verilir: arama listesi (iOS gibi) ekran kenarına kadar uzanır,
     // sağdaki harf dizini kenara yakın durur.
-    Column(Modifier.fillMaxSize().nestedScroll(pullDown)) {
+    Column(Modifier.fillMaxSize().padding(start = landL, end = landR).nestedScroll(pullDown)) {
         Row(Modifier.padding(horizontal = side), verticalAlignment = Alignment.CenterVertically) {
             Row(
                 Modifier
@@ -609,6 +614,11 @@ fun LibraryGroupOverlay(
     BoxWithConstraints(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { onClose() }) }) {
         val u = LocalPt.current
         val side = u * 29f
+        // Yatayda ana ekranla aynı kenarlar (solda ilk simge sütunu, sağda dock'un sağ kenarı).
+        val ghm = LocalHomeMetrics.current
+        val landL = if (ghm?.dockVertical == true) (ghm.marginX - side).coerceAtLeast(0.dp) else 0.dp
+        val landR = if (ghm?.dockVertical == true) (ghm.edgeRight - side).coerceAtLeast(0.dp) else 0.dp
+        val maxWidth = this.maxWidth - landL - landR
         // Simgeler ana ekranla aynı boyutta (4 sütuna sığmazsa küçülür).
         val icon = minOf(LocalHomeMetrics.current?.icon ?: (u * 64f), (maxWidth - side * 2f) / 4.6f)
         // Yatayda (geniş alan) sütun sayısı alana göre artar; yoksa aralık çok açılıyor ve kenar payı eksiye düşüp
@@ -625,7 +635,7 @@ fun LibraryGroupOverlay(
         rb.extent = constraints.maxHeight.toFloat().coerceAtLeast(1f)
         LazyVerticalGrid(
             columns = GridCells.Fixed(cols),
-            contentPadding = PaddingValues(start = gridSide, end = gridSide, bottom = navBottom + u * 24f),
+            contentPadding = PaddingValues(start = gridSide + landL, end = gridSide + landR, bottom = navBottom + u * 24f),
             modifier = Modifier.fillMaxSize().nestedScroll(rb.connection),
         ) {
             item(key = "title", span = { GridItemSpan(maxLineSpan) }) {
