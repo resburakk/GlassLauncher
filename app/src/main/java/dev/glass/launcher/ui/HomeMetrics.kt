@@ -191,9 +191,13 @@ data class HomeMetrics(
             val pillH = u * 29f * s.pillScale
             val pillCenterY = height - bottomGap - pillH / 2f
             val firstTop = top + u * 4f
-            val pitchY = max(u * 92f * s.vSpacing, icon + labelBlock + u * 4f)
+            val minPitchY = max(u * 92f * s.vSpacing, icon + labelBlock + u * 4f)
             val avail = pillCenterY - pillH / 2f - u * 8f - firstTop - icon - labelBlock
-            val rows = ((avail / pitchY).toInt() + 1).coerceIn(1, s.rows)
+            val rows = ((avail / minPitchY).toInt() + 1).coerceIn(1, s.rows)
+            // Satırlar arama hapına kadar olan alana yayılır (hapın üstünde küçük bir boşluk kalır); aralık yine de
+            // yatay adımı geçmez.
+            val spread = if (rows > 1) (pillCenterY - pillH / 2f - u * 14f - firstTop - icon - labelBlock) / (rows - 1).toFloat() else minPitchY
+            val pitchY = max(minPitchY, min(spread, pitchX))
             val gridBottom = firstTop + pitchY * (rows - 1).toFloat() + icon + labelBlock
             val dockCornerR = dockT * (if (s.dockCorner < 0f) 0.378f else s.dockCorner)
             // dockMarginX: arama önerileri paneli gibi dock genişliğini kullanan yerler dikeydeki genişlikte kalsın.
