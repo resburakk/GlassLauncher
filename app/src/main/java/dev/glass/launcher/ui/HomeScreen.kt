@@ -539,7 +539,8 @@ fun HomeScreen(
         LocalLauncherSettings provides settings,
         LocalOverlayBackdrop provides overlayBackdropHolder.value,
         LocalMotion provides motion,
-        LocalPt provides HomeMetrics.pt(LocalConfiguration.current.screenWidthDp.dp),
+        // Kısa kenara göre: yatayda yazılar ve arşiv iki kat büyüyüp kesiliyordu.
+        LocalPt provides HomeMetrics.pt(minOf(LocalConfiguration.current.screenWidthDp, LocalConfiguration.current.screenHeightDp).dp),
         LocalHomeMetrics provides homeMetrics,
         // Dock'un kendi bulanıklığı (Ayarlar > Dock > Bulanıklık): farklıysa dock bu kopyayı büker.
         // Her durumda geçerli (telefonun duvar kâğıdı, düşük güç, ana ekran bulanıklığı açık olsa da): dock kendi

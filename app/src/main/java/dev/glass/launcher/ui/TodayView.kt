@@ -204,7 +204,8 @@ fun TodayPage(
     // Sayfa kayarak gelirken camlar (arama çubuğu, kartlar) bulanık kopyayı sayfanın o anki yerinden çizer
     // (önceden son konumdan çizildiği için "resmi önceden kopyalamış" gibi görünüyordu).
     CompositionLocalProvider(LocalPageAnchor provides todayAnchor) {
-        val columns = hm.columns
+        // Yatayda ızgara 8 sütuna kadar çıkıyor; widget'lar dikeydeki gibi 4 sütun genişliğinde, ortada kalsın.
+        val columns = hm.columns.coerceAtMost(4)
         val contentW = hm.widgetWidth(columns)
         val smallW = hm.widgetWidth(2)
         val gapX = contentW - smallW * 2f

@@ -370,8 +370,11 @@ private fun SuggestionsPanel(
 ) {
     val hm = LocalHomeMetrics.current ?: return
     val st = LocalLauncherSettings.current
-    val screenW = LocalConfiguration.current.screenWidthDp.dp
-    val panelW = screenW - hm.dockMarginX * 2f
+    // Yatayda panel geniş ekrana yayılmasın: kısa kenar genişliğinde (dikeydeki gibi), ortada.
+    val conf = LocalConfiguration.current
+    val screenW = conf.screenWidthDp.dp
+    val shortW = minOf(conf.screenWidthDp, conf.screenHeightDp).dp
+    val panelW = shortW - (hm.dockMarginX - (screenW - shortW) / 2f) * 2f
     // Yanlardaki boşluk = simgelerin dış kenarından panel kenarına; aynı boşluk üstte ve altta da kullanılır.
     val pad = hm.dockInnerStart
     val labelBlock: Dp = if (showLabels) 22.dp else 0.dp

@@ -237,10 +237,12 @@ fun LibraryPage(
         } else {
             BoxWithConstraints(Modifier.fillMaxSize().padding(horizontal = side)) {
                 val gap = u * 24f
-                val tile = (maxWidth - gap) / 2f
+                // Yatayda (geniş alan) 4 kart yan yana; yoksa kartlar ekranı kaplıyordu.
+                val libCols = if (maxWidth > maxHeight * 1.1f) 4 else 2
+                val tile = (maxWidth - gap * (libCols - 1)) / libCols.toFloat()
                 LazyVerticalGrid(
                     state = gridState,
-                    columns = GridCells.Fixed(2),
+                    columns = GridCells.Fixed(libCols),
                     horizontalArrangement = Arrangement.spacedBy(gap),
                     // iOS 26: kart satırları arası ≈ 199 pt (kart 160 + etiket + boşluk).
                     verticalArrangement = Arrangement.spacedBy(u * 20f),
