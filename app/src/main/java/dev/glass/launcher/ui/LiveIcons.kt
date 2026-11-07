@@ -176,15 +176,16 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         // Rakamlar boyut/renk değişince bir kez ölçülür (her karede değil).
         val numStyle = TextStyle(
             // iOS 26 Saat simgesi: rakamlar küçük ve normal kalınlıkta (kalın ve büyük değil).
-            color = p.clockInk, fontFamily = AppFont, fontWeight = FontWeight.Normal,
-            fontSize = (s * 0.15f).toSp(), letterSpacing = 0.sp,
+            // iOS 26 ölçümü: rakamlar biraz büyük, orta kalınlıkta, koyu gri.
+            color = p.clockInk.copy(alpha = 0.85f), fontFamily = AppFont, fontWeight = FontWeight.Medium,
+            fontSize = (s * 0.16f).toSp(), letterSpacing = 0.sp,
         )
         val nums = listOf(12, 3, 6, 9).map { h ->
             val a = Math.toRadians(h * 30.0 - 90.0)
             val m = measurer.measure(h.toString(), numStyle)
             m to Offset(
-                c.x + s * 0.27f * cos(a).toFloat() - m.size.width / 2f,
-                c.y + s * 0.27f * sin(a).toFloat() - m.size.height / 2f,
+                c.x + s * 0.255f * cos(a).toFloat() - m.size.width / 2f,
+                c.y + s * 0.255f * sin(a).toFloat() - m.size.height / 2f,
             )
         }
         // iOS 26 Saat simgesi: kenarda 60 çizgi (saat başları kalın), rakamlar içeride, turuncu saniye ibresi.
@@ -198,8 +199,9 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         val ticks = (0 until 60).map { i ->
             val a = Math.toRadians(i * 6.0 - 90.0)
             val major = i % 5 == 0
-            val outer = edge(a, s * 0.445f)
-            val inner = outer - if (major) s * 0.105f else s * 0.042f
+            // iOS ölçümü: çizgiler kenara çok yakın; saat başları uzun ve ince, dakikalar uzunca ve çok ince.
+            val outer = edge(a, s * 0.465f)
+            val inner = outer - if (major) s * 0.135f else s * 0.058f
             Triple(
                 Offset(c.x + inner * cos(a).toFloat(), c.y + inner * sin(a).toFloat()),
                 Offset(c.x + outer * cos(a).toFloat(), c.y + outer * sin(a).toFloat()),
@@ -210,8 +212,8 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         drawRect(p.clockBg)
         nums.forEach { (m, o) -> drawText(m, topLeft = o) }
         ticks.forEach { (a, b, major) ->
-            drawLine(if (major) p.clockInk else p.clockInk.copy(alpha = 0.45f), a, b,
-                strokeWidth = if (major) s * 0.022f else s * 0.009f, cap = StrokeCap.Butt)
+            drawLine(if (major) p.clockInk.copy(alpha = 0.78f) else p.clockInk.copy(alpha = 0.32f), a, b,
+                strokeWidth = if (major) s * 0.013f else s * 0.0075f, cap = StrokeCap.Butt)
         }
         val cal = Calendar.getInstance().apply { timeInMillis = now() }
         val ms = cal.get(Calendar.MILLISECOND)
@@ -219,17 +221,27 @@ private fun LiveClock(seconds: Boolean, p: LivePalette) {
         val min = cal.get(Calendar.MINUTE) + sec / 60f
         val hr = (cal.get(Calendar.HOUR) + min / 60f)
         // iOS 26: ince akrep ve yelkovan (yelkovan çizgilere kadar), ince uzun turuncu saniye ibresi.
-        hand(c, hr * 30f, r * 0.50f, s * 0.045f, p.clockInk, tail = r * 0.08f)
-        hand(c, min * 6f, r * 0.86f, s * 0.032f, p.clockInk, tail = r * 0.08f)
+        // iOS 26: ibre merkezden ince bir sapla çıkar, sonra kalınlaşır (yuvarlak uçlu).
+        stemHand(c, hr * 30f, r * 0.55f, s * 0.05f, s * 0.018f, p.clockInk)
+        stemHand(c, min * 6f, r * 0.95f, s * 0.042f, s * 0.018f, p.clockInk)
         if (seconds) {
-            hand(c, sec * 6f, r * 0.94f, s * 0.012f, p.clockRed, tail = r * 0.22f)
-            drawCircle(p.clockRed, s * 0.03f, c)
-            drawCircle(p.clockBg, s * 0.011f, c)
+            hand(c, sec * 6f, r * 1.0f, s * 0.009f, p.clockRed, tail = r * 0.22f)
+            // Ortada içi beyaz turuncu halka.
+            drawCircle(p.clockRed, s * 0.028f, c)
+            drawCircle(p.clockBg, s * 0.015f, c)
         } else {
             drawCircle(p.clockInk, s * 0.045f, c)
         }
         }
     })
+}
+
+private fun DrawScope.stemHand(c: Offset, deg: Float, len: Float, width: Float, stem: Float, color: Color) {
+    rotate(deg, pivot = c) {
+        val joint = len * 0.22f
+        drawLine(color, c, Offset(c.x, c.y - joint), strokeWidth = stem, cap = StrokeCap.Round)
+        drawLine(color, Offset(c.x, c.y - joint), Offset(c.x, c.y - len), strokeWidth = width, cap = StrokeCap.Round)
+    }
 }
 
 private fun DrawScope.hand(c: Offset, deg: Float, len: Float, width: Float, color: Color, tail: Float) {
