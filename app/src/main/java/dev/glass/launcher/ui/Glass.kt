@@ -1063,10 +1063,14 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             val rr = (shapeRadiusPx(shape, Size(wPx.toFloat(), hPx.toFloat()), layoutDirection, this) / wPx).coerceIn(0.08f, 0.32f)
             // Kenarın büyük kısmında tam parlak; yalnızca uçlara yakın %16'lık bölümde söner (önceki sürüm ortadan itibaren
             // sönüyordu, çizgi çok kısa görünüyordu).
+            // Kullanıcı isteği: ortada belirgin; sağa sola doğru çok hafifleyerek köşelere kadar gelir ve köşe kavsine biraz
+            // döner (uçta ~%15 parlaklık, en uçta söner).
+            val faint = 0x26000000
             fun taper(start: Float) = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f,
-                intArrayOf(0, 0, android.graphics.Color.BLACK, android.graphics.Color.BLACK, 0, 0),
-                floatArrayOf(0f, start, start + 0.16f, 1f - start - 0.16f, 1f - start, 1f), android.graphics.Shader.TileMode.CLAMP)
-            val band = (w * 3f / hPx).coerceIn(0.02f, 0.12f)
+                intArrayOf(0, faint, android.graphics.Color.BLACK, android.graphics.Color.BLACK, faint, 0),
+                floatArrayOf(0f, 0.03f, start + 0.16f, 1f - start - 0.16f, 0.97f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            // Dikeyde köşe kavsinin üst kısmına biraz taşar (kavse hafifçe döner).
+            val band = maxOf(w * 3f / hPx, rr * wPx * 0.35f / hPx).coerceIn(0.02f, 0.14f)
             fun line(alpha: Float, width: Float, start: Float) {
                 val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
                     intArrayOf(tint(alpha), 0, 0, tint(alpha)), floatArrayOf(0f, band, 1f - band, 1f), android.graphics.Shader.TileMode.CLAMP)
