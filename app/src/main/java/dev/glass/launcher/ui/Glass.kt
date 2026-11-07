@@ -1035,12 +1035,8 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
             p.shader = null
         }
         p.style = android.graphics.Paint.Style.STROKE
-        if (material && !rimOnly) {
-            val mw = minOf(wPx, hPx) * 0.014f
-            // Koyu kenar biraz daha silik (kullanıcı isteği: önceden 0x09 / 0x0D).
-            p.color = 0x07000000; p.strokeWidth = mw * 4f; c.drawPath(path, p)
-            p.color = 0x0A000000; p.strokeWidth = mw * 1.6f; c.drawPath(path, p)
-        }
+        // Kenardaki koyu iç gölge kaldırıldı: beyaz simgelerde içte etrafı saran gri bir çerçeve gibi görünüyordu
+        // (iOS simgelerinde yok).
         // Kenar parıltısı (iOS 26 App Store simgesinden ölçüldü): üst kenarda simge renginden ~%35 parlak, hafif
         // camgöbeği-beyaz, ~2 px kalın ve içeri doğru yumuşakça sönen ışık; altta aynısı üsttekinin ~%60'ı.
         // Kenar ortasında (genişliğin ~%22–80'i) parlak, köşelerde yok.
