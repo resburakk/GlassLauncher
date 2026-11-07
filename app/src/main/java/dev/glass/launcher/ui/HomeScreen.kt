@@ -414,7 +414,7 @@ fun HomeScreen(
     val statusTopDp = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
     // Ana ekran ölçüleri (klasör, arama ve arşiv katmanları da aynı simge boyutunu kullanır).
     val homeMetrics = if (rootSize.width > 0) with(density) {
-        HomeMetrics.compute(rootSize.width.toDp(), rootSize.height.toDp(), statusTopDp, settings, navButtonsDp())
+        HomeMetrics.compute(rootSize.width.toDp(), rootSize.height.toDp(), statusTopDp, settings, navButtonsDp(), cutoutLeftDp(), cutoutRightDp())
     } else null
     val topInsetPx = WindowInsets.statusBars.getTop(density)
     val topZonePx = topInsetPx + with(density) { 72.dp.toPx() }

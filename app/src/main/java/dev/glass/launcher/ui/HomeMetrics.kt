@@ -4,6 +4,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.tappableElement
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.min
@@ -58,6 +59,8 @@ data class HomeMetrics(
     val dockLen: Dp = 0.dp,
     /** Simge dizisinin ve arama hapının yerleştiği alanın genişliği (yatayda dock'un solu). */
     val contentW: Dp = 0.dp,
+    /** Bu alanın sol kenarı (yatayda kamera deliği soldaysa onun sağı). */
+    val contentX: Dp = 0.dp,
 ) {
     val perPage: Int get() = columns * rows
 
@@ -90,12 +93,15 @@ data class HomeMetrics(
          * @param statusTop durum çubuğu yüksekliği; ilk satır en az bunun biraz altında başlar
          * @param navButtons üç tuşlu gezinti çubuğunun yüksekliği (hareketle gezintide 0): dock onun üstünde durur
          */
-        fun compute(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp = 0.dp): HomeMetrics {
+        fun compute(
+            width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp = 0.dp,
+            cutLeft: Dp = 0.dp, cutRight: Dp = 0.dp,
+        ): HomeMetrics {
             // Yatayda ölçüler ekranın kısa kenarına göre (dikeydeki genişlik): yoksa simgeler ve dock iki kat büyüyüp
             // ekranı kaplıyordu.
             val ref = min(width, height)
             val u = pt(ref)
-            if (width > height * 1.1f) return landscape(width, height, statusTop, s, navButtons, u)
+            if (width > height * 1.1f) return landscape(width, height, statusTop, s, navButtons, u, cutLeft, cutRight)
             val cols = s.columns
             val f = 4f / cols
 
@@ -149,7 +155,10 @@ data class HomeMetrics(
          * alanda; sütun sayısı alana göre artar (sığdığı kadar, en çok 8), satırlar yüksekliğe sığdığı kadar. Arama hapı
          * simge alanının altında ortada. Ölçüler dikeydeki genişliğe (kısa kenar) göre.
          */
-        private fun landscape(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp, u: Dp): HomeMetrics {
+        private fun landscape(
+            width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp, u: Dp,
+            cutLeft: Dp, cutRight: Dp,
+        ): HomeMetrics {
             val pc = s.columns
             val f = 4f / pc
             val basePitchX = u * 92f * f
@@ -160,17 +169,19 @@ data class HomeMetrics(
             val dockT = dockIcon * 1.62f * s.dockHeight
             val dockInset = (dockT - dockIcon) / 2f
             val sideGap = u * (s.dockBottom * 0.8f).coerceAtLeast(8f)
-            val dockLeft = width - sideGap - dockT
+            // Kamera deliği yatayda yan kenara düşer: o taraftaki öğeler deliğin içine girmesin.
+            val dockLeft = width - max(sideGap, cutRight + u * 4f) - dockT
+            val gridX = if (cutLeft > 0.dp) cutLeft + u * 2f else 0.dp
             val top = statusTop + u * 8f
             val bottomGap = max(u * 10f, navButtons + u * 6f)
             val dockLen = height - top - bottomGap
             val dockPitch = max((dockLen - dockInset * 2f - dockIcon) / 3f, dockIcon + 2.dp)
 
-            val gridW = dockLeft - u * 6f
+            val gridW = dockLeft - u * 6f - gridX
             val wantPitch = basePitchX * s.hSpacing
             val cols = (((gridW - icon - u * 24f) / wantPitch).toInt() + 1).coerceIn(pc, 8)
             val pitchX = max(min((gridW - icon - u * 24f) / (cols - 1).coerceAtLeast(1).toFloat(), wantPitch * 1.5f), icon + 2.dp)
-            val marginX = (gridW - icon - pitchX * (cols - 1).toFloat()) / 2f
+            val marginX = gridX + (gridW - icon - pitchX * (cols - 1).toFloat()) / 2f
 
             val pillW = u * 77f * s.pillScale
             val pillH = u * 29f * s.pillScale
@@ -188,10 +199,26 @@ data class HomeMetrics(
                 u, cols, rows, icon, pitchX, pitchY, marginX, firstTop, gridBottom,
                 dockT, dockMarginX, top, dockIcon, dockPitch, dockInset, dockCornerR,
                 pillW, pillH, pillCenterY,
-                dockVertical = true, dockLeft = dockLeft, dockLen = dockLen, contentW = gridW,
+                dockVertical = true, dockLeft = dockLeft, dockLen = dockLen, contentW = gridW, contentX = gridX,
             )
         }
     }
+}
+
+/** Ekran kesiği (kamera deliği) sol kenardaysa genişliği; yatay düzende simgeler ondan uzak durur. */
+@androidx.compose.runtime.Composable
+fun cutoutLeftDp(): Dp {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    val dir = androidx.compose.ui.platform.LocalLayoutDirection.current
+    return with(d) { WindowInsets.displayCutout.getLeft(this, dir).toDp() }
+}
+
+/** Ekran kesiği (kamera deliği) sağ kenardaysa genişliği; yatay düzende dock ondan uzak durur. */
+@androidx.compose.runtime.Composable
+fun cutoutRightDp(): Dp {
+    val d = androidx.compose.ui.platform.LocalDensity.current
+    val dir = androidx.compose.ui.platform.LocalLayoutDirection.current
+    return with(d) { WindowInsets.displayCutout.getRight(this, dir).toDp() }
 }
 
 /**

@@ -147,7 +147,7 @@ internal fun HomeContent(
     val statusTop = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
     val navBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val m = HomeMetrics.compute(maxWidth, maxHeight, statusTop, settings, navButtonsDp())
+        val m = HomeMetrics.compute(maxWidth, maxHeight, statusTop, settings, navButtonsDp(), cutoutLeftDp(), cutoutRightDp())
         val firstTopPx = with(density) { m.firstTop.toPx() }
         val motion = LocalMotion.current
         val view = LocalView.current
@@ -716,9 +716,9 @@ internal fun HomeContent(
             // Hap: simge dizisinin altı ile dock'un üstü arasında tam ortada.
             Box(
                 Modifier
+                    .offset(x = m.contentX, y = m.pillCenterY - m.pillH / 2f)
                     .width(m.contentW)
-                    .height(m.pillH)
-                    .offset(y = m.pillCenterY - m.pillH / 2f),
+                    .height(m.pillH),
                 contentAlignment = Alignment.Center,
             ) {
                 Row(Modifier.graphicsLayer { alpha = dotsAlpha }) {
