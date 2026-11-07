@@ -68,12 +68,16 @@ data class HomeMetrics(
     val widgetBleed: Dp get() = icon * 0.055f
 
     /** [spanX]×[spanY] hücrelik widget'ın boyutu (simge kenarları + iOS taşma payı). */
-    fun widgetWidth(spanX: Int): Dp = pitchX * (spanX - 1) + icon + widgetBleed * 2f
+    /** Widget adımı: yatayda sütunlar seyrek, satırlar sık; widget satıra sığsın ve oranı bozulmasın diye küçüğü alınır. */
+    val widgetStep: Dp get() = if (dockVertical) minOf(pitchX, pitchY) else pitchX
+    fun widgetWidth(spanX: Int): Dp = widgetStep * (spanX - 1) + icon + widgetBleed * 2f
+    /** Yatayda widget kendi sütun alanından dar kalır; alanın ortasına kaydırma payı. */
+    fun widgetShiftX(spanX: Int): Dp = (pitchX - widgetStep) * (spanX - 1) / 2f
     /**
      * Yükseklik yatay adımla hesaplanır: iOS'ta küçük widget tam karedir, büyük widget iki küçük + bir boşluk
      * kadardır. Satırlar daha seyrek olduğundan kalan yer widget'ın altındaki ada kalır (iOS gibi).
      */
-    fun widgetHeight(spanY: Int): Dp = pitchX * (spanY - 1) + icon + widgetBleed * 2f
+    fun widgetHeight(spanY: Int): Dp = widgetStep * (spanY - 1) + icon + widgetBleed * 2f
 
     companion object {
         /** Referans ekran genişliği (pt). */

@@ -119,7 +119,11 @@ fun SearchOverlay(
 
     val view = LocalView.current
     val imeVisible by rememberUpdatedState(WindowInsets.isImeVisible)
+    // Yatayda klavye ekranın çoğunu kaplar: açılışta klavye kendiliğinden açılmaz (öneriler görünsün);
+    // kutuya dokununca açılır ve öneriler yer açmak için gizlenir.
+    val landscape = LocalConfiguration.current.let { it.screenWidthDp > it.screenHeightDp }
     LaunchedEffect(Unit) {
+        if (landscape) return@LaunchedEffect
         // Kutu ekranın altında; yerleşim tamamlanınca odaklanıp klavyeyi aç. Klavye gelmezse birkaç kez
         // yeniden istenir (bazı cihaz/klavyelerde ilk istek yok sayılabiliyor).
         delay(80)
@@ -206,7 +210,7 @@ fun SearchOverlay(
             Spacer(Modifier.height(12.dp))
             // iOS 26: öneriler yukarıdan aşağı yumuşakça iner (açılışta), kapanırken yukarı çekilir.
             val dropPx = with(LocalDensity.current) { 56.dp.toPx() }
-            Column(Modifier.graphicsLayer {
+            if (!(landscape && imeVisible)) Column(Modifier.graphicsLayer {
                 val v = visibility().coerceIn(0f, 1f)
                 val e = 1f - (1f - v) * (1f - v) // yavaşlayarak yerine oturur
                 translationY = -(1f - e) * dropPx + rb.value

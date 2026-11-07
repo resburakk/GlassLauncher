@@ -430,7 +430,13 @@ fun FolderOverlay(
                 val px = (c.maxWidth - panel.width) / 2
                 val py = (c.maxHeight - panel.height) / 2
                 panel.place(px, py)
-                title.place((c.maxWidth - title.width) / 2, (py - gap - title.height).coerceAtLeast(0))
+                val above = py - gap - title.height
+                if (c.maxWidth > c.maxHeight && above < (u * 30f).roundToPx() && px - gap - title.width > 0) {
+                    // Yatay: panelin üstünde yer yok (ad durum çubuğuna giriyordu); ad panelin soluna, üst hizasına.
+                    title.place(px - gap - title.width, py + (u * 14f).roundToPx())
+                } else {
+                    title.place((c.maxWidth - title.width) / 2, above.coerceAtLeast(0))
+                }
             }
         }
     }

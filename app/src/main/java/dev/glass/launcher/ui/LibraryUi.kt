@@ -611,16 +611,20 @@ fun LibraryGroupOverlay(
         val side = u * 29f
         // Simgeler ana ekranla aynı boyutta (4 sütuna sığmazsa küçülür).
         val icon = minOf(LocalHomeMetrics.current?.icon ?: (u * 64f), (maxWidth - side * 2f) / 4.6f)
+        // Yatayda (geniş alan) sütun sayısı alana göre artar; yoksa aralık çok açılıyor ve kenar payı eksiye düşüp
+        // uygulama çöküyordu ("Padding must be non-negative").
+        val wantPitch = icon * 1.45f
+        val cols = if (maxWidth > maxHeight * 1.1f) (((maxWidth - side * 2f - icon) / wantPitch).toInt() + 1).coerceIn(4, 10) else 4
         // iOS'ta ilk ve son sütundaki simgelerin dış kenarı kenar boşluğuna hizalı: sütunlar buna göre yayılır.
-        val pitch = (maxWidth - side * 2f - icon) / 3f
-        val gridSide = side + icon / 2f - pitch / 2f
+        val pitch = (maxWidth - side * 2f - icon) / (cols - 1).toFloat()
+        val gridSide = (side + icon / 2f - pitch / 2f).coerceAtLeast(0.dp)
         val rowH = maxOf(u * 100.6f, icon + u * 34f)
         val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         // iOS gibi esnek: başta/sonda çekmeye devam edince öğeler direnç artarak kayar (ızgaranın kendisi değil).
         val rb = rememberRubberBand()
         rb.extent = constraints.maxHeight.toFloat().coerceAtLeast(1f)
         LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
+            columns = GridCells.Fixed(cols),
             contentPadding = PaddingValues(start = gridSide, end = gridSide, bottom = navBottom + u * 24f),
             modifier = Modifier.fillMaxSize().nestedScroll(rb.connection),
         ) {
