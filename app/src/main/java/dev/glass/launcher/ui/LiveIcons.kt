@@ -143,10 +143,14 @@ private fun LiveCalendar(p: LivePalette) {
         val dayStyle = TextStyle(
             color = p.calRed, fontFamily = AppFont, fontWeight = FontWeight.SemiBold,
             fontSize = (s * 0.165f).toSp(), letterSpacing = 0.sp,
+            // iOS 26: gün adının altında çok hafif gölge (kabartma hissi).
+            shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.10f), Offset(0f, s * 0.008f), s * 0.02f),
         )
         val dateStyle = TextStyle(
             color = p.calInk, fontFamily = AppFont, fontWeight = FontWeight.Medium,
             fontSize = (s * 0.50f).toSp(), letterSpacing = (-0.02f * s).toSp(),
+            // iOS 26 Takvim simgesi (ölçüldü): rakamın altında yumuşak, biraz aşağı kaymış gölge; rakam yüzeyden kalkık durur.
+            shadow = androidx.compose.ui.graphics.Shadow(Color.Black.copy(alpha = 0.20f), Offset(0f, s * 0.014f), s * 0.035f),
         )
         val d = measurer.measure(day, dayStyle)
         val n = measurer.measure(date, dateStyle)
