@@ -180,6 +180,9 @@ class MainActivity : ComponentActivity(), WidgetRequester {
     }
 
     override fun onResume() {
+        // Ana ekrana dönünce yön ayarı yeniden uygulanır (yatay bir uygulamadan dönünce ana ekran yatay kalmasın).
+        requestedOrientation = if (vm.settings.value.allowRotation) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onResume()
         applyNavHandle()
         // Launcher varsayılan ana ekran yapılınca kısayollar okunabilir hale gelir; ön plana her gelişte tazele.

@@ -80,7 +80,10 @@ data class HomeMetrics(
          * @param navButtons üç tuşlu gezinti çubuğunun yüksekliği (hareketle gezintide 0): dock onun üstünde durur
          */
         fun compute(width: Dp, height: Dp, statusTop: Dp, s: LauncherSettings, navButtons: Dp = 0.dp): HomeMetrics {
-            val u = pt(width)
+            // Yatayda ölçüler ekranın kısa kenarına göre (dikeydeki genişlik): yoksa simgeler ve dock iki kat büyüyüp
+            // ekranı kaplıyordu.
+            val ref = min(width, height)
+            val u = pt(ref)
             val cols = s.columns
             val f = 4f / cols
 
@@ -100,7 +103,7 @@ data class HomeMetrics(
             val dockIcon = (u * 65f * s.iconScale).coerceAtMost(u * 90f * 0.96f)
             val dockH = dockIcon * 1.62f * s.dockHeight
             val dockInset = (dockH - dockIcon) / 2f
-            val dockMarginX = (u * 16.5f + width * (1f - s.dockWidth) * 0.5f).coerceAtLeast(4.dp)
+            val dockMarginX = (u * 16.5f + ref * (1f - s.dockWidth) * 0.5f + (width - ref) / 2f).coerceAtLeast(4.dp)
             // Üç tuşlu gezintide dock tuş çubuğunun üstüne binmez: çubuğun üstünde küçük bir boşlukla durur.
             val dockBottom = if (navButtons > 0.dp) max(u * s.dockBottom, navButtons + u * 8f) else u * s.dockBottom
             val dockTop = height - dockBottom - dockH
