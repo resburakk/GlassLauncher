@@ -1041,44 +1041,34 @@ private fun Modifier.cachedGlassOverlay(shape: Shape, rimGlow: Float, rimWidth: 
         // camgöbeği-beyaz, ~2 px kalın ve içeri doğru yumuşakça sönen ışık; altta aynısı üsttekinin ~%60'ı.
         // Kenar ortasında (genişliğin ~%22–80'i) parlak, köşelerde yok.
         if (rimGlow > 0.01f && rimPx > 0.05f) {
-            // Simge: iOS ölçüsü (%50). Widget/dock: önceki ince, soluk kenar (%30, hale yok).
-            // Simgelerde parıltı çizgisi çok hafif, neredeyse fark edilmez (kullanıcı isteği; önceden %50).
-            // iOS 26 simgeleri: alt kenarda belirgin beyaz bir parlaklık (üsttekinden güçlü), köşelere kadar uzanır.
-            // Telefonda (Honor) önceki değerler hiç görünmüyordu; iOS ekran görüntüsüyle karşılaştırılıp artırıldı.
-            // Simgelerde iOS gibi neredeyse fark edilmeyen ince çizgi; widget/dock'ta altta belirgin.
-            // Simge: üstteki çizgi alttakiyle AYNI (kullanıcı isteği). Widget/dock: üst hafif, alt belirgin.
-            // Kullanıcı isteği (simge ve widget'ların hepsi): ince beyaz çizgi YALNIZCA üst ve alt kenarda, ikisi aynı;
-            // kenarın ortasında en kalın, sağa sola doğru incelerek köşelere varmadan söner (köşe kavsine dönmez).
-            // Parlaklık ve en kalın yer önceki sürümle aynı (kullanıcı: "şu anki kalınlıkta, daha kalın olmasın").
-            // Simgelerde de widget'larla aynı parlaklık (önceki %18 telefonda hiç görünmüyordu).
-            val a = ((if (material) 0.50f else 0.52f) * rimGlow).coerceIn(0f, 1f)
-            fun tint(x: Float) = android.graphics.Color.argb((x * 255).toInt(), 235, 248, 255)
-            val w = if (material) (minOf(wPx, hPx) * 0.012f * (rimPx / (1.2f * density)).coerceIn(0.3f, 2.5f)).coerceIn(1.2f, 4f * density)
-                else (0.8f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1f)
-            // Köşe kavsi bitmeden (yarıçap kadar içeride) tamamen söner; ortaya doğru artar.
+            // iOS 26 ölçümü (simge ve widget): üst ve alt kenarda ~1 dp ince, beyazımsı yarı saydam çizgi (altındaki rengin
+            // açık tonu gibi görünür), şekli izleyip köşe kavislerine kadar uzanır ve yan kenarlarda söner. Simgelerde ayrıca
+            // üst kenarın hemen altında çok hafif bir aydınlık. Abartısız.
+            val a = ((if (material) 0.38f else 0.45f) * rimGlow).coerceIn(0f, 1f)
+            fun tint(x: Float) = android.graphics.Color.argb((x * 255).toInt(), 255, 255, 255)
+            val w = (1.0f * density * (rimPx / (1.2f * density)).coerceIn(0.4f, 2.5f)).coerceAtLeast(1.5f)
             val rr = (shapeRadiusPx(shape, Size(wPx.toFloat(), hPx.toFloat()), layoutDirection, this) / wPx).coerceIn(0.08f, 0.32f)
-            // Kenarın büyük kısmında tam parlak; yalnızca uçlara yakın %16'lık bölümde söner (önceki sürüm ortadan itibaren
-            // sönüyordu, çizgi çok kısa görünüyordu).
-            // Kullanıcı isteği: ortada belirgin; sağa sola doğru çok hafifleyerek köşelere kadar gelir ve köşe kavsine biraz
-            // döner (uçta ~%15 parlaklık, en uçta söner).
-            val faint = 0x26000000
-            fun taper(start: Float) = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f,
-                intArrayOf(0, faint, android.graphics.Color.BLACK, android.graphics.Color.BLACK, faint, 0),
-                floatArrayOf(0f, 0.03f, start + 0.16f, 1f - start - 0.16f, 0.97f, 1f), android.graphics.Shader.TileMode.CLAMP)
-            // Dikeyde köşe kavsinin üst kısmına biraz taşar (kavse hafifçe döner).
-            val band = maxOf(w * 3f / hPx, rr * wPx * 0.35f / hPx).coerceIn(0.02f, 0.14f)
-            fun line(alpha: Float, width: Float, start: Float) {
-                val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
-                    intArrayOf(tint(alpha), 0, 0, tint(alpha)), floatArrayOf(0f, band, 1f - band, 1f), android.graphics.Shader.TileMode.CLAMP)
-                p.shader = android.graphics.ComposeShader(vert, taper(start), android.graphics.PorterDuff.Mode.DST_IN)
-                p.strokeWidth = width
-                c.drawPath(path, p)
+            // Yatayda köşelere kadar (uçta ~%55), dikeyde köşe kavsinin yarısına kadar iner, yanlarda söner.
+            val ends = 0x8C000000.toInt()
+            val taper = android.graphics.LinearGradient(0f, 0f, wPx.toFloat(), 0f,
+                intArrayOf(ends, android.graphics.Color.BLACK, android.graphics.Color.BLACK, ends),
+                floatArrayOf(0f, rr, 1f - rr, 1f), android.graphics.Shader.TileMode.CLAMP)
+            val band = (rr * wPx * 0.6f / hPx).coerceIn(0.03f, 0.2f)
+            val vert = android.graphics.LinearGradient(0f, 0f, 0f, hPx.toFloat(),
+                intArrayOf(tint(a), tint(a * 0.35f), 0, 0, tint(a * 0.35f), tint(a)),
+                floatArrayOf(0f, band * 0.5f, band, 1f - band, 1f - band * 0.5f, 1f), android.graphics.Shader.TileMode.CLAMP)
+            p.shader = android.graphics.ComposeShader(vert, taper, android.graphics.PorterDuff.Mode.DST_IN)
+            p.strokeWidth = w * 2f // yarısı şeklin içinde (~1 dp görünür)
+            c.drawPath(path, p)
+            p.shader = null
+            if (material) {
+                // Üstten çok hafif aydınlatma: simge renginin üst kısmı birkaç ton açık başlar.
+                p.style = android.graphics.Paint.Style.FILL
+                p.shader = android.graphics.LinearGradient(0f, 0f, 0f, hPx * 0.28f, intArrayOf(tint(0.07f * rimGlow.coerceAtMost(1.5f)), 0), null, android.graphics.Shader.TileMode.CLAMP)
+                c.drawRect(0f, 0f, wPx.toFloat(), hPx * 0.28f, p)
+                p.shader = null
+                p.style = android.graphics.Paint.Style.STROKE
             }
-            // Ortada önceki kalınlık (w×2), uçlara doğru yarı kalınlığa iner ve söner: kısa kalın + uzun ince çizgi.
-            // Simgelerde çizgi köşelere biraz daha yakın uzanır (kullanıcı isteği); widget'lar aynı kalır.
-            val st0 = if (material) rr * 0.28f else rr * 0.55f
-            line(a, w * 2f, st0 + 0.05f)
-            line(a, w * 1f, st0)
         }
         bmp.prepareToDraw()
         bmp.asImageBitmap()
