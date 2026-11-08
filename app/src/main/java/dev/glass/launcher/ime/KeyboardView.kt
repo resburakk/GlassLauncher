@@ -48,6 +48,8 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         fun pickSuggestion(i: Int)
         /** Kaydırarak yazma: parmağın geçtiği harfler; büyük harfle başlasın mı. */
         fun swipeWord(path: String, capital: Boolean)
+        /** İmleç taşıma (iPhone'daki boşluk tuşu dokunmatik yüzeyi): yatay/dikey adım. */
+        fun moveCursor(dx: Int, dy: Int)
         /** Emoji paneli (Android'in tam emoji seçicisi) açılır/kapanır. */
         fun showEmoji(show: Boolean)
     }
@@ -101,6 +103,12 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     var navInset = 0
         set(v) { field = v; requestLayout() }
 
+    // iPhone: boşluk tuşunu basılı tut → klavye dokunmatik yüzey olur, parmağı kaydırınca imleç gider.
+    private var trackpad = false
+    private var tpX = 0f; private var tpY = 0f
+    private val startTrackpad = Runnable {
+        if (pressed?.code == Code.Space) { trackpad = true; tpX = downX; tpY = downY; tick(); invalidate() }
+    }
     private var swiping = false
     private val trail = ArrayList<Float>()
     private val swipePath = StringBuilder()
@@ -361,6 +369,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         fill.color = col
         c.drawRoundRect(rr, radius, radius, fill)
 
+        if (trackpad) return
         val cx = rr.centerX(); val cy = rr.centerY()
         val onBlue = k.code == Code.Return && host.returnIsAction()
         text.color = if (onBlue) 0xFFFFFFFF.toInt() else if (k.code == Code.Shift && shift != Shift.Off) 0xFF111111.toInt() else colTxt
@@ -518,10 +527,21 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
                 when (k.code) {
                     Code.Delete -> { host.deleteBack(); repeating = true; handler.postDelayed(repeatDelete, cfg.longPressMs.toLong()) }
                     Code.Globe -> handler.postDelayed(longGlobe, cfg.longPressMs.toLong())
+                    Code.Space -> handler.postDelayed(startTrackpad, cfg.longPressMs.toLong())
                     else -> {}
                 }
             }
             MotionEvent.ACTION_MOVE -> {
+                if (trackpad) {
+                    val stepX = dp(9f); val stepY = dp(22f)
+                    val sx = ((e.x - tpX) / stepX).toInt(); val sy = ((e.y - tpY) / stepY).toInt()
+                    if (sx != 0 || sy != 0) {
+                        host.moveCursor(sx, sy)
+                        tpX += sx * stepX; tpY += sy * stepY
+                        if (host.haptics() && sx != 0) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    }
+                    return true
+                }
                 val k = pressed ?: return true
                 // Kaydırarak yazma: harf tuşundan başlayıp bir tuş genişliğinden fazla kayınca iz çizilir.
                 if (cfg.swipe && page == Page.Letters && k.code == Code.Char && !swiping &&
@@ -543,7 +563,9 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
             MotionEvent.ACTION_UP -> {
                 val k = pressed
                 repeating = false; handler.removeCallbacks(repeatDelete); handler.removeCallbacks(longGlobe)
+                handler.removeCallbacks(startTrackpad)
                 pressed = null
+                if (trackpad) { trackpad = false; invalidate(); return true }
                 if (swiping) {
                     keyAt(e.x, e.y)?.takeIf { it.code == Code.Char }?.let { if (swipePath.last().toString() != it.label) swipePath.append(it.label) }
                     host.swipeWord(swipePath.toString(), shift != Shift.Off)
@@ -554,6 +576,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
+                handler.removeCallbacks(startTrackpad); trackpad = false
                 repeating = false; handler.removeCallbacks(repeatDelete); handler.removeCallbacks(longGlobe); pressed = null; invalidate()
             }
         }

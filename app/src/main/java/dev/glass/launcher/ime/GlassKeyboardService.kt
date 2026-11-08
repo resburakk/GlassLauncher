@@ -297,6 +297,12 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         view?.invalidate()
     }
 
+    override fun moveCursor(dx: Int, dy: Int) {
+        repeat(kotlin.math.abs(dx)) { sendDownUpKeyEvents(if (dx > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT) }
+        repeat(kotlin.math.abs(dy)) { sendDownUpKeyEvents(if (dy > 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP) }
+        lastCorr = null; lastSwipe = null
+    }
+
     override fun suggestions(): List<String> = sugg
     override fun boldSuggestion(): Int = bold
 
