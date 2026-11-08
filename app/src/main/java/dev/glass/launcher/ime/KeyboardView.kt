@@ -69,13 +69,13 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
     private var repeating = false
 
     // Ölçüler (iOS: tuş 43, aralık 6/11, köşe ~9)
-    private val barH = dp(44f)
-    private val keyH = dp(43f)
-    private val rowGap = dp(11f)
-    private val gapX = dp(6f)
+    private val barH = dp(40f)
+    private val keyH = dp(40f)
+    private val rowGap = dp(10f)
+    private val gapX = dp(5f)
     private val side = dp(3f)
     private val radius = dp(9f)
-    private val bottomH = dp(40f)
+    private val bottomH = dp(6f)
     var navInset = 0
         set(v) { field = v; requestLayout() }
 
@@ -149,7 +149,7 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
             Page.Symbols -> symbols()
             Page.Emoji -> emojiPage()
         }
-        bottomKeys = listOf(Key("globe", Code.Globe), Key("mic", Code.Mic))
+        bottomKeys = listOf(Key("mic", Code.Mic))
         layoutKeys()
     }
 
@@ -181,15 +181,14 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
             }
             y += keyH + rowGap
         }
-        val by = y - rowGap / 2f
-        bottomKeys[0].rect.set(dp(14f), by, dp(14f) + dp(48f), by + bottomH)
-        bottomKeys[1].rect.set(w - dp(62f), by, w - dp(14f), by + bottomH)
+        // Mikrofon üst şeridin sağında (alt satırda Android'in kendi dünya/kapat simgeleriyle üst üste biniyordu).
+        bottomKeys[0].rect.set(w - dp(52f), 0f, w - dp(8f), barH)
     }
 
     // ---------- Çizim ----------
-    private val colBg get() = if (dark) 0xF0202024.toInt() else 0xF5E7E9ED.toInt()
-    private val colKey get() = if (dark) 0xFF6B6B70.toInt() else 0xFFFFFFFF.toInt()
-    private val colFn get() = if (dark) 0xFF46464B.toInt() else 0xFFB9BEC7.toInt()
+    private val colBg get() = if (dark) 0xFF1B1B1E.toInt() else 0xFFE4E6EA.toInt()
+    private val colKey get() = if (dark) 0xFF5B5B60.toInt() else 0xFFFFFFFF.toInt()
+    private val colFn get() = if (dark) 0xFF3A3A3E.toInt() else 0xFFB4B9C2.toInt()
     private val colTxt get() = if (dark) 0xFFFFFFFF.toInt() else 0xFF111111.toInt()
     private val colSub get() = if (dark) 0x99EBEBF5.toInt() else 0x993C3C43.toInt()
     private val colShadow get() = if (dark) 0x80000000.toInt() else 0x47000000
@@ -200,11 +199,10 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
         // Cam panel: üst köşeler yuvarlak, üstte ince ışık çizgisi, hafif dikey ton.
         val r = dp(30f)
         val panel = Path().apply { addRoundRect(RectF(0f, 0f, w, h), floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f), Path.Direction.CW) }
+        fill.color = 0xFF000000.toInt() // gölgelerden kalan saydamlık zemine geçmesin
         fill.shader = LinearGradient(0f, 0f, 0f, h,
-            if (dark) intArrayOf(0xF22A2A2E.toInt(), colBg) else intArrayOf(0xF7F1F2F5.toInt(), colBg), null, Shader.TileMode.CLAMP)
+            if (dark) intArrayOf(0xFF26262A.toInt(), colBg) else intArrayOf(0xFFEEEFF2.toInt(), colBg), null, Shader.TileMode.CLAMP)
         c.drawPath(panel, fill); fill.shader = null
-        stroke.color = if (dark) 0x40FFFFFF else 0xCCFFFFFF.toInt(); stroke.strokeWidth = dp(1f)
-        c.save(); c.clipPath(panel); c.drawLine(r, dp(0.5f), w - r, dp(0.5f), stroke); c.restore()
 
         drawBar(c, w)
         rows.flatten().forEach { drawKey(c, it) }
@@ -220,7 +218,7 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
             text.textSize = dp(14.5f)
             val label = "Yapıştır: “" + chip.replace('\n', ' ').let { if (it.length > 28) it.take(27) + "…" else it } + "”"
             val tw = text.measureText(label) + dp(44f)
-            val cw = minOf(tw, w - dp(24f))
+            val cw = minOf(tw, w - dp(120f))
             val cy = barH / 2f + dp(2f)
             pasteRect.set(w / 2 - cw / 2, cy - dp(16f), w / 2 + cw / 2, cy + dp(16f))
             fill.color = if (dark) 0x26FFFFFF else 0xD9FFFFFF.toInt()
@@ -279,7 +277,7 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
             Code.Page123, Code.PageAbc, Code.PageSym -> { text.textSize = dp(16f); c.drawText(k.label, cx, cy + dp(5.5f), text) }
             else -> {
                 val s = display(k.label)
-                text.textSize = if (page == Page.Emoji) dp(26f) else if (s.length > 1) dp(16f) else dp(23f)
+                text.textSize = if (page == Page.Emoji) dp(24f) else if (s.length > 1) dp(16f) else dp(22f)
                 c.drawText(s, cx, cy + text.textSize * 0.36f, text)
             }
         }
@@ -291,29 +289,22 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
         // iOS balonu: tuşun üstüne taşan, biraz daha geniş kapsül; büyük harf.
         val rr = k.rect
         val bw = rr.width() + dp(18f)
-        val top = rr.top - dp(58f)
+        val top = maxOf(0f, rr.top - dp(48f))
         val bub = RectF(rr.centerX() - bw / 2, top, rr.centerX() + bw / 2, rr.top + dp(6f))
         fill.color = 0x40000000
         c.drawRoundRect(bub.left, bub.top + dp(2f), bub.right, bub.bottom + dp(2f), dp(12f), dp(12f), fill)
         fill.color = colKey
         c.drawRoundRect(bub, dp(12f), dp(12f), fill)
         c.drawRoundRect(rr.left, rr.top - dp(2f), rr.right, rr.bottom, radius, radius, fill)
-        text.color = colTxt; text.textSize = dp(34f)
-        c.drawText(display(k.label), bub.centerX(), bub.centerY() + dp(12f), text)
+        text.color = colTxt; text.textSize = dp(30f)
+        c.drawText(display(k.label), bub.centerX(), bub.top + dp(32f), text)
     }
 
     private fun drawBottom(c: Canvas) {
-        val g = bottomKeys[0].rect; val m = bottomKeys[1].rect
+        if (pressed?.let { it.code == Code.Char && rows.firstOrNull()?.contains(it) == true } == true) return // balon şeridin üstünde
+        val m = bottomKeys[0].rect
         stroke.color = colSub; stroke.strokeWidth = dp(1.6f)
-        // Dünya
-        val gx = g.centerX(); val gy = g.centerY(); val gr = dp(11f)
-        c.drawCircle(gx, gy, gr, stroke)
-        c.drawOval(gx - gr * 0.45f, gy - gr, gx + gr * 0.45f, gy + gr, stroke)
-        c.drawLine(gx - gr, gy, gx + gr, gy, stroke)
-        c.drawLine(gx - gr * 0.85f, gy - gr * 0.5f, gx + gr * 0.85f, gy - gr * 0.5f, stroke)
-        c.drawLine(gx - gr * 0.85f, gy + gr * 0.5f, gx + gr * 0.85f, gy + gr * 0.5f, stroke)
-        // Mikrofon
-        val mx = m.centerX(); val my = m.centerY()
+        val mx = m.centerX(); val my = m.centerY() + dp(1f)
         fill.color = colSub
         c.drawRoundRect(mx - dp(4.5f), my - dp(12f), mx + dp(4.5f), my + dp(3f), dp(4.5f), dp(4.5f), fill)
         val arc = RectF(mx - dp(9f), my - dp(9f), mx + dp(9f), my + dp(6f))

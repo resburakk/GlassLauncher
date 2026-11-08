@@ -1476,7 +1476,7 @@ private fun KeyboardPage() {
             ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker()
         }
     }
-    Footer("iOS 27 görünümlü klavye: Türkçe Q, 123 ve sembol sayfaları, emoji, büyük harf (iki dokunuşla kilit), basılı tutunca hızlı silme, son kopyalanan yazıyı tek dokunuşla yapıştırma. Dünya simgesi klavye değiştirir (basılı tutunca liste açılır), mikrofon sesle yazmaya geçer. Açık ve koyu mod telefonun temasını izler.")
+    Footer("iOS 27 görünümlü klavye: Türkçe Q, 123 ve sembol sayfaları, emoji, büyük harf (iki dokunuşla kilit), basılı tutunca hızlı silme, son kopyalanan yazıyı tek dokunuşla yapıştırma. Klavye değiştirmek için alttaki sistem dünya simgesini kullan; sağ üstteki mikrofon sesle yazmaya geçer. Açık ve koyu mod telefonun temasını izler.")
     Group("Ayarlar") {
         ToggleRow("Tuş titreşimi", haptics) { v -> haptics = v; prefs.edit().putBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_HAPTICS, v).apply() }
         RowDivider()
