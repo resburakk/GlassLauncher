@@ -20,6 +20,9 @@ import androidx.core.view.WindowInsetsCompat
 class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
 
     private var view: KeyboardView? = null
+    private var emojiPanel: android.widget.LinearLayout? = null
+    private var emojiBarView: KeyboardView? = null
+    private var picker: androidx.emoji2.emojipicker.EmojiPickerView? = null
     private var paste: String? = null
     private var dismissedClip: String? = null
 
@@ -28,12 +31,52 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     override fun onCreateInputView(): View {
         val v = KeyboardView(this, this)
         v.dark = isDark()
-        ViewCompat.setOnApplyWindowInsetsListener(v) { vv, ins ->
-            (vv as KeyboardView).navInset = ins.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        view = v
+        // Emoji paneli: Android'in tam emoji seçicisi (bütün emojiler, kategoriler, son kullanılanlar, ten rengi).
+        val themed = android.view.ContextThemeWrapper(this, android.R.style.Theme_DeviceDefault_DayNight)
+        val d = resources.displayMetrics.density
+        val pk = androidx.emoji2.emojipicker.EmojiPickerView(themed).apply {
+            emojiGridColumns = 8
+            setOnEmojiPickedListener { commit(it.emoji) }
+        }
+        picker = pk
+        val bar = KeyboardView(this, this, emojiBar = true).also { it.dark = isDark() }
+        emojiBarView = bar
+        val panel = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            visibility = View.GONE
+            addView(pk, android.widget.LinearLayout.LayoutParams(-1, (214 * d).toInt()))
+            addView(bar, android.widget.LinearLayout.LayoutParams(-1, -2))
+        }
+        emojiPanel = panel
+        styleEmojiPanel()
+        val root = android.widget.FrameLayout(this).apply {
+            addView(v, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.BOTTOM))
+            addView(panel, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.BOTTOM))
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, ins ->
+            val nb = ins.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            v.navInset = nb; bar.navInset = nb
             ins
         }
-        view = v
-        return v
+        return root
+    }
+
+    private fun styleEmojiPanel() {
+        val panel = emojiPanel ?: return
+        val d = resources.displayMetrics.density
+        val bg = view?.colBg ?: 0xFFE4E6EA.toInt()
+        panel.background = android.graphics.drawable.GradientDrawable().apply {
+            setColor(bg)
+            cornerRadii = floatArrayOf(30 * d, 30 * d, 30 * d, 30 * d, 0f, 0f, 0f, 0f)
+        }
+        panel.setPadding(0, (8 * d).toInt(), 0, 0)
+    }
+
+    override fun showEmoji(show: Boolean) {
+        emojiPanel?.visibility = if (show) View.VISIBLE else View.GONE
+        view?.visibility = if (show) View.INVISIBLE else View.VISIBLE
+        if (!show) view?.updateAutoCaps()
     }
 
     private fun isDark() = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
@@ -42,7 +85,7 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         super.onStartInputView(info, restarting)
         readClipboard()
         val v = view ?: return
-        v.dark = isDark()
+        v.dark = isDark(); emojiBarView?.dark = isDark(); styleEmojiPanel(); showEmoji(false)
         val cls = (info?.inputType ?: 0) and InputType.TYPE_MASK_CLASS
         v.reset(if (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE) KeyboardView.Page.Numbers else KeyboardView.Page.Letters)
     }

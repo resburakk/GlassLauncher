@@ -23,7 +23,7 @@ import java.util.Locale
  * Sayfalar: harfler (Türkçe Q), 123, #+=, emoji.
  */
 @SuppressLint("ViewConstructor")
-class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
+class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: Boolean = false) : View(ctx) {
 
     interface Host {
         fun commit(text: String)
@@ -38,6 +38,8 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
         fun returnIsAction(): Boolean
         fun autoCaps(): Boolean
         fun haptics(): Boolean
+        /** Emoji paneli (Android'in tam emoji seçicisi) açılır/kapanır. */
+        fun showEmoji(show: Boolean)
     }
 
     enum class Page { Letters, Numbers, Symbols, Emoji }
@@ -69,7 +71,7 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
     private var repeating = false
 
     // Ölçüler (iOS: tuş 43, aralık 6/11, köşe ~9)
-    private val barH = dp(40f)
+    private val barH = if (emojiBar) 0f else dp(40f)
     private val keyH = dp(40f)
     private val rowGap = dp(10f)
     private val gapX = dp(5f)
@@ -143,6 +145,11 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
         listOf(listOf(Key("ABC", Code.PageAbc, 1.25f, true)) + emojis.drop(24).map { Key(it) } + Key("⌫", Code.Delete, 1.25f, true))
 
     private fun build() {
+        if (emojiBar) {
+            // Emoji panelinin alt satırı: ABC, boşluk, sil.
+            rows = listOf(listOf(Key("ABC", Code.PageAbc, 1.5f, true), Key("boşluk", Code.Space, 6f), Key("⌫", Code.Delete, 1.5f, true)))
+            bottomKeys = emptyList(); layoutKeys(); return
+        }
         rows = when (page) {
             Page.Letters -> letters()
             Page.Numbers -> numbers()
@@ -155,7 +162,8 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
-        val h = (barH + dp(4f) + (keyH + rowGap) * 4 + bottomH).toInt() + navInset
+        val h = if (emojiBar) (dp(6f) + keyH + rowGap + bottomH).toInt() + navInset
+            else (barH + dp(4f) + (keyH + rowGap) * 4 + bottomH).toInt() + navInset
         setMeasuredDimension(w, h)
     }
 
@@ -166,7 +174,7 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
         val inner = w - side * 2
         // Birim: en kalabalık satırdaki (12 tuş) bir harf tuşunun genişliği.
         val unit = (inner - gapX * 11) / 12f
-        var y = barH + dp(4f)
+        var y = if (emojiBar) dp(6f) else barH + dp(4f)
         rows.forEachIndexed { ri, row ->
             val total = row.sumOf { it.w.toDouble() }.toFloat()
             var rowW = unit * total + gapX * (row.size - 1)
@@ -182,11 +190,11 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
             y += keyH + rowGap
         }
         // Mikrofon üst şeridin sağında (alt satırda Android'in kendi dünya/kapat simgeleriyle üst üste biniyordu).
-        bottomKeys[0].rect.set(w - dp(52f), 0f, w - dp(8f), barH)
+        bottomKeys.firstOrNull()?.rect?.set(w - dp(52f), 0f, w - dp(8f), barH)
     }
 
     // ---------- Çizim ----------
-    private val colBg get() = if (dark) 0xFF1B1B1E.toInt() else 0xFFE4E6EA.toInt()
+    val colBg get() = if (dark) 0xFF1B1B1E.toInt() else 0xFFE4E6EA.toInt()
     private val colKey get() = if (dark) 0xFF5B5B60.toInt() else 0xFFFFFFFF.toInt()
     private val colFn get() = if (dark) 0xFF3A3A3E.toInt() else 0xFFB4B9C2.toInt()
     private val colTxt get() = if (dark) 0xFFFFFFFF.toInt() else 0xFF111111.toInt()
@@ -198,15 +206,16 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
         val w = width.toFloat(); val h = height.toFloat()
         // Cam panel: üst köşeler yuvarlak, üstte ince ışık çizgisi, hafif dikey ton.
         val r = dp(30f)
-        val panel = Path().apply { addRoundRect(RectF(0f, 0f, w, h), floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f), Path.Direction.CW) }
+        val rr0 = if (emojiBar) 0f else r
+        val panel = Path().apply { addRoundRect(RectF(0f, 0f, w, h), floatArrayOf(rr0, rr0, rr0, rr0, 0f, 0f, 0f, 0f), Path.Direction.CW) }
         fill.color = 0xFF000000.toInt() // gölgelerden kalan saydamlık zemine geçmesin
         fill.shader = LinearGradient(0f, 0f, 0f, h,
-            if (dark) intArrayOf(0xFF26262A.toInt(), colBg) else intArrayOf(0xFFEEEFF2.toInt(), colBg), null, Shader.TileMode.CLAMP)
+            if (emojiBar) intArrayOf(colBg, colBg) else if (dark) intArrayOf(0xFF26262A.toInt(), colBg) else intArrayOf(0xFFEEEFF2.toInt(), colBg), null, Shader.TileMode.CLAMP)
         c.drawPath(panel, fill); fill.shader = null
 
-        drawBar(c, w)
+        if (!emojiBar) drawBar(c, w)
         rows.flatten().forEach { drawKey(c, it) }
-        drawBottom(c)
+        if (!emojiBar) drawBottom(c)
         pressed?.let { if (it.code == Code.Char && page != Page.Emoji) drawPreview(c, it) }
     }
 
@@ -437,8 +446,8 @@ class KeyboardView(ctx: Context, private val host: Host) : View(ctx) {
             Code.Return -> { host.action(); updateAutoCaps() }
             Code.Page123 -> { page = Page.Numbers; build() }
             Code.PageSym -> { page = Page.Symbols; build() }
-            Code.PageAbc -> { page = Page.Letters; build(); updateAutoCaps() }
-            Code.PageEmoji -> { page = Page.Emoji; build() }
+            Code.PageAbc -> if (emojiBar) host.showEmoji(false) else { page = Page.Letters; build(); updateAutoCaps() }
+            Code.PageEmoji -> host.showEmoji(true)
             Code.Globe -> host.switchKeyboard(false)
             Code.Mic -> host.voice()
         }
