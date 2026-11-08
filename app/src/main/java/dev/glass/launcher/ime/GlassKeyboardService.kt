@@ -114,9 +114,31 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         }
     }
 
+    /**
+     * Cam zemin: klavye penceresinin arkası gerçekten bulanıklaştırılır (Android 12+ pencere arkası bulanıklığı;
+     * ana ekrandaki duvar kâğıdı bulanıklığıyla aynı sistem özelliği). Cihaz/ayar desteklemiyorsa opak zemin.
+     */
+    private fun applyGlass() {
+        val w = window?.window ?: return
+        val wm = getSystemService(android.view.WindowManager::class.java)
+        val ok = cfg.glass && android.os.Build.VERSION.SDK_INT >= 31 && runCatching { wm.isCrossWindowBlurEnabled }.getOrDefault(false)
+        val d = resources.displayMetrics.density
+        runCatching {
+            if (ok) {
+                w.setBackgroundDrawable(android.graphics.drawable.GradientDrawable().apply {
+                    cornerRadius = 30 * d; setColor(android.graphics.Color.TRANSPARENT)
+                })
+                w.setBackgroundBlurRadius((36 * d).toInt())
+            } else if (android.os.Build.VERSION.SDK_INT >= 31) w.setBackgroundBlurRadius(0)
+        }
+        view?.glass = ok; emojiBarView?.glass = ok
+        emojiPanel?.background?.let { (it as? android.graphics.drawable.GradientDrawable)?.setColor(if (ok) (if (isDark()) 0xB01B1B1E.toInt() else 0xBDE4E6EA.toInt()) else (view?.colBg ?: 0)) }
+    }
+
     override fun onWindowShown() {
         super.onWindowShown()
         requestHighRefresh()
+        applyGlass()
         // Üst sıradaki harf balonu klavyenin üstüne taşabilsin: üst kapsayıcılar kırpmasın.
         var p = view?.parent
         while (p is android.view.ViewGroup) { p.clipChildren = false; p.clipToPadding = false; p = p.parent }

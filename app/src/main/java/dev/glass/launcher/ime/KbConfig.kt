@@ -9,6 +9,7 @@ import org.json.JSONObject
  */
 data class KbConfig(
     val theme: Int = 0,            // 0 otomatik, 1 açık, 2 koyu
+    val glass: Boolean = true,     // arkası bulanık cam zemin
     val autoCaps: Boolean = true,
     val capsLock: Boolean = true,
     val preview: Boolean = true,   // karakter önizleme (balon)
@@ -37,6 +38,7 @@ data class KbConfig(
             } ?: d.replacements
             return KbConfig(
                 theme = p.getInt("theme", d.theme),
+                glass = p.getBoolean("glass", d.glass),
                 autoCaps = p.getBoolean("autocaps", d.autoCaps),
                 capsLock = p.getBoolean("capsLock", d.capsLock),
                 preview = p.getBoolean("preview", d.preview),
@@ -57,7 +59,7 @@ data class KbConfig(
 
         fun save(ctx: Context, c: KbConfig) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putInt("theme", c.theme).putBoolean("autocaps", c.autoCaps).putBoolean("capsLock", c.capsLock)
+                .putInt("theme", c.theme).putBoolean("glass", c.glass).putBoolean("autocaps", c.autoCaps).putBoolean("capsLock", c.capsLock)
                 .putBoolean("preview", c.preview).putBoolean("periodShortcut", c.periodShortcut).putBoolean("smartPunct", c.smartPunct)
                 .putBoolean("sound", c.sound).putBoolean("haptics", c.haptics).putInt("hapticStrength", c.hapticStrength)
                 .putBoolean("dictation", c.dictation).putInt("oneHanded", c.oneHanded).putInt("height", c.height)

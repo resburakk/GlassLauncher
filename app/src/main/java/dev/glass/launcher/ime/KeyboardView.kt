@@ -64,6 +64,10 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     var dark = false
         set(v) { field = v; invalidate() }
 
+    /** Arkası gerçekten bulanık cam (pencere arkası bulanıklığı açıksa zemin yarı saydam çizilir). */
+    var glass = false
+        set(v) { field = v; invalidate() }
+
     /** Ayarlar (yükseklik, tek elle, önizleme, hassasiyet...). */
     var cfg = KbConfig()
         set(v) { field = v; build(); requestLayout(); invalidate() }
@@ -81,7 +85,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     // Ölçüler (iOS: tuş ~42, aralık 5/10, köşe ~9). Yükseklik ayara göre (kısa/normal/uzun).
     private val hScale get() = when (cfg.height) { 0 -> 0.88f; 2 -> 1.12f; else -> 1f }
     /** Üst şerit yalnızca yapıştır düğmesi varken açılır (yoksa boş duruyordu); kapalıyken ince bir pay kalır. */
-    private val barH get() = if (emojiBar) 0f else if (host.pasteChip() != null) dp(40f) else dp(10f)
+    private val barH get() = if (emojiBar) 0f else if (host.pasteChip() != null) dp(40f) else dp(26f)
     private val keyH get() = dp(40f) * hScale
     private val rowGap get() = dp(10f) * hScale
     private val gapX = dp(5f)
@@ -233,7 +237,13 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         val panel = Path().apply { addRoundRect(RectF(0f, 0f, w, h), floatArrayOf(rr0, rr0, rr0, rr0, 0f, 0f, 0f, 0f), Path.Direction.CW) }
         fill.color = 0xFF000000.toInt() // gölgelerden kalan saydamlık zemine geçmesin
         fill.shader = LinearGradient(0f, 0f, 0f, h,
-            if (emojiBar) intArrayOf(colBg, colBg) else if (dark) intArrayOf(0xFF26262A.toInt(), colBg) else intArrayOf(0xFFEEEFF2.toInt(), colBg), null, Shader.TileMode.CLAMP)
+            when {
+                glass && dark -> intArrayOf(0x9E2A2A2E.toInt(), 0xB01B1B1E.toInt())
+                glass -> intArrayOf(0xA8F4F5F8.toInt(), 0xBDE4E6EA.toInt())
+                emojiBar -> intArrayOf(colBg, colBg)
+                dark -> intArrayOf(0xFF26262A.toInt(), colBg)
+                else -> intArrayOf(0xFFEEEFF2.toInt(), colBg)
+            }, null, Shader.TileMode.CLAMP)
         c.drawPath(panel, fill); fill.shader = null
 
         if (!emojiBar) drawBar(c, w)
@@ -323,7 +333,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         val rr = k.rect
         val bw = rr.width() + dp(18f)
         // Üst sıranın balonu klavyenin üstüne taşabilir (üst pencere kırpmıyor).
-        val top = rr.top - dp(48f)
+        val top = maxOf(dp(1f), rr.top - dp(48f))
         val bub = RectF(rr.centerX() - bw / 2, top, rr.centerX() + bw / 2, rr.top + dp(6f))
         fill.color = 0x40000000
         c.drawRoundRect(bub.left, bub.top + dp(2f), bub.right, bub.bottom + dp(2f), dp(12f), dp(12f), fill)

@@ -1489,6 +1489,8 @@ private fun KeyboardPage() {
         Text("Tema", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         Chips(listOf("Otomatik", "Açık", "Koyu"), c.theme) { set(c.copy(theme = it)) }
         RowDivider()
+        ToggleRow("Cam zemin (arkası bulanık)", c.glass, default = true) { set(c.copy(glass = it)) }
+        RowDivider()
         Text("Klavye yüksekliği", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         Chips(listOf("Kısa", "Normal", "Uzun"), c.height) { set(c.copy(height = it)) }
         RowDivider()
