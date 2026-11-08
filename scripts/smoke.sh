@@ -511,6 +511,21 @@ adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
 adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
 shot 29b-simge-paketi
 
+# 29k) Glass Klavye: etkinleştirilir, Ayarlar > Klavye'deki deneme alanında açık ve koyu modda görüntülenir.
+adb shell ime enable dev.glass.launcher/.ime.GlassKeyboardService >/dev/null 2>&1
+adb shell ime set dev.glass.launcher/.ime.GlassKeyboardService >/dev/null 2>&1
+adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3
+adb shell input swipe 540 1900 540 700 300; adb shell input swipe 540 1900 540 700 300; step "kaydır" 1
+tap_text "Klavye" && step "klavye sayfası" 2
+tap_text "Buraya yazarak klavyeyi dene" && step "klavye açıldı" 2
+adb shell input text "Merhaba" ; step "yazıldı" 1
+shot 29k-klavye-acik
+adb shell cmd uimode night yes; step "koyu mod" 3
+tap_text "Merhaba" && step "klavye" 2
+shot 29l-klavye-koyu
+adb shell cmd uimode night no; step "açık mod" 2
+adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+
 # 30) Dinamik Ada: izin verilir, Ayarlar > Dinamik Ada'dan açılır; boşta, mesajda ve şarjda görüntülenir.
 adb shell appops set dev.glass.launcher SYSTEM_ALERT_WINDOW allow || true
 adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3

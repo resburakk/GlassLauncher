@@ -146,6 +146,7 @@ private enum class SettingsPage(val title: String, val glyph: Glyph, val color: 
     Gestures("Hareketler", Glyph.Grid, Color(0xFF30D158)),
     Widgets("Widget'lar", Glyph.Widget, Color(0xFFFF375F)),
     Island("Dinamik Ada", Glyph.Widget, Color(0xFF1C1C1E)),
+    Keyboard("Klavye", Glyph.Grid, Color(0xFF8E8E93)),
     Library("Uygulama Arşivi", Glyph.Grid, Color(0xFFBF5AF2)),
     Privacy("Gizli ve Kilitli Uygulamalar", Glyph.Lock, Color(0xFF5856D6)),
     Backup("Yedekleme ve Geri Yükleme", Glyph.Folder, Color(0xFF8E8E93)),
@@ -266,6 +267,7 @@ fun SettingsScreen(
                         SettingsPage.Gestures -> GesturesPage(s, onChange)
                         SettingsPage.Widgets -> WidgetsPage(s, onChange, onAddWidget)
                         SettingsPage.Island -> IslandPage()
+                        SettingsPage.Keyboard -> KeyboardPage()
                         SettingsPage.Library -> LibraryPageSettings(s, onChange)
                         SettingsPage.Privacy -> PrivacyPage(vm, s)
                         SettingsPage.Backup -> BackupPage(vm)
@@ -1455,6 +1457,40 @@ private fun StepRow(
 }
 
 /** Dinamik Ada: aç/kapat, izinler, konum ve boyut, etkinlikler, görünüm, davranış. Değişiklikler anında adaya yansır. */
+@Composable
+private fun KeyboardPage() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var tick by remember { mutableStateOf(0) }
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { tick++ }
+    val enabled = remember(tick) { dev.glass.launcher.ime.GlassKeyboardService.isEnabled(ctx) }
+    val selected = remember(tick) { dev.glass.launcher.ime.GlassKeyboardService.isSelected(ctx) }
+    val prefs = remember { ctx.getSharedPreferences(dev.glass.launcher.ime.GlassKeyboardService.PREFS, android.content.Context.MODE_PRIVATE) }
+    var haptics by remember { mutableStateOf(prefs.getBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_HAPTICS, true)) }
+    var autoCaps by remember { mutableStateOf(prefs.getBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_AUTOCAPS, true)) }
+    Group("Glass Klavye") {
+        ActionRow(if (enabled) "1. Klavye etkin ✓" else "1. Klavyeyi etkinleştir") {
+            runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
+        RowDivider()
+        ActionRow(if (selected) "2. Varsayılan klavye ✓" else "2. Varsayılan klavye yap") {
+            ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker()
+        }
+    }
+    Footer("iOS 27 görünümlü klavye: Türkçe Q, 123 ve sembol sayfaları, emoji, büyük harf (iki dokunuşla kilit), basılı tutunca hızlı silme, son kopyalanan yazıyı tek dokunuşla yapıştırma. Dünya simgesi klavye değiştirir (basılı tutunca liste açılır), mikrofon sesle yazmaya geçer. Açık ve koyu mod telefonun temasını izler.")
+    Group("Ayarlar") {
+        ToggleRow("Tuş titreşimi", haptics) { v -> haptics = v; prefs.edit().putBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_HAPTICS, v).apply() }
+        RowDivider()
+        ToggleRow("Otomatik büyük harf", autoCaps) { v -> autoCaps = v; prefs.edit().putBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_AUTOCAPS, v).apply() }
+    }
+    Group("Dene") {
+        var t by remember { mutableStateOf("") }
+        androidx.compose.material3.TextField(
+            value = t, onValueChange = { t = it }, modifier = Modifier.fillMaxWidth(),
+            placeholder = { androidx.compose.material3.Text("Buraya yazarak klavyeyi dene") },
+        )
+    }
+}
+
 @Composable
 private fun IslandPage() {
     val ctx = androidx.compose.ui.platform.LocalContext.current
