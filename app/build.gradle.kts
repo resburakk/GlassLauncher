@@ -1,3 +1,6 @@
+import java.net.URI
+import java.io.InputStream
+import java.io.OutputStream
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -88,9 +91,9 @@ val downloadTrDict by tasks.registering {
         val f = trDict.asFile
         f.parentFile.mkdirs()
         runCatching {
-            java.net.URI("https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/tr/tr_50k.txt")
-                .toURL().openStream().use { input -> f.outputStream().use { input.copyTo(it) } }
-        }.onFailure { logger.warn("Türkçe sözlük indirilemedi: ${it.message}"); f.writeText("") }
+            URI("https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/tr/tr_50k.txt")
+                .toURL().openStream().use { input: InputStream -> f.outputStream().use { out: OutputStream -> input.copyTo(out) } }
+        }.onFailure { e: Throwable -> logger.warn("Türkçe sözlük indirilemedi: " + e.message); f.writeText("") }
     }
 }
 tasks.named("preBuild") { dependsOn(downloadTrDict) }
