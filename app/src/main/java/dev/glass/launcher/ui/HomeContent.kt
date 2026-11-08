@@ -3,6 +3,8 @@ package dev.glass.launcher.ui
 import androidx.compose.runtime.DisposableEffect
 
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.draw.drawWithContent
 
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 
@@ -534,7 +536,16 @@ internal fun HomeContent(
             }
         }
         val stillJiggle = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-        Box(Modifier.fillMaxSize().drawBehind {
+        // Yatay: sayfalar dikey dock'un altından kaymaz, dock'un solunda kesilir (iOS'ta da öyle). Önceden simgeler
+        // kayarken dock'un altına giriyor, dock'un camı ise yalnızca duvar kâğıdını gösterdiği için iki katman üst üste
+        // binmiş gibi duruyordu. Arşive geçerken kesme çizgisi ekranın sağına açılır (arşiv dock'un sağına kadar uzanır).
+        val pageClip = if (!m.dockVertical) Modifier else Modifier.drawWithContent {
+            if (dragging) { drawContent(); return@drawWithContent }
+            val edge = (m.dockLeft - 6.dp).toPx()
+            val right = edge + (size.width - edge) * libFraction
+            clipRect(right = right) { this@drawWithContent.drawContent() }
+        }
+        Box(Modifier.fillMaxSize().then(pageClip).drawBehind {
             // Arşiv yukarı/aşağı kayarken de kart camlarının arkası burada çizilir (kartlar kendi arkalarını çizmez).
             if (!(scrollHold || GlassMotion.listHoles) || edit || dragging) return@drawBehind
             // Widget sayfası geçişi de sayfa kaydırıcısından başladığı için "kayıyor" sayılıyordu: bu katman ana ekranla
@@ -564,7 +575,7 @@ internal fun HomeContent(
             // Bütün ana ekran sayfaları hep hazır tutulur: sayfa değişince bir sonrakinin simgeleri baştan hazırlanıyor,
             // o karede 30 ms'lik tek bir takılma oluyordu. (Arşiv yalnızca son sayfadayken hazırlanır.)
             beyondViewportPageCount = if (dragging) homeCount else maxOf(1, pageTotal - 1),
-            modifier = Modifier.fillMaxSize().nestedScroll(todayConn).onGloballyPositioned {
+            modifier = Modifier.fillMaxSize().then(pageClip).nestedScroll(todayConn).onGloballyPositioned {
                 // Widget sayfası geçişinde ana ekran tek parça kayar: konum o sırada güncellenmez. Güncellenince her karede
                 // bütün sayfaların (görünmeyen arşiv dahil) camları baştan çiziliyor, geçiş 120 Hz'in altına düşüyordu.
                 if ((today == null || today.progress == 0f) && !GlassMotion.homeShift) gridOrigin = it.positionInRoot()

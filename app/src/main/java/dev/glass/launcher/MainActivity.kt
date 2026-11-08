@@ -481,12 +481,25 @@ class MainActivity : ComponentActivity(), WidgetRequester {
      * Hareketle gezintide ana ekrandayken alttaki ince çubuk gizlenir (ayar açıksa). Hareketler çalışmaya devam eder;
      * uygulamalar kendi penceresinde çubuğu normal gösterir. Üç tuşlu gezintide tuşlar hiç gizlenmez.
      */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Ekran döndü: yatayda durum çubuğu gizlenir, dikeyde geri gelir.
+        applyNavHandle()
+    }
+
     private fun applyNavHandle() {
         if (isDestroyed) return
         runCatching {
             WindowCompat.getInsetsController(window, window.decorView).apply {
+                // Yatay ekranda üstteki durum çubuğu (saat, şebeke, pil) gizlenir; iOS'ta da yatayda görünmez. Sistem
+                // simgeleri yerinden kaydırılamıyor, dikey dock'un üstüne biniyordu; gizlenince dock ve simgeler
+                // ekranın üstüne kadar uzanır. Yukarıdan kaydırınca geçici olarak görünür.
+                val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                systemBarsBehavior = if (landscape) androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                    else androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+                if (landscape) hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                else show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
                 if (hideNavHandle && gestureNav()) {
-                    systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
                     hide(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
                 } else {
                     show(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
