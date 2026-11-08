@@ -166,8 +166,9 @@ fun SettingsScreen(
     onRequestDefault: () -> Unit,
     onAddWidget: () -> Unit,
     onClose: () -> Unit,
+    initialPage: String? = null,
 ) {
-    var page by rememberSaveable { mutableStateOf<String?>(null) }
+    var page by rememberSaveable(initialPage) { mutableStateOf<String?>(initialPage) }
     val onChange: ((LauncherSettings) -> LauncherSettings) -> Unit = { vm.updateSettings(it) }
 
     BackHandler { if (page != null) page = null else onClose() }

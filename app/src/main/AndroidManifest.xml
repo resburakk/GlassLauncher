@@ -205,6 +205,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity-alias>
+        <!-- Sistem klavye ayarlarındaki dişli: Glass Ayarları > Klavye sayfasını açar. -->
+        <activity-alias
+            android:name=".ime.KeyboardSettingsEntry"
+            android:exported="true"
+            android:label="@string/ime_name"
+            android:targetActivity=".SettingsActivity" />
+
         <!-- Glass Klavye: iOS 27 görünümlü klavye (Ayarlar > Klavye'den etkinleştirilir). -->
         <service
             android:name=".ime.GlassKeyboardService"

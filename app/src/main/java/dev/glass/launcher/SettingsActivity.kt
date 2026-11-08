@@ -27,6 +27,7 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        startPage = pageFor(intent)
         enableEdgeToEdge()
         requestHighRefresh()
         setContent {
@@ -41,8 +42,19 @@ class SettingsActivity : ComponentActivity() {
                 onRequestDefault = ::requestHomeRole,
                 onAddWidget = ::addWidgetOnHome,
                 onClose = { finishAndRemoveTask() },
+                initialPage = startPage,
             )
         }
+    }
+
+    /** Klavye ayarları kısayolundan (sistem "Dil ve giriş" > Glass Klavye) gelinirse doğrudan Klavye sayfası. */
+    private var startPage by androidx.compose.runtime.mutableStateOf<String?>(null)
+    private fun pageFor(i: android.content.Intent?): String? =
+        if (i?.component?.className?.endsWith("KeyboardSettingsEntry") == true || i?.getStringExtra("page") == "Keyboard") "Keyboard" else null
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        pageFor(intent)?.let { startPage = it }
     }
 
     override fun onResume() {

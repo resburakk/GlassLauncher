@@ -525,6 +525,11 @@ tap_text "Ara" && step "arama" 3
 shot 29l-klavye-koyu
 adb shell cmd uimode night no; step "açık mod" 2
 adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
+adb shell am start -W -n dev.glass.launcher/.ime.KeyboardSettingsEntry >/dev/null; step "klavye ayarları" 3
+shot 29m-klavye-ayarlari
+adb shell input swipe 540 1900 540 500 300; step "kaydır" 2
+shot 29n-klavye-ayarlari-2
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 2
 
 # 30) Dinamik Ada: izin verilir, Ayarlar > Dinamik Ada'dan açılır; boşta, mesajda ve şarjda görüntülenir.
 adb shell appops set dev.glass.launcher SYSTEM_ALERT_WINDOW allow || true
