@@ -54,7 +54,9 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         fun showEmoji(show: Boolean)
     }
 
-    enum class Page { Letters, Numbers, Symbols, Emoji }
+    enum class Page { Letters, Numbers, Symbols, Emoji, NumPad, Decimal, Phone, PhoneSym }
+    /** Sadece rakam isteyen alanlar (şifre/PIN, kod, tutar, telefon): iPhone'daki 3×4 sayı klavyesi. */
+    private val numeric get() = page == Page.NumPad || page == Page.Decimal || page == Page.Phone || page == Page.PhoneSym
     private enum class Shift { Off, On, Caps }
 
     private data class Key(
@@ -64,7 +66,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         val fn: Boolean = false,
     ) { val rect = RectF() }
 
-    private enum class Code { Char, Shift, Delete, Space, Return, Page123, PageAbc, PageSym, PageEmoji, Globe, Mic, OneHandOff, OneHandSwap }
+    private enum class Code { None, PhoneSym, Char, Shift, Delete, Space, Return, Page123, PageAbc, PageSym, PageEmoji, Globe, Mic, OneHandOff, OneHandSwap }
 
     private val d = resources.displayMetrics.density
     private fun dp(v: Float) = v * d
@@ -93,9 +95,9 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     // Ölçüler (iOS: tuş ~42, aralık 5/10, köşe ~9). Yükseklik ayara göre (kısa/normal/uzun).
     private val hScale get() = when (cfg.height) { 0 -> 0.88f; 2 -> 1.12f; else -> 1f }
     /** Üst şerit yalnızca yapıştır düğmesi varken açılır (yoksa boş duruyordu); kapalıyken ince bir pay kalır. */
-    private val barH get() = if (emojiBar) 0f else dp(40f)
-    private val keyH get() = dp(40f) * hScale
-    private val rowGap get() = dp(10f) * hScale
+    private val barH get() = if (emojiBar) 0f else if (numeric) (if (host.pasteChip() != null) dp(40f) else dp(12f)) else dp(40f)
+    private val keyH get() = (if (numeric) dp(52f) else dp(40f)) * hScale
+    private val rowGap get() = (if (numeric) dp(7f) else dp(10f)) * hScale
     private val gapX = dp(5f)
     private val side = dp(7f)
     private val radius = dp(11f) // iOS 26/27: daha yuvarlak, kapsüle yakın tuşlar
@@ -126,7 +128,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     fun reset(page0: Page = Page.Letters) {
         page = page0
         shift = if (host.autoCaps()) Shift.On else Shift.Off
-        build(); invalidate()
+        build(); requestLayout(); invalidate()
     }
 
     /** İmleç cümle başına geldiğinde büyük harf (Caps kilidi açık değilse). */
@@ -177,6 +179,25 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     private fun emojiPage(): List<List<Key>> = emojis.chunked(8).map { r -> r.map { Key(it) } }.take(3) +
         listOf(listOf(Key("ABC", Code.PageAbc, 1.25f, true)) + emojis.drop(24).map { Key(it) } + Key("⌫", Code.Delete, 1.25f, true))
 
+    private val subLetters = mapOf("2" to "ABC", "3" to "DEF", "4" to "GHI", "5" to "JKL", "6" to "MNO", "7" to "PQRS", "8" to "TUV", "9" to "WXYZ")
+
+    private fun numPad(): List<List<Key>> {
+        val rows = listOf("123", "456", "789").map { r -> r.map { Key(it.toString()) } }
+        val left = when (page) {
+            Page.Decimal -> Key(",")
+            Page.Phone -> Key("+*#", Code.PhoneSym, fn = true)
+            else -> Key("", Code.None)
+        }
+        return rows + listOf(listOf(left, Key("0"), Key("⌫", Code.Delete)))
+    }
+
+    private fun phoneSym() = listOf(
+        listOf("(", "/", ")").map { Key(it) },
+        listOf("-", "N", ",").map { Key(it) },
+        listOf("*", "#", "+").map { Key(it) },
+        listOf(Key("123", Code.PhoneSym, fn = true), Key("."), Key("⌫", Code.Delete)),
+    )
+
     private fun build() {
         if (emojiBar) {
             // Emoji panelinin alt satırı: ABC, boşluk, sil.
@@ -188,7 +209,10 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
             Page.Numbers -> numbers()
             Page.Symbols -> symbols()
             Page.Emoji -> emojiPage()
+            Page.NumPad, Page.Decimal, Page.Phone -> numPad()
+            Page.PhoneSym -> phoneSym()
         }
+        if (numeric) { bottomKeys = emptyList(); layoutKeys(); return }
         // Tek elle: boş kalan yanda "tam klavye" ve "öbür yana" düğmeleri.
         bottomKeys = listOfNotNull(
             Key("emoji", Code.PageEmoji),
@@ -200,7 +224,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
         val h = if (emojiBar) (dp(6f) + keyH + rowGap + bottomH).toInt() + navInset
-            else (barH + dp(4f) + (keyH + rowGap) * 4 + zoneH).toInt()
+            else (barH + dp(4f) + (keyH + rowGap) * rows.size.coerceAtLeast(4) + zoneH).toInt()
         setMeasuredDimension(w, h)
     }
 
@@ -209,7 +233,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     fun refreshBar() { layoutKeys(); requestLayout(); invalidate() }
 
     /** En alt bölge (emoji + mikrofon, altında sistem çubuğu payı): iOS'taki gibi yüksek. */
-    private val zoneH get() = navInset + dp(46f)
+    private val zoneH get() = navInset + if (numeric) dp(14f) else dp(46f)
 
     private fun layoutKeys() {
         val w = width.toFloat().takeIf { it > 0 } ?: return
@@ -273,7 +297,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
             }, null, Shader.TileMode.CLAMP)
         c.drawPath(panel, fill); fill.shader = null
 
-        if (!emojiBar) drawBar(c, w)
+        if (!emojiBar && !(numeric && host.pasteChip() == null)) drawBar(c, w)
         rows.flatten().forEach { drawKey(c, it) }
         if (!emojiBar) drawBottom(c)
         if (swiping && trail.size > 1) {
@@ -367,8 +391,14 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     }
 
     private fun drawKey(c: Canvas, k: Key) {
+        if (k.code == Code.None) return
         val isPressed = pressed === k
         val rr = k.rect
+        if (numeric && k.code == Code.Delete) {
+            // iPhone sayı klavyesi: sil tuşunun zemini yok (basınca hafif belirir).
+            if (isPressed) { fill.color = if (dark) 0x33FFFFFF else 0x22000000; c.drawRoundRect(rr, radius, radius, fill) }
+            drawDelete(c, rr.centerX(), rr.centerY(), colTxt); return
+        }
         if (glass) { drawGlassKey(c, k, isPressed) } else {
             // Opak zemin: alt kenarda 1 dp gölge, düz tuş.
             fill.color = colShadow
@@ -381,6 +411,18 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
 
         if (trackpad) return
         val cx = rr.centerX(); val cy = rr.centerY()
+        if (numeric) {
+            text.color = colTxt
+            val sub = if (page != Page.PhoneSym) subLetters[k.label] ?: (if (k.label == "0" && page == Page.Phone) "+" else null) else null
+            if (k.code == Code.PhoneSym) { text.textSize = dp(17f); c.drawText(k.label, cx, cy + dp(6f), text); return }
+            text.textSize = dp(27f)
+            if (sub != null) {
+                c.drawText(k.label, cx, cy + dp(4f), text)
+                text.textSize = dp(10f); text.letterSpacing = 0.18f
+                c.drawText(sub, cx, cy + dp(17f), text); text.letterSpacing = 0f
+            } else c.drawText(k.label, cx, cy + dp(9.5f), text)
+            return
+        }
         val onBlue = k.code == Code.Return && host.returnIsAction()
         text.color = if (onBlue) 0xFFFFFFFF.toInt() else if (k.code == Code.Shift && shift != Shift.Off) 0xFF111111.toInt() else colTxt
         when (k.code) {
@@ -661,6 +703,8 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
             Code.PageEmoji -> host.showEmoji(true)
             Code.Globe -> host.switchKeyboard(false)
             Code.Mic -> host.voice()
+            Code.None -> {}
+            Code.PhoneSym -> { page = if (page == Page.PhoneSym) Page.Phone else Page.PhoneSym; build(); requestLayout() }
             Code.OneHandOff -> host.setOneHanded(0)
             Code.OneHandSwap -> host.setOneHanded(if (cfg.oneHanded == 1) 2 else 1)
         }

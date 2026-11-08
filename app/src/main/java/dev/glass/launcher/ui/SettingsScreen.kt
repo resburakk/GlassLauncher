@@ -1609,6 +1609,14 @@ private fun KeyboardPage() {
             value = t, onValueChange = { t = it }, modifier = Modifier.fillMaxWidth(),
             placeholder = { Text("Buraya yazarak klavyeyi dene") },
         )
+        RowDivider()
+        var pin by remember { mutableStateOf("") }
+        androidx.compose.material3.TextField(
+            value = pin, onValueChange = { pin = it.filter { ch -> ch.isDigit() } }, modifier = Modifier.fillMaxWidth(),
+            placeholder = { Text("Sayı klavyesini dene (şifre)") },
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.NumberPassword),
+            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+        )
     }
 }
 

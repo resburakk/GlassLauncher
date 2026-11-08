@@ -74,6 +74,12 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
             addView(v, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.BOTTOM))
             addView(panel, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.BOTTOM))
         }
+        // Alt payın ilk tahmini hemen verilir: önceden pay ilk düzenden sonra geldiği için klavye ilk açılışta uzuyor,
+        // pencere eski boyda kaldığından üstteki öneri şeridi kesik çıkıyordu (kapatıp açınca düzeliyordu).
+        val guess = window?.window?.decorView?.rootWindowInsets?.let {
+            WindowInsetsCompat.toWindowInsetsCompat(it).getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+        }?.takeIf { it > 0 } ?: sysDimen("navigation_bar_height")
+        v.navInset = guess; bar.navInset = guess
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, ins ->
             // Alt pay: uygulamanın bildirdiği gezinme çubuğu bazı uygulamalarda (ör. Claude) 0 geliyordu ve Honor'un
             // "Klavyeyi yükselt" çubuğu tuşların üstüne biniyordu. Sistemin klavye altı çubuk yüksekliği de hesaba katılır.
@@ -82,7 +88,11 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
                 ins.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars()).bottom,
                 sysDimen("navigation_bar_frame_height"),
             )
-            v.navInset = nb; bar.navInset = nb
+            if (nb != v.navInset) {
+                v.navInset = nb; bar.navInset = nb
+                // Pencere boyunu hemen yeni yüksekliğe getir (kesik kalmasın).
+                root.post { root.requestLayout(); window?.window?.decorView?.requestLayout() }
+            }
             ins
         }
         return root
@@ -176,7 +186,14 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         v.dark = isDark(); emojiBarView?.dark = isDark(); styleEmojiPanel(); showEmoji(false)
         val cls = (info?.inputType ?: 0) and InputType.TYPE_MASK_CLASS
         lastCorr = null; lastSwipe = null; swipeAlts = emptyList()
-        v.reset(if (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE) KeyboardView.Page.Numbers else KeyboardView.Page.Letters)
+        val it0 = info?.inputType ?: 0
+        v.reset(when (cls) {
+            // Sadece rakam: şifre/PIN, kod, tutar → iPhone sayı klavyesi (ondalıkta sol altta virgül).
+            InputType.TYPE_CLASS_NUMBER -> if (it0 and InputType.TYPE_NUMBER_FLAG_DECIMAL != 0) KeyboardView.Page.Decimal else KeyboardView.Page.NumPad
+            InputType.TYPE_CLASS_PHONE -> KeyboardView.Page.Phone
+            InputType.TYPE_CLASS_DATETIME -> KeyboardView.Page.Numbers
+            else -> KeyboardView.Page.Letters
+        })
         updateSuggestions()
         v.refreshBar()
     }
