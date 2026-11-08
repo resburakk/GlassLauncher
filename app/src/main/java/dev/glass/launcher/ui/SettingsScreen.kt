@@ -1570,15 +1570,33 @@ private fun KeyboardPage() {
     }
     Footer("Kısayolu yazıp boşluğa (ya da noktalama işaretine) basınca ifadeyle değiştirilir; ör. \"slm\" → \"Selam\".")
 
-    Group("Sonraki aşamada") {
-        InfoRow("Otomatik düzeltme", "Yakında")
+    Group("Akıllı yazma") {
+        ToggleRow("Tahmini metin", c.predictive, default = true) { set(c.copy(predictive = it)) }
         RowDivider()
-        InfoRow("Yazım denetimi", "Yakında")
+        ToggleRow("Otomatik düzeltme", c.autocorrect, default = true) { set(c.copy(autocorrect = it)) }
         RowDivider()
-        InfoRow("Tahmini metin (öneriler)", "Yakında")
-        RowDivider()
-        InfoRow("Kaydırarak yazma", "Yakında")
+        ToggleRow("Kaydırarak yazma", c.swipe, default = true) { set(c.copy(swipe = it)) }
+        if (c.swipe) {
+            RowDivider()
+            ToggleRow("Kaydırarak yazılanı kelime kelime sil", c.swipeDeleteWord, default = true) { set(c.copy(swipeDeleteWord = it)) }
+        }
     }
+    Footer("Tahmini metin: yazarken klavyenin üstünde kelime önerileri, boşluktan sonra sık kullandığın devam kelimeleri çıkar; dokununca yazılır. Otomatik düzeltme: yanlış yazılan kelime boşluğa basınca düzeltilir (öneri şeridinde vurgulanır); hemen silersen yazdığına döner ve o kelime öğrenilir. Kaydırarak yazma: parmağını kaldırmadan harflerin üzerinden geçir. Klavye yazdığın kelimeleri telefonda öğrenir, dışarı göndermez.")
+
+    Group("Yazım denetimi") {
+        ActionRow("Yazım denetleyicisini aç") {
+            val i1 = android.content.Intent("android.settings.SPELL_CHECKER_SETTINGS").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { ctx.startActivity(i1) }.onFailure {
+                runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
+        }
+    }
+    Footer("Açılan ekranda \"Yazım denetleyicisi\"ni açıp \"Glass Klavye\"yi seç: uygulamalardaki yanlış kelimelerin altı kırmızı çizilir, dokununca düzeltme önerileri çıkar.")
+
+    Group(null) {
+        ActionRow("Öğrenilen kelimeleri sıfırla", destructive = true) { dev.glass.launcher.ime.TrEngine.clearLearned(ctx) }
+    }
+    Footer("Sözlük: FrequencyWords (OpenSubtitles 2018), CC BY-SA 4.0.")
 
     Group("Dene") {
         var t by remember { mutableStateOf("") }

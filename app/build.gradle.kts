@@ -77,3 +77,20 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }
+
+// Klavye sözlüğü (Türkçe kelime sıklık listesi, FrequencyWords / OpenSubtitles 2018, CC BY-SA 4.0).
+// Depoya konmaz; derlemede yoksa indirilir. İndirilemezse boş dosya yazılır (öneri/düzeltme kapalı kalır).
+val trDict = layout.projectDirectory.file("src/main/assets/tr_words.txt")
+val downloadTrDict by tasks.registering {
+    outputs.file(trDict)
+    onlyIf { !trDict.asFile.exists() || trDict.asFile.length() == 0L }
+    doLast {
+        val f = trDict.asFile
+        f.parentFile.mkdirs()
+        runCatching {
+            java.net.URI("https://raw.githubusercontent.com/hermitdave/FrequencyWords/master/content/2018/tr/tr_50k.txt")
+                .toURL().openStream().use { input -> f.outputStream().use { input.copyTo(it) } }
+        }.onFailure { logger.warn("Türkçe sözlük indirilemedi: ${it.message}"); f.writeText("") }
+    }
+}
+tasks.named("preBuild") { dependsOn(downloadTrDict) }

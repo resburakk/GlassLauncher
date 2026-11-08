@@ -29,6 +29,23 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     private val prefs get() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     private var cfg = KbConfig()
     private var lastSpaceAt = 0L
+    // Tahmin/düzeltme durumu
+    private var sugg: List<String> = emptyList()
+    private var bold = -1
+    private var typedWord = ""
+    private var lastCorr: Pair<String, String>? = null // (yazılan, düzeltilen) — hemen silinirse geri alınır
+    private var lastSwipe: String? = null
+    private var swipeAlts: List<String> = emptyList()
+
+    override fun onCreate() {
+        super.onCreate()
+        Thread { TrEngine.load(applicationContext) }.start()
+    }
+
+    override fun onFinishInputView(finishingInput: Boolean) {
+        super.onFinishInputView(finishingInput)
+        Thread { TrEngine.save() }.start()
+    }
     private val audio by lazy { getSystemService(android.media.AudioManager::class.java) }
 
     override fun onCreateInputView(): View {
@@ -60,8 +77,8 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, ins ->
             // Alt pay: uygulamanın bildirdiği gezinme çubuğu bazı uygulamalarda (ör. Claude) 0 geliyordu ve Honor'un
             // "Klavyeyi yükselt" çubuğu tuşların üstüne biniyordu. Sistemin klavye altı çubuk yüksekliği de hesaba katılır.
-            val nb = maxOf(
-                ins.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom,
+            val rep = ins.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            val nb = if (rep > 0) rep else maxOf(
                 ins.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars()).bottom,
                 sysDimen("navigation_bar_frame_height"),
             )
@@ -158,13 +175,16 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         v.cfg = cfg; emojiBarView?.cfg = cfg
         v.dark = isDark(); emojiBarView?.dark = isDark(); styleEmojiPanel(); showEmoji(false)
         val cls = (info?.inputType ?: 0) and InputType.TYPE_MASK_CLASS
+        lastCorr = null; lastSwipe = null; swipeAlts = emptyList()
         v.reset(if (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE) KeyboardView.Page.Numbers else KeyboardView.Page.Letters)
+        updateSuggestions()
         v.refreshBar()
     }
 
     override fun onUpdateSelection(oss: Int, ose: Int, nss: Int, nse: Int, cs: Int, ce: Int) {
         super.onUpdateSelection(oss, ose, nss, nse, cs, ce)
         view?.updateAutoCaps()
+        updateSuggestions()
     }
 
     /** iOS 27 hızlı yapıştır: son 3 dakikada kopyalanan yazı şeritte gösterilir. */
@@ -183,7 +203,12 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         val ic = currentInputConnection ?: return
         var t = text
         val plain = plainField()
-        if (plain && (t == " " || t == "\n" || t in listOf(".", ",", "!", "?"))) applyReplacement()
+        if (t != " ") lastCorr = null
+        lastSwipe = null
+        if (plain && (t == " " || t == "\n" || t in listOf(".", ",", "!", "?"))) {
+            if (!applyReplacement()) autoCorrectWord(t)
+            learnLastWord()
+        }
         if (t == " " && plain && cfg.periodShortcut) {
             // "." kısayolu: kelimeden sonra iki kez boşluk = nokta + boşluk.
             val before = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
@@ -204,15 +229,110 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     }
 
     /** Metin değiştirme: imleçten önceki kelime listede varsa karşılığıyla değiştirilir (ör. "slm" → "Selam"). */
-    private fun applyReplacement() {
-        if (cfg.replacements.isEmpty()) return
-        val ic = currentInputConnection ?: return
-        val before = ic.getTextBeforeCursor(40, 0)?.toString() ?: return
+    private fun applyReplacement(): Boolean {
+        if (cfg.replacements.isEmpty()) return false
+        val ic = currentInputConnection ?: return false
+        val before = ic.getTextBeforeCursor(40, 0)?.toString() ?: return false
         val word = before.takeLastWhile { !it.isWhitespace() && it !in ".,!?" }
-        if (word.isEmpty()) return
-        val hit = cfg.replacements.entries.firstOrNull { it.key.equals(word, ignoreCase = true) } ?: return
+        if (word.isEmpty()) return false
+        val hit = cfg.replacements.entries.firstOrNull { it.key.equals(word, ignoreCase = true) } ?: return false
         ic.deleteSurroundingText(word.length, 0)
         ic.commitText(hit.value, 1)
+        return true
+    }
+
+    private fun currentWord(): String =
+        currentInputConnection?.getTextBeforeCursor(32, 0)?.toString()?.takeLastWhile { it.isLetter() }.orEmpty()
+
+    /** Otomatik düzeltme: boşluk/noktalama gelince bilinmeyen kelime en iyi adayla değiştirilir. */
+    private fun autoCorrectWord(trigger: String) {
+        if (!cfg.autocorrect || !TrEngine.ready) return
+        val ic = currentInputConnection ?: return
+        val w = currentWord()
+        if (w.length < 2) return
+        val fixed = TrEngine.autocorrect(w) ?: return
+        if (fixed == w) return
+        ic.deleteSurroundingText(w.length, 0)
+        ic.commitText(fixed, 1)
+        if (trigger == " ") lastCorr = w to fixed
+    }
+
+    private fun learnLastWord() {
+        if (!TrEngine.ready) return
+        val w = currentWord()
+        if (w.isNotEmpty()) TrEngine.learn(w, prevWordBefore(w))
+    }
+
+    private fun prevWordBefore(w: String): String? {
+        val b = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString() ?: return null
+        val rest = b.dropLast(w.length).trimEnd()
+        if (rest.isEmpty() || rest.last() in ".!?") return null
+        return rest.takeLastWhile { it.isLetter() }.takeIf { it.isNotEmpty() }
+    }
+
+    /** Öneri şeridini günceller (yazılan kelimeye göre tamamlama/düzeltme, boşluktan sonra sonraki kelime). */
+    private fun updateSuggestions() {
+        if (!cfg.predictive || !TrEngine.ready || !plainField()) { sugg = emptyList(); bold = -1; view?.invalidate(); return }
+        if (lastSwipe != null && swipeAlts.isNotEmpty()) {
+            sugg = listOf(swipeAlts.getOrElse(1) { "" }, lastSwipe!!, swipeAlts.getOrElse(2) { "" }); bold = -1
+            view?.invalidate(); return
+        }
+        val w = currentWord()
+        typedWord = w
+        if (w.isEmpty()) {
+            val b = currentInputConnection?.getTextBeforeCursor(64, 0)?.toString().orEmpty()
+            val prev = if (b.endsWith(" ")) b.trimEnd().takeLastWhile { it.isLetter() }.takeIf { it.isNotEmpty() && !b.trimEnd().endsWith(".") } else null
+            val cap = view?.let { autoCaps() } == true
+            sugg = TrEngine.nextWords(prev, 3).map { if (cap) it.replaceFirstChar { c -> c.titlecase(java.util.Locale.forLanguageTag("tr")) } else it }
+            bold = -1
+        } else {
+            val comps = TrEngine.completions(w, 4).map { TrEngine.matchCase(w, it) }.filter { it != w }
+            val auto = if (cfg.autocorrect) TrEngine.autocorrect(w) else null
+            val corr = if (!TrEngine.known(w)) TrEngine.corrections(w, 3).map { TrEngine.matchCase(w, it.word) } else emptyList()
+            val middle = auto ?: comps.firstOrNull() ?: corr.firstOrNull() ?: ""
+            val right = (comps + corr).firstOrNull { it != middle && it != w } ?: ""
+            sugg = listOf("“$w”", middle, right)
+            bold = if (auto != null) 1 else -1
+        }
+        view?.invalidate()
+    }
+
+    override fun suggestions(): List<String> = sugg
+    override fun boldSuggestion(): Int = bold
+
+    override fun pickSuggestion(i: Int) {
+        val ic = currentInputConnection ?: return
+        var t = sugg.getOrNull(i)?.takeIf { it.isNotEmpty() } ?: return
+        if (lastSwipe != null) {
+            // Kaydırmayla yazılan kelimenin yerine seçilen alternatif.
+            val b = ic.getTextBeforeCursor(lastSwipe!!.length, 0)?.toString()
+            if (b == lastSwipe) ic.deleteSurroundingText(lastSwipe!!.length, 0)
+            ic.commitText(t, 1); lastSwipe = t; swipeAlts = emptyList(); updateSuggestions(); return
+        }
+        val literal = t.startsWith("“") && t.endsWith("”")
+        if (literal) { t = t.substring(1, t.length - 1); TrEngine.accept(t) }
+        val w = currentWord()
+        if (w.isNotEmpty()) ic.deleteSurroundingText(w.length, 0)
+        ic.commitText(t, 1)
+        TrEngine.learn(t, prevWordBefore(t))
+        ic.commitText(" ", 1)
+        lastCorr = null
+        view?.updateAutoCaps(); updateSuggestions()
+    }
+
+    override fun swipeWord(path: String, capital: Boolean) {
+        val ic = currentInputConnection ?: return
+        if (!TrEngine.ready) return
+        val c = TrEngine.swipe(path, 3)
+        if (c.isEmpty()) return
+        val before = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+        if (before.isNotEmpty() && !before[0].isWhitespace() && before[0] !in "([{“‘\"'") ic.commitText(" ", 1)
+        val tr = java.util.Locale.forLanguageTag("tr")
+        val words = c.map { if (capital) it.replaceFirstChar { ch -> ch.titlecase(tr) } else it }
+        ic.commitText(words[0], 1)
+        TrEngine.learn(words[0], prevWordBefore(words[0]))
+        lastSwipe = words[0]; swipeAlts = words; lastCorr = null
+        updateSuggestions()
     }
 
     /** Şifre, e-posta, adres gibi alanlarda düzeltme/noktalama yapılmaz. */
@@ -244,6 +364,21 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
 
     override fun deleteBack() {
         val ic = currentInputConnection ?: return
+        lastCorr?.let { (orig, fixed) ->
+            val tail = "$fixed "
+            if (ic.getTextBeforeCursor(tail.length, 0)?.toString() == tail) {
+                // iOS gibi: düzeltmeden hemen sonra sil = yazdığına geri dön (ve kelimeyi öğren).
+                ic.deleteSurroundingText(tail.length, 0); ic.commitText(orig, 1); TrEngine.accept(orig)
+                lastCorr = null; updateSuggestions(); return
+            }
+        }
+        lastCorr = null
+        lastSwipe?.let { sw ->
+            if (cfg.swipeDeleteWord && ic.getTextBeforeCursor(sw.length, 0)?.toString() == sw) {
+                ic.deleteSurroundingText(sw.length, 0); lastSwipe = null; swipeAlts = emptyList(); updateSuggestions(); return
+            }
+        }
+        lastSwipe = null
         val sel = ic.getSelectedText(0)
         if (!sel.isNullOrEmpty()) ic.commitText("", 1)
         else {

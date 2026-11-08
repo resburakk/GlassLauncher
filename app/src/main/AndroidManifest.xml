@@ -212,6 +212,18 @@
             android:label="@string/ime_name"
             android:targetActivity=".SettingsActivity" />
 
+        <!-- Yazım denetleyicisi (sistem geneli kırmızı alt çizgi + öneriler). -->
+        <service
+            android:name=".ime.GlassSpellChecker"
+            android:label="@string/ime_name"
+            android:permission="android.permission.BIND_TEXT_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.textservice.SpellCheckerService" />
+            </intent-filter>
+            <meta-data android:name="android.view.textservice.scs" android:resource="@xml/glass_spellchecker" />
+        </service>
+
         <!-- Glass Klavye: iOS 27 görünümlü klavye (Ayarlar > Klavye'den etkinleştirilir). -->
         <service
             android:name=".ime.GlassKeyboardService"

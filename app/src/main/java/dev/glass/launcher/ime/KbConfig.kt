@@ -11,6 +11,10 @@ data class KbConfig(
     val theme: Int = 0,            // 0 otomatik, 1 açık, 2 koyu
     val glass: Boolean = true,     // arkası bulanık cam zemin
     val autoCaps: Boolean = true,
+    val autocorrect: Boolean = true,
+    val predictive: Boolean = true,
+    val swipe: Boolean = true,
+    val swipeDeleteWord: Boolean = true, // kaydırarak yazılan kelime tek silmede silinir
     val capsLock: Boolean = true,
     val preview: Boolean = true,   // karakter önizleme (balon)
     val periodShortcut: Boolean = true, // iki boşluk = ". "
@@ -40,6 +44,10 @@ data class KbConfig(
                 theme = p.getInt("theme", d.theme),
                 glass = p.getBoolean("glass", d.glass),
                 autoCaps = p.getBoolean("autocaps", d.autoCaps),
+                autocorrect = p.getBoolean("autocorrect", d.autocorrect),
+                predictive = p.getBoolean("predictive", d.predictive),
+                swipe = p.getBoolean("swipe", d.swipe),
+                swipeDeleteWord = p.getBoolean("swipeDeleteWord", d.swipeDeleteWord),
                 capsLock = p.getBoolean("capsLock", d.capsLock),
                 preview = p.getBoolean("preview", d.preview),
                 periodShortcut = p.getBoolean("periodShortcut", d.periodShortcut),
@@ -59,7 +67,9 @@ data class KbConfig(
 
         fun save(ctx: Context, c: KbConfig) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putInt("theme", c.theme).putBoolean("glass", c.glass).putBoolean("autocaps", c.autoCaps).putBoolean("capsLock", c.capsLock)
+                .putInt("theme", c.theme).putBoolean("glass", c.glass).putBoolean("autocaps", c.autoCaps)
+                .putBoolean("autocorrect", c.autocorrect).putBoolean("predictive", c.predictive)
+                .putBoolean("swipe", c.swipe).putBoolean("swipeDeleteWord", c.swipeDeleteWord).putBoolean("capsLock", c.capsLock)
                 .putBoolean("preview", c.preview).putBoolean("periodShortcut", c.periodShortcut).putBoolean("smartPunct", c.smartPunct)
                 .putBoolean("sound", c.sound).putBoolean("haptics", c.haptics).putInt("hapticStrength", c.hapticStrength)
                 .putBoolean("dictation", c.dictation).putInt("oneHanded", c.oneHanded).putInt("height", c.height)
