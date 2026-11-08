@@ -1490,6 +1490,11 @@ private fun KeyboardPage() {
         Chips(listOf("Otomatik", "Açık", "Koyu"), c.theme) { set(c.copy(theme = it)) }
         RowDivider()
         ToggleRow("Cam zemin (arkası bulanık)", c.glass, default = true) { set(c.copy(glass = it)) }
+        if (c.glass) {
+            RowDivider()
+            SliderRow("Cam yoğunluğu", when { c.glassTint < 34 -> "Şeffaf"; c.glassTint > 66 -> "Renkli"; else -> "Orta" },
+                c.glassTint.toFloat(), 0f..100f, default = 50f) { set(c.copy(glassTint = it.toInt())) }
+        }
         RowDivider()
         Text("Klavye yüksekliği", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
         Chips(listOf("Kısa", "Normal", "Uzun"), c.height) { set(c.copy(height = it)) }

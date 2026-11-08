@@ -98,7 +98,7 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     private val rowGap get() = dp(10f) * hScale
     private val gapX = dp(5f)
     private val side = dp(7f)
-    private val radius = dp(9f)
+    private val radius = dp(11f) // iOS 26/27: daha yuvarlak, kapsüle yakın tuşlar
     private val bottomH = dp(12f)
     var navInset = 0
         set(v) { field = v; requestLayout() }
@@ -265,8 +265,8 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         fill.color = 0xFF000000.toInt() // gölgelerden kalan saydamlık zemine geçmesin
         fill.shader = LinearGradient(0f, 0f, 0f, h,
             when {
-                glass && dark -> intArrayOf(0x9E2A2A2E.toInt(), 0xB01B1B1E.toInt())
-                glass -> intArrayOf(0xA8F4F5F8.toInt(), 0xBDE4E6EA.toInt())
+                glass && dark -> panelAlpha(0x2A2A2E, 0.45f, 0.85f, 0x1B1B1E)
+                glass -> panelAlpha(0xF4F5F8, 0.50f, 0.88f, 0xE4E6EA)
                 emojiBar -> intArrayOf(colBg, colBg)
                 dark -> intArrayOf(0xFF26262A.toInt(), colBg)
                 else -> intArrayOf(0xFFEEEFF2.toInt(), colBg)
@@ -311,6 +311,14 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
             }
         }
         text.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+    }
+
+    /** Cam yoğunluğuna göre panel saydamlığı (üst/alt renk). */
+    private fun panelAlpha(top: Int, lo: Float, hi: Float, bottom: Int): IntArray {
+        val g = cfg.glassTint / 100f
+        val a = ((lo + (hi - lo) * g) * 255).toInt().coerceIn(0, 255)
+        val a2 = (a + 18).coerceAtMost(255)
+        return intArrayOf((a shl 24) or top, (a2 shl 24) or bottom)
     }
 
     private fun drawBar(c: Canvas, w: Float) {
@@ -361,13 +369,15 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     private fun drawKey(c: Canvas, k: Key) {
         val isPressed = pressed === k
         val rr = k.rect
-        // Gölge (alt kenarda 1 dp), sonra tuş.
-        fill.color = colShadow
-        c.drawRoundRect(rr.left, rr.top + dp(1f), rr.right, rr.bottom + dp(1f), radius, radius, fill)
-        var col = keyColor(k)
-        if (isPressed && (k.fn || k.code != Code.Char || page == Page.Emoji)) col = if (k.fn || k.code == Code.Return) colKey else colFn
-        fill.color = col
-        c.drawRoundRect(rr, radius, radius, fill)
+        if (glass) { drawGlassKey(c, k, isPressed) } else {
+            // Opak zemin: alt kenarda 1 dp gölge, düz tuş.
+            fill.color = colShadow
+            c.drawRoundRect(rr.left, rr.top + dp(1f), rr.right, rr.bottom + dp(1f), radius, radius, fill)
+            var col = keyColor(k)
+            if (isPressed && (k.fn || k.code != Code.Char || page == Page.Emoji)) col = if (k.fn || k.code == Code.Return) colKey else colFn
+            fill.color = col
+            c.drawRoundRect(rr, radius, radius, fill)
+        }
 
         if (trackpad) return
         val cx = rr.centerX(); val cy = rr.centerY()
@@ -391,6 +401,43 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
                 c.drawText(s, cx, cy + text.textSize * 0.36f, text)
             }
         }
+    }
+
+    /**
+     * iOS 26/27 Liquid Glass tuşu: yarı saydam dolgu (arkadaki bulanık zemin hafifçe görünür), çevresinde üstte
+     * parlak altta sönük ince cam kenarı, çok yumuşak gölge; basınca tuş aydınlanır. Saydamlık "Cam yoğunluğu"
+     * ayarıyla (iOS 27'deki Liquid Glass kaydırıcısı gibi: Şeffaf ↔ Renkli) değişir.
+     */
+    private fun drawGlassKey(c: Canvas, k: Key, isPressed: Boolean) {
+        val rr = k.rect
+        val g = cfg.glassTint / 100f
+        fun a(lo: Float, hi: Float) = ((lo + (hi - lo) * g) * 255).toInt().coerceIn(0, 255)
+        val action = k.code == Code.Return && host.returnIsAction()
+        val shiftOn = k.code == Code.Shift && shift != Shift.Off
+        val isFn = (k.fn || k.code == Code.Return) && !action && !shiftOn
+        // yumuşak gölge
+        fill.color = if (dark) 0x40000000 else 0x24000000
+        c.drawRoundRect(rr.left, rr.top + dp(0.8f), rr.right, rr.bottom + dp(1.2f), radius, radius, fill)
+        val base = when {
+            action -> 0xFF0A84FF.toInt()
+            shiftOn -> 0xFFFFFFFF.toInt()
+            dark && isFn -> (a(0.07f, 0.18f) shl 24) or 0xFFFFFF
+            dark -> (a(0.18f, 0.34f) shl 24) or 0xFFFFFF
+            isFn -> (a(0.40f, 0.80f) shl 24) or 0xB4B9C2
+            else -> (a(0.72f, 0.97f) shl 24) or 0xFFFFFF
+        }
+        fill.color = base
+        c.drawRoundRect(rr, radius, radius, fill)
+        if (isPressed && (k.code != Code.Char || page == Page.Emoji || !cfg.preview)) {
+            fill.color = if (dark) 0x40FFFFFF else if (isFn) 0x66FFFFFF else 0x1F000000
+            c.drawRoundRect(rr, radius, radius, fill)
+        }
+        // cam kenarı: üstte parlak, alta doğru sönük
+        stroke.strokeWidth = dp(1f)
+        stroke.shader = LinearGradient(0f, rr.top, 0f, rr.bottom,
+            if (dark) intArrayOf(0x66FFFFFF, 0x0FFFFFFF) else intArrayOf(0xE6FFFFFF.toInt(), 0x33FFFFFF), null, Shader.TileMode.CLAMP)
+        c.drawRoundRect(rr.left + dp(0.5f), rr.top + dp(0.5f), rr.right - dp(0.5f), rr.bottom - dp(0.5f), radius, radius, stroke)
+        stroke.shader = null
     }
 
     private fun display(l: String) = if (page == Page.Letters && shift != Shift.Off) l.uppercase(tr) else l

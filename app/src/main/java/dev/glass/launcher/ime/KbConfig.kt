@@ -10,6 +10,7 @@ import org.json.JSONObject
 data class KbConfig(
     val theme: Int = 0,            // 0 otomatik, 1 açık, 2 koyu
     val glass: Boolean = true,     // arkası bulanık cam zemin
+    val glassTint: Int = 50,       // cam yoğunluğu 0 şeffaf … 100 renkli (iOS 27 Liquid Glass kaydırıcısı)
     val autoCaps: Boolean = true,
     val autocorrect: Boolean = true,
     val predictive: Boolean = true,
@@ -43,6 +44,7 @@ data class KbConfig(
             return KbConfig(
                 theme = p.getInt("theme", d.theme),
                 glass = p.getBoolean("glass", d.glass),
+                glassTint = p.getInt("glassTint", d.glassTint),
                 autoCaps = p.getBoolean("autocaps", d.autoCaps),
                 autocorrect = p.getBoolean("autocorrect", d.autocorrect),
                 predictive = p.getBoolean("predictive", d.predictive),
@@ -67,7 +69,7 @@ data class KbConfig(
 
         fun save(ctx: Context, c: KbConfig) {
             ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                .putInt("theme", c.theme).putBoolean("glass", c.glass).putBoolean("autocaps", c.autoCaps)
+                .putInt("theme", c.theme).putBoolean("glass", c.glass).putInt("glassTint", c.glassTint).putBoolean("autocaps", c.autoCaps)
                 .putBoolean("autocorrect", c.autocorrect).putBoolean("predictive", c.predictive)
                 .putBoolean("swipe", c.swipe).putBoolean("swipeDeleteWord", c.swipeDeleteWord).putBoolean("capsLock", c.capsLock)
                 .putBoolean("preview", c.preview).putBoolean("periodShortcut", c.periodShortcut).putBoolean("smartPunct", c.smartPunct)
