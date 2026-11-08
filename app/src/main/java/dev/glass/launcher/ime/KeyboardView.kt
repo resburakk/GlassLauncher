@@ -85,13 +85,13 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     // Ölçüler (iOS: tuş ~42, aralık 5/10, köşe ~9). Yükseklik ayara göre (kısa/normal/uzun).
     private val hScale get() = when (cfg.height) { 0 -> 0.88f; 2 -> 1.12f; else -> 1f }
     /** Üst şerit yalnızca yapıştır düğmesi varken açılır (yoksa boş duruyordu); kapalıyken ince bir pay kalır. */
-    private val barH get() = if (emojiBar) 0f else if (host.pasteChip() != null) dp(40f) else dp(26f)
+    private val barH get() = if (emojiBar) 0f else dp(40f)
     private val keyH get() = dp(40f) * hScale
     private val rowGap get() = dp(10f) * hScale
     private val gapX = dp(5f)
-    private val side = dp(3f)
+    private val side = dp(7f)
     private val radius = dp(9f)
-    private val bottomH = dp(6f)
+    private val bottomH = dp(12f)
     var navInset = 0
         set(v) { field = v; requestLayout() }
 
@@ -256,29 +256,36 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         val chip = host.pasteChip()
         pasteRect.setEmpty(); pasteClose.setEmpty()
         if (chip != null) {
-            // iOS 27 hızlı yapıştır: son kopyalanan yazı tek dokunuşla.
+            // iOS 27 hızlı yapıştır: [pano] Yapıştır: “…”  |  ✕   (✕ düğmenin içinde, ince ayırıcıyla ayrı)
             text.textSize = dp(14.5f)
-            val label = "Yapıştır: “" + chip.replace('\n', ' ').let { if (it.length > 28) it.take(27) + "…" else it } + "”"
-            val tw = text.measureText(label) + dp(44f)
-            val cw = minOf(tw, w - dp(120f))
-            val cy = barH / 2f + dp(2f)
-            pasteRect.set(w / 2 - cw / 2, cy - dp(16f), w / 2 + cw / 2, cy + dp(16f))
-            fill.color = if (dark) 0x26FFFFFF else 0xD9FFFFFF.toInt()
-            c.drawRoundRect(pasteRect, dp(16f), dp(16f), fill)
-            // pano simgesi
-            stroke.color = colTxt; stroke.strokeWidth = dp(1.6f)
+            val cy = barH / 2f + dp(1f)
+            val maxW = w - side * 2 - dp(24f)
+            val iconW = dp(30f); val closeW = dp(34f)
+            var body = chip.replace('\n', ' ').trim()
+            fun label(b: String) = "Yapıştır: “$b”"
+            while (body.length > 1 && text.measureText(label(body)) > maxW - iconW - closeW - dp(16f)) body = body.dropLast(2).trimEnd() + "…"
+            val lw = text.measureText(label(body))
+            val cw = iconW + lw + dp(10f) + closeW
+            pasteRect.set(w / 2 - cw / 2, cy - dp(16f), w / 2 + cw / 2 - closeW, cy + dp(16f))
+            pasteClose.set(pasteRect.right, pasteRect.top, pasteRect.right + closeW, pasteRect.bottom)
+            fill.color = if (dark) 0x2EFFFFFF else 0xE6FFFFFF.toInt()
+            c.drawRoundRect(pasteRect.left, pasteRect.top, pasteClose.right, pasteClose.bottom, dp(16f), dp(16f), fill)
+            // Pano simgesi: tahta + üstte klips
+            stroke.color = colTxt; stroke.strokeWidth = dp(1.5f)
             val ix = pasteRect.left + dp(17f)
-            c.drawRoundRect(ix - dp(5.5f), cy - dp(7f), ix + dp(5.5f), cy + dp(7.5f), dp(2f), dp(2f), stroke)
-            c.drawLine(ix - dp(2.5f), cy - dp(7f), ix + dp(2.5f), cy - dp(7f), stroke)
+            c.drawRoundRect(ix - dp(6f), cy - dp(7f), ix + dp(6f), cy + dp(8f), dp(2.5f), dp(2.5f), stroke)
+            fill.color = colTxt
+            c.drawRoundRect(ix - dp(3.5f), cy - dp(9f), ix + dp(3.5f), cy - dp(5f), dp(1.5f), dp(1.5f), fill)
+            c.drawLine(ix - dp(3f), cy, ix + dp(3f), cy, stroke); c.drawLine(ix - dp(3f), cy + dp(3.5f), ix + dp(1.5f), cy + dp(3.5f), stroke)
             text.color = colTxt; text.textAlign = Paint.Align.LEFT
-            c.drawText(label, pasteRect.left + dp(30f), cy + dp(5f), text)
+            c.drawText(label(body), pasteRect.left + iconW, cy + dp(5f), text)
             text.textAlign = Paint.Align.CENTER
-            pasteClose.set(pasteRect.right, pasteRect.top, pasteRect.right + dp(36f), pasteRect.bottom)
+            // ayırıcı + ✕
+            stroke.color = if (dark) 0x33FFFFFF else 0x22000000; stroke.strokeWidth = dp(1f)
+            c.drawLine(pasteClose.left, cy - dp(9f), pasteClose.left, cy + dp(9f), stroke)
             stroke.color = colSub; stroke.strokeWidth = dp(1.6f)
-            val xx = pasteClose.centerX() - dp(6f); val s = dp(4.5f)
-            if (pasteClose.right < w) {
-                c.drawLine(xx - s, cy - s, xx + s, cy + s, stroke); c.drawLine(xx - s, cy + s, xx + s, cy - s, stroke)
-            }
+            val xx = pasteClose.centerX(); val sz = dp(4.5f)
+            c.drawLine(xx - sz, cy - sz, xx + sz, cy + sz, stroke); c.drawLine(xx - sz, cy + sz, xx + sz, cy - sz, stroke)
         }
     }
 
@@ -299,9 +306,6 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
         if (isPressed && (k.fn || k.code != Code.Char || page == Page.Emoji)) col = if (k.fn || k.code == Code.Return) colKey else colFn
         fill.color = col
         c.drawRoundRect(rr, radius, radius, fill)
-        // Üst kenarda ince cam ışığı.
-        stroke.color = if (dark) 0x30FFFFFF else 0x80FFFFFF.toInt(); stroke.strokeWidth = dp(0.8f)
-        c.drawLine(rr.left + radius, rr.top + dp(0.6f), rr.right - radius, rr.top + dp(0.6f), stroke)
 
         val cx = rr.centerX(); val cy = rr.centerY()
         val onBlue = k.code == Code.Return && host.returnIsAction()
