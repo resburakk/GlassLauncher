@@ -155,6 +155,8 @@ data class LauncherSettings(
     val showToday: Boolean = true,
     /** Yuvarlak (köşeleri boş) simgeleri dolu kareye tamamla. */
     val iconFillRound: Boolean = true,
+    /** Canlı simgeler: renkler daha doygun, zeminde derinlik, sembol takvim rakamı gibi kabarık (gölgeli). */
+    val iconVivid: Boolean = true,
     /** Saat ve Takvim simgeleri canlı çizilir (iOS gibi: ibreler döner, tarih her gün değişir). */
     val liveIcons: Boolean = true,
     /** Simge kenarındaki ince beyaz çizginin (iOS kenar ışığı) kalınlığı, dp. */
@@ -340,7 +342,7 @@ data class LauncherSettings(
         put("menuTextSize", menuTextSize.toDouble()); put("menuRowHeight", menuRowHeight.toDouble())
         put("menuOpacity", menuOpacity.toDouble()); put("menuBlur", menuBlur.toDouble()); put("menuDark", menuDark); put("menuAuto", menuAuto); put("widgetStyle", widgetStyle)
         put("dockCorner2", dockCorner.toDouble()); put("pillScale", pillScale.toDouble()); put("pillOffset", pillOffset.toDouble())
-        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound)
+        put("topSwipe", topSwipe.name); put("midSwipe2", midSwipe.name); put("doubleTapLock", doubleTapLock); put("upSwipeRecents", upSwipeRecents); put("hideNavHandle", hideNavHandle); put("showLibrary2", showLibrary); put("showToday", showToday); put("iconFillRound", iconFillRound); put("iconVivid", iconVivid)
         put("liveIcons", liveIcons); put("liveClockSeconds", liveClockSeconds)
         put("iconRimWidth", iconRimWidth.toDouble()); put("wallpaperTarget", wallpaperTarget)
         put("liveIconTheme", liveIconTheme); put("appTransitions2", appTransitions); put("unlockAnimation2", unlockAnimation); put("clearTone", clearTone); put("clearSurface", clearSurface); put("allowRotation", allowRotation); put("weatherIcon", weatherIcon); put("glassAccent", glassAccent.toDouble())
@@ -459,6 +461,7 @@ data class LauncherSettings(
                 showLibrary = o.optBoolean("showLibrary2", d.showLibrary),
                 showToday = o.optBoolean("showToday", d.showToday),
                 iconFillRound = o.optBoolean("iconFillRound", d.iconFillRound),
+                iconVivid = o.optBoolean("iconVivid", d.iconVivid),
                 liveIcons = o.optBoolean("liveIcons", d.liveIcons),
                 iconRimWidth = o.optDouble("iconRimWidth", d.iconRimWidth.toDouble()).toFloat(),
                 liveIconTheme = o.optString("liveIconTheme", d.liveIconTheme),

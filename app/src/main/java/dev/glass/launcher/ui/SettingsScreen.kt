@@ -702,11 +702,16 @@ private fun IconsPage(s: LauncherSettings, onChange: ((LauncherSettings) -> Laun
     // Simge paketi (Play Store'daki Nova / ADW uyumlu paketler).
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val packs = remember { dev.glass.launcher.data.IconPacks.installed(ctx) }
+    Group(null) {
+        // Bütün simgeler: daha canlı renk, zeminde derinlik, sembol takvim rakamı gibi kabarık.
+        ToggleRow("Canlı simgeler", s.iconVivid, default = Def.iconVivid) { v -> onChange { it.copy(iconVivid = v) } }
+    }
     Group("Simge paketi") {
         PackRow("Yok (uygulamaların kendi simgeleri)", s.iconPack.isEmpty()) { onChange { it.copy(iconPack = "") } }
         packs.forEach { p ->
             RowDivider()
-            PackRow(p.label, s.iconPack == p.packageName) {
+            PackRow(p.label, s.iconPack == p.packageName ||
+                (p.packageName == dev.glass.launcher.data.IconPacks.BUILTIN_CAM27 && s.iconPack == "dev.glass.cam27")) {
                 dev.glass.launcher.data.IconPacks.clear()
                 onChange { it.copy(iconPack = p.packageName) }
             }

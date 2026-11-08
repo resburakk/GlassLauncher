@@ -11,7 +11,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /** Simge görünümünü belirleyen ayarlar (önbellek anahtarının parçası). */
-data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?, val fillRound: Boolean = true, val iconPack: String = "")
+data class IconLook(val style: IconStyle, val tint: Int, val customFile: String?, val fillRound: Boolean = true, val iconPack: String = "", val vivid: Boolean = false)
 
 /**
  * Sınırlı boyutlu simge önbelleği. Bitmap'ler ekrandaki gerçek boyutta üretilir (büyük bitmap yok);
@@ -28,9 +28,11 @@ class IconCache(private val context: Context) {
     suspend fun get(app: AppInfo, sizePx0: Int, look: IconLook): ImageBitmap {
         // Animasyonun ilk karesinde (ör. 0'dan büyüyen menü/hücre) boyut 0 gelebilir: en az 1 px.
         val sizePx = sizePx0.coerceAtLeast(1)
-        val k = "${app.key}~${app.iconStamp}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}/${look.iconPack}"
+        val k = "${app.key}~${app.iconStamp}@$sizePx/${look.style}/${look.tint}/${look.customFile}/${look.fillRound}/${look.iconPack}/${look.vivid}"
         cache.get(k)?.let { return it }
         val bmp = withContext(Dispatchers.Default) {
+            // Canlı simge efekti bu iş parçacığındaki çizimlere uygulanır (bkz. IconRenderer.vivid).
+            IconRenderer.vivid.set(look.vivid)
             // Küçük simgeler (klasör önizlemesi vb.) de en az 192 px'te çizilip sonra küçültülür: yuvarlak simge
             // algılaması her boyutta aynı sonucu verir ve küçük simgeler daha net olur.
             // İki kat çözünürlükte üretilip yüksek kaliteyle küçültülür: koyu/renkli simgelerde sembol kenarları

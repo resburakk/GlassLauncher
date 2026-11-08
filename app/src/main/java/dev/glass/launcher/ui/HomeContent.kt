@@ -539,12 +539,23 @@ internal fun HomeContent(
         // Yatay: sayfalar dikey dock'un altından kaymaz, dock'un solunda kesilir (iOS'ta da öyle). Önceden simgeler
         // kayarken dock'un altına giriyor, dock'un camı ise yalnızca duvar kâğıdını gösterdiği için iki katman üst üste
         // binmiş gibi duruyordu. Arşive geçerken kesme çizgisi ekranın sağına açılır (arşiv dock'un sağına kadar uzanır).
-        val pageClip = if (!m.dockVertical) Modifier else Modifier.drawWithContent {
-            if (dragging) { drawContent(); return@drawWithContent }
-            val edge = (m.dockLeft - 6.dp).toPx()
-            val right = edge + (size.width - edge) * libFraction
-            clipRect(right = right) { this@drawWithContent.drawContent() }
-        }
+        // Kesme yumuşak: simgeler dock'a yaklaşırken ~28 dp'lik bantta saydamlaşarak kaybolur (keskin çizgi yok).
+        val pageClip = if (!m.dockVertical || dragging) Modifier else Modifier
+            .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+            .drawWithContent {
+                val edge = (m.dockLeft - 4.dp).toPx()
+                val right = edge + (size.width - edge) * libFraction
+                val fade = 28.dp.toPx()
+                clipRect(right = right) { this@drawWithContent.drawContent() }
+                if (libFraction < 0.999f) drawRect(
+                    brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                        0f to Color.Black, 1f to Color.Transparent, startX = right - fade, endX = right,
+                    ),
+                    topLeft = androidx.compose.ui.geometry.Offset(right - fade, 0f),
+                    size = androidx.compose.ui.geometry.Size(fade, size.height),
+                    blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                )
+            }
         Box(Modifier.fillMaxSize().then(pageClip).drawBehind {
             // Arşiv yukarı/aşağı kayarken de kart camlarının arkası burada çizilir (kartlar kendi arkalarını çizmez).
             if (!(scrollHold || GlassMotion.listHoles) || edit || dragging) return@drawBehind

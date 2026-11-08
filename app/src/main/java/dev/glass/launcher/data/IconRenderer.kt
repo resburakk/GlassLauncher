@@ -35,6 +35,28 @@ import kotlin.math.sin
  */
 object IconRenderer {
 
+    /**
+     * Canlı simgeler (Ayarlar > Simgeler): renkler daha doygun ve tok (doygunluk ×1,38, kontrast ×1,10), zeminde üstten
+     * alta hafif açık→koyu derinlik, sembolün altında takvim rakamındaki gibi belirgin yumuşak gölge (kabartma).
+     * Çizimi yapan iş parçacığına göre (simge önbelleği aynı anda birkaç simge hazırlayabilir).
+     */
+    val vivid: ThreadLocal<Boolean> = ThreadLocal.withInitial { false }
+
+    private fun vividMatrix(): ColorMatrix {
+        val sat = ColorMatrix().apply { setSaturation(1.38f) }
+        val c = 1.10f; val t = 128f * (1f - c)
+        val con = ColorMatrix(floatArrayOf(c, 0f, 0f, 0f, t, 0f, c, 0f, 0f, t, 0f, 0f, c, 0f, t, 0f, 0f, 0f, 1f, 0f))
+        return ColorMatrix().apply { setConcat(con, sat) }
+    }
+
+    /** Katmanı olmayan (eski tip) simgelerde yalnızca renk canlandırılır. */
+    private fun vividPost(src: Bitmap): Bitmap {
+        val out = createBitmap(src.width, src.height)
+        Canvas(out).drawBitmap(src, 0f, 0f, Paint(Paint.FILTER_BITMAP_FLAG).apply { colorFilter = ColorMatrixColorFilter(vividMatrix()) })
+        src.recycle()
+        return out
+    }
+
     fun render(d: Drawable, size: Int, style: IconStyle, tint: Int, fillRound: Boolean = true): Bitmap {
         if (style == IconStyle.Dark) return renderDark(d, size, tint, fillRound)
         if (style == IconStyle.Clear) return renderClear(d, size, tint, fillRound)
@@ -52,14 +74,17 @@ object IconRenderer {
             // Zemini tek renk olmayan simgelerde (Chrome gibi renkli, tam dolu) sembol ayrıştırılamaz: normal yol.
             if (!usable) fromDarkGlyph(renderDark(d, size, tint, fillRound), style, tint)?.let { return it }
         }
-        val out = createBitmap(size, size)
-        val c = Canvas(out)
+        val out0 = createBitmap(size, size)
+        val c = Canvas(out0)
+        val viv = style == IconStyle.Original && vivid.get() == true
+        val layered = d is AdaptiveIconDrawable && !plated(d, size)
         if (d is AdaptiveIconDrawable) {
             // Katmanlara renk filtresi uygulanacağı için paylaşılan sistem önbelleği etkilenmesin.
             renderAdaptive(c, d.mutate() as AdaptiveIconDrawable, size, style, tint)
         } else {
             renderLegacy(c, d, size, style, tint)
         }
+        val out = if (viv && !layered) vividPost(out0) else out0
         // Köşeleri boş kalan (yuvarlak/şekilli) simgeler iOS gibi dolu kareye tamamlanır.
         return if (style == IconStyle.Original && fillRound) fillShape(out, size).also { if (it !== out) out.recycle() } else out
     }
@@ -301,11 +326,14 @@ object IconRenderer {
         val bg = d.background
         when (style) {
             IconStyle.Original -> {
-                bg?.let { it.bounds = bounds; it.draw(c) }
+                val viv = vivid.get() == true && !plated(d, size)
+                val filter = if (viv) ColorMatrixColorFilter(vividMatrix()) else null
+                bg?.let { it.bounds = bounds; it.colorFilter = filter; it.draw(c); it.colorFilter = null }
+                if (viv && bg != null) drawVividDepth(c, size)
                 // iOS 26: sembol zemine hafif, yumuşak bir gölge düşürür (katmanlı görünüm). Plakası ön planda
                 // olan simgelerde (Honor) plakanın altına çizgi düşmesin diye yapılmaz.
-                if (fg != null && bg != null && !plated(d, size)) drawGlyphShadow(c, fg, bounds, size)
-                fg?.let { it.bounds = bounds; it.draw(c) }
+                if (fg != null && bg != null && !plated(d, size)) drawGlyphShadow(c, fg, bounds, size, strong = viv)
+                fg?.let { it.bounds = bounds; it.colorFilter = filter; it.draw(c); it.colorFilter = null }
             }
             IconStyle.Light, IconStyle.Dark, IconStyle.Clear -> {
                 drawBackdrop(c, size, style)
@@ -335,15 +363,24 @@ object IconRenderer {
     }
 
     /** Ön plan katmanının yumuşak gölgesi: aşağı ~%1,8 kaymış, ~%3 bulanık, %18 siyah (iOS simge sembolleri gibi). */
-    private fun drawGlyphShadow(c: Canvas, fg: Drawable, bounds: Rect, size: Int) {
+    /** Canlı simge zemini: üstte hafif açık, altta hafif koyu (simge düz renk yerine hacimli görünür). */
+    private fun drawVividDepth(c: Canvas, size: Int) {
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        p.shader = android.graphics.LinearGradient(0f, 0f, 0f, size.toFloat(),
+            intArrayOf(0x12FFFFFF, 0x00FFFFFF, 0x1A000000), floatArrayOf(0f, 0.45f, 1f), android.graphics.Shader.TileMode.CLAMP)
+        c.drawRect(0f, 0f, size.toFloat(), size.toFloat(), p)
+    }
+
+    private fun drawGlyphShadow(c: Canvas, fg: Drawable, bounds: Rect, size: Int, strong: Boolean = false) {
         runCatching {
             val tmp = createBitmap(size, size)
             fg.bounds = bounds
             fg.draw(Canvas(tmp))
-            val blur = (size * 0.03f).coerceAtLeast(1f)
+            // Canlı simgede takvim rakamındaki gibi daha belirgin: aşağı %2,8, yumuşak, %36 siyah.
+            val blur = (size * if (strong) 0.045f else 0.03f).coerceAtLeast(1f)
             val off = IntArray(2)
             val alpha = tmp.extractAlpha(Paint().apply { maskFilter = android.graphics.BlurMaskFilter(blur, android.graphics.BlurMaskFilter.Blur.NORMAL) }, off)
-            c.drawBitmap(alpha, off[0].toFloat(), off[1] + size * 0.018f, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { color = 0x2E000000 })
+            c.drawBitmap(alpha, off[0].toFloat(), off[1] + size * (if (strong) 0.028f else 0.018f), Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { color = if (strong) 0x5C000000 else 0x2E000000 })
             alpha.recycle(); tmp.recycle()
         }
     }

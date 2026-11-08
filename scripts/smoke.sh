@@ -502,18 +502,14 @@ for f in 1 2 3 4 5 6 7 8 9 10; do adb shell input motionevent MOVE $((W*20/100 +
 sleep 0.8; shot 28b-gecis-yarida
 adb shell input motionevent MOVE $((W*20/100)) $((H*45/100)); adb shell input motionevent UP $((W*20/100)) $((H*45/100)); step "bırak" 2
 
-# 29) Cam 27 simge paketi: kurulur, Ayarlar > Simgeler'den seçilir, ana ekran görüntülenir.
-PACK=iconpack/build/outputs/apk/release/iconpack-release.apk
-if [ -f "$PACK" ]; then
-  adb install -r "$PACK" >/dev/null && echo "::notice::Simge paketi kuruldu" || echo "::warning::Simge paketi kurulamadı"
-  adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3
-  tap_text "Simgeler" && step "simgeler" 2
-  shot 29a-simge-ayarlari
-  tap_text "Cam 27" && step "paket seçildi" 2
-  adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
-  adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
-  shot 29b-simge-paketi
-fi
+# 29) Cam 27 simge paketi (launcher'ın içinde): Ayarlar > Simgeler'den seçilir, ana ekran görüntülenir.
+adb shell am start -W -n dev.glass.launcher/.SettingsEntry >/dev/null; step "ayarlar" 3
+tap_text "Simgeler" && step "simgeler" 2
+shot 29a-simge-ayarlari
+tap_text "Cam 27" && step "paket seçildi" 2
+adb shell input keyevent KEYCODE_HOME; step "ana ekran" 3
+adb shell input keyevent KEYCODE_HOME; step "ilk sayfa" 2
+shot 29b-simge-paketi
 
 # 30) Dinamik Ada: izin verilir, Ayarlar > Dinamik Ada'dan açılır; boşta, mesajda ve şarjda görüntülenir.
 adb shell appops set dev.glass.launcher SYSTEM_ALERT_WINDOW allow || true

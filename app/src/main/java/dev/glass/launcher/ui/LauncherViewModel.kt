@@ -361,7 +361,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         }
         // Renk 0 = otomatik: duvar kâğıdının vurgu rengi (Material You gibi).
         val tint = if (s.tintColor == 0) WallpaperAccent.color.value else s.tintColor
-        return IconLook(style, tint, s.customIcons[app.key], s.iconFillRound, s.iconPack)
+        return IconLook(style, tint, s.customIcons[app.key], s.iconFillRound, s.iconPack, s.iconVivid && style == dev.glass.launcher.data.IconStyle.Original)
     }
 
     private fun isSystemDark(): Boolean =

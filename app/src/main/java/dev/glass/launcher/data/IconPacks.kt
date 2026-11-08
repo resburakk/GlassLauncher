@@ -31,8 +31,14 @@ object IconPacks {
 
     private val loaded = HashMap<String, Pack?>()
 
-    /** Telefonda yüklü simge paketleri (ada göre sıralı). */
-    fun installed(ctx: Context): List<IconPackInfo> {
+    /** Launcher'ın içindeki Cam 27 paketi (ayrı APK gerekmez). */
+    const val BUILTIN_CAM27 = "builtin:cam27"
+
+    /** Dahili paket + telefonda yüklü simge paketleri (ada göre sıralı). */
+    fun installed(ctx: Context): List<IconPackInfo> =
+        listOf(IconPackInfo(BUILTIN_CAM27, "Cam 27")) + installedExternal(ctx).filter { it.packageName != "dev.glass.cam27" && it.label != "Cam 27" }
+
+    private fun installedExternal(ctx: Context): List<IconPackInfo> {
         val pm = ctx.packageManager
         val seen = LinkedHashMap<String, IconPackInfo>()
         for (i in THEME_INTENTS) {
@@ -47,11 +53,13 @@ object IconPacks {
     @Synchronized
     private fun pack(ctx: Context, pkg: String): Pack? = loaded.getOrPut(pkg) {
         runCatching {
-            val res = ctx.packageManager.getResourcesForApplication(pkg)
+            val builtin = pkg == BUILTIN_CAM27
+            val resPkg = if (builtin) ctx.packageName else pkg
+            val res = if (builtin) ctx.resources else ctx.packageManager.getResourcesForApplication(pkg)
             val map = HashMap<String, String>()
             val byPkg = HashMap<String, String>()
             val parser: XmlPullParser? = run {
-                val id = res.getIdentifier("appfilter", "xml", pkg)
+                val id = if (builtin) dev.glass.launcher.R.xml.cam27_appfilter else res.getIdentifier("appfilter", "xml", pkg)
                 if (id != 0) res.getXml(id) else runCatching {
                     XmlPullParserFactory.newInstance().newPullParser().apply { setInput(res.assets.open("appfilter.xml"), "UTF-8") }
                 }.getOrNull()
@@ -76,12 +84,14 @@ object IconPacks {
                     ev = parser.next()
                 }
             }
-            Pack(res, pkg, map, byPkg)
+            Pack(res, resPkg, map, byPkg)
         }.getOrNull()
     }
 
     /** Paketteki simge (yoksa null: uygulama kendi simgesiyle gösterilir). */
-    fun icon(ctx: Context, pkg: String, component: ComponentName, density: Int): Drawable? {
+    fun icon(ctx: Context, pkg0: String, component: ComponentName, density: Int): Drawable? {
+        // Eski ayrı Cam 27 APK'sı seçiliyse dahili pakete yönlenir (APK kaldırılsa da simgeler kalır).
+        val pkg = if (pkg0 == "dev.glass.cam27") BUILTIN_CAM27 else pkg0
         val p = pack(ctx, pkg) ?: return null
         val name = p.map[component.flattenToString()] ?: p.map[component.flattenToShortString()]
             ?: p.byPackage[component.packageName] ?: return null

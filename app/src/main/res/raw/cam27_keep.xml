@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dahili Cam 27 simgeleri adla (appfilter) bulunur: kaynak küçültme bunları silmesin. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/cam_*,@xml/cam27_appfilter" />
