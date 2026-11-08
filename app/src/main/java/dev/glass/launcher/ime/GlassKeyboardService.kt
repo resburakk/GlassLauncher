@@ -27,6 +27,9 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     private var dismissedClip: String? = null
 
     private val prefs get() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private var cfg = KbConfig()
+    private var lastSpaceAt = 0L
+    private val audio by lazy { getSystemService(android.media.AudioManager::class.java) }
 
     override fun onCreateInputView(): View {
         val v = KeyboardView(this, this)
@@ -55,12 +58,23 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
             addView(panel, android.widget.FrameLayout.LayoutParams(-1, -2, android.view.Gravity.BOTTOM))
         }
         ViewCompat.setOnApplyWindowInsetsListener(root) { _, ins ->
-            val nb = ins.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            // Alt pay: uygulamanın bildirdiği gezinme çubuğu bazı uygulamalarda (ör. Claude) 0 geliyordu ve Honor'un
+            // "Klavyeyi yükselt" çubuğu tuşların üstüne biniyordu. Sistemin klavye altı çubuk yüksekliği de hesaba katılır.
+            val nb = maxOf(
+                ins.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom,
+                ins.getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars()).bottom,
+                sysDimen("navigation_bar_frame_height"),
+            )
             v.navInset = nb; bar.navInset = nb
             ins
         }
         return root
     }
+
+    private fun sysDimen(name: String): Int = runCatching {
+        val id = resources.getIdentifier(name, "dimen", "android")
+        if (id != 0) resources.getDimensionPixelSize(id) else 0
+    }.getOrDefault(0)
 
     private fun styleEmojiPanel() {
         val panel = emojiPanel ?: return
@@ -103,17 +117,27 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     override fun onWindowShown() {
         super.onWindowShown()
         requestHighRefresh()
+        // Üst sıradaki harf balonu klavyenin üstüne taşabilsin: üst kapsayıcılar kırpmasın.
+        var p = view?.parent
+        while (p is android.view.ViewGroup) { p.clipChildren = false; p.clipToPadding = false; p = p.parent }
     }
 
-    private fun isDark() = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    private fun isDark() = when (cfg.theme) {
+        1 -> false
+        2 -> true
+        else -> (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        cfg = KbConfig.load(this)
         readClipboard()
         val v = view ?: return
+        v.cfg = cfg; emojiBarView?.cfg = cfg
         v.dark = isDark(); emojiBarView?.dark = isDark(); styleEmojiPanel(); showEmoji(false)
         val cls = (info?.inputType ?: 0) and InputType.TYPE_MASK_CLASS
         v.reset(if (cls == InputType.TYPE_CLASS_NUMBER || cls == InputType.TYPE_CLASS_PHONE) KeyboardView.Page.Numbers else KeyboardView.Page.Letters)
+        v.refreshBar()
     }
 
     override fun onUpdateSelection(oss: Int, ose: Int, nss: Int, nse: Int, cs: Int, ce: Int) {
@@ -133,7 +157,68 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     }
 
     // ---------- Host ----------
-    override fun commit(text: String) { currentInputConnection?.commitText(text, 1) }
+    override fun commit(text: String) {
+        val ic = currentInputConnection ?: return
+        var t = text
+        val plain = plainField()
+        if (plain && (t == " " || t == "\n" || t in listOf(".", ",", "!", "?"))) applyReplacement()
+        if (t == " " && plain && cfg.periodShortcut) {
+            // "." kısayolu: kelimeden sonra iki kez boşluk = nokta + boşluk.
+            val before = ic.getTextBeforeCursor(2, 0)?.toString().orEmpty()
+            val now = SystemClock.uptimeMillis()
+            if (before.length == 2 && before[1] == ' ' && before[0].isLetterOrDigit() && now - lastSpaceAt < 600) {
+                ic.deleteSurroundingText(1, 0); t = ". "; lastSpaceAt = 0L
+                ic.commitText(t, 1); return
+            }
+            lastSpaceAt = now
+        }
+        if (plain && cfg.smartPunct && (t == "\"" || t == "'")) {
+            // Akıllı noktalama: boşluktan/başlangıçtan sonra açılış, aksi halde kapanış tırnağı.
+            val prev = ic.getTextBeforeCursor(1, 0)?.toString().orEmpty()
+            val opening = prev.isEmpty() || prev[0].isWhitespace() || prev[0] in "([{“‘"
+            t = if (t == "\"") (if (opening) "“" else "”") else (if (opening) "‘" else "’")
+        }
+        ic.commitText(t, 1)
+    }
+
+    /** Metin değiştirme: imleçten önceki kelime listede varsa karşılığıyla değiştirilir (ör. "slm" → "Selam"). */
+    private fun applyReplacement() {
+        if (cfg.replacements.isEmpty()) return
+        val ic = currentInputConnection ?: return
+        val before = ic.getTextBeforeCursor(40, 0)?.toString() ?: return
+        val word = before.takeLastWhile { !it.isWhitespace() && it !in ".,!?" }
+        if (word.isEmpty()) return
+        val hit = cfg.replacements.entries.firstOrNull { it.key.equals(word, ignoreCase = true) } ?: return
+        ic.deleteSurroundingText(word.length, 0)
+        ic.commitText(hit.value, 1)
+    }
+
+    /** Şifre, e-posta, adres gibi alanlarda düzeltme/noktalama yapılmaz. */
+    private fun plainField(): Boolean {
+        val it = currentInputEditorInfo?.inputType ?: return false
+        if (it and InputType.TYPE_MASK_CLASS != InputType.TYPE_CLASS_TEXT) return false
+        val v = it and InputType.TYPE_MASK_VARIATION
+        return v != InputType.TYPE_TEXT_VARIATION_PASSWORD && v != InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD &&
+            v != InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD && v != InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS &&
+            v != InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS && v != InputType.TYPE_TEXT_VARIATION_URI
+    }
+
+    override fun click(kind: Int) {
+        if (!cfg.sound) return
+        runCatching {
+            audio.playSoundEffect(when (kind) {
+                1 -> android.media.AudioManager.FX_KEYPRESS_DELETE
+                2 -> android.media.AudioManager.FX_KEYPRESS_SPACEBAR
+                3 -> android.media.AudioManager.FX_KEYPRESS_RETURN
+                else -> android.media.AudioManager.FX_KEYPRESS_STANDARD
+            }, 0.6f)
+        }
+    }
+
+    override fun setOneHanded(mode: Int) {
+        cfg = cfg.copy(oneHanded = mode); KbConfig.save(this, cfg)
+        view?.cfg = cfg
+    }
 
     override fun deleteBack() {
         val ic = currentInputConnection ?: return
@@ -204,12 +289,12 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
     }
 
     override fun pasteChip(): String? = paste
-    override fun pasteNow() { paste?.let { commit(it); dismissedClip = it }; paste = null }
+    override fun pasteNow() { paste?.let { currentInputConnection?.commitText(it, 1); dismissedClip = it }; paste = null }
     override fun dismissPaste() { dismissedClip = paste; paste = null }
 
     override fun autoCaps(): Boolean {
         val info = currentInputEditorInfo ?: return false
-        if (!prefs.getBoolean(KEY_AUTOCAPS, true)) return false
+        if (!cfg.autoCaps) return false
         val cls = info.inputType and InputType.TYPE_MASK_CLASS
         if (cls != InputType.TYPE_CLASS_TEXT) return false
         val variation = info.inputType and InputType.TYPE_MASK_VARIATION
@@ -220,7 +305,7 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         return ic.getCursorCapsMode(info.inputType) != 0
     }
 
-    override fun haptics(): Boolean = prefs.getBoolean(KEY_HAPTICS, true)
+    override fun haptics(): Boolean = cfg.haptics
 
     companion object {
         const val PREFS = "glass_keyboard"

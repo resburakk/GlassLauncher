@@ -1464,9 +1464,15 @@ private fun KeyboardPage() {
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { tick++ }
     val enabled = remember(tick) { dev.glass.launcher.ime.GlassKeyboardService.isEnabled(ctx) }
     val selected = remember(tick) { dev.glass.launcher.ime.GlassKeyboardService.isSelected(ctx) }
-    val prefs = remember { ctx.getSharedPreferences(dev.glass.launcher.ime.GlassKeyboardService.PREFS, android.content.Context.MODE_PRIVATE) }
-    var haptics by remember { mutableStateOf(prefs.getBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_HAPTICS, true)) }
-    var autoCaps by remember { mutableStateOf(prefs.getBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_AUTOCAPS, true)) }
+    var c by remember { mutableStateOf(dev.glass.launcher.ime.KbConfig.load(ctx)) }
+    fun set(n: dev.glass.launcher.ime.KbConfig) { c = n; dev.glass.launcher.ime.KbConfig.save(ctx, n) }
+    @Composable
+    fun Chips(options: List<String>, sel: Int, onSel: (Int) -> Unit) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            options.forEachIndexed { i, t -> Chip(t, sel == i, Modifier.weight(1f)) { onSel(i) } }
+        }
+    }
+
     Group("Glass Klavye") {
         ActionRow(if (enabled) "1. Klavye etkin ✓" else "1. Klavyeyi etkinleştir") {
             runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_INPUT_METHOD_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -1476,17 +1482,106 @@ private fun KeyboardPage() {
             ctx.getSystemService(android.view.inputmethod.InputMethodManager::class.java).showInputMethodPicker()
         }
     }
-    Footer("iOS 27 görünümlü klavye: Türkçe Q, 123 ve sembol sayfaları, emoji, büyük harf (iki dokunuşla kilit), basılı tutunca hızlı silme, son kopyalanan yazıyı tek dokunuşla yapıştırma. Klavye değiştirmek için alttaki sistem dünya simgesini kullan; sağ üstteki mikrofon sesle yazmaya geçer. Açık ve koyu mod telefonun temasını izler.")
-    Group("Ayarlar") {
-        ToggleRow("Tuş titreşimi", haptics) { v -> haptics = v; prefs.edit().putBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_HAPTICS, v).apply() }
+    Footer("iOS 27 görünümlü klavye. Klavye değiştirmek için alttaki sistem dünya simgesini kullan.")
+
+    Group("Görünüm") {
+        Text("Tema", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        Chips(listOf("Otomatik", "Açık", "Koyu"), c.theme) { set(c.copy(theme = it)) }
         RowDivider()
-        ToggleRow("Otomatik büyük harf", autoCaps) { v -> autoCaps = v; prefs.edit().putBoolean(dev.glass.launcher.ime.GlassKeyboardService.KEY_AUTOCAPS, v).apply() }
+        Text("Klavye yüksekliği", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        Chips(listOf("Kısa", "Normal", "Uzun"), c.height) { set(c.copy(height = it)) }
+        RowDivider()
+        Text("Tek elle klavye", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+        Chips(listOf("Kapalı", "Sol", "Sağ"), c.oneHanded) { set(c.copy(oneHanded = it)) }
+        RowDivider()
+        ToggleRow("Karakter önizleme", c.preview, default = true) { set(c.copy(preview = it)) }
     }
+    Footer("Otomatik tema telefonun açık/koyu ayarını izler. Tek elle modda boş kalan yandaki düğmelerle tam klavyeye dönebilir ya da öbür yana geçebilirsin.")
+
+    Group("Yazma") {
+        ToggleRow("Otomatik büyük harf", c.autoCaps, default = true) { set(c.copy(autoCaps = it)) }
+        RowDivider()
+        ToggleRow("Büyük harf kilidi", c.capsLock, default = true) { set(c.copy(capsLock = it)) }
+        RowDivider()
+        ToggleRow("Akıllı noktalama", c.smartPunct, default = true) { set(c.copy(smartPunct = it)) }
+        RowDivider()
+        ToggleRow("\".\" kısayolu", c.periodShortcut, default = true) { set(c.copy(periodShortcut = it)) }
+        RowDivider()
+        ToggleRow("Dikte (mikrofon tuşu)", c.dictation, default = true) { set(c.copy(dictation = it)) }
+    }
+    Footer("Büyük harf kilidi: Shift'e iki kez dokununca kilitlenir. Akıllı noktalama: düz tırnakları “ ” ve ’ yapar. \".\" kısayolu: iki kez boşluğa dokununca nokta ve boşluk ekler. Şifre, e-posta ve adres alanlarında bunlar uygulanmaz.")
+
+    Group("Ses ve titreşim") {
+        ToggleRow("Klavye sesi", c.sound, default = false) { set(c.copy(sound = it)) }
+        RowDivider()
+        ToggleRow("Dokunsal geri bildirim", c.haptics, default = true) { set(c.copy(haptics = it)) }
+        if (c.haptics) {
+            RowDivider()
+            Text("Titreşim gücü", color = Fg, fontSize = 17.sp, modifier = Modifier.padding(start = 16.dp, top = 12.dp))
+            Chips(listOf("Hafif", "Orta", "Güçlü"), c.hapticStrength) { set(c.copy(hapticStrength = it)) }
+        }
+    }
+
+    Group("Tuş hassasiyeti") {
+        SliderRow("Basılı tutma süresi", "${c.longPressMs} ms", c.longPressMs.toFloat(), 250f..800f, default = 420f) {
+            set(c.copy(longPressMs = (it / 10).toInt() * 10))
+        }
+        RowDivider()
+        SliderRow("Silme tekrar hızı", "${c.repeatMs} ms", c.repeatMs.toFloat(), 30f..150f, default = 60f) {
+            set(c.copy(repeatMs = (it / 5).toInt() * 5))
+        }
+        RowDivider()
+        SliderRow("Dokunma yakalama alanı", "${c.touchSlopDp} dp", c.touchSlopDp.toFloat(), 4f..24f, default = 14f) {
+            set(c.copy(touchSlopDp = it.toInt()))
+        }
+    }
+    Footer("Basılı tutma süresi: silme tuşunun hızlı silmeye başlaması için gereken süre. Silme tekrar hızı: hızlı silmede iki harf arası (küçük = daha hızlı). Dokunma yakalama alanı: iki tuşun arasına dokununca en yakın tuşun ne kadar uzaktan yakalanacağı.")
+
+    Group("Metin değiştirme") {
+        c.replacements.entries.toList().forEachIndexed { i, (k, v) ->
+            if (i > 0) RowDivider()
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(k, color = Fg, fontSize = 17.sp, modifier = Modifier.width(90.dp))
+                Text(v, color = Muted, fontSize = 17.sp, modifier = Modifier.weight(1f))
+                Text("Sil", color = Color(0xFFFF453A), fontSize = 16.sp, modifier = Modifier.clickable {
+                    set(c.copy(replacements = LinkedHashMap(c.replacements).apply { remove(k) }))
+                })
+            }
+        }
+        if (c.replacements.isNotEmpty()) RowDivider()
+        var kIn by remember { mutableStateOf("") }
+        var vIn by remember { mutableStateOf("") }
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.TextField(kIn, { kIn = it.trim() }, Modifier.width(100.dp), singleLine = true,
+                placeholder = { Text("Kısayol") })
+            Spacer(Modifier.width(8.dp))
+            androidx.compose.material3.TextField(vIn, { vIn = it }, Modifier.weight(1f), singleLine = true,
+                placeholder = { Text("İfade") })
+            Spacer(Modifier.width(8.dp))
+            Text("Ekle", color = Color(0xFF0A84FF), fontSize = 16.sp, modifier = Modifier.clickable {
+                if (kIn.isNotBlank() && vIn.isNotBlank()) {
+                    set(c.copy(replacements = LinkedHashMap(c.replacements).apply { put(kIn, vIn) })); kIn = ""; vIn = ""
+                }
+            })
+        }
+    }
+    Footer("Kısayolu yazıp boşluğa (ya da noktalama işaretine) basınca ifadeyle değiştirilir; ör. \"slm\" → \"Selam\".")
+
+    Group("Sonraki aşamada") {
+        InfoRow("Otomatik düzeltme", "Yakında")
+        RowDivider()
+        InfoRow("Yazım denetimi", "Yakında")
+        RowDivider()
+        InfoRow("Tahmini metin (öneriler)", "Yakında")
+        RowDivider()
+        InfoRow("Kaydırarak yazma", "Yakında")
+    }
+
     Group("Dene") {
         var t by remember { mutableStateOf("") }
         androidx.compose.material3.TextField(
             value = t, onValueChange = { t = it }, modifier = Modifier.fillMaxWidth(),
-            placeholder = { androidx.compose.material3.Text("Buraya yazarak klavyeyi dene") },
+            placeholder = { Text("Buraya yazarak klavyeyi dene") },
         )
     }
 }
