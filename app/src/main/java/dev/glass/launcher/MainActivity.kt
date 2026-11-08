@@ -491,14 +491,9 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         if (isDestroyed) return
         runCatching {
             WindowCompat.getInsetsController(window, window.decorView).apply {
-                // Yatay ekranda üstteki durum çubuğu (saat, şebeke, pil) gizlenir; iOS'ta da yatayda görünmez. Sistem
-                // simgeleri yerinden kaydırılamıyor, dikey dock'un üstüne biniyordu; gizlenince dock ve simgeler
-                // ekranın üstüne kadar uzanır. Yukarıdan kaydırınca geçici olarak görünür.
-                val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                systemBarsBehavior = if (landscape) androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                    else androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
-                if (landscape) hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
-                else show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                // Durum çubuğu (saat, şebeke, pil) yatayda da görünür (kullanıcı tercihi).
+                systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
+                show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
                 if (hideNavHandle && gestureNav()) {
                     hide(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
                 } else {

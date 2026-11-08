@@ -549,7 +549,12 @@ fun HomeScreen(
         LocalGlassFrost provides (if (useBackdrop) 1f else settings.glassBlur.coerceIn(0f, 2f)),
         // Duvar kâğıdı bulanıklığı açıkken dock (ve "dock gibi" klasörler/Ara) arkadaki bulanık duvar kâğıdıyla aynı
         // kopyayı büker: net kopya bulanık zeminin içinde ayrı bir fotoğraf gibi duruyordu.
-        LocalDockBackdrop provides (if (wallpaper == null || homeBackdrop != null || kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f) null
+        // Yatayda telefonun kendi duvar kâğıdı kullanılıyorsa dock kopya çizmez: sistem yatayda duvar kâğıdını kendi
+        // kırpmasıyla gösteriyor (dikeydekinden farklı), kopya ise dikey kırpmaya göre eşlendiği için dock'un içinde
+        // kaymış, "dikeydeki arka plan" gibi ayrı bir görüntü duruyordu. Kopya yokken dock yarı saydam kalır ve
+        // arkasındaki gerçek duvar kâğıdı birebir görünür.
+        LocalDockBackdrop provides (if (wallpaper == null || homeBackdrop != null || kotlin.math.abs(dockBlurStep - glassBlurStep) < 0.05f ||
+            (!settings.launcherWallpaper && LocalConfiguration.current.screenWidthDp > LocalConfiguration.current.screenHeightDp)) null
             else if (dockBlurStep < 0.05f) sharpBackdrop else dockBlurred),
         LocalGlass provides GlassLook(
             dark = dark,
