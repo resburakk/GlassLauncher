@@ -79,6 +79,32 @@ class GlassKeyboardService : InputMethodService(), KeyboardView.Host {
         if (!show) view?.updateAutoCaps()
     }
 
+    /**
+     * 120 Hz: klavye penceresi ekranın en yüksek yenileme hızını ister (tuş basışı, balon ve emoji kaydırma akıcı).
+     * Android 15+ uyarlanabilir yenileme hızı (≈60 Hz'e düşürme) bu pencere için kapatılır; görünümler de yüksek
+     * hız kategorisi ister. Not: MagicOS'ta ekran yenileme hızı "Yüksek"/"Dinamik" değilse sistem sınırlayabilir.
+     */
+    private fun requestHighRefresh() {
+        val w = window?.window ?: return
+        runCatching {
+            val d = w.decorView.display ?: (getSystemService(android.hardware.display.DisplayManager::class.java).getDisplay(0)) ?: return@runCatching
+            val cur = d.mode
+            val best = d.supportedModes
+                .filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
+                .maxByOrNull { it.refreshRate } ?: return@runCatching
+            w.attributes = w.attributes.apply { preferredDisplayModeId = best.modeId; preferredRefreshRate = best.refreshRate }
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {
+            w.isFrameRatePowerSavingsBalanced = false
+            listOfNotNull(view, emojiBarView, picker).forEach { it.requestedFrameRate = View.REQUESTED_FRAME_RATE_CATEGORY_HIGH }
+        }
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        requestHighRefresh()
+    }
+
     private fun isDark() = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
