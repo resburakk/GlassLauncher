@@ -543,11 +543,15 @@ internal fun HomeContent(
         val pageClip = if (!m.dockVertical || dragging) Modifier else Modifier
             .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
             .drawWithContent {
-                val edge = (m.dockLeft - 4.dp).toPx()
+                // Kesme çizgisi dock'un tam kenarında: duran sayfada son sütuna hiç değmez.
+                val edge = m.dockLeft.toPx()
                 val right = edge + (size.width - edge) * libFraction
-                val fade = 28.dp.toPx()
+                // Yumuşatma yalnızca sayfa kayarken: kaydırma başlayınca bant açılır, sayfa oturunca kapanır
+                // (önceden duran sayfada da son sütunun sağ kenarını siliyordu).
+                val moving = kotlin.math.abs(pagerState.currentPageOffsetFraction)
+                val fade = 28.dp.toPx() * (moving * 8f).coerceIn(0f, 1f)
                 clipRect(right = right) { this@drawWithContent.drawContent() }
-                if (libFraction < 0.999f) drawRect(
+                if (libFraction < 0.999f && fade > 0.5f) drawRect(
                     brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
                         0f to Color.Black, 1f to Color.Transparent, startX = right - fade, endX = right,
                     ),
