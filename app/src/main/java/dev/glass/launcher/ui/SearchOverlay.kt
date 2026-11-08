@@ -22,6 +22,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -376,15 +377,24 @@ private fun SuggestionsPanel(
     val st = LocalLauncherSettings.current
     // Yatayda panel geniş ekrana yayılmasın: kısa kenar genişliğinde (dikeydeki gibi), ortada.
     val conf = LocalConfiguration.current
+    val landscape = conf.screenWidthDp > conf.screenHeightDp
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
     val screenW = conf.screenWidthDp.dp
     val shortW = minOf(conf.screenWidthDp, conf.screenHeightDp).dp
-    val panelW = shortW - (hm.dockMarginX - (screenW - shortW) / 2f) * 2f
     // Yanlardaki boşluk = simgelerin dış kenarından panel kenarına; aynı boşluk üstte ve altta da kullanılır.
     val pad = hm.dockInnerStart
+    // Dikey: dock genişliğinde, 4 sütun, dock'un simge adımıyla.
+    // Yatay: Ara kutusuyla aynı kenarlara uzanır; dikeydeki simge aralığıyla kaç sütun sığıyorsa o kadar, simgeler
+    // panele eşit dağıtılır (sol ve sağ boşluk aynı). Önceden dikey dock'un adımı kullanıldığı için sağda fazladan
+    // boşluk kalıyordu.
+    val portraitPitch = (shortW - hm.dockIcon - pad * 2f - (hm.dockMarginX - (screenW - shortW) / 2f) * 2f) / 3f
+    val panelW = if (landscape) maxWidth else shortW - (hm.dockMarginX - (screenW - shortW) / 2f) * 2f
+    val cols = if (landscape) (((panelW - pad * 2f - hm.dockIcon) / portraitPitch).toInt() + 1).coerceIn(4, 10) else 4
+    val pitch = if (landscape) (panelW - pad * 2f - hm.dockIcon) / (cols - 1).toFloat() else hm.dockPitch
     val labelBlock: Dp = if (showLabels) 22.dp else 0.dp
     val cellH = hm.dockIcon + labelBlock
     // Aşağı çekince 8 öneri (iki sıra), yukarı çekince 4; son durum ayarlarda saklanır.
-    val expanded = st.searchSuggestExpanded && suggestions.size > 4
+    val expanded = st.searchSuggestExpanded && suggestions.size > cols
     val rowGap = pad * 0.6f
     val motion = LocalMotion.current
     val panelH by androidx.compose.animation.core.animateDpAsState(
@@ -417,22 +427,23 @@ private fun SuggestionsPanel(
             // Öneri paneli göze batacak kadar parlaktı: hafif koyu tonla biraz kısılır.
             .background(Color.Black.copy(alpha = 0.12f), panelShape)
     ) {
-        suggestions.take(if (expanded || secondRow > 0f) 8 else 4).forEachIndexed { i, app ->
-            val row = i / 4
-            val col = i % 4
+        suggestions.take(if (expanded || secondRow > 0f) cols * 2 else cols).forEachIndexed { i, app ->
+            val row = i / cols
+            val col = i % cols
             Box(
                 Modifier
-                    .offset(x = pad + hm.dockPitch * col.toFloat(), y = pad + (cellH + rowGap) * row.toFloat())
+                    .offset(x = pad + pitch * col.toFloat(), y = pad + (cellH + rowGap) * row.toFloat())
                     .graphicsLayer { if (row == 1) { alpha = secondRow; translationY = (1f - secondRow) * -24f } }
             ) {
                 AppCell(
-                    app, vm, hm.dockIcon, hm.dockPitch, cellH, showLabels, iconGlass, strength,
+                    app, vm, hm.dockIcon, pitch, cellH, showLabels, iconGlass, strength,
                     labelSize = st.searchSuggestLabelSize, labelWeight = st.searchSuggestLabelWeight,
                 ) { onOpen(app) }
             }
         }
     }
     }
+    } // BoxWithConstraints
 }
 
 @Composable

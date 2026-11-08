@@ -172,7 +172,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val scores = LaunchStats.scores(la)
         val byComp = all.associateBy { it.componentName.flattenToString() }
         val ranked = scores.entries.sortedByDescending { it.value }.mapNotNull { byComp[it.key] }
-        (ranked.take(8) + recent).distinctBy { it.key }.take(8)
+        // Yatay aramada iki sıra × 10 öneri gösterilebilir: 20'ye kadar.
+        (ranked.take(20) + recent).distinctBy { it.key }.take(20)
     }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(viewModelScope, eager, emptyList())
 
     /**
@@ -190,7 +191,7 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
      */
     val libraryGroups: StateFlow<List<LibraryGroup>> = combine(shownApps, suggestedApps) { all, recent ->
         val groups = ArrayList<LibraryGroup>()
-        if (recent.isNotEmpty()) groups += LibraryGroup("Öneriler", recent)
+        if (recent.isNotEmpty()) groups += LibraryGroup("Öneriler", recent.take(8))
         val newest = all.filter { it.installTime > 0 }.sortedByDescending { it.installTime }.take(8)
         if (newest.isNotEmpty()) groups += LibraryGroup("Son Eklenenler", newest)
         val (work, personal) = all.partition { it.profile == dev.glass.launcher.data.ProfileKind.Work }
