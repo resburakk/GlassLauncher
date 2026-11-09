@@ -100,7 +100,8 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
     private val rowGap get() = (if (numeric) dp(7f) else dp(10f)) * hScale
     private val gapX = dp(5f)
     private val side = dp(7f)
-    private val radius = dp(11f) // iOS 26/27: daha yuvarlak, kapsüle yakın tuşlar
+    // iOS 27: köşe ≈ tuş yüksekliğinin beşte biri (40 dp tuşta 8 dp); sayı klavyesinin büyük tuşlarında orantılı.
+    private val radius get() = if (numeric) dp(10f) else dp(8f)
     private val bottomH = dp(12f)
     var navInset = 0
         set(v) { field = v; requestLayout() }
