@@ -16,6 +16,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -484,14 +485,37 @@ internal fun FolderIcon(
         ),
         contentAlignment = Alignment.Center,
     ) {
-        val pageStep = block + icon * 0.12f
-        Box(Modifier.size(block).clipToBounds()) {
+        // Mini sayfalar camın KENDİ yuvarlak şekliyle kırpılır ve kenara yaklaşınca solarak kaybolur (iOS gibi):
+        // önceden yalnızca 3×3 blok kadar dar, köşeli bir kutuyla kırpılıyordu; kayarken simgeler camın ortasında
+        // dümdüz bir çizgiyle kesiliyordu. Bir sayfa adımı klasör genişliği kadar: sayfalar birbirine girmeden yer değişir.
+        val shape = appShape(icon * LocalLauncherSettings.current.iconCorner)
+        val margin = ((icon - block) / 2f) / icon // dururken simgelerin kenara uzaklığı (oran)
+        Box(
+            Modifier.size(icon).clip(shape)
+                .graphicsLayer {
+                    val moving = anim.value != kotlin.math.round(anim.value)
+                    compositingStrategy = if (moving) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                    else androidx.compose.ui.graphics.CompositingStrategy.Auto
+                }
+                .drawWithContent {
+                    drawContent()
+                    if (anim.value == kotlin.math.round(anim.value)) return@drawWithContent
+                    val f = margin.coerceIn(0.04f, 0.3f)
+                    drawRect(
+                        androidx.compose.ui.graphics.Brush.horizontalGradient(
+                            0f to Color.Transparent, f to Color.Black, (1f - f) to Color.Black, 1f to Color.Transparent,
+                        ),
+                        blendMode = androidx.compose.ui.graphics.BlendMode.DstIn,
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
             val pos = anim.value
             for (pg in 0 until maxOf(pageCount, 1)) {
                 if (kotlin.math.abs(pg - pos) >= 1f) continue // yalnızca görünen sayfalar çizilir
                 val shown = folder.keys.drop(pg * 9).take(9)
                 Column(
-                    Modifier.size(block).graphicsLayer { translationX = (pg - pos) * pageStep.toPx() },
+                    Modifier.size(block).graphicsLayer { translationX = (pg - anim.value) * icon.toPx() },
                     verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     shown.chunked(3).forEach { row ->

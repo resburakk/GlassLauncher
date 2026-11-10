@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -151,6 +152,50 @@ fun FolderOverlay(
         val rubberY = remember { androidx.compose.animation.core.Animatable(0f) }
         val rubberScope = androidx.compose.runtime.rememberCoroutineScope()
         val singlePage = pages.size <= 1
+        // Sayfa kaydırıcısının kenarı (tek sayfalı klasörde her yön; çok sayfalıda ilk sayfadan sola, son sayfadan sağa):
+        // kaydırıcının kullanamadığı parmak hareketi iOS lastik bandına çevrilir. Simgelerin üstünden çekince de
+        // çalışır. Önceden burada Android'in zayıf "gerilme" efekti vardı; tek sayfada içerik neredeyse kımıldamıyordu.
+        val edgeW = with(androidx.compose.ui.platform.LocalDensity.current) {
+            androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.dp.toPx()
+        }
+        val edgeConn = remember(edgeW) {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                var raw = 0f
+                fun band(r: Float): Float {
+                    val a = kotlin.math.abs(r)
+                    return kotlin.math.sign(r) * (1f - 1f / (a * 0.55f / edgeW + 1f)) * edgeW
+                }
+                fun unband(v: Float): Float {
+                    val a = kotlin.math.abs(v).coerceAtMost(edgeW * 0.98f)
+                    return kotlin.math.sign(v) * (1f / (1f - a / edgeW) - 1f) * edgeW / 0.55f
+                }
+                fun show() { val v = band(raw); rubberScope.launch { rubber.snapTo(v) } }
+
+                override fun onPreScroll(available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                    if (source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput) return Offset.Zero
+                    if (rubber.isRunning) { rubberScope.launch { rubber.stop() }; raw = unband(rubber.value) }
+                    if (raw == 0f || available.x == 0f || kotlin.math.sign(available.x) == kotlin.math.sign(raw)) return Offset.Zero
+                    // Esneme varken ters yöne çekmek önce esnemeyi geri alır, sonra sayfa kayar.
+                    val next = raw + available.x
+                    val used = if (kotlin.math.sign(next) != kotlin.math.sign(raw)) -raw else available.x
+                    raw += used; show()
+                    return Offset(used, 0f)
+                }
+
+                override fun onPostScroll(consumed: Offset, available: Offset, source: androidx.compose.ui.input.nestedscroll.NestedScrollSource): Offset {
+                    if (source != androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput || available.x == 0f) return Offset.Zero
+                    raw += available.x; show()
+                    return Offset(available.x, 0f)
+                }
+
+                override suspend fun onPreFling(available: androidx.compose.ui.unit.Velocity): androidx.compose.ui.unit.Velocity {
+                    if (raw == 0f && rubber.value == 0f) return androidx.compose.ui.unit.Velocity.Zero
+                    raw = 0f
+                    rubberScope.launch { rubber.animateTo(0f, androidx.compose.animation.core.spring(dampingRatio = 0.62f, stiffness = 340f)) }
+                    return available
+                }
+            }
+        }
 
         // Sürüklenen uygulama panelden çıkıp kısa süre dışarıda kalırsa klasör kapanır (iOS davranışı).
         val outside by remember {
@@ -316,14 +361,15 @@ fun FolderOverlay(
                         )
                     }
             ) {
+            // Android'in kendi kenar gerilmesi kapalı: kenardaki çekmeyi yukarıdaki iOS lastik bandı karşılar.
+            androidx.compose.runtime.CompositionLocalProvider(androidx.compose.foundation.LocalOverscrollFactory provides null) {
             HorizontalPager(
                 state = pagerState,
-                // Tek sayfada kaydırılacak yer yok: çekmeyi aşağıdaki esnek çekme karşılar.
-                // Tek sayfalı klasörde de sayfa kaydırma açık: kenar esnemesi çok sayfalı klasörlerin ilk/son sayfasındaki
-                // ile aynı olur ve simgelerin üstünden çekince de çalışır.
+                // Tek sayfalı klasörde de sayfa kaydırma açık: kenardaki fazla hareket lastik bandına gider; simgelerin
+                // üstünden çekince de çalışır, çok sayfalı klasörlerin ilk/son sayfasıyla aynı his.
                 userScrollEnabled = drag.key == null,
                 modifier = Modifier
-                    .graphicsLayer { translationX = rubber.value }
+                    .nestedScroll(edgeConn)
                     .fillMaxWidth()
                         .height(rowH * 3 + badgeRoom),
             ) { page ->
@@ -332,7 +378,12 @@ fun FolderOverlay(
                 // camları her karede yeniden çizilmez; yalnızca düzenleme modunda (sallanma) yeniden çizilir.
                 Column(
                     Modifier.fillMaxSize()
-                        .graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                        // Esneme sayfa İÇERİĞİNE uygulanır, kaydırıcının kendisine değil: dokunuşu algılayan düğüm kayarsa
+                        // parmak altındaki hareket küçülür ve titrer.
+                        .graphicsLayer {
+                            compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                            translationX = rubber.value
+                        }
                         .drawBehind { DrawCount.hit("Klasör sayfası") }
                         .padding(top = badgeRoom)
                 ) {
@@ -367,6 +418,7 @@ fun FolderOverlay(
                     }
                 }
             }
+            } // CompositionLocalProvider
             }
 
             if (pages.size > 1) {
