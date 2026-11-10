@@ -274,11 +274,27 @@ fun IslandRoot() {
     if (winW <= 0f || aw.value <= 1f) return
     val shapeR = (ah.value / 2f).coerceAtMost(if (mode is IslandMode.Expanded) 42f else 999f) * s.corner.coerceIn(0f, 1f)
     val glass = s.style == 1
+    // iOS 27 görünümü: ada açıldıkça zemini yukarıdan aşağı siyahtan saydama geçer. Üst kısım kamera deliğiyle
+    // birleşen tam siyah kalır; alt kısımda arkadaki ekran koyulaşmış olarak seçilir. Kapalı (küçük) ada tam siyah.
+    // Geçiş adanın yüksekliğine bağlı: açılırken ve kapanırken kesintisiz.
+    val openK = ((ah.value - baseH) / 60f).coerceIn(0f, 1f)
+    val solid = if (glass) Color(0xFF1C1C1E) else Color.Black
+    val topA = if (glass) 0.85f else 1f
+    fun lerp(a: Float, b: Float) = a + (b - a) * openK
+    val islandBg = Brush.verticalGradient(
+        0f to solid.copy(alpha = topA),
+        0.28f to solid.copy(alpha = lerp(topA, topA * 0.97f)),
+        0.62f to solid.copy(alpha = lerp(topA, if (glass) 0.66f else 0.80f)),
+        1f to solid.copy(alpha = lerp(topA, if (glass) 0.48f else 0.60f)),
+    )
+    // İnce cam kenarı: açık adada alt kenara doğru belirginleşen ışık çizgisi (üstte siyahla birleşir, görünmez).
+    val rim = if (glass) Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x14FFFFFF)))
+        else Brush.verticalGradient(0f to Color.Transparent, 0.45f to Color(0x0FFFFFFF), 1f to Color.White.copy(alpha = 0.30f * openK))
     val islandMod = Modifier
         .requiredSize(aw.value.dp, ah.value.dp)
         .clip(RoundedCornerShape(shapeR.dp))
-        .background(if (glass) Color(0xD91C1C1E) else Color.Black)
-        .then(if (glass) Modifier.border(0.8.dp, Brush.verticalGradient(listOf(Color(0x40FFFFFF), Color(0x14FFFFFF))), RoundedCornerShape(shapeR.dp)) else Modifier)
+        .background(islandBg)
+        .then(if (glass || openK > 0.01f) Modifier.border(0.8.dp, rim, RoundedCornerShape(shapeR.dp)) else Modifier)
 
     Box(Modifier.fillMaxSize()) {
         Box(
