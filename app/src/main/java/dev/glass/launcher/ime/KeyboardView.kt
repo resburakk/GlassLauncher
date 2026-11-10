@@ -476,10 +476,11 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
             c.drawRoundRect(rr, radius, radius, fill)
         }
         // cam kenarı: üstte parlak, alta doğru sönük
-        stroke.strokeWidth = dp(1f)
+        // İnce cam kenarı (0,6 dp; önceden 1 dp ve fazla parlaktı).
+        stroke.strokeWidth = dp(0.6f)
         stroke.shader = LinearGradient(0f, rr.top, 0f, rr.bottom,
-            if (dark) intArrayOf(0x66FFFFFF, 0x0FFFFFFF) else intArrayOf(0xE6FFFFFF.toInt(), 0x33FFFFFF), null, Shader.TileMode.CLAMP)
-        c.drawRoundRect(rr.left + dp(0.5f), rr.top + dp(0.5f), rr.right - dp(0.5f), rr.bottom - dp(0.5f), radius, radius, stroke)
+            if (dark) intArrayOf(0x4DFFFFFF, 0x0AFFFFFF) else intArrayOf(0x99FFFFFF.toInt(), 0x1AFFFFFF), null, Shader.TileMode.CLAMP)
+        c.drawRoundRect(rr.left + dp(0.3f), rr.top + dp(0.3f), rr.right - dp(0.3f), rr.bottom - dp(0.3f), radius, radius, stroke)
         stroke.shader = null
     }
 
@@ -600,77 +601,118 @@ class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: B
 
     private fun kindOf(k: Key) = when (k.code) { Code.Delete -> 1; Code.Space -> 2; Code.Return -> 3; else -> 0 }
 
+    /** İzlenen parmak (çoklu dokunma: iki başparmakla hızlı yazarken her parmak ayrı tuş). */
+    private var activeId = -1
+
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
-            MotionEvent.ACTION_DOWN -> {
-                if (pasteClose.contains(e.x, e.y)) { host.dismissPaste(); refreshBar(); return true }
-                if (pasteRect.contains(e.x, e.y)) { tick(); host.pasteNow(); refreshBar(); return true }
-                if (e.y < barH) {
-                    val i = suggRects.indexOfFirst { it.contains(e.x, e.y) }
-                    if (i >= 0 && !host.suggestions().getOrNull(i).isNullOrEmpty()) { tick(); host.pickSuggestion(i) }
-                    return true
+            MotionEvent.ACTION_DOWN -> { activeId = e.getPointerId(0); down(e.x, e.y) }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // Hızlı yazma: ikinci parmak değerken ilk parmağın tuşu hemen yazılır, yeni parmak izlenir.
+                // (Önceden ikinci parmak yok sayılıyordu; harf kayboluyor ya da yanlış tuş yazılıyordu.)
+                if (swiping || trackpad) return true
+                pressed?.let { k ->
+                    stopRepeats(); pressed = null
+                    if (k.code != Code.Delete) release(k)
                 }
-                swiping = false; trail.clear(); swipePath.clear(); downX = e.x; downY = e.y
-                val k = keyAt(e.x, e.y) ?: return true
-                pressed = k; tick(kindOf(k)); invalidate()
-                when (k.code) {
-                    Code.Delete -> { host.deleteBack(); repeating = true; handler.postDelayed(repeatDelete, cfg.longPressMs.toLong()) }
-                    Code.Globe -> handler.postDelayed(longGlobe, cfg.longPressMs.toLong())
-                    Code.Space -> handler.postDelayed(startTrackpad, cfg.longPressMs.toLong())
-                    else -> {}
-                }
+                val idx = e.actionIndex
+                activeId = e.getPointerId(idx)
+                down(e.getX(idx), e.getY(idx))
             }
             MotionEvent.ACTION_MOVE -> {
-                if (trackpad) {
-                    val stepX = dp(9f); val stepY = dp(22f)
-                    val sx = ((e.x - tpX) / stepX).toInt(); val sy = ((e.y - tpY) / stepY).toInt()
-                    if (sx != 0 || sy != 0) {
-                        host.moveCursor(sx, sy)
-                        tpX += sx * stepX; tpY += sy * stepY
-                        if (host.haptics() && sx != 0) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                    }
-                    return true
-                }
-                val k = pressed ?: return true
-                // Kaydırarak yazma: harf tuşundan başlayıp bir tuş genişliğinden fazla kayınca iz çizilir.
-                if (cfg.swipe && page == Page.Letters && k.code == Code.Char && !swiping &&
-                    kotlin.math.hypot(e.x - downX, e.y - downY) > k.rect.width() * 1.1f) {
-                    swiping = true; swipePath.append(k.label); trail.add(downX); trail.add(downY)
-                }
-                if (swiping) {
-                    trail.add(e.x); trail.add(e.y)
-                    val n = keyAt(e.x, e.y)
-                    if (n != null && n.code == Code.Char && n.rect.contains(e.x, e.y) && (swipePath.isEmpty() || swipePath.last().toString() != n.label)) swipePath.append(n.label)
-                    invalidate(); return true
-                }
-                if (k.code == Code.Char && page != Page.Emoji) {
-                    // Parmak kayınca balon yeni tuşa geçer (iOS gibi; bırakınca o yazılır).
-                    val n = keyAt(e.x, e.y)
-                    if (n != null && n !== k && n.code == Code.Char) { pressed = n; invalidate() }
-                }
+                val idx = e.findPointerIndex(activeId)
+                if (idx >= 0) move(e.getX(idx), e.getY(idx))
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val idx = e.actionIndex
+                if (e.getPointerId(idx) == activeId) { up(e.getX(idx), e.getY(idx)); activeId = -1 }
             }
             MotionEvent.ACTION_UP -> {
-                val k = pressed
-                repeating = false; handler.removeCallbacks(repeatDelete); handler.removeCallbacks(longGlobe)
-                handler.removeCallbacks(startTrackpad)
-                pressed = null
-                if (trackpad) { trackpad = false; invalidate(); return true }
-                if (swiping) {
-                    keyAt(e.x, e.y)?.takeIf { it.code == Code.Char }?.let { if (swipePath.last().toString() != it.label) swipePath.append(it.label) }
-                    host.swipeWord(swipePath.toString(), shift != Shift.Off)
-                    if (shift == Shift.On) { shift = Shift.Off; build() }
-                    swiping = false; trail.clear(); invalidate(); return true
-                }
-                if (k != null) release(k)
-                invalidate()
+                if (e.getPointerId(0) == activeId) up(e.x, e.y)
+                activeId = -1
             }
             MotionEvent.ACTION_CANCEL -> {
-                handler.removeCallbacks(startTrackpad); trackpad = false
-                repeating = false; handler.removeCallbacks(repeatDelete); handler.removeCallbacks(longGlobe); pressed = null; invalidate()
+                stopRepeats(); trackpad = false; swiping = false; trail.clear(); pressed = null; activeId = -1; invalidate()
             }
         }
         return true
+    }
+
+    private fun stopRepeats() {
+        repeating = false
+        handler.removeCallbacks(repeatDelete); handler.removeCallbacks(longGlobe); handler.removeCallbacks(startTrackpad)
+    }
+
+    private fun down(x: Float, y: Float) {
+        if (pasteClose.contains(x, y)) { host.dismissPaste(); refreshBar(); return }
+        if (pasteRect.contains(x, y)) { tick(); host.pasteNow(); refreshBar(); return }
+        if (y < barH) {
+            val i = suggRects.indexOfFirst { it.contains(x, y) }
+            if (i >= 0 && !host.suggestions().getOrNull(i).isNullOrEmpty()) { tick(); host.pickSuggestion(i) }
+            return
+        }
+        swiping = false; trail.clear(); swipePath.clear(); downX = x; downY = y
+        val k = keyAt(x, y) ?: return
+        pressed = k; tick(kindOf(k)); invalidate()
+        when (k.code) {
+            Code.Delete -> { host.deleteBack(); repeating = true; handler.postDelayed(repeatDelete, cfg.longPressMs.toLong()) }
+            Code.Globe -> handler.postDelayed(longGlobe, cfg.longPressMs.toLong())
+            Code.Space -> handler.postDelayed(startTrackpad, cfg.longPressMs.toLong())
+            else -> {}
+        }
+    }
+
+    private fun move(x: Float, y: Float) {
+        if (trackpad) {
+            val stepX = dp(9f); val stepY = dp(22f)
+            val sx = ((x - tpX) / stepX).toInt(); val sy = ((y - tpY) / stepY).toInt()
+            if (sx != 0 || sy != 0) {
+                host.moveCursor(sx, sy)
+                tpX += sx * stepX; tpY += sy * stepY
+                if (host.haptics() && sx != 0) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+            return
+        }
+        val k = pressed ?: return
+        // Kaydırarak yazma: bir buçuk tuş genişliğinden fazla kayınca başlar (hızlı dokunuşlar yanlışlıkla
+        // kaydırma sayılmasın).
+        if (cfg.swipe && page == Page.Letters && k.code == Code.Char && !swiping &&
+            kotlin.math.hypot(x - downX, y - downY) > k.rect.width() * 1.5f) {
+            swiping = true; swipePath.append(k.label); trail.add(downX); trail.add(downY)
+        }
+        if (swiping) {
+            trail.add(x); trail.add(y)
+            val n = keyAt(x, y)
+            if (n != null && n.code == Code.Char && n.rect.contains(x, y) && (swipePath.isEmpty() || swipePath.last().toString() != n.label)) swipePath.append(n.label)
+            invalidate(); return
+        }
+        if (k.code == Code.Char && page != Page.Emoji) {
+            // Parmak kayınca balon yeni tuşa geçer (iOS gibi), ama yalnızca parmak yeni tuşun açıkça içine
+            // girdiyse: kenarlarda %20 pay var (hızlı yazarken parmağın hafif kayması komşu tuşa geçirmesin).
+            val n = rows.flatten().firstOrNull { it.code == Code.Char && it !== k && insetContains(it.rect, x, y) }
+            if (n != null) { pressed = n; invalidate() }
+        }
+    }
+
+    private fun insetContains(r: RectF, x: Float, y: Float): Boolean {
+        val ix = r.width() * 0.2f; val iy = r.height() * 0.2f
+        return x > r.left + ix && x < r.right - ix && y > r.top + iy && y < r.bottom - iy
+    }
+
+    private fun up(x: Float, y: Float) {
+        val k = pressed
+        stopRepeats()
+        pressed = null
+        if (trackpad) { trackpad = false; invalidate(); return }
+        if (swiping) {
+            keyAt(x, y)?.takeIf { it.code == Code.Char }?.let { if (swipePath.last().toString() != it.label) swipePath.append(it.label) }
+            host.swipeWord(swipePath.toString(), shift != Shift.Off)
+            if (shift == Shift.On) { shift = Shift.Off; build() }
+            swiping = false; trail.clear(); invalidate(); return
+        }
+        if (k != null) release(k)
+        invalidate()
     }
 
     private fun release(k: Key) {
