@@ -15,6 +15,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.rememberUpdatedState
 
 import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
@@ -142,6 +143,20 @@ class PageAnchor {
     var drawExtra: (androidx.compose.ui.graphics.drawscope.DrawScope.(shiftX: Float) -> Unit)? = null
     /** true: camlar normal gölgesini korur (ana ekranın sayfa dışı camları: dock, arama çubuğu). */
     var normalShadow = false
+}
+
+/** Bir camın arkasını şeklin içine yumuşak kenarlı çizmek için fırça ve görüntü fırçası (cam başına bir tane). */
+class BackdropPaint {
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG or android.graphics.Paint.FILTER_BITMAP_FLAG)
+    val matrix = android.graphics.Matrix()
+    private var src: androidx.compose.ui.graphics.ImageBitmap? = null
+    private var shader: android.graphics.BitmapShader? = null
+    fun imageShader(img: androidx.compose.ui.graphics.ImageBitmap): android.graphics.BitmapShader {
+        val cur = shader
+        if (cur != null && src === img) return cur
+        return android.graphics.BitmapShader(img.asAndroidBitmap(), android.graphics.Shader.TileMode.CLAMP, android.graphics.Shader.TileMode.CLAMP)
+            .also { shader = it; src = img }
+    }
 }
 
 /** Sayfa içindeki bir camın arkası: sayfaya göre alanı, şekli ve çizim ayarları. */
@@ -321,6 +336,8 @@ fun Modifier.liquidGlass(
     val glow = st.glassRimGlow
     val s = strength
     val lens = remember { GlassLens.newShader() }
+    // Camın arkasını şeklin içine yumuşak kenarlı çizen fırça (kırpma katmanı olmadan).
+    val maskPaint = remember { BackdropPaint() }
     // Panel: arkasındaki bulanıklığı ayrı bir [BlurBackdrop] kutusu çizer; burada yalnızca dolgu incelir.
     val content = if (panel && !look.reduced) LocalGlassRegions.current else null
     val clear = look.clear
@@ -424,47 +441,61 @@ fun Modifier.liquidGlass(
                     if (old == null || old.rect != r || old.clip != clipR || old.bd !== bd || old.refr != refr || old.clear != clear ||
                         old.soft != softPx || old.rootW != look.rootW || old.rootH != look.rootH
                     ) {
-                        // Arşiv kayarken alan her karede değişir ama boyutu aynı kalır: şekil yeniden oluşturulmaz.
-                        val outline = shape.createOutline(r.size, holeDir, holeDensity)
-                        val path = if (old != null && old.rect.size == r.size) old.path
-                            else androidx.compose.ui.graphics.Path().apply { addOutline(outline) }
+                        // Arşiv / widget sayfası kayarken alan her karede değişir ama boyutu aynı kalır: şekil ve köşe
+                        // yarıçapı yeniden hesaplanmaz (önceden şekil her karede her cam için baştan oluşturuluyordu).
+                        val same = old != null && old.rect.size == r.size
+                        val outline = if (same) null else shape.createOutline(r.size, holeDir, holeDensity)
+                        val path = if (same) old!!.path
+                            else androidx.compose.ui.graphics.Path().apply { addOutline(outline!!) }
                         pageAnchor.holes[holeKey] = GlassHole(
                             // Kayarken de tam cam (mercek + parlama): önceden sade çiziliyor, sayfa yerine oturunca
                             // mercek birden gelip kartlar aydınlanıyordu.
                             r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = false,
-                            ios = ios && refr > 0.01f, lensRadius = (shape as? SquircleShape)?.let { with(holeDensity) { it.radius.toPx() } } ?: outlineRadius(outline),
+                            ios = ios && refr > 0.01f, lensRadius = if (same) old!!.lensRadius else (shape as? SquircleShape)?.let { with(holeDensity) { it.radius.toPx() } } ?: outlineRadius(outline!!),
                         )
                     }
                 }
             }
             else Modifier
         )
-        .smoothClip(shape)
+        // Camın ARKASI (bulanık/kırılmış duvar kâğıdı) kırpma katmanının DIŞINDA, şeklin kendisiyle yumuşak kenarlı
+        // çizilir. Önceden kırpma katmanının (squircle için ekran dışı tampon) içindeydi: kaydırırken arka her karede
+        // değiştiği için her camın tamponu ve bütün içeriği her karede baştan çiziliyordu (widget sayfasında 6 cam ×
+        // 120 Hz → takılma). Şimdi kaydırırken yalnızca arka çizilir; içerik hazır görüntüsünden kullanılır.
         .then(
-            if (bd != null) Modifier.drawBehind {
-                // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
-                if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
-                    // Katman camı hareket halindeyken kopya çizilmez: cam şeffaf kalır, arkadaki gerçek arka plan
-                    // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
-                    val sh = if (inPage) pageAnchor?.shift?.invoke() else null
-                    if (sh != null) {
-                        // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Yumuşatma geçişte de açık:
-                        // kapatılınca kayarken cam içi keskin görünüp bırakınca birden bulanıklaşıyordu.
-                        drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
-                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth)
-                    } else if (inPage && GlassMotion.listScrolling) {
-                        // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
-                    } else if (inPage || !(overlay && GlassMotion.moving)) {
-                        // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
-                        // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
-                        drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
-                            ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth)
+            if (bd != null) Modifier.drawWithCache {
+                val outline = shape.createOutline(size, layoutDirection, this)
+                val mask = androidx.compose.ui.graphics.Path().apply { addOutline(outline) }.asAndroidPath()
+                onDrawBehind {
+                    DrawCount.hit("Cam arkası")
+                    // Sayfalar kayarken bu camın arkasını sayfanın altındaki ayrı katman çizer (bkz. drawPageGlassHoles).
+                    if (!(inPage && pageAnchor != null && pageAnchor.holesActive())) {
+                        // Katman camı hareket halindeyken kopya çizilmez: cam şeffaf kalır, arkadaki gerçek arka plan
+                        // görünür (konumu her karede değişen kopya hem pahalıydı hem de yanlış yerden görünüyordu).
+                        val sh = if (inPage) pageAnchor?.shift?.invoke() else null
+                        if (sh != null) {
+                            // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Yumuşatma geçişte de açık:
+                            // kapatılınca kayarken cam içi keskin görünüp bırakınca birden bulanıklaşıyordu.
+                            drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
+                                ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth, mask = mask, maskPaint = maskPaint)
+                        } else if (inPage && GlassMotion.listScrolling) {
+                            // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
+                        } else if (inPage || !(overlay && GlassMotion.moving)) {
+                            // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
+                            // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
+                            drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
+                                ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth, mask = mask, maskPaint = maskPaint)
+                        }
                     }
                 }
             }
             else Modifier
         )
-
+        .smoothClip(shape)
+        // Camın İÇERİĞİ (yazılar, simgeler, parlama, kenar) ayrı katmanda: kaydırırken camın arkası her karede yeniden
+        // çizilmek zorunda (arkasındaki görüntü değişiyor) ama içerik değişmiyor. Ayrı katman olmayınca arkanın her
+        // yeniden çiziminde widget'ın bütün içeriği de baştan çiziliyordu (widget sayfasında 120 Hz'i yetiştiremiyordu).
+        .then(if (bd != null) Modifier.graphicsLayer().drawBehind { DrawCount.hit("Cam içeriği") } else Modifier)
         .background(base)
         .accentTint(st.glassAccent, fill)
         .glassBrightness(st.glassBrightness)
@@ -529,6 +560,9 @@ private fun DrawScope.drawBackdrop(
     /** Camın gerçek köşe yarıçapı (px); < 0: kısa kenarın %30'u. */
     lensRadius: Float = -1f,
     edgeFraction: Float = GlassLens.edgeFrac,
+    /** Verilirse çizim bu şeklin içine, kenar yumuşatmalı yapılır (kırpma gerekmez). */
+    mask: android.graphics.Path? = null,
+    maskPaint: BackdropPaint? = null,
 ) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
@@ -544,7 +578,11 @@ private fun DrawScope.drawBackdrop(
         lens.setInputShader("content", bs)
         val rad = if (lensRadius >= 0f) lensRadius else minOf(area.width, area.height) * 0.3f
         GlassLens.configure(lens, area.width, area.height, rad, refraction, origin.x, origin.y, soft, ios, edgeFraction = edgeFraction)
-        drawRect(androidx.compose.ui.graphics.ShaderBrush(lens), size = area)
+        if (mask != null && maskPaint != null) {
+            maskPaint.paint.shader = lens
+            drawIntoCanvas { it.nativeCanvas.drawPath(mask, maskPaint.paint) }
+            maskPaint.paint.shader = null
+        } else drawRect(androidx.compose.ui.graphics.ShaderBrush(lens), size = area)
         return
     }
     // Duvar kâğıdı kökte ContentScale.Crop ile çizilir: aynı eşlemeyi bulanık kopyaya uygula.
@@ -565,6 +603,17 @@ private fun DrawScope.drawBackdrop(
     val itop = st.toInt().coerceIn(0, img.height - 1)
     val iw = sw.toInt().coerceIn(1, img.width - il)
     val ih = sh.toInt().coerceIn(1, img.height - itop)
+    if (mask != null && maskPaint != null) {
+        // Aynı kesit, şeklin içine yumuşak kenarlı (görüntü fırçasıyla).
+        val bs = maskPaint.imageShader(img)
+        maskPaint.matrix.setScale(area.width / iw, area.height / ih)
+        maskPaint.matrix.preTranslate(-il.toFloat(), -itop.toFloat())
+        bs.setLocalMatrix(maskPaint.matrix)
+        maskPaint.paint.shader = bs
+        drawIntoCanvas { it.nativeCanvas.drawPath(mask, maskPaint.paint) }
+        maskPaint.paint.shader = null
+        return
+    }
     drawImage(
         img,
         srcOffset = IntOffset(il, itop),

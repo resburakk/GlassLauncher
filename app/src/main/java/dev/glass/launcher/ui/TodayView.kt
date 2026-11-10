@@ -166,7 +166,9 @@ fun TodayPage(
     val navBottom = with(density) { WindowInsets.navigationBars.getBottom(this).toDp() }
     val editNow by rememberUpdatedState(edit)
     // Widget'ların ekrandaki alanları (sürükleyerek sıralama ve uzun basmanın widget'a mı boşluğa mı olduğu için).
-    val bounds = remember { mutableStateMapOf<String, Rect>() }
+    // Düz (gözlemlenmeyen) harita: kaydırırken her karede her widget için yazılıyordu; gözlemlenen durum haritası
+    // her yazımda anlık görüntü işlemi yapıyordu. Yalnızca dokunma anında okunur, gözlemlenmesine gerek yok.
+    val bounds = remember { HashMap<String, Rect>() }
     val hostView = androidx.compose.ui.platform.LocalView.current
     androidx.compose.runtime.LaunchedEffect(widgets) {
         val ids = widgets.map { it.id }.toSet()
@@ -244,6 +246,9 @@ fun TodayPage(
         // (uygulama arşivindeki gibi): widget'lar kayarken altında yumuşakça solarak kaybolur.
         val searchTop = maxOf(statusTop + u * 6f, hm.firstTop)
         val searchH = u * 43f
+        val listScroll = rememberScrollState()
+        // Dikey kaydırmanın gerçek kare ölçümü: Ayarlar > Performans'ta "Widget sayfası (kaydırma)" olarak görünür.
+        MeasureFrames(listScroll.isScrollInProgress, "Widget sayfası (kaydırma)")
         Box(Modifier.fillMaxSize()) {
         Column(
             Modifier
@@ -252,7 +257,7 @@ fun TodayPage(
                 .todayEdgeFade(u * 16f)
                 .nestedScroll(rb.connection)
                 .nestedScroll(pullToSearch)
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(listScroll)
                 .padding(top = u * 16f, bottom = navBottom + u * 28f),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
