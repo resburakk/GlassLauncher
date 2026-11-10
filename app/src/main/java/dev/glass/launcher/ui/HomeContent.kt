@@ -266,13 +266,10 @@ internal fun HomeContent(
         }
         // Kayarken katman camlarının merceği kapalı (bkz. GlassMotion).
         LaunchedEffect(scrollHold) { GlassMotion.scrolling = scrollHold }
-        // Kaydırma sürerken (parmak kalktıktan sonraki yerine oturma dahil) yüksek kare hızı istenir (Android 15+).
-        LaunchedEffect(pagerState.isScrollInProgress) {
-            if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {
-                view.requestedFrameRate = if (pagerState.isScrollInProgress) android.view.View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
-                else android.view.View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
-            }
-        }
+        // Ana ekran görünümü HER ZAMAN yüksek kare hızı ister (Android 15+): yalnızca çizerken etkilidir. Önceden yalnızca
+        // sayfa kaydırırken isteniyor, kaydırma bitince "varsayılan"a dönülüyordu; klasör, arşiv, menü ve açılış
+        // animasyonlarında karar sisteme kalıyor, Honor yer yer 60–90 Hz'e iniyordu.
+        LaunchedEffect(view) { dev.glass.launcher.HighRefresh.vote(view) }
         // Performans ölçümü: her sayfa kaydırmasında gerçek kare aralıkları (Ayarlar > Performans).
         LaunchedEffect(pagerState.isScrollInProgress) {
             if (!pagerState.isScrollInProgress) return@LaunchedEffect

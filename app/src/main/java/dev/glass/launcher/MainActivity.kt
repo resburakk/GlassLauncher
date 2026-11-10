@@ -184,6 +184,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         requestedOrientation = if (vm.settings.value.allowRotation) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         super.onResume()
+        requestHighestRefreshRate()
         applyNavHandle()
         // Launcher varsayılan ana ekran yapılınca kısayollar okunabilir hale gelir; ön plana her gelişte tazele.
         vm.refreshPinned()
@@ -277,30 +278,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
         if (alreadyInFront && intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) vm.onHomePressed()
     }
 
-    /**
-     * 120 Hz: ekranın mevcut çözünürlükteki en yüksek yenileme hızına sahip modunu ister. Animasyonlar
-     * otomatik olarak bu hızda çizilir. Not: MagicOS'ta Ayarlar > Ekran > Ekran yenileme hızı "Yüksek" veya
-     * "Dinamik" değilse sistem yine sınırlayabilir.
-     */
-    private fun requestHighestRefreshRate() {
-        runCatching {
-            val d = display ?: return
-            val cur = d.mode
-            val best = d.supportedModes
-                .filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
-                .maxByOrNull { it.refreshRate } ?: return
-            window.attributes = window.attributes.apply {
-                preferredDisplayModeId = best.modeId
-                preferredRefreshRate = best.refreshRate
-            }
-        }
-        // Android 15 QPR1+/16 "uyarlanabilir yenileme hızı": görünümler varsayılan olarak ≈60 Hz ister; parmak
-        // kalkınca sayfa kaydırma/yerine oturma animasyonu 60 Hz'e düşüyordu. Launcher penceresi için kapatılır:
-        // pencere yukarıda istenen en yüksek hızda (120 Hz) çizilir.
-        if (android.os.Build.VERSION.SDK_INT >= 35) runCatching {
-            window.isFrameRatePowerSavingsBalanced = false
-        }
-    }
+    /** 120 Hz: ortak yol (bkz. [HighRefresh]). Öne her gelişte yenilenir. */
+    private fun requestHighestRefreshRate() = HighRefresh.apply(this)
 
     private var lastBlur = -1
 

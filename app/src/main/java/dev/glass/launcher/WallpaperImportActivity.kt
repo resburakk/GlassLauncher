@@ -48,6 +48,7 @@ import kotlinx.coroutines.launch
 class WallpaperImportActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        HighRefresh.apply(this) // 120 Hz (ana ekrandaki gibi)
         val uri = imageUri(intent)
         if (uri == null) {
             Toast.makeText(this, "Görsel bulunamadı.", Toast.LENGTH_SHORT).show()

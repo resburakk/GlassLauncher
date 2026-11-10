@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glass Launcher simgesi (R5 "Beyaz Cam"): buzlu beyaz zemin + sağ üstte camgöbeği ışık. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="54" android:startY="0" android:endX="54" android:endY="108">
+                <item android:offset="0" android:color="#FFFFFFFF"/>
+                <item android:offset="1" android:color="#FFE3EBF6"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:pathData="M67,42.5m-22,0a22,22 0,1 1,44 0a22,22 0,1 1,-44 0">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="radial" android:centerX="67" android:centerY="42.5" android:gradientRadius="22">
+                <item android:offset="0" android:color="#665AC8FA"/>
+                <item android:offset="0.5" android:color="#2E5AC8FA"/>
+                <item android:offset="1" android:color="#005AC8FA"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

@@ -59,6 +59,7 @@ class AddItemActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        HighRefresh.apply(this) // 120 Hz (ana ekrandaki gibi)
         val la = getSystemService(LauncherApps::class.java)
         val req = runCatching { la.getPinItemRequest(intent) }.getOrNull()
         if (req == null || !req.isValid) { finish(); return }

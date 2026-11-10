@@ -59,6 +59,7 @@ class SettingsActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        requestHighRefresh()
         dev.glass.launcher.ui.AppLock.attach(this)
         updateDefault()
     }
@@ -90,15 +91,6 @@ class SettingsActivity : ComponentActivity() {
         finishAndRemoveTask()
     }
 
-    /** 120 Hz (ana ekrandaki gibi): ekranın en yüksek yenileme hızlı modu istenir. */
-    private fun requestHighRefresh() {
-        runCatching {
-            val d = display ?: return
-            val cur = d.mode
-            val best = d.supportedModes.filter { it.physicalWidth == cur.physicalWidth && it.physicalHeight == cur.physicalHeight }
-                .maxByOrNull { it.refreshRate } ?: return
-            window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
-            if (android.os.Build.VERSION.SDK_INT >= 35) window.isFrameRatePowerSavingsBalanced = false
-        }
-    }
+    /** 120 Hz (ana ekrandaki gibi, bkz. [HighRefresh]). */
+    private fun requestHighRefresh() = HighRefresh.apply(this)
 }

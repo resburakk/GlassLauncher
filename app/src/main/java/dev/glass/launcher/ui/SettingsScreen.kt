@@ -192,11 +192,8 @@ fun SettingsScreen(
         if (android.os.Build.VERSION.SDK_INT >= 35) {
             frView.requestedFrameRate = android.view.View.REQUESTED_FRAME_RATE_CATEGORY_HIGH
         }
-        onDispose {
-            if (android.os.Build.VERSION.SDK_INT >= 35) {
-                frView.requestedFrameRate = android.view.View.REQUESTED_FRAME_RATE_CATEGORY_DEFAULT
-            }
-        }
+        // Kapanınca "varsayılan"a dönülmez: ayarlar ana ekranın içinde de açılır, ana ekran da hep yüksek hız ister.
+        onDispose { }
     }
 
     CompositionLocalProvider(
