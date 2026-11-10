@@ -147,16 +147,16 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                     fill == 1 -> SolidColor(Color.White)
                     else -> SolidColor(Color(0xFF1C1C1E))
                 }
-                // Simge dizen widget'lar (Öneriler, Google Play) renkli görünümde düz beyaz/koyu değil, yarı saydam cam:
-                // simgeler düz beyaz zeminde sönük duruyordu.
+                // Uygulama Önerileri her görünümde Fotoğraf widget'ıyla AYNI saf Liquid Glass zeminde: önceden renkli
+                // görünümde üstüne yarı saydam beyaz/koyu katman konuyordu; koyu duvar kâğıdında gri bir yama gibi duruyordu.
                 if (w.kind == WidgetKind.Suggestions)
                     Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true)
-                        .background(if (fill == 1) Color.White.copy(alpha = 0.26f) else Color(0xFF1C1C1E).copy(alpha = 0.36f))
+                        .background(if (HomeInk.light) Color(0x38FFFFFF) else Color(0x26000000))
                 else if (play) Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).widgetRim(shape)
                 else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg).widgetRim(shape)
             }
             // Şeffaf cam widget: açık duvar kâğıdında yazılar koyu (iOS). Hava durumu ve Google Play kendi koyu zemininde.
-            val ink = when { (weather && fill != 0) || play -> GlassInk; fill == 0 -> if (HomeInk.light) GlassLightInk else GlassInk; fill == 1 -> LightInk; else -> DarkInk }
+            val ink = when { (weather && fill != 0) || play -> GlassInk; fill == 0 || w.kind == WidgetKind.Suggestions -> if (HomeInk.light) GlassLightInk else GlassInk; fill == 1 -> LightInk; else -> DarkInk }
             androidx.compose.runtime.CompositionLocalProvider(LocalWidgetInk provides ink) {
                 Box(frame) {
                     if (weather && fill != 0) WeatherBackdrop(dark = fill == 2)

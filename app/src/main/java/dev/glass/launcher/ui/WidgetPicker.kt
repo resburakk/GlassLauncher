@@ -59,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -229,7 +230,7 @@ fun WidgetPicker(vm: LauncherViewModel, strength: Float, onClose: () -> Unit) {
                     if (app == null) {
                         GalleryList(list, phoneOpen, { phoneOpen = !phoneOpen }, query, { query = it }, onOpen = { openApp = it }, onClose = onClose)
                     } else {
-                        GalleryDetail(app, hm, onBack = { openApp = null }, onAdd = ::add)
+                        GalleryDetail(app, hm, vm, strength, onBack = { openApp = null }, onAdd = ::add)
                     }
                 }
             }
@@ -362,7 +363,7 @@ private fun GalleryRow(a: GalleryApp, onOpen: (String) -> Unit) {
 
 /** Bir uygulamanın widget'ları: her widget × boyut bir kart; yatay kaydırılır, altta "Widget Ekle". */
 @Composable
-private fun GalleryDetail(app: GalleryApp, hm: HomeMetrics?, onBack: () -> Unit, onAdd: (GalleryWidget, Span) -> Unit) {
+private fun GalleryDetail(app: GalleryApp, hm: HomeMetrics?, vm: LauncherViewModel, strength: Float, onBack: () -> Unit, onAdd: (GalleryWidget, Span) -> Unit) {
     val pages = remember(app.key) { app.widgets.flatMap { w -> w.sizes.map { w to it } } }
     val pager = rememberPagerState { pages.size }
     Column(Modifier.fillMaxSize()) {
@@ -388,7 +389,7 @@ private fun GalleryDetail(app: GalleryApp, hm: HomeMetrics?, onBack: () -> Unit,
             HorizontalPager(state = pager, modifier = Modifier.fillMaxSize()) { i ->
                 val (w, s) = pages[i]
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    WidgetPreviewCard(app, w, s, hm, maxW, maxH)
+                    WidgetPreviewCard(app, w, s, hm, maxW, maxH, vm, strength)
                 }
             }
         }
@@ -426,7 +427,7 @@ private fun GalleryDetail(app: GalleryApp, hm: HomeMetrics?, onBack: () -> Unit,
  * uygulamanın verdiği ön izleme görseli, yoksa uygulama simgesi gösterilir.
  */
 @Composable
-private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: HomeMetrics?, maxW: Dp, maxH: Dp) {
+private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: HomeMetrics?, maxW: Dp, maxH: Dp, vm: LauncherViewModel, strength: Float) {
     val ctx = LocalContext.current
     val realW = hm?.widgetWidth(s.x) ?: (80.dp * s.x)
     val realH = hm?.widgetHeight(s.y) ?: (80.dp * s.y)
@@ -448,6 +449,18 @@ private fun WidgetPreviewCard(app: GalleryApp, w: GalleryWidget, s: Span, hm: Ho
     }
     val info = w.info
     val density = LocalDensity.current.density
+    // Glass widget'ları: kartın içinde ana ekrandaki GERÇEK widget çizilir (o boyuttaki gerçek düzen, seçili stil,
+    // Liquid Glass zemin). Önceden kartta yalnızca tek bir işaret ("9:41", "%85", "14") vardı.
+    w.builtin?.let { kind ->
+        Box(Modifier.size(cw, ch), contentAlignment = Alignment.Center) {
+            Box(Modifier.requiredSize(realW, realH).graphicsLayer { scaleX = k; scaleY = k }) {
+                WidgetBody(WidgetItem("preview:${kind.name}:${s.x}x${s.y}", kind, s.x, s.y), vm, realW, realH, strength)
+                // Ön izleme dokunulmaz (öneriler uygulama açmasın); kaydırma sayfa değiştirmeye gider.
+                Box(Modifier.matchParentSize().pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } })
+            }
+        }
+        return
+    }
     Box(
         Modifier.size(cw, ch).clip(cardShape).background(Color.White.copy(alpha = 0.10f))
             .border(0.8.dp, Color.White.copy(alpha = 0.18f), cardShape),
@@ -508,6 +521,7 @@ private fun BuiltinPreview(kind: WidgetKind, w: Dp) {
 
 @Composable
 private fun AppBadge(a: GalleryApp, size: Dp) {
+    a.widgets.firstOrNull()?.builtin?.takeIf { a.isGlass }?.let { GlassWidgetBadge(it, size); return }
     val icon = a.icon
     if (icon != null) {
         Image(icon, a.name, Modifier.size(size).clip(RoundedCornerShape(size * 0.23f)))
@@ -530,4 +544,108 @@ private fun GlassCircle(onClick: () -> Unit, content: @Composable () -> Unit) {
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
+}
+
+
+/**
+ * Glass widget'larının listedeki küçük simgesi: her widget'ın kendi minyatür görünümü (saat için saat, pil için
+ * halka, takvim için takvim yaprağı…). Önceden hepsinde aynı mavi widget simgesi vardı.
+ */
+@Composable
+private fun GlassWidgetBadge(kind: WidgetKind, size: Dp) {
+    val tm = androidx.compose.ui.text.rememberTextMeasurer(cacheSize = 4)
+    val day = remember { java.time.LocalDate.now() }
+    val dayName = remember(day) { day.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.forLanguageTag("tr")).uppercase(java.util.Locale.forLanguageTag("tr")) }
+    val shape = RoundedCornerShape(size * 0.23f)
+    val (top, bottom) = when (kind) {
+        WidgetKind.DigitalClock, WidgetKind.Music -> Color(0xFF2C2C2E) to Color(0xFF111113)
+        WidgetKind.Weather -> Color(0xFF4FA8FF) to Color(0xFF1C6FE0)
+        WidgetKind.Photo -> Color(0xFF7FC8FF) to Color(0xFFFFB37A)
+        WidgetKind.GlassClock, WidgetKind.Suggestions -> Color(0x40FFFFFF) to Color(0x1AFFFFFF)
+        WidgetKind.Prayer -> Color(0xFF0F3B4A) to Color(0xFF0A1F33)
+        WidgetKind.PlayStore -> Color(0xFF3A2C9E) to Color(0xFF1B1660)
+        else -> Color.White to Color(0xFFF0F0F3)
+    }
+    Box(
+        Modifier.size(size).clip(shape)
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(top, bottom)))
+            .border(0.6.dp, Color.White.copy(alpha = 0.25f), shape)
+    ) {
+        if (kind == WidgetKind.Weather) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { SkyGlyph(dev.glass.launcher.data.Sky.PartlyCloudy, true, size * 0.7f) }
+            return@Box
+        }
+        if (kind == WidgetKind.PlayStore) {
+            Box(Modifier.matchParentSize(), contentAlignment = Alignment.Center) { GlyphIcon(Glyph.Bag, Color.White, size * 0.5f) }
+            return@Box
+        }
+        androidx.compose.foundation.Canvas(Modifier.matchParentSize()) {
+            val w = this.size.width; val h = this.size.height
+            fun txt(t: String, c: Color, sp: Float, bold: Boolean, cx: Float, cy: Float) {
+                val r = tm.measure(t, TextStyle(color = c, fontSize = (sp * w / density / 40f).sp, fontWeight = if (bold) FontWeight.Bold else FontWeight.SemiBold, fontFamily = AppFont))
+                drawText(r, topLeft = androidx.compose.ui.geometry.Offset(cx - r.size.width / 2f, cy - r.size.height / 2f))
+            }
+            val green = Color(0xFF34C759); val red = Color(0xFFFF3B30); val blue = Color(0xFF0A84FF)
+            when (kind) {
+                WidgetKind.DigitalClock -> txt("9:41", Color.White, 13f, true, w / 2, h / 2)
+                WidgetKind.GlassClock -> txt("9:41", Color.White.copy(alpha = 0.9f), 14f, true, w / 2, h / 2)
+                WidgetKind.AnalogClock -> {
+                    val c = androidx.compose.ui.geometry.Offset(w / 2, h / 2); val r = w * 0.36f
+                    drawCircle(Color(0xFF1C1C1E), r, c, style = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.035f))
+                    for (i in 0 until 12) {
+                        val a = Math.toRadians(i * 30.0)
+                        val o = androidx.compose.ui.geometry.Offset((c.x + kotlin.math.sin(a) * r * 0.82f).toFloat(), (c.y - kotlin.math.cos(a) * r * 0.82f).toFloat())
+                        drawCircle(Color(0xFF8E8E93), w * 0.018f, o)
+                    }
+                    drawLine(Color(0xFF1C1C1E), c, c + androidx.compose.ui.geometry.Offset(r * 0.38f, -r * 0.3f), w * 0.05f, androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(Color(0xFF1C1C1E), c, c + androidx.compose.ui.geometry.Offset(-r * 0.15f, -r * 0.7f), w * 0.04f, androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawLine(Color(0xFFFF9500), c, c + androidx.compose.ui.geometry.Offset(r * 0.2f, r * 0.62f), w * 0.02f, androidx.compose.ui.graphics.StrokeCap.Round)
+                    drawCircle(Color(0xFFFF9500), w * 0.03f, c)
+                }
+                WidgetKind.Calendar -> {
+                    txt(dayName, red, 7.5f, true, w / 2, h * 0.27f)
+                    txt(day.dayOfMonth.toString(), Color(0xFF1C1C1E), 17f, false, w / 2, h * 0.6f)
+                }
+                WidgetKind.Battery -> {
+                    val st = androidx.compose.ui.graphics.drawscope.Stroke(w * 0.09f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                    val r = w * 0.3f; val tl = androidx.compose.ui.geometry.Offset(w / 2 - r, h / 2 - r); val sz = androidx.compose.ui.geometry.Size(r * 2, r * 2)
+                    drawArc(Color(0xFFE5E5EA), 0f, 360f, false, tl, sz, style = st)
+                    drawArc(green, -90f, 360f * 0.72f, false, tl, sz, style = st)
+                }
+                WidgetKind.Photo -> {
+                    drawCircle(Color(0xFFFFE08A), w * 0.1f, androidx.compose.ui.geometry.Offset(w * 0.7f, h * 0.3f))
+                    val m = androidx.compose.ui.graphics.Path().apply { moveTo(0f, h); lineTo(w * 0.35f, h * 0.48f); lineTo(w * 0.55f, h * 0.7f); lineTo(w * 0.72f, h * 0.55f); lineTo(w, h * 0.85f); lineTo(w, h); close() }
+                    drawPath(m, Color(0xFF2E7D5B))
+                }
+                WidgetKind.Suggestions -> {
+                    val cols = listOf(blue, green, Color(0xFFFF9500), Color(0xFFFF2D55))
+                    val g = w * 0.08f; val cell = (w - g * 3) / 2
+                    for (i in 0 until 4) {
+                        val x = g + (i % 2) * (cell + g); val y = g + (i / 2) * (cell + g)
+                        drawRoundRect(cols[i], androidx.compose.ui.geometry.Offset(x, y), androidx.compose.ui.geometry.Size(cell, cell), androidx.compose.ui.geometry.CornerRadius(cell * 0.26f))
+                    }
+                }
+                WidgetKind.Events, WidgetKind.Overview -> {
+                    drawRoundRect(red, androidx.compose.ui.geometry.Offset(w * 0.18f, h * 0.22f), androidx.compose.ui.geometry.Size(w * 0.06f, h * 0.26f), androidx.compose.ui.geometry.CornerRadius(w * 0.03f))
+                    drawRoundRect(Color(0xFF1C1C1E), androidx.compose.ui.geometry.Offset(w * 0.3f, h * 0.24f), androidx.compose.ui.geometry.Size(w * 0.5f, h * 0.08f), androidx.compose.ui.geometry.CornerRadius(h * 0.04f))
+                    drawRoundRect(Color(0xFF8E8E93), androidx.compose.ui.geometry.Offset(w * 0.3f, h * 0.38f), androidx.compose.ui.geometry.Size(w * 0.32f, h * 0.07f), androidx.compose.ui.geometry.CornerRadius(h * 0.035f))
+                    drawRoundRect(blue, androidx.compose.ui.geometry.Offset(w * 0.18f, h * 0.56f), androidx.compose.ui.geometry.Size(w * 0.06f, h * 0.26f), androidx.compose.ui.geometry.CornerRadius(w * 0.03f))
+                    drawRoundRect(Color(0xFF1C1C1E), androidx.compose.ui.geometry.Offset(w * 0.3f, h * 0.58f), androidx.compose.ui.geometry.Size(w * 0.44f, h * 0.08f), androidx.compose.ui.geometry.CornerRadius(h * 0.04f))
+                    drawRoundRect(Color(0xFF8E8E93), androidx.compose.ui.geometry.Offset(w * 0.3f, h * 0.72f), androidx.compose.ui.geometry.Size(w * 0.26f, h * 0.07f), androidx.compose.ui.geometry.CornerRadius(h * 0.035f))
+                }
+                WidgetKind.Music -> {
+                    drawRoundRect(androidx.compose.ui.graphics.Brush.linearGradient(listOf(Color(0xFFFF2D55), Color(0xFFFF9500))), androidx.compose.ui.geometry.Offset(w * 0.2f, h * 0.16f), androidx.compose.ui.geometry.Size(w * 0.6f, h * 0.44f), androidx.compose.ui.geometry.CornerRadius(w * 0.08f))
+                    val p = androidx.compose.ui.graphics.Path().apply { moveTo(w * 0.44f, h * 0.68f); lineTo(w * 0.44f, h * 0.88f); lineTo(w * 0.6f, h * 0.78f); close() }
+                    drawPath(p, Color.White)
+                }
+                WidgetKind.Prayer -> {
+                    val c = androidx.compose.ui.geometry.Offset(w * 0.48f, h * 0.5f)
+                    drawCircle(Color(0xFF7FE0C0), w * 0.24f, c)
+                    drawCircle(top, w * 0.22f, c + androidx.compose.ui.geometry.Offset(w * 0.11f, -h * 0.07f))
+                    drawCircle(Color.White, w * 0.025f, androidx.compose.ui.geometry.Offset(w * 0.74f, h * 0.28f))
+                }
+                else -> {}
+            }
+        }
+    }
 }
