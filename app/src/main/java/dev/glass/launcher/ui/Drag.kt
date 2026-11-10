@@ -16,6 +16,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -459,7 +460,12 @@ internal fun FolderIcon(
     val gap = icon * 0.03f
     val block = mini * 3f + gap * 2f
     val pageCount = (folder.keys.size + 8) / 9
-    val shown = folder.keys.drop(page.coerceIn(0, maxOf(pageCount - 1, 0)) * 9).take(9)
+    val target = page.coerceIn(0, maxOf(pageCount - 1, 0))
+    // Sayfa değişince mini simgeler yaylı kayar (klasör kapanınca ilk sayfaya esnek dönüş, iOS gibi).
+    val anim = remember { androidx.compose.animation.core.Animatable(target.toFloat()) }
+    LaunchedEffect(target) {
+        anim.animateTo(target.toFloat(), androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 130f))
+    }
     // Klasör rozeti: içindeki uygulamaların toplam bildirim sayısı (iOS gibi).
     val folderBadge = badgeCount(folder.keys.mapNotNull { byKey[it]?.takeIf { a -> !a.isShortcut }?.packageName })
     // Ana ekran klasörü dock ile aynı cam ortamında (ayar açıksa).
@@ -478,13 +484,24 @@ internal fun FolderIcon(
         ),
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.size(block), verticalArrangement = Arrangement.spacedBy(gap)) {
-            shown.chunked(3).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    row.forEach { k ->
-                        val app = byKey[k]
-                        if (app != null) AppIconImage(app, vm, mini, false, 0f, badge = false)
-                        else Spacer(Modifier.size(mini))
+        val pageStep = block + icon * 0.12f
+        Box(Modifier.size(block).clipToBounds()) {
+            val pos = anim.value
+            for (pg in 0 until maxOf(pageCount, 1)) {
+                if (kotlin.math.abs(pg - pos) >= 1f) continue // yalnızca görünen sayfalar çizilir
+                val shown = folder.keys.drop(pg * 9).take(9)
+                Column(
+                    Modifier.size(block).graphicsLayer { translationX = (pg - pos) * pageStep.toPx() },
+                    verticalArrangement = Arrangement.spacedBy(gap),
+                ) {
+                    shown.chunked(3).forEach { row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                            row.forEach { k ->
+                                val app = byKey[k]
+                                if (app != null) AppIconImage(app, vm, mini, false, 0f, badge = false)
+                                else Spacer(Modifier.size(mini))
+                            }
+                        }
                     }
                 }
             }

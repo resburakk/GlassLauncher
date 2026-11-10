@@ -143,9 +143,8 @@ fun FolderOverlay(
         LaunchedEffect(pagerState) {
             snapshotFlow { pagerState.currentPage }.collect { pageChanged(it) }
         }
-        LaunchedEffect(closing) {
-            if (closing && pagerState.currentPage != 0) pagerState.animateScrollToPage(0)
-        }
+        // Kapanırken sayfa değiştirilmez: klasör o anki sayfasıyla küçülür, ilk sayfaya dönüşü ana ekrandaki
+        // küçük klasör yaylı kayarak yapar (iOS). Önceden küçülürken sayfalar hızla geri sarıyordu.
         // Esnek çekme (iOS lastik bandı): ekranın HERHANGİ bir yerinden çekince tek sayfalı klasörün simgeleri yana,
         // klasör (ad + panel) yukarı/aşağı direnç artarak kayar; bırakınca yaylı geri döner.
         val rubber = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -320,7 +319,9 @@ fun FolderOverlay(
             HorizontalPager(
                 state = pagerState,
                 // Tek sayfada kaydırılacak yer yok: çekmeyi aşağıdaki esnek çekme karşılar.
-                userScrollEnabled = drag.key == null && !singlePage,
+                // Tek sayfalı klasörde de sayfa kaydırma açık: kenar esnemesi çok sayfalı klasörlerin ilk/son sayfasındaki
+                // ile aynı olur ve simgelerin üstünden çekince de çalışır.
+                userScrollEnabled = drag.key == null,
                 modifier = Modifier
                     .graphicsLayer { translationX = rubber.value }
                     .fillMaxWidth()

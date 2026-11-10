@@ -300,8 +300,11 @@ fun HomeScreen(
     LaunchedEffect(overlay) { LiveMotion.overlay = overlay != Overlay.None }
 
     fun closeOverlay() {
-        // Klasör kapanınca bir sonraki açılışta ve küçük simgede ilk sayfa görünür (iOS 26).
-        openFolderId?.let { folderPages[it] = 0 }
+        // Klasör kapanınca bir sonraki açılışta ve küçük simgede ilk sayfa görünür (iOS 26). Küçülme animasyonu
+        // (≈220 ms) bitince küçük klasör ilk sayfaya yaylı kayar.
+        openFolderId?.let { id ->
+            if ((folderPages[id] ?: 0) != 0) pullScope.launch { delay(260); if (openFolderId != id) folderPages[id] = 0 }
+        }
         overlay = Overlay.None
         openFolderId = null
         menu = null
