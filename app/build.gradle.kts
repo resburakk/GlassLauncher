@@ -15,8 +15,12 @@ android {
         applicationId = "dev.glass.launcher"
         minSdk = 33
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.0.0"
+        // Sürüm numarası her CI derlemesinde artar (GitHub çalışma numarası). Sabit kaldığında (10) Honor/MagicOS
+        // uygulama simgesini ve adını sürüm numarasına göre önbellekte tuttuğu için yeni simge görünmüyordu.
+        // Yerel derlemede 10 kalır; CI numarası her zaman 10'dan büyük olduğu için eskisinin üzerine kurulur.
+        val run = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+        versionCode = maxOf(10, (run ?: 0) + 10)
+        versionName = "1.0." + (run ?: 0)
     }
 
     // Kişisel kullanım için sabit imza anahtarı: her derleme aynı anahtarla imzalanır, böylece yeni APK
