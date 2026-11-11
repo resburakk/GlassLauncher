@@ -38,13 +38,13 @@ object HeadsUpHider {
         val svc = LockService.service() ?: run { note("Erişilebilirlik hizmeti kapalı"); return }
         val my = ++token
         val start = System.currentTimeMillis()
-        // Pencere açılış animasyonu ~150–300 ms; 1,6 sn boyunca 90 ms arayla bakılır.
+        // Pencere açılış animasyonu ~150–300 ms; 2,6 sn boyunca 90 ms arayla bakılır.
         fun attempt(n: Int) {
             if (my != token) return
             val r = runCatching { tryHide(svc, pkg) }.getOrElse { "hata: ${it.javaClass.simpleName}" }
             when {
-                r == null && System.currentTimeMillis() - start < 1600 -> main.postDelayed({ attempt(n + 1) }, 90)
-                r == null -> note("${Island.appLabel(svc, pkg)}: sistem penceresi görülmedi")
+                r == null && System.currentTimeMillis() - start < 2600 -> main.postDelayed({ attempt(n + 1) }, 90)
+                r == null -> note("${Island.appLabel(svc, pkg)}: sistem penceresi görülmedi · ${describe(svc)}")
                 else -> note("${Island.appLabel(svc, pkg)}: $r")
             }
         }
@@ -102,13 +102,28 @@ object HeadsUpHider {
         val b = best ?: return null
         if (System.currentTimeMillis() - lastSwipe < 500) return "zaten kaydırıldı"
         lastSwipe = System.currentTimeMillis()
-        // Satırın ortasından ekranın üstüne hızlı kaydırma (parmakla yukarı atmak gibi).
+        // Satırın ortasından ekranın üstüne hızlı kaydırma (parmakla yukarı atmak gibi). Ada sistem penceresinin
+        // üstünde durur: kaydırma sırasında ada dokunuşları alttaki pencereye geçirir; mümkünse adanın altında kalan
+        // kısımdan başlanır.
+        val isl = IslandOverlay.islandRect()
         val x = b.exactCenterX().coerceIn(sw * 0.2f, sw * 0.8f)
-        val y0 = b.exactCenterY()
+        val below = isl?.let { maxOf(b.top, it.bottom) + 10 * dp }
+        val y0 = if (below != null && below < b.bottom - 8 * dp) (below + b.bottom) / 2f else b.exactCenterY()
+        IslandOverlay.passThrough(420)
         val path = Path().apply { moveTo(x, y0); lineTo(x, (b.top - 60 * dp).coerceAtLeast(1f)) }
         val ok = svc.dispatchGesture(
             GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 140)).build(), null, null,
         )
-        return if (ok) "sistem penceresi yukarı kaydırıldı (${b.top}–${b.bottom} px)" else "kaydırma yapılamadı"
+        return if (ok) "sistem penceresi yukarı kaydırıldı (${b.top}–${b.bottom} px, ${y0.toInt()} px'ten)" else "kaydırma yapılamadı"
     }
+
+    /** Bulunamadığında: ekrandaki pencerelerin kısa özeti (Ayarlar'da "Son deneme"de görünür). */
+    private fun describe(svc: AccessibilityService): String = runCatching {
+        val r = Rect()
+        svc.windows.orEmpty().take(8).joinToString(", ") { w ->
+            w.getBoundsInScreen(r)
+            val pk = w.root?.packageName?.toString()?.substringAfterLast('.') ?: "?"
+            "t${w.type}:$pk ${r.top}-${r.bottom}"
+        }
+    }.getOrDefault("")
 }

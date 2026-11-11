@@ -130,12 +130,42 @@ object IslandOverlay {
     /** Pencereyi adanın kapladığı alana getirir. Genişlik/yükseklik 0 ise ada gizli (dokunuşlar geçer). */
     fun place(x: Int, y: Int, width: Int, height: Int) {
         val p = lp ?: return; val v = view ?: return
+        lastPlace = intArrayOf(x, y, width, height)
         val hidden = width <= 0 || height <= 0
         val nw = if (hidden) 1 else width; val nh = if (hidden) 1 else height
-        val flags = if (hidden) p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+        val flags = if (hidden || passing) p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE else p.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
         if (p.x == x && p.y == y && p.width == nw && p.height == nh && p.flags == flags) return
         p.x = x; p.y = y; p.width = nw; p.height = nh; p.flags = flags
         runCatching { wm?.updateViewLayout(v, p) }
+    }
+
+    /** Ada şu an dokunuşları alttaki pencereye geçiriyor (sistem bildirim penceresi kaydırılırken). */
+    @Volatile private var passing = false
+    private var lastPlace: IntArray? = null
+    private val restore = Runnable {
+        passing = false
+        lastPlace?.let { (x, y, w, h) -> place(x, y, w, h) }
+    }
+
+    /**
+     * [ms] boyunca ada dokunulamaz olur: erişilebilirlikle yapılan kaydırma adanın altındaki sistem bildirim
+     * penceresine ulaşır (önceden ada üstte olduğu için kaydırma adanın kendisine geliyordu).
+     */
+    fun passThrough(ms: Long) {
+        val p = lp ?: return; val v = view ?: return
+        passing = true
+        p.flags = p.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        runCatching { wm?.updateViewLayout(v, p) }
+        v.removeCallbacks(restore); v.postDelayed(restore, ms)
+    }
+
+    /** Adanın ekrandaki alanı (px); sistem penceresinin adanın altında kalan kısmını bulmak için. */
+    fun islandRect(): android.graphics.Rect? {
+        val p = lp ?: return null
+        if (p.width <= 1 || p.height <= 1) return null
+        val v = view ?: return null
+        val loc = IntArray(2); v.getLocationOnScreen(loc)
+        return android.graphics.Rect(loc[0], loc[1], loc[0] + p.width, loc[1] + p.height)
     }
 
     private class OverlayOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
