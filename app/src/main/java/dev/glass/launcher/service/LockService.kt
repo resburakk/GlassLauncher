@@ -21,7 +21,10 @@ class LockService : AccessibilityService() {
         runCatching { IslandOverlay.sync(this) }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        val pkg = event?.packageName?.toString() ?: return
+        if (pkg.contains("systemui", ignoreCase = true)) HeadsUpHider.onSystemUiEvent()
+    }
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
@@ -42,6 +45,21 @@ class LockService : AccessibilityService() {
 
         /** Çalışan hizmet (sistem bildirim penceresini gizlemek için, bkz. [HeadsUpHider]). */
         fun service(): AccessibilityService? = instance
+
+        /**
+         * Sistem arayüzünün pencere/içerik olaylarını yalnızca bir bildirim penceresi beklenirken (≈2 sn) ve
+         * gecikmesiz dinler; geri kalan zamanda olay alınmaz (pil, işlemci).
+         */
+        fun watchSystemUi(on: Boolean) {
+            val s = instance ?: return
+            runCatching {
+                val info = s.serviceInfo ?: return
+                info.eventTypes = if (on) AccessibilityEvent.TYPE_WINDOWS_CHANGED or AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED or
+                    AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED else AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                info.notificationTimeout = if (on) 0L else 1000L
+                s.serviceInfo = info
+            }
+        }
 
         /** Kilitlediyse true; hizmet kapalıysa false. */
         fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true

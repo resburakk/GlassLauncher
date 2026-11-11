@@ -28,27 +28,56 @@ object HeadsUpHider {
     private val _last = MutableStateFlow("")
     val last: StateFlow<String> = _last
 
-    private var token = 0
     private var lastSwipe = 0L
 
-    /** [pkg] uygulamasının bildirimi adada gösterildi: sistemin penceresi açılırsa gizle. */
+    // Bekleyen istek: sistem penceresi bu süre içinde açılırsa gizlenir.
+    private var pendingPkg: String? = null
+    private var pendingSvc: AccessibilityService? = null
+    private var deadline = 0L
+    private var lastTry = 0L
+    private var started = 0L
+
+    /**
+     * [pkg] uygulamasının bildirimi adada gösterildi: sistemin penceresi açılırsa gizle.
+     * Hız: sistem penceresi değiştiği AN haber verir (erişilebilirlik olayı, bekleme yok); ek olarak 30 ms'de bir
+     * bakılır. Önceden ilk bakış 120 ms sonra, sonrakiler 90 ms arayla yapılıyordu.
+     */
     fun request(pkg: String) {
         val s = Island.settings.value
         if (!s.enabled || !s.hideSystemPopup || pkg in s.popupKeep) return
         val svc = LockService.service() ?: run { note("Erişilebilirlik hizmeti kapalı"); return }
-        val my = ++token
-        val start = System.currentTimeMillis()
-        // Pencere açılış animasyonu ~150–300 ms; 2,6 sn boyunca 90 ms arayla bakılır.
-        fun attempt(n: Int) {
-            if (my != token) return
-            val r = runCatching { tryHide(svc, pkg) }.getOrElse { "hata: ${it.javaClass.simpleName}" }
-            when {
-                r == null && System.currentTimeMillis() - start < 2600 -> main.postDelayed({ attempt(n + 1) }, 90)
-                r == null -> note("${Island.appLabel(svc, pkg)}: sistem penceresi görülmedi · ${describe(svc)}")
-                else -> note("${Island.appLabel(svc, pkg)}: $r")
-            }
+        pendingPkg = pkg; pendingSvc = svc
+        started = System.currentTimeMillis(); deadline = started + 2600
+        LockService.watchSystemUi(true)
+        main.removeCallbacks(poll)
+        attempt()
+    }
+
+    private val poll = Runnable { attempt() }
+
+    /** Sistem arayüzünden bir pencere / içerik olayı geldi (yalnızca bekleyen istek varken dinlenir). */
+    fun onSystemUiEvent() {
+        if (pendingPkg == null) return
+        if (System.currentTimeMillis() - lastTry < 12) return // aynı karede tekrar tarama yapılmaz
+        attempt()
+    }
+
+    private fun attempt() {
+        val pkg = pendingPkg ?: return; val svc = pendingSvc ?: return
+        lastTry = System.currentTimeMillis()
+        val r = runCatching { tryHide(svc, pkg) }.getOrElse { "hata: ${it.javaClass.simpleName}" }
+        when {
+            r == null && System.currentTimeMillis() < deadline -> { main.removeCallbacks(poll); main.postDelayed(poll, 30) }
+            r == null -> finish("${Island.appLabel(svc, pkg)}: sistem penceresi görülmedi · ${describe(svc)}")
+            else -> finish("${Island.appLabel(svc, pkg)}: $r · ${System.currentTimeMillis() - started} ms")
         }
-        main.postDelayed({ attempt(0) }, 120)
+    }
+
+    private fun finish(t: String) {
+        pendingPkg = null; pendingSvc = null
+        main.removeCallbacks(poll)
+        LockService.watchSystemUi(false)
+        note(t)
     }
 
     private fun note(t: String) {
@@ -109,10 +138,11 @@ object HeadsUpHider {
         val x = b.exactCenterX().coerceIn(sw * 0.2f, sw * 0.8f)
         val below = isl?.let { maxOf(b.top, it.bottom) + 10 * dp }
         val y0 = if (below != null && below < b.bottom - 8 * dp) (below + b.bottom) / 2f else b.exactCenterY()
-        IslandOverlay.passThrough(420)
+        IslandOverlay.passThrough(300)
+        // Kısa ve hızlı fırlatma (70 ms): sistem bunu "yukarı atma" sayar ve pencereyi hemen kapatır.
         val path = Path().apply { moveTo(x, y0); lineTo(x, (b.top - 60 * dp).coerceAtLeast(1f)) }
         val ok = svc.dispatchGesture(
-            GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 140)).build(), null, null,
+            GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 70)).build(), null, null,
         )
         return if (ok) "sistem penceresi yukarı kaydırıldı (${b.top}–${b.bottom} px, ${y0.toInt()} px'ten)" else "kaydırma yapılamadı"
     }
