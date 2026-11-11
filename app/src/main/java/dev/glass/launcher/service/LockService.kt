@@ -7,8 +7,10 @@ import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
 
 /**
- * Yalnızca "boş alana çift dokununca ekranı kilitle" için kullanılan Erişilebilirlik hizmeti.
- * Ekran içeriğini OKUMAZ, olay dinlemez; tek yaptığı sistemin kilitleme eylemini çağırmaktır.
+ * "Boş alana çift dokununca ekranı kilitle", Kontrol Merkezi ve Dinamik Ada için Erişilebilirlik hizmeti.
+ * Olay dinlemez. Yalnızca "Honor bildirim penceresini gizle" açıkken, ada bir bildirimi gösterdiği anda sistemin
+ * (SystemUI) üstteki bildirim penceresini bulup yukarı kaydırmak için sistem pencerelerine bakar (bkz. [HeadsUpHider]);
+ * başka uygulamaların ekranını okumaz, hiçbir şey kaydetmez.
  * Bu yöntemle kilitlenen telefon parmak izi/yüz tanıma ile açılabilir (Cihaz Yöneticisi yöntemi bunu bozar).
  * Kullanıcı Ayarlar > Erişilebilirlik'ten açıkça etkinleştirmelidir.
  */
@@ -37,6 +39,9 @@ class LockService : AccessibilityService() {
 
         /** Hizmet çalışıyorsa onun bağlamı (erişilebilirlik katmanı penceresi için). */
         fun context(): Context? = instance
+
+        /** Çalışan hizmet (sistem bildirim penceresini gizlemek için, bkz. [HeadsUpHider]). */
+        fun service(): AccessibilityService? = instance
 
         /** Kilitlediyse true; hizmet kapalıysa false. */
         fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true

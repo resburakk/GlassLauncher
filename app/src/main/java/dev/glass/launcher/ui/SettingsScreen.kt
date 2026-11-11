@@ -1724,6 +1724,41 @@ private fun IslandPage() {
             ToggleRow("Mesaj metnini göster", st.notifText, default = IDef.notifText) { v -> set(st.copy(notifText = v)) }
         }
     }
+    // Sistemin (Honor) üstten açılan bildirim penceresi: ada gösterirken gizlenir, üst üste binmez.
+    val lastHide by dev.glass.launcher.service.HeadsUpHider.last.collectAsState()
+    var showApps by remember { mutableStateOf(false) }
+    Group("Honor bildirim penceresi") {
+        ToggleRow("Honor bildirim penceresini gizle", st.hideSystemPopup, default = IDef.hideSystemPopup) { v ->
+            set(st.copy(hideSystemPopup = v))
+            if (v && !a11yOk) open(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }
+        if (st.hideSystemPopup) {
+            RowDivider()
+            ActionRow(if (showApps) "Uygulama listesini kapat" else "Uygulamaları seç" + if (st.popupKeep.isNotEmpty()) " (${st.popupKeep.size} hariç)" else "") { showApps = !showApps }
+            if (lastHide.isNotEmpty()) { RowDivider(); InfoRow("Son deneme", lastHide) }
+        }
+    }
+    Footer(
+        if (!a11yOk) "Erişilebilirlik hizmeti (\"Glass Launcher – Kilit ve Kontrol Merkezi\") açık olmalı. Açıkken: mesaj ya da arama geldiğinde Honor'un üstten açılan penceresi otomatik yukarı itilir, yalnızca ada genişler."
+        else "Mesaj ya da arama geldiğinde Honor'un üstten açılan penceresi otomatik yukarı itilir, yalnızca ada genişler. Bildirim silinmez, bildirim panelinde kalır. Pencere bir an görünüp kaybolabilir. Kilit ekranında ve bildirim paneli açıkken dokunulmaz."
+    )
+    if (st.hideSystemPopup && showApps) {
+        val apps = remember {
+            val pm = ctx.packageManager
+            val i = android.content.Intent(android.content.Intent.ACTION_MAIN).addCategory(android.content.Intent.CATEGORY_LAUNCHER)
+            pm.queryIntentActivities(i, 0).map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+                .distinctBy { it.first }.filter { it.first != ctx.packageName }.sortedBy { it.second.lowercase(Locale.forLanguageTag("tr")) }
+        }
+        Group("Penceresi gizlenecek uygulamalar") {
+            apps.forEachIndexed { i, (pkg, label) ->
+                if (i > 0) RowDivider()
+                ToggleRow(label, pkg !in st.popupKeep) { v ->
+                    set(st.copy(popupKeep = if (v) st.popupKeep - pkg else st.popupKeep + pkg))
+                }
+            }
+        }
+        Footer("Kapalı olan uygulamaların mesajlarında Honor'un penceresi normal şekilde açılır.")
+    }
     Group("Görünüm") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Chip("Siyah (iOS)", st.style == 0, Modifier.weight(1f)) { set(st.copy(style = 0)) }

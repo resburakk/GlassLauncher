@@ -49,6 +49,10 @@ data class IslandSettings(
     val notifText: Boolean = true,
     val navigation: Boolean = true,
     val progress: Boolean = true,
+    /** Ada bir bildirimi gösterirken sistemin (Honor) üstten açılan penceresi gizlensin (erişilebilirlik gerekir). */
+    val hideSystemPopup: Boolean = false,
+    /** Bu uygulamaların sistem penceresi gizlenmez (paket adları). */
+    val popupKeep: Set<String> = emptySet(),
 ) {
     companion object {
         private const val P = "island"
@@ -80,6 +84,8 @@ data class IslandSettings(
                 notifText = p.getBoolean("notifText", d.notifText),
                 navigation = p.getBoolean("navigation", d.navigation),
                 progress = p.getBoolean("progress", d.progress),
+                hideSystemPopup = p.getBoolean("hideSystemPopup", d.hideSystemPopup),
+                popupKeep = p.getStringSet("popupKeep", d.popupKeep)?.toSet() ?: d.popupKeep,
             )
         }
 
@@ -94,6 +100,7 @@ data class IslandSettings(
                 .putBoolean("music", s.music).putBoolean("calls", s.calls).putBoolean("timers", s.timers)
                 .putBoolean("charging", s.charging).putBoolean("ringer", s.ringer).putBoolean("notifications", s.notifications)
                 .putBoolean("notifText", s.notifText).putBoolean("navigation", s.navigation).putBoolean("progress", s.progress)
+                .putBoolean("hideSystemPopup", s.hideSystemPopup).putStringSet("popupKeep", s.popupKeep)
                 .apply()
         }
     }
@@ -160,6 +167,8 @@ object Island {
     private val clearTransient = Runnable { _transient.value = null }
     private var app: Context? = null
     private val seen = HashMap<String, Int>()
+    /** Şu an çalan aramalar (yeni gelen aramayı bir kez tanımak için). */
+    private val ringing = HashSet<String>()
     private var receiversOn = false
 
     fun init(ctx: Context) {
@@ -240,6 +249,12 @@ object Island {
             }
         }
         out.sortByDescending { it.priority }
+        // Yeni gelen arama: ada kendiliğinden büyür, sistemin arama penceresi açılırsa gizlenir.
+        val s = _settings.value
+        out.filterIsInstance<IslandAct.Call>().filter { it.incoming && it.key !in ringing }.forEach {
+            if (s.enabled && s.calls) HeadsUpHider.request(it.pkg)
+        }
+        ringing.clear(); out.filterIsInstance<IslandAct.Call>().filter { it.incoming }.forEach { ringing += it.key }
         _ongoing.value = out
     }
 
@@ -264,6 +279,8 @@ object Island {
         // Arama sürerken mesaj adayı kaplamaz.
         if (_ongoing.value.any { it is IslandAct.Call }) return
         showTransient(IslandAct.Message(sbn.key, sbn.packageName, n.contentIntent, title.ifBlank { appLabel(ctx, sbn.packageName) }, text, largeIcon(ctx, n)))
+        // Aynı bildirimin sistem penceresi açılırsa gizlenir: yalnızca ada genişler.
+        HeadsUpHider.request(sbn.packageName)
     }
 
     fun removed(key: String) {

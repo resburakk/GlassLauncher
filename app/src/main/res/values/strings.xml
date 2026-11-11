@@ -6,7 +6,7 @@
     <string name="settings_label">Glass Ayarları</string>
     <string name="wallpaper_import_label">Glass Launcher duvar kâğıdı</string>
     <string name="lock_service_label">Glass Launcher – Kilit ve Kontrol Merkezi</string>
-    <string name="lock_service_description">Ana ekranda boş bir yere çift dokunduğunuzda telefonu kilitler ve üstten kaydırınca telefonun kendi Kontrol Merkezi\'ni açar. Ekran içeriğini okumaz ve hiçbir veri toplamaz.</string>
+    <string name="lock_service_description">Ana ekranda boş bir yere çift dokunduğunuzda telefonu kilitler, üstten kaydırınca telefonun kendi Kontrol Merkezi\'ni açar ve Dinamik Ada\'yı her ekranda gösterir. "Honor bildirim penceresini gizle" açıksa, ada bir bildirimi gösterdiğinde sistemin üstteki bildirim penceresini yukarı kaydırır. Hiçbir veri toplamaz.</string>
     <string name="ime_name">Glass Klavye</string>
     <string name="ime_subtype_tr">Türkçe (Q)</string>
 </resources>
