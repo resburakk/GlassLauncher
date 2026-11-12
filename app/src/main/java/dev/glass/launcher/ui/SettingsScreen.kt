@@ -1753,6 +1753,13 @@ private fun IslandPage() {
         } else {
             InfoRow("İzin", "verilmedi")
             RowDivider()
+            ActionRow("Shizuku ile izin ver") {
+                shu.grantViaShizuku(ctx) { err ->
+                    tick++
+                    android.widget.Toast.makeText(ctx, err ?: "İzin verildi", android.widget.Toast.LENGTH_LONG).show()
+                }
+            }
+            RowDivider()
             ActionRow("İzin komutunu kopyala") {
                 val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
                 cm?.setPrimaryClip(android.content.ClipData.newPlainText("komut", shu.GRANT_CMD))
@@ -1767,7 +1774,7 @@ private fun IslandPage() {
         InfoRow("Sistem pencereleri", when (sysOn) { true -> "açık"; false -> "kapalı"; null -> "?" })
     }
     Footer(
-        if (!secureOk) "Honor'un penceresini hiç oluşmadan kapatır (süre sıfır). Bunun için bir kez ADB izni gerekir:\n${shu.GRANT_CMD}\n\nGeliştirici seçenekleri > Kablosuz hata ayıklama açılıp bu komut LADB gibi bir uygulamadan ya da bilgisayardan çalıştırılır. İzin verildikten sonra bu sayfaya dönünce seçenek görünür."
+        if (!secureOk) "Honor'un penceresini hiç oluşmadan kapatır (süre sıfır). Bunun için bir kez izin gerekir: Shizuku uygulamasını kablosuz hata ayıklamayla başlatıp \"Shizuku ile izin ver\"e bas (ek uygulama gerekmez). Bilgisayarla da verilebilir:\n${shu.GRANT_CMD}"
         else "Açıkken Honor'un üstten açılan bildirim pencereleri tamamen kapanır, bildirimler yalnızca adada ve bildirim panelinde görünür. \"Uygulamaları seç\" listesi bu modda çalışmaz (hepsi kapanır). Gelen arama sistem penceresi yerine tam ekran arama ekranıyla açılabilir. Ada ya da bu seçenek kapatılınca eski ayar geri gelir. Launcher'ı kaldırmadan önce bu seçeneği kapat."
     )
     if (st.hideSystemPopup && showApps) {

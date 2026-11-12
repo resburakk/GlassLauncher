@@ -44,4 +44,50 @@ object SystemHeadsUp {
             }
         }.onFailure { Log.w("GlassDiag", "headsup ayarı: ${it.message}") }
     }
+
+    // ------------------------------------------------------------ Shizuku ile izin
+
+    /** 0 = Shizuku çalışmıyor / kurulu değil, 1 = Shizuku izni gerekiyor, 2 = hazır. */
+    fun shizukuState(): Int = runCatching {
+        if (!rikka.shizuku.Shizuku.pingBinder()) 0
+        else if (rikka.shizuku.Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) 2 else 1
+    }.getOrDefault(0)
+
+    /**
+     * Shizuku üzerinden "pm grant" çalıştırıp WRITE_SECURE_SETTINGS iznini verir. Gerekirse önce Shizuku'nun kendi
+     * izin penceresini açar. Sonuç ana iş parçacığında [done] ile bildirilir (null = başarılı, metin = hata).
+     */
+    fun grantViaShizuku(ctx: Context, done: (String?) -> Unit) {
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+        fun run() {
+            Thread {
+                val err = runCatching {
+                    val m = rikka.shizuku.Shizuku::class.java.getDeclaredMethod(
+                        "newProcess", Array<String>::class.java, Array<String>::class.java, String::class.java,
+                    ).apply { isAccessible = true }
+                    val p = m.invoke(null, arrayOf("pm", "grant", ctx.packageName, android.Manifest.permission.WRITE_SECURE_SETTINGS), null, null) as Process
+                    val out = p.errorStream.bufferedReader().readText() + p.inputStream.bufferedReader().readText()
+                    p.waitFor()
+                    if (granted(ctx)) null else "izin verilemedi: ${out.take(160)}"
+                }.getOrElse { "hata: ${it.cause?.message ?: it.message}" }
+                main.post { done(err) }
+            }.start()
+        }
+        when (shizukuState()) {
+            0 -> done("Shizuku çalışmıyor. Shizuku uygulamasını açıp \"Başlat\"a bas.")
+            2 -> run()
+            else -> {
+                val code = 7301
+                val l = object : rikka.shizuku.Shizuku.OnRequestPermissionResultListener {
+                    override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
+                        if (requestCode != code) return
+                        rikka.shizuku.Shizuku.removeRequestPermissionResultListener(this)
+                        if (grantResult == PackageManager.PERMISSION_GRANTED) run() else main.post { done("Shizuku izni reddedildi") }
+                    }
+                }
+                rikka.shizuku.Shizuku.addRequestPermissionResultListener(l)
+                runCatching { rikka.shizuku.Shizuku.requestPermission(code) }.onFailure { done("hata: ${it.message}") }
+            }
+        }
+    }
 }
