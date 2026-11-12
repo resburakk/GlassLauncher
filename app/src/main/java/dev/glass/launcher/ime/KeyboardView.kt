@@ -1,0 +1,755 @@
+package dev.glass.launcher.ime
+
+import android.annotation.SuppressLint
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.Shader
+import android.graphics.Typeface
+import android.os.Handler
+import android.os.Looper
+import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
+import android.view.View
+import java.util.Locale
+
+/**
+ * iOS 27 (Liquid Glass) görünümlü klavye: kendi çizer (Compose yok; giriş penceresinde hızlı ve hafif).
+ *
+ * Düzen: üstte öneri/yapıştır şeridi, 4 tuş satırı, en altta dünya (klavye değiştir) ve mikrofon.
+ * Sayfalar: harfler (Türkçe Q), 123, #+=, emoji.
+ */
+@SuppressLint("ViewConstructor")
+class KeyboardView(ctx: Context, private val host: Host, private val emojiBar: Boolean = false) : View(ctx) {
+
+    interface Host {
+        fun commit(text: String)
+        fun deleteBack()
+        fun action()
+        fun switchKeyboard(longPress: Boolean)
+        fun voice()
+        fun pasteChip(): String?
+        fun pasteNow()
+        fun dismissPaste()
+        fun returnLabel(): String?
+        fun returnIsAction(): Boolean
+        fun autoCaps(): Boolean
+        fun haptics(): Boolean
+        /** Tuş sesi/titreşimi (tür: 0 harf, 1 sil, 2 boşluk, 3 dönüş). */
+        fun click(kind: Int)
+        /** Tek elle klavye: 0 kapalı, 1 sol, 2 sağ (ayara yazılır). */
+        fun setOneHanded(mode: Int)
+        /** Öneri şeridi: 3 hücre ve kalın (otomatik düzeltilecek) hücrenin sırası (-1 yok). */
+        fun suggestions(): List<String>
+        fun boldSuggestion(): Int
+        fun pickSuggestion(i: Int)
+        /** Kaydırarak yazma: parmağın geçtiği harfler; büyük harfle başlasın mı. */
+        fun swipeWord(path: String, capital: Boolean)
+        /** İmleç taşıma (iPhone'daki boşluk tuşu dokunmatik yüzeyi): yatay/dikey adım. */
+        fun moveCursor(dx: Int, dy: Int)
+        /** Emoji paneli (Android'in tam emoji seçicisi) açılır/kapanır. */
+        fun showEmoji(show: Boolean)
+    }
+
+    enum class Page { Letters, Numbers, Symbols, Emoji, NumPad, Decimal, Phone, PhoneSym }
+    /** Sadece rakam isteyen alanlar (şifre/PIN, kod, tutar, telefon): iPhone'daki 3×4 sayı klavyesi. */
+    private val numeric get() = page == Page.NumPad || page == Page.Decimal || page == Page.Phone || page == Page.PhoneSym
+    private enum class Shift { Off, On, Caps }
+
+    private data class Key(
+        val label: String,
+        val code: Code = Code.Char,
+        val w: Float = 1f,
+        val fn: Boolean = false,
+    ) { val rect = RectF() }
+
+    private enum class Code { None, PhoneSym, Char, Shift, Delete, Space, Return, Page123, PageAbc, PageSym, PageEmoji, Globe, Mic, OneHandOff, OneHandSwap }
+
+    private val d = resources.displayMetrics.density
+    private fun dp(v: Float) = v * d
+
+    var dark = false
+        set(v) { field = v; invalidate() }
+
+    /** Arkası gerçekten bulanık cam (pencere arkası bulanıklığı açıksa zemin yarı saydam çizilir). */
+    var glass = false
+        set(v) { field = v; invalidate() }
+
+    /** Ayarlar (yükseklik, tek elle, önizleme, hassasiyet...). */
+    var cfg = KbConfig()
+        set(v) { field = v; build(); requestLayout(); invalidate() }
+
+    private var page = Page.Letters
+    private var shift = Shift.Off
+    private var lastShiftTap = 0L
+    private var rows: List<List<Key>> = emptyList()
+    private var bottomKeys: List<Key> = emptyList()
+    private var pressed: Key? = null
+    private val tr = Locale.forLanguageTag("tr")
+    private val handler = Handler(Looper.getMainLooper())
+    private var repeating = false
+
+    // Ölçüler (iOS: tuş ~42, aralık 5/10, köşe ~9). Yükseklik ayara göre (kısa/normal/uzun).
+    private val hScale get() = when (cfg.height) { 0 -> 0.88f; 2 -> 1.12f; else -> 1f }
+    /** Üst şerit yalnızca yapıştır düğmesi varken açılır (yoksa boş duruyordu); kapalıyken ince bir pay kalır. */
+    private val barH get() = if (emojiBar) 0f else if (numeric) (if (host.pasteChip() != null) dp(40f) else dp(12f)) else dp(40f)
+    private val keyH get() = (if (numeric) dp(52f) else dp(40f)) * hScale
+    private val rowGap get() = (if (numeric) dp(7f) else dp(10f)) * hScale
+    private val gapX = dp(5f)
+    private val side = dp(7f)
+    // iOS 27: köşe ≈ tuş yüksekliğinin beşte biri (40 dp tuşta 8 dp); sayı klavyesinin büyük tuşlarında orantılı.
+    private val radius get() = if (numeric) dp(10f) else dp(8f)
+    private val bottomH = dp(12f)
+    var navInset = 0
+        set(v) { field = v; requestLayout() }
+
+    // iPhone: boşluk tuşunu basılı tut → klavye dokunmatik yüzey olur, parmağı kaydırınca imleç gider.
+    private var trackpad = false
+    private var tpX = 0f; private var tpY = 0f
+    private val startTrackpad = Runnable {
+        if (pressed?.code == Code.Space) { trackpad = true; tpX = downX; tpY = downY; tick(); invalidate() }
+    }
+    private var swiping = false
+    private val trail = ArrayList<Float>()
+    private val swipePath = StringBuilder()
+    private var downX = 0f; private var downY = 0f
+
+    private val pasteRect = RectF()
+    private val pasteClose = RectF()
+
+    private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val text = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER; typeface = Typeface.create("sans-serif", Typeface.NORMAL) }
+    private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
+
+    init { build() }
+
+    fun reset(page0: Page = Page.Letters) {
+        page = page0
+        shift = if (host.autoCaps()) Shift.On else Shift.Off
+        build(); requestLayout(); invalidate()
+    }
+
+    /** İmleç cümle başına geldiğinde büyük harf (Caps kilidi açık değilse). */
+    fun updateAutoCaps() {
+        if (page != Page.Letters || shift == Shift.Caps) return
+        val want = if (host.autoCaps()) Shift.On else Shift.Off
+        if (want != shift) { shift = want; build(); invalidate() }
+    }
+
+    private fun letters(): List<List<Key>> {
+        fun row(s: String) = s.map { Key(it.toString()) }
+        return listOf(
+            row("qwertyuıopğü"),
+            row("asdfghjklşi"),
+            listOf(Key("⇧", Code.Shift, 1.35f, true)) + row("zxcvbnmöç") + Key("⌫", Code.Delete, 1.35f, true),
+            bottomRow("123", Code.Page123),
+        )
+    }
+
+    // iOS 27: alt sıra 123 · boşluk · dönüş; emoji (sol) ve mikrofon (sağ) klavyenin en altında.
+    private fun bottomRow(sw: String, code: Code) = listOf(
+        Key(sw, code, 1.25f, true),
+        Key("boşluk", Code.Space, 6.2f),
+        Key("⏎", Code.Return, 2.0f),
+    )
+
+    private fun numbers() = listOf(
+        "1234567890".map { Key(it.toString()) },
+        listOf("-", "/", ":", ";", "(", ")", "₺", "&", "@", "\"").map { Key(it) },
+        listOf(Key("#+=", Code.PageSym, 1.35f, true)) + listOf(".", ",", "?", "!", "'").map { Key(it, w = 1.4f) } + Key("⌫", Code.Delete, 1.35f, true),
+        bottomRow("ABC", Code.PageAbc),
+    )
+
+    private fun symbols() = listOf(
+        listOf("[", "]", "{", "}", "#", "%", "^", "*", "+", "=").map { Key(it) },
+        listOf("_", "\\", "|", "~", "<", ">", "€", "$", "£", "·").map { Key(it) },
+        listOf(Key("123", Code.Page123, 1.35f, true)) + listOf(".", ",", "?", "!", "'").map { Key(it, w = 1.4f) } + Key("⌫", Code.Delete, 1.35f, true),
+        bottomRow("ABC", Code.PageAbc),
+    )
+
+    private val emojis = listOf(
+        "😀", "😂", "🥹", "😊", "😍", "😘", "😎", "🤔",
+        "😅", "😭", "😡", "🥳", "😴", "🙄", "😇", "🤗",
+        "👍", "👏", "🙏", "💪", "👌", "✌️", "🤝", "👋",
+        "❤️", "🔥", "✨", "🎉", "💯", "✅", "⭐", "☕",
+    )
+
+    private fun emojiPage(): List<List<Key>> = emojis.chunked(8).map { r -> r.map { Key(it) } }.take(3) +
+        listOf(listOf(Key("ABC", Code.PageAbc, 1.25f, true)) + emojis.drop(24).map { Key(it) } + Key("⌫", Code.Delete, 1.25f, true))
+
+    private val subLetters = mapOf("2" to "ABC", "3" to "DEF", "4" to "GHI", "5" to "JKL", "6" to "MNO", "7" to "PQRS", "8" to "TUV", "9" to "WXYZ")
+
+    private fun numPad(): List<List<Key>> {
+        val rows = listOf("123", "456", "789").map { r -> r.map { Key(it.toString()) } }
+        val left = when (page) {
+            Page.Decimal -> Key(",")
+            Page.Phone -> Key("+*#", Code.PhoneSym, fn = true)
+            else -> Key("", Code.None)
+        }
+        return rows + listOf(listOf(left, Key("0"), Key("⌫", Code.Delete)))
+    }
+
+    private fun phoneSym() = listOf(
+        listOf("(", "/", ")").map { Key(it) },
+        listOf("-", "N", ",").map { Key(it) },
+        listOf("*", "#", "+").map { Key(it) },
+        listOf(Key("123", Code.PhoneSym, fn = true), Key("."), Key("⌫", Code.Delete)),
+    )
+
+    private fun build() {
+        if (emojiBar) {
+            // Emoji panelinin alt satırı: ABC, boşluk, sil.
+            rows = listOf(listOf(Key("ABC", Code.PageAbc, 1.5f, true), Key("boşluk", Code.Space, 6f), Key("⌫", Code.Delete, 1.5f, true)))
+            bottomKeys = emptyList(); layoutKeys(); return
+        }
+        rows = when (page) {
+            Page.Letters -> letters()
+            Page.Numbers -> numbers()
+            Page.Symbols -> symbols()
+            Page.Emoji -> emojiPage()
+            Page.NumPad, Page.Decimal, Page.Phone -> numPad()
+            Page.PhoneSym -> phoneSym()
+        }
+        if (numeric) { bottomKeys = emptyList(); layoutKeys(); return }
+        // Tek elle: boş kalan yanda "tam klavye" ve "öbür yana" düğmeleri.
+        bottomKeys = listOfNotNull(
+            Key("emoji", Code.PageEmoji),
+            if (cfg.dictation) Key("mic", Code.Mic) else null,
+        ) + if (cfg.oneHanded != 0) listOf(Key("full", Code.OneHandOff), Key("swap", Code.OneHandSwap)) else emptyList()
+        layoutKeys()
+    }
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        val h = if (emojiBar) (dp(6f) + keyH + rowGap + bottomH).toInt() + navInset
+            else (barH + dp(4f) + (keyH + rowGap) * rows.size.coerceAtLeast(4) + zoneH).toInt()
+        setMeasuredDimension(w, h)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, ow: Int, oh: Int) { layoutKeys() }
+
+    fun refreshBar() { layoutKeys(); requestLayout(); invalidate() }
+
+    /** En alt bölge (emoji + mikrofon, altında sistem çubuğu payı): iOS'taki gibi yüksek. */
+    private val zoneH get() = navInset + if (numeric) dp(14f) else dp(46f)
+
+    private fun layoutKeys() {
+        val w = width.toFloat().takeIf { it > 0 } ?: return
+        val oh = if (emojiBar) 0 else cfg.oneHanded
+        val area = if (oh != 0) w * 0.84f else w
+        val x0 = if (oh == 2) w - area else 0f
+        val inner = area - side * 2
+        // Birim: en kalabalık satırdaki (12 tuş) bir harf tuşunun genişliği.
+        val unit = (inner - gapX * 11) / 12f
+        var y = if (emojiBar) dp(6f) else barH + dp(4f)
+        rows.forEachIndexed { ri, row ->
+            val total = row.sumOf { it.w.toDouble() }.toFloat()
+            var rowW = unit * total + gapX * (row.size - 1)
+            val stretch = ri == rows.lastIndex || page != Page.Letters || row.size >= 12 || row.any { it.code == Code.Shift }
+            val scale = if (stretch) (inner - gapX * (row.size - 1)) / (unit * total) else 1f
+            rowW = unit * total * scale + gapX * (row.size - 1)
+            var x = x0 + side + (inner - rowW) / 2f
+            row.forEach { k ->
+                val kw = unit * k.w * scale
+                k.rect.set(x, y, x + kw, y + keyH)
+                x += kw + gapX
+            }
+            y += keyH + rowGap
+        }
+        // Emoji ve mikrofon: en alt bölgenin üst kısmında, solda ve sağda.
+        val zy = y - rowGap + dp(4f)
+        bottomKeys.firstOrNull { it.code == Code.PageEmoji }?.rect?.set(dp(8f), zy, dp(8f) + dp(56f), zy + dp(40f))
+        bottomKeys.firstOrNull { it.code == Code.Mic }?.rect?.set(w - dp(64f), zy, w - dp(8f), zy + dp(40f))
+        if (oh != 0) {
+            val sx = if (oh == 1) area else 0f
+            val sw = w - area
+            val top = barH + dp(4f); val total = (keyH + rowGap) * 4
+            bottomKeys.first { it.code == Code.OneHandOff }.rect.set(sx, top + total * 0.22f, sx + sw, top + total * 0.48f)
+            bottomKeys.first { it.code == Code.OneHandSwap }.rect.set(sx, top + total * 0.52f, sx + sw, top + total * 0.78f)
+        }
+    }
+
+    // ---------- Çizim ----------
+    val colBg get() = if (dark) 0xFF1B1B1E.toInt() else 0xFFE4E6EA.toInt()
+    private val colKey get() = if (dark) 0xFF5B5B60.toInt() else 0xFFFFFFFF.toInt()
+    private val colFn get() = if (dark) 0xFF3A3A3E.toInt() else 0xFFB4B9C2.toInt()
+    private val colTxt get() = if (dark) 0xFFFFFFFF.toInt() else 0xFF111111.toInt()
+    private val colSub get() = if (dark) 0x99EBEBF5.toInt() else 0x993C3C43.toInt()
+    private val colShadow get() = if (dark) 0x80000000.toInt() else 0x47000000
+    private val blue = 0xFF0A84FF.toInt()
+
+    override fun onDraw(c: Canvas) {
+        val w = width.toFloat(); val h = height.toFloat()
+        // Cam panel: üst köşeler yuvarlak, üstte ince ışık çizgisi, hafif dikey ton.
+        val r = dp(30f)
+        val rr0 = if (emojiBar) 0f else r
+        val panel = Path().apply { addRoundRect(RectF(0f, 0f, w, h), floatArrayOf(rr0, rr0, rr0, rr0, 0f, 0f, 0f, 0f), Path.Direction.CW) }
+        fill.color = 0xFF000000.toInt() // gölgelerden kalan saydamlık zemine geçmesin
+        fill.shader = LinearGradient(0f, 0f, 0f, h,
+            when {
+                glass && dark -> panelAlpha(0x2A2A2E, 0.45f, 0.85f, 0x1B1B1E)
+                glass -> panelAlpha(0xF4F5F8, 0.50f, 0.88f, 0xE4E6EA)
+                emojiBar -> intArrayOf(colBg, colBg)
+                dark -> intArrayOf(0xFF26262A.toInt(), colBg)
+                else -> intArrayOf(0xFFEEEFF2.toInt(), colBg)
+            }, null, Shader.TileMode.CLAMP)
+        c.drawPath(panel, fill); fill.shader = null
+
+        if (!emojiBar && !(numeric && host.pasteChip() == null)) drawBar(c, w)
+        rows.flatten().forEach { drawKey(c, it) }
+        if (!emojiBar) drawBottom(c)
+        if (swiping && trail.size > 1) {
+            stroke.color = 0xCC0A84FF.toInt(); stroke.strokeWidth = dp(5f)
+            val path = Path(); path.moveTo(trail[0], trail[1])
+            var i = 2; while (i < trail.size) { path.lineTo(trail[i], trail[i + 1]); i += 2 }
+            c.drawPath(path, stroke)
+        }
+        if (!swiping) pressed?.let { if (cfg.preview && it.code == Code.Char && page != Page.Emoji) drawPreview(c, it) }
+    }
+
+    private val suggRects = Array(3) { RectF() }
+
+    private fun drawSuggestions(c: Canvas, w: Float) {
+        suggRects.forEach { it.setEmpty() }
+        val list = host.suggestions()
+        if (list.isEmpty()) return
+        val bold = host.boldSuggestion()
+        val cw = (w - side * 2) / 3f
+        val cy = barH / 2f + dp(1f)
+        text.textSize = dp(16f)
+        for (i in 0 until 3) {
+            val r = suggRects[i]; r.set(side + cw * i, 0f, side + cw * (i + 1), barH)
+            val t = list.getOrNull(i) ?: continue
+            if (t.isEmpty()) continue
+            if (i == bold) { fill.color = if (dark) 0x26FFFFFF else 0xB3FFFFFF.toInt(); c.drawRoundRect(r.left + dp(4f), cy - dp(15f), r.right - dp(4f), cy + dp(15f), dp(9f), dp(9f), fill) }
+            text.color = colTxt
+            text.typeface = if (i == bold) Typeface.create("sans-serif-medium", Typeface.NORMAL) else Typeface.create("sans-serif", Typeface.NORMAL)
+            var shown = t
+            while (shown.length > 2 && text.measureText(shown) > cw - dp(14f)) shown = shown.dropLast(2) + "…"
+            c.drawText(shown, r.centerX(), cy + dp(5.5f), text)
+            if (i > 0 && i - 1 != bold && i != bold) {
+                stroke.color = if (dark) 0x33FFFFFF else 0x26000000; stroke.strokeWidth = dp(1f)
+                c.drawLine(r.left, cy - dp(10f), r.left, cy + dp(10f), stroke)
+            }
+        }
+        text.typeface = Typeface.create("sans-serif", Typeface.NORMAL)
+    }
+
+    /** Cam yoğunluğuna göre panel saydamlığı (üst/alt renk). */
+    private fun panelAlpha(top: Int, lo: Float, hi: Float, bottom: Int): IntArray {
+        val g = cfg.glassTint / 100f
+        val a = ((lo + (hi - lo) * g) * 255).toInt().coerceIn(0, 255)
+        val a2 = (a + 18).coerceAtMost(255)
+        return intArrayOf((a shl 24) or top, (a2 shl 24) or bottom)
+    }
+
+    private fun drawBar(c: Canvas, w: Float) {
+        val chip = host.pasteChip()
+        pasteRect.setEmpty(); pasteClose.setEmpty()
+        if (chip == null) { drawSuggestions(c, w); return }
+        if (chip != null) {
+            // iOS 27 hızlı yapıştır: [pano] Yapıştır: “…”  |  ✕   (✕ düğmenin içinde, ince ayırıcıyla ayrı)
+            text.textSize = dp(14.5f)
+            val cy = barH / 2f + dp(1f)
+            val maxW = w - side * 2 - dp(24f)
+            val iconW = dp(30f); val closeW = dp(34f)
+            var body = chip.replace('\n', ' ').trim()
+            fun label(b: String) = "Yapıştır: “$b”"
+            while (body.length > 1 && text.measureText(label(body)) > maxW - iconW - closeW - dp(16f)) body = body.dropLast(2).trimEnd() + "…"
+            val lw = text.measureText(label(body))
+            val cw = iconW + lw + dp(10f) + closeW
+            pasteRect.set(w / 2 - cw / 2, cy - dp(16f), w / 2 + cw / 2 - closeW, cy + dp(16f))
+            pasteClose.set(pasteRect.right, pasteRect.top, pasteRect.right + closeW, pasteRect.bottom)
+            fill.color = if (dark) 0x2EFFFFFF else 0xE6FFFFFF.toInt()
+            c.drawRoundRect(pasteRect.left, pasteRect.top, pasteClose.right, pasteClose.bottom, dp(16f), dp(16f), fill)
+            // Pano simgesi: tahta + üstte klips
+            stroke.color = colTxt; stroke.strokeWidth = dp(1.5f)
+            val ix = pasteRect.left + dp(17f)
+            c.drawRoundRect(ix - dp(6f), cy - dp(7f), ix + dp(6f), cy + dp(8f), dp(2.5f), dp(2.5f), stroke)
+            fill.color = colTxt
+            c.drawRoundRect(ix - dp(3.5f), cy - dp(9f), ix + dp(3.5f), cy - dp(5f), dp(1.5f), dp(1.5f), fill)
+            c.drawLine(ix - dp(3f), cy, ix + dp(3f), cy, stroke); c.drawLine(ix - dp(3f), cy + dp(3.5f), ix + dp(1.5f), cy + dp(3.5f), stroke)
+            text.color = colTxt; text.textAlign = Paint.Align.LEFT
+            c.drawText(label(body), pasteRect.left + iconW, cy + dp(5f), text)
+            text.textAlign = Paint.Align.CENTER
+            // ayırıcı + ✕
+            stroke.color = if (dark) 0x33FFFFFF else 0x22000000; stroke.strokeWidth = dp(1f)
+            c.drawLine(pasteClose.left, cy - dp(9f), pasteClose.left, cy + dp(9f), stroke)
+            stroke.color = colSub; stroke.strokeWidth = dp(1.6f)
+            val xx = pasteClose.centerX(); val sz = dp(4.5f)
+            c.drawLine(xx - sz, cy - sz, xx + sz, cy + sz, stroke); c.drawLine(xx - sz, cy + sz, xx + sz, cy - sz, stroke)
+        }
+    }
+
+    private fun keyColor(k: Key): Int = when {
+        k.code == Code.Return && host.returnIsAction() -> blue
+        k.code == Code.Shift && shift != Shift.Off -> if (dark) 0xFFFFFFFF.toInt() else 0xFFFFFFFF.toInt()
+        k.fn || k.code == Code.Return -> colFn
+        else -> colKey
+    }
+
+    private fun drawKey(c: Canvas, k: Key) {
+        if (k.code == Code.None) return
+        val isPressed = pressed === k
+        val rr = k.rect
+        if (numeric && k.code == Code.Delete) {
+            // iPhone sayı klavyesi: sil tuşunun zemini yok (basınca hafif belirir).
+            if (isPressed) { fill.color = if (dark) 0x33FFFFFF else 0x22000000; c.drawRoundRect(rr, radius, radius, fill) }
+            drawDelete(c, rr.centerX(), rr.centerY(), colTxt); return
+        }
+        if (glass) { drawGlassKey(c, k, isPressed) } else {
+            // Opak zemin: alt kenarda 1 dp gölge, düz tuş.
+            fill.color = colShadow
+            c.drawRoundRect(rr.left, rr.top + dp(1f), rr.right, rr.bottom + dp(1f), radius, radius, fill)
+            var col = keyColor(k)
+            if (isPressed && (k.fn || k.code != Code.Char || page == Page.Emoji)) col = if (k.fn || k.code == Code.Return) colKey else colFn
+            fill.color = col
+            c.drawRoundRect(rr, radius, radius, fill)
+        }
+
+        if (trackpad) return
+        val cx = rr.centerX(); val cy = rr.centerY()
+        if (numeric) {
+            text.color = colTxt
+            val sub = if (page != Page.PhoneSym) subLetters[k.label] ?: (if (k.label == "0" && page == Page.Phone) "+" else null) else null
+            if (k.code == Code.PhoneSym) { text.textSize = dp(17f); c.drawText(k.label, cx, cy + dp(6f), text); return }
+            text.textSize = dp(27f)
+            if (sub != null) {
+                c.drawText(k.label, cx, cy + dp(4f), text)
+                text.textSize = dp(10f); text.letterSpacing = 0.18f
+                c.drawText(sub, cx, cy + dp(17f), text); text.letterSpacing = 0f
+            } else c.drawText(k.label, cx, cy + dp(9.5f), text)
+            return
+        }
+        val onBlue = k.code == Code.Return && host.returnIsAction()
+        text.color = if (onBlue) 0xFFFFFFFF.toInt() else if (k.code == Code.Shift && shift != Shift.Off) 0xFF111111.toInt() else colTxt
+        when (k.code) {
+            Code.Shift -> drawShift(c, cx, cy, text.color, shift == Shift.Caps)
+            Code.Delete -> drawDelete(c, cx, cy, text.color)
+            Code.PageEmoji -> drawSmile(c, cx, cy, text.color)
+            Code.Mic -> drawMic(c, cx, cy, text.color)
+            Code.Return -> {
+                val lbl = host.returnLabel()
+                if (lbl == null) drawReturn(c, cx, cy, text.color)
+                else { text.textSize = dp(16f); c.drawText(lbl, cx, cy + dp(5.5f), text) }
+            }
+            Code.Space -> { text.textSize = dp(16f); c.drawText("boşluk", cx, cy + dp(5.5f), text) }
+            Code.Page123, Code.PageAbc, Code.PageSym -> { text.textSize = dp(16f); c.drawText(k.label, cx, cy + dp(5.5f), text) }
+            else -> {
+                val s = display(k.label)
+                text.textSize = if (page == Page.Emoji) dp(24f) else if (s.length > 1) dp(16f) else dp(22f)
+                c.drawText(s, cx, cy + text.textSize * 0.36f, text)
+            }
+        }
+    }
+
+    /**
+     * iOS 26/27 Liquid Glass tuşu: yarı saydam dolgu (arkadaki bulanık zemin hafifçe görünür), çevresinde üstte
+     * parlak altta sönük ince cam kenarı, çok yumuşak gölge; basınca tuş aydınlanır. Saydamlık "Cam yoğunluğu"
+     * ayarıyla (iOS 27'deki Liquid Glass kaydırıcısı gibi: Şeffaf ↔ Renkli) değişir.
+     */
+    private fun drawGlassKey(c: Canvas, k: Key, isPressed: Boolean) {
+        val rr = k.rect
+        val g = cfg.glassTint / 100f
+        fun a(lo: Float, hi: Float) = ((lo + (hi - lo) * g) * 255).toInt().coerceIn(0, 255)
+        val action = k.code == Code.Return && host.returnIsAction()
+        val shiftOn = k.code == Code.Shift && shift != Shift.Off
+        val isFn = (k.fn || k.code == Code.Return) && !action && !shiftOn
+        // yumuşak gölge
+        fill.color = if (dark) 0x40000000 else 0x24000000
+        c.drawRoundRect(rr.left, rr.top + dp(0.8f), rr.right, rr.bottom + dp(1.2f), radius, radius, fill)
+        val base = when {
+            action -> 0xFF0A84FF.toInt()
+            shiftOn -> 0xFFFFFFFF.toInt()
+            dark && isFn -> (a(0.07f, 0.18f) shl 24) or 0xFFFFFF
+            dark -> (a(0.18f, 0.34f) shl 24) or 0xFFFFFF
+            isFn -> (a(0.40f, 0.80f) shl 24) or 0xB4B9C2
+            else -> (a(0.72f, 0.97f) shl 24) or 0xFFFFFF
+        }
+        fill.color = base
+        c.drawRoundRect(rr, radius, radius, fill)
+        if (isPressed && (k.code != Code.Char || page == Page.Emoji || !cfg.preview)) {
+            fill.color = if (dark) 0x40FFFFFF else if (isFn) 0x66FFFFFF else 0x1F000000
+            c.drawRoundRect(rr, radius, radius, fill)
+        }
+        // cam kenarı: üstte parlak, alta doğru sönük
+        // İnce cam kenarı (0,6 dp; önceden 1 dp ve fazla parlaktı).
+        stroke.strokeWidth = dp(0.6f)
+        stroke.shader = LinearGradient(0f, rr.top, 0f, rr.bottom,
+            if (dark) intArrayOf(0x4DFFFFFF, 0x0AFFFFFF) else intArrayOf(0x99FFFFFF.toInt(), 0x1AFFFFFF), null, Shader.TileMode.CLAMP)
+        c.drawRoundRect(rr.left + dp(0.3f), rr.top + dp(0.3f), rr.right - dp(0.3f), rr.bottom - dp(0.3f), radius, radius, stroke)
+        stroke.shader = null
+    }
+
+    private fun display(l: String) = if (page == Page.Letters && shift != Shift.Off) l.uppercase(tr) else l
+
+    private fun drawPreview(c: Canvas, k: Key) {
+        // iOS balonu: tuşun üstüne taşan, biraz daha geniş kapsül; büyük harf.
+        val rr = k.rect
+        val bw = rr.width() + dp(18f)
+        // Üst sıranın balonu klavyenin üstüne taşabilir (üst pencere kırpmıyor).
+        val top = maxOf(dp(1f), rr.top - dp(48f))
+        val bub = RectF(rr.centerX() - bw / 2, top, rr.centerX() + bw / 2, rr.top + dp(6f))
+        fill.color = 0x40000000
+        c.drawRoundRect(bub.left, bub.top + dp(2f), bub.right, bub.bottom + dp(2f), dp(12f), dp(12f), fill)
+        fill.color = colKey
+        c.drawRoundRect(bub, dp(12f), dp(12f), fill)
+        c.drawRoundRect(rr.left, rr.top - dp(2f), rr.right, rr.bottom, radius, radius, fill)
+        text.color = colTxt; text.textSize = dp(30f)
+        c.drawText(display(k.label), bub.centerX(), bub.top + dp(32f), text)
+    }
+
+    private fun drawBottom(c: Canvas) {
+        bottomKeys.firstOrNull { it.code == Code.PageEmoji }?.rect?.let { r ->
+            drawSmile(c, r.centerX(), r.centerY(), if (pressed?.code == Code.PageEmoji) colTxt else colSub, big = true)
+        }
+        bottomKeys.firstOrNull { it.code == Code.Mic }?.rect?.let { r -> drawMic(c, r.centerX(), r.centerY(), if (pressed?.code == Code.Mic) colTxt else colSub) }
+        if (bottomKeys.none { it.code == Code.OneHandOff }) return
+        // Tek elle: tam klavye (genişleyen oklar) ve öbür yana (yan ok) düğmeleri.
+        stroke.color = colSub; stroke.strokeWidth = dp(1.8f)
+        val a = bottomKeys.first { it.code == Code.OneHandOff }.rect; val ax = a.centerX(); val ay = a.centerY()
+        c.drawRoundRect(ax - dp(10f), ay - dp(7f), ax + dp(10f), ay + dp(7f), dp(2f), dp(2f), stroke)
+        c.drawLine(ax - dp(6f), ay, ax + dp(6f), ay, stroke)
+        val b = bottomKeys.first { it.code == Code.OneHandSwap }.rect; val bx = b.centerX(); val by = b.centerY()
+        val dir = if (cfg.oneHanded == 1) 1f else -1f
+        c.drawLine(bx - dp(6f) * dir, by - dp(9f), bx + dp(4f) * dir, by, stroke)
+        c.drawLine(bx + dp(4f) * dir, by, bx - dp(6f) * dir, by + dp(9f), stroke)
+    }
+
+    private fun drawMic(c: Canvas, mx: Float, cy: Float, col: Int) {
+        stroke.color = col; stroke.strokeWidth = dp(1.6f); fill.color = col
+        val my = cy + dp(1f)
+        c.drawRoundRect(mx - dp(4f), my - dp(11f), mx + dp(4f), my + dp(2f), dp(4f), dp(4f), fill)
+        c.drawArc(RectF(mx - dp(8f), my - dp(8f), mx + dp(8f), my + dp(5f)), 20f, 140f, false, stroke)
+        c.drawLine(mx, my + dp(5f), mx, my + dp(9f), stroke)
+    }
+
+    private fun drawShift(c: Canvas, cx: Float, cy: Float, col: Int, caps: Boolean) {
+        val p = Path().apply {
+            moveTo(cx, cy - dp(9f)); lineTo(cx + dp(9f), cy + dp(1f)); lineTo(cx + dp(4.5f), cy + dp(1f))
+            lineTo(cx + dp(4.5f), cy + dp(7f)); lineTo(cx - dp(4.5f), cy + dp(7f)); lineTo(cx - dp(4.5f), cy + dp(1f))
+            lineTo(cx - dp(9f), cy + dp(1f)); close()
+        }
+        if (shift != Shift.Off) { fill.color = col; c.drawPath(p, fill) } else { stroke.color = col; stroke.strokeWidth = dp(1.6f); c.drawPath(p, stroke) }
+        if (caps) { fill.color = col; c.drawRect(cx - dp(4.5f), cy + dp(9f), cx + dp(4.5f), cy + dp(10.6f), fill) }
+    }
+
+    private fun drawDelete(c: Canvas, cx: Float, cy: Float, col: Int) {
+        stroke.color = col; stroke.strokeWidth = dp(1.6f)
+        val p = Path().apply {
+            moveTo(cx - dp(11f), cy); lineTo(cx - dp(5f), cy - dp(7f)); lineTo(cx + dp(10f), cy - dp(7f))
+            lineTo(cx + dp(10f), cy + dp(7f)); lineTo(cx - dp(5f), cy + dp(7f)); close()
+        }
+        c.drawPath(p, stroke)
+        c.drawLine(cx - dp(1f), cy - dp(3f), cx + dp(5f), cy + dp(3f), stroke)
+        c.drawLine(cx - dp(1f), cy + dp(3f), cx + dp(5f), cy - dp(3f), stroke)
+    }
+
+    private fun drawSmile(c: Canvas, cx: Float, cy: Float, col: Int, big: Boolean = false) {
+        // iOS'taki emoji simgesi: dolu daire, gözler ve ağız oyuk.
+        val r = dp(if (big) 12f else 10f)
+        fill.color = col; c.drawCircle(cx, cy, r, fill)
+        fill.color = if (glass) (if (dark) 0xFF2A2A2E.toInt() else 0xFFE9EBEF.toInt()) else colBg
+        c.drawCircle(cx - r * 0.36f, cy - r * 0.25f, r * 0.14f, fill); c.drawCircle(cx + r * 0.36f, cy - r * 0.25f, r * 0.14f, fill)
+        stroke.color = fill.color; stroke.strokeWidth = r * 0.15f
+        c.drawArc(RectF(cx - r * 0.55f, cy - r * 0.35f, cx + r * 0.55f, cy + r * 0.6f), 25f, 130f, false, stroke)
+    }
+
+    private fun drawReturn(c: Canvas, cx: Float, cy: Float, col: Int) {
+        stroke.color = col; stroke.strokeWidth = dp(1.7f)
+        val p = Path().apply { moveTo(cx + dp(8f), cy - dp(7f)); lineTo(cx + dp(8f), cy + dp(2f)); lineTo(cx - dp(8f), cy + dp(2f)) }
+        c.drawPath(p, stroke)
+        c.drawLine(cx - dp(8f), cy + dp(2f), cx - dp(4f), cy - dp(2f), stroke)
+        c.drawLine(cx - dp(8f), cy + dp(2f), cx - dp(4f), cy + dp(6f), stroke)
+    }
+
+    // ---------- Dokunma ----------
+    private fun keyAt(x: Float, y: Float): Key? {
+        // Tuşlar arasındaki boşluğa dokunulursa en yakın tuş (iOS'ta da öyle).
+        var best: Key? = null; var bd = Float.MAX_VALUE
+        (rows.flatten() + bottomKeys).forEach { k ->
+            val r = k.rect
+            val dx = maxOf(r.left - x, 0f, x - r.right); val dy = maxOf(r.top - y, 0f, y - r.bottom)
+            val dd = dx * dx + dy * dy
+            if (dd < bd) { bd = dd; best = k }
+        }
+        val slop = dp(cfg.touchSlopDp.toFloat())
+        return if (bd < slop * slop) best else null
+    }
+
+    private val repeatDelete = object : Runnable {
+        override fun run() {
+            if (!repeating) return
+            host.deleteBack(); tick(1)
+            handler.postDelayed(this, cfg.repeatMs.toLong())
+        }
+    }
+
+    private val longGlobe = Runnable { pressed?.takeIf { it.code == Code.Globe }?.let { host.switchKeyboard(true); pressed = null; invalidate() } }
+
+    private fun tick(kind: Int = 0) {
+        if (host.haptics()) performHapticFeedback(when (cfg.hapticStrength) {
+            0 -> HapticFeedbackConstants.CLOCK_TICK
+            2 -> HapticFeedbackConstants.VIRTUAL_KEY
+            else -> HapticFeedbackConstants.KEYBOARD_TAP
+        })
+        host.click(kind)
+    }
+
+    private fun kindOf(k: Key) = when (k.code) { Code.Delete -> 1; Code.Space -> 2; Code.Return -> 3; else -> 0 }
+
+    /** İzlenen parmak (çoklu dokunma: iki başparmakla hızlı yazarken her parmak ayrı tuş). */
+    private var activeId = -1
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> { activeId = e.getPointerId(0); down(e.x, e.y) }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // Hızlı yazma: ikinci parmak değerken ilk parmağın tuşu hemen yazılır, yeni parmak izlenir.
+                // (Önceden ikinci parmak yok sayılıyordu; harf kayboluyor ya da yanlış tuş yazılıyordu.)
+                if (swiping || trackpad) return true
+                pressed?.let { k ->
+                    stopRepeats(); pressed = null
+                    if (k.code != Code.Delete) release(k)
+                }
+                val idx = e.actionIndex
+                activeId = e.getPointerId(idx)
+                down(e.getX(idx), e.getY(idx))
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val idx = e.findPointerIndex(activeId)
+                if (idx >= 0) move(e.getX(idx), e.getY(idx))
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                val idx = e.actionIndex
+                if (e.getPointerId(idx) == activeId) { up(e.getX(idx), e.getY(idx)); activeId = -1 }
+            }
+            MotionEvent.ACTION_UP -> {
+                if (e.getPointerId(0) == activeId) up(e.x, e.y)
+                activeId = -1
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                stopRepeats(); trackpad = false; swiping = false; trail.clear(); pressed = null; activeId = -1; invalidate()
+            }
+        }
+        return true
+    }
+
+    private fun stopRepeats() {
+        repeating = false
+        handler.removeCallbacks(repeatDelete); handler.removeCallbacks(longGlobe); handler.removeCallbacks(startTrackpad)
+    }
+
+    private fun down(x: Float, y: Float) {
+        if (pasteClose.contains(x, y)) { host.dismissPaste(); refreshBar(); return }
+        if (pasteRect.contains(x, y)) { tick(); host.pasteNow(); refreshBar(); return }
+        if (y < barH) {
+            val i = suggRects.indexOfFirst { it.contains(x, y) }
+            if (i >= 0 && !host.suggestions().getOrNull(i).isNullOrEmpty()) { tick(); host.pickSuggestion(i) }
+            return
+        }
+        swiping = false; trail.clear(); swipePath.clear(); downX = x; downY = y
+        val k = keyAt(x, y) ?: return
+        pressed = k; tick(kindOf(k)); invalidate()
+        when (k.code) {
+            Code.Delete -> { host.deleteBack(); repeating = true; handler.postDelayed(repeatDelete, cfg.longPressMs.toLong()) }
+            Code.Globe -> handler.postDelayed(longGlobe, cfg.longPressMs.toLong())
+            Code.Space -> handler.postDelayed(startTrackpad, cfg.longPressMs.toLong())
+            else -> {}
+        }
+    }
+
+    private fun move(x: Float, y: Float) {
+        if (trackpad) {
+            val stepX = dp(9f); val stepY = dp(22f)
+            val sx = ((x - tpX) / stepX).toInt(); val sy = ((y - tpY) / stepY).toInt()
+            if (sx != 0 || sy != 0) {
+                host.moveCursor(sx, sy)
+                tpX += sx * stepX; tpY += sy * stepY
+                if (host.haptics() && sx != 0) performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            }
+            return
+        }
+        val k = pressed ?: return
+        // Kaydırarak yazma: bir buçuk tuş genişliğinden fazla kayınca başlar (hızlı dokunuşlar yanlışlıkla
+        // kaydırma sayılmasın).
+        if (cfg.swipe && page == Page.Letters && k.code == Code.Char && !swiping &&
+            kotlin.math.hypot(x - downX, y - downY) > k.rect.width() * 1.5f) {
+            swiping = true; swipePath.append(k.label); trail.add(downX); trail.add(downY)
+        }
+        if (swiping) {
+            trail.add(x); trail.add(y)
+            val n = keyAt(x, y)
+            if (n != null && n.code == Code.Char && n.rect.contains(x, y) && (swipePath.isEmpty() || swipePath.last().toString() != n.label)) swipePath.append(n.label)
+            invalidate(); return
+        }
+        if (k.code == Code.Char && page != Page.Emoji) {
+            // Parmak kayınca balon yeni tuşa geçer (iOS gibi), ama yalnızca parmak yeni tuşun açıkça içine
+            // girdiyse: kenarlarda %20 pay var (hızlı yazarken parmağın hafif kayması komşu tuşa geçirmesin).
+            val n = rows.flatten().firstOrNull { it.code == Code.Char && it !== k && insetContains(it.rect, x, y) }
+            if (n != null) { pressed = n; invalidate() }
+        }
+    }
+
+    private fun insetContains(r: RectF, x: Float, y: Float): Boolean {
+        val ix = r.width() * 0.2f; val iy = r.height() * 0.2f
+        return x > r.left + ix && x < r.right - ix && y > r.top + iy && y < r.bottom - iy
+    }
+
+    private fun up(x: Float, y: Float) {
+        val k = pressed
+        stopRepeats()
+        pressed = null
+        if (trackpad) { trackpad = false; invalidate(); return }
+        if (swiping) {
+            keyAt(x, y)?.takeIf { it.code == Code.Char }?.let { if (swipePath.last().toString() != it.label) swipePath.append(it.label) }
+            host.swipeWord(swipePath.toString(), shift != Shift.Off)
+            if (shift == Shift.On) { shift = Shift.Off; build() }
+            swiping = false; trail.clear(); invalidate(); return
+        }
+        if (k != null) release(k)
+        invalidate()
+    }
+
+    private fun release(k: Key) {
+        when (k.code) {
+            Code.Char -> {
+                host.commit(display(k.label))
+                if (page == Page.Letters && shift == Shift.On) { shift = Shift.Off; build() }
+                // iOS: 123 sayfasında kesme işareti/boşluk sonrası harflere dönülür.
+                if (page == Page.Numbers && k.label == "'") { page = Page.Letters; build() }
+                updateAutoCaps()
+            }
+            Code.Shift -> {
+                val now = System.currentTimeMillis()
+                shift = when {
+                    cfg.capsLock && now - lastShiftTap < 320 && shift == Shift.On -> Shift.Caps
+                    shift == Shift.Off -> Shift.On
+                    else -> Shift.Off
+                }
+                lastShiftTap = now; build()
+            }
+            Code.Delete -> updateAutoCaps()
+            Code.Space -> {
+                host.commit(" ")
+                if (page == Page.Numbers || page == Page.Symbols) { page = Page.Letters; build() }
+                updateAutoCaps()
+            }
+            Code.Return -> { host.action(); updateAutoCaps() }
+            Code.Page123 -> { page = Page.Numbers; build() }
+            Code.PageSym -> { page = Page.Symbols; build() }
+            Code.PageAbc -> if (emojiBar) host.showEmoji(false) else { page = Page.Letters; build(); updateAutoCaps() }
+            Code.PageEmoji -> host.showEmoji(true)
+            Code.Globe -> host.switchKeyboard(false)
+            Code.Mic -> host.voice()
+            Code.None -> {}
+            Code.PhoneSym -> { page = if (page == Page.PhoneSym) Page.Phone else Page.PhoneSym; build(); requestLayout() }
+            Code.OneHandOff -> host.setOneHanded(0)
+            Code.OneHandSwap -> host.setOneHanded(if (cfg.oneHanded == 1) 2 else 1)
+        }
+    }
+}

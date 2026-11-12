@@ -1,0 +1,52 @@
+package dev.glass.launcher.data
+
+import android.content.ComponentName
+import android.content.pm.LauncherActivityInfo
+import android.os.UserHandle
+
+/** Uygulamanın bulunduğu kullanıcı profili. */
+enum class ProfileKind { Main, Work, Private }
+
+/** Bir kullanıcı profilinin durumu (iş profili / Özel Alan). [quiet]: duraklatılmış veya kilitli. */
+data class ProfileState(val user: UserHandle, val kind: ProfileKind, val quiet: Boolean)
+
+/** Başlatılabilir bir uygulama girişi. Kimlik: bileşen + kullanıcı profili. */
+class AppInfo(
+    val componentName: ComponentName,
+    val user: UserHandle,
+    val label: String,
+    val activityInfo: LauncherActivityInfo,
+    /** Uygulama Arşivi kategorisi. */
+    val category: AppCategory = AppCategory.Other,
+    /** İlk kurulum zamanı (ms). */
+    val installTime: Long = 0L,
+    /** Kaldırılamayan sistem uygulaması mı? */
+    val isSystem: Boolean = false,
+    /** Ana ekrana sabitlenmiş uygulama kısayolu (Chrome "Ana ekrana ekle", WhatsApp sohbeti vb.); yoksa null. */
+    val shortcut: android.content.pm.ShortcutInfo? = null,
+    /** Ana profil, iş profili veya Özel Alan (Android 15+). */
+    val profile: ProfileKind = ProfileKind.Main,
+) {
+    val key: String = shortcut?.let { shortcutKey(it.`package`, it.id, user) }
+        ?: "${componentName.flattenToString()}#${user.hashCode()}"
+    val packageName: String get() = componentName.packageName
+    /**
+     * Uygulamanın yüklü sürümünü belirten damga: her güncellemede APK yolu (ve simge kaynağı) değişir.
+     * Simge önbelleği bununla anahtarlanır; güncellenen uygulamanın yeni simgesi hemen görünür.
+     */
+    val iconStamp: String = runCatching {
+        val ai = activityInfo.applicationInfo
+        "${ai.sourceDir}:${ai.icon}:${activityInfo.activityInfo.icon}" + (shortcut?.let { ":sc${it.lastChangedTimestamp}" } ?: "")
+    }.getOrDefault("")
+    val isShortcut: Boolean get() = shortcut != null
+    /** Uygulamanın kendi anahtarı (kısayolda da sahibi olan uygulamanınki): gizleme/kilit bununla tutulur. */
+    val appKey: String get() = "${componentName.flattenToString()}#${user.hashCode()}"
+
+    companion object {
+        /** Sabitlenmiş kısayolun düzendeki anahtarı ("sc:" ile başlar). */
+        fun shortcutKey(pkg: String, id: String, user: UserHandle) = "sc:$pkg/$id#${user.hashCode()}"
+        fun isShortcutKey(key: String) = key.startsWith("sc:")
+    }
+    override fun equals(other: Any?) = other is AppInfo && other.key == key && other.label == label && other.iconStamp == iconStamp
+    override fun hashCode() = key.hashCode()
+}

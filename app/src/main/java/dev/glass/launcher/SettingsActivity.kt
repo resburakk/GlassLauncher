@@ -1,0 +1,96 @@
+package dev.glass.launcher
+
+import android.app.role.RoleManager
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.glass.launcher.ui.LauncherViewModel
+import dev.glass.launcher.ui.SettingsScreen
+
+/**
+ * Ayarlar ayrı bir uygulama ekranı olarak açılır: sistem onu sıradan bir uygulama gibi görür, böylece alttan
+ * kaydırma onu kapatıp ana ekrana döner, geri hareketi çalışır (MagicOS geriyi ana ekran uygulamasına vermiyor)
+ * ve son uygulamalarda "Glass Ayarları" kartı olarak görünür. Ana ekranla aynı ViewModel'i kullanır.
+ */
+class SettingsActivity : ComponentActivity() {
+    private val vm: LauncherViewModel get() = (application as LauncherApp).launcherViewModel
+    private var isDefault by mutableStateOf(true)
+
+    private val roleLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { updateDefault() }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        startPage = pageFor(intent)
+        enableEdgeToEdge()
+        requestHighRefresh()
+        setContent {
+            val s by vm.settings.collectAsStateWithLifecycle()
+            dev.glass.launcher.ui.GlassLens.edgeFrac = s.glassEdgeWidth
+            dev.glass.launcher.ui.GlassLens.lightAngle = s.glassLightAngle
+            dev.glass.launcher.ui.GlassLens.lightBack = s.glassLightBack
+            dev.glass.launcher.ui.GlassLens.contactShadow = s.glassContactShadow
+            dev.glass.launcher.ui.GlassLens.iconShadow = s.iconShadow
+            SettingsScreen(
+                vm = vm, s = s, isDefaultHome = isDefault,
+                onRequestDefault = ::requestHomeRole,
+                onAddWidget = ::addWidgetOnHome,
+                onClose = { finishAndRemoveTask() },
+                initialPage = startPage,
+            )
+        }
+    }
+
+    /** Klavye ayarları kısayolundan (sistem "Dil ve giriş" > Glass Klavye) gelinirse doğrudan Klavye sayfası. */
+    private var startPage by androidx.compose.runtime.mutableStateOf<String?>(null)
+    private fun pageFor(i: android.content.Intent?): String? =
+        if (i?.component?.className?.endsWith("KeyboardSettingsEntry") == true || i?.getStringExtra("page") == "Keyboard") "Keyboard" else null
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        pageFor(intent)?.let { startPage = it }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requestHighRefresh()
+        dev.glass.launcher.ui.AppLock.attach(this)
+        updateDefault()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        dev.glass.launcher.ui.AppLock.paused(this)
+    }
+
+    private fun updateDefault() {
+        isDefault = runCatching { getSystemService(RoleManager::class.java).isRoleHeld(RoleManager.ROLE_HOME) }.getOrDefault(true)
+    }
+
+    private fun requestHomeRole() {
+        val rm = getSystemService(RoleManager::class.java)
+        if (rm.isRoleAvailable(RoleManager.ROLE_HOME) && !rm.isRoleHeld(RoleManager.ROLE_HOME)) {
+            roleLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_HOME))
+        }
+    }
+
+    /** "Widget ekle": ana ekrana dönülür ve widget galerisi orada açılır (widget'lar ana ekrana eklenir). */
+    private fun addWidgetOnHome() {
+        runCatching {
+            startActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).setPackage(packageName)
+                    .putExtra(MainActivity.EXTRA_ADD_WIDGET, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+        finishAndRemoveTask()
+    }
+
+    /** 120 Hz (ana ekrandaki gibi, bkz. [HighRefresh]). */
+    private fun requestHighRefresh() = HighRefresh.apply(this)
+}

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Glass Launcher simgesi (R5): camgöbeği → mavi geçişli yuvarlak hatlı ev, beyaz kemerli kapı.
+     Tasarım 100 birimlik karede çizildi; 0,72 ölçekle simgenin görünen alanına (18…90) yerleştirilir. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="18" android:translateY="18" android:scaleX="0.72" android:scaleY="0.72">
+        <!-- yumuşak gölge -->
+        <group android:translateY="2.2">
+            <path android:pathData="M44,25 Q50,20 56,25 L76,42 Q80,45.5 80,51 L80,72 Q80,80 72,80 L28,80 Q20,80 20,72 L20,51 Q20,45.5 24,42Z" android:fillColor="#1400143D"/>
+        </group>
+        <group android:translateY="1.1">
+            <path android:pathData="M44,25 Q50,20 56,25 L76,42 Q80,45.5 80,51 L80,72 Q80,80 72,80 L28,80 Q20,80 20,72 L20,51 Q20,45.5 24,42Z" android:fillColor="#1A00143D"/>
+        </group>
+        <path android:pathData="M44,25 Q50,20 56,25 L76,42 Q80,45.5 80,51 L80,72 Q80,80 72,80 L28,80 Q20,80 20,72 L20,51 Q20,45.5 24,42Z"
+            android:strokeColor="#8CFFFFFF" android:strokeWidth="1.2">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="20" android:startY="20" android:endX="80" android:endY="80">
+                    <item android:offset="0" android:color="#FF40D8E8"/>
+                    <item android:offset="0.5" android:color="#FF1FA2FF"/>
+                    <item android:offset="1" android:color="#FF0A5BFF"/>
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path android:pathData="M30,44 L46,30" android:strokeColor="#BFFFFFFF"
+            android:strokeWidth="2.6" android:strokeLineCap="round"/>
+        <path android:pathData="M42,80 L42,64 Q42,56 50,56 Q58,56 58,64 L58,80Z" android:fillColor="#FFFFFFFF"/>
+    </group>
+</vector>

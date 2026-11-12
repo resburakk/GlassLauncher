@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<spell-checker xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/ime_name"
+    android:settingsActivity="dev.glass.launcher.ime.KeyboardSettingsEntry">
+    <subtype
+        android:label="@string/ime_subtype_tr"
+        android:subtypeLocale="tr_TR"
+        android:languageTag="tr-TR" />
+</spell-checker>
