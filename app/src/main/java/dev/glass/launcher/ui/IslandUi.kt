@@ -220,17 +220,23 @@ fun IslandRoot() {
     // Uygulama katmanında durum çubuğu (saat, pil) adanın üstünde çizilir: genişlemiş adanın içeriği durum çubuğunun
     // altından başlar. Erişilebilirlik katmanında ada durum çubuğunun da üstündedir: gerek yok.
     val islandTopPx = (geo.cy - (baseH * density.density) / 2f + s.offsetY * density.density).coerceAtLeast(2f * density.density)
-    val topInset = if (aboveBars) 0f else ((geo.statusH - islandTopPx) / density.density).coerceIn(0f, 40f)
+    // Genişlemiş adada içerik kamera deliğinin bulunduğu üst bandın (kapalı ada yüksekliği) ve durum çubuğunun
+    // altından başlar; önceden erişilebilirlik katmanında 0'dı ve simge/yazı kameranın yanına, en üste yapışıyordu.
+    val barInset = if (aboveBars) 0f else ((geo.statusH - islandTopPx) / density.density).coerceIn(0f, 40f)
+    val topInset = max(baseH, barInset).coerceAtMost(52f)
     val (tw, th) = when (mode) {
         IslandMode.Hidden -> 0f to 0f
         IslandMode.Idle -> idleW to baseH
         is IslandMode.Compact -> compactW to baseH
         is IslandMode.Expanded -> bigW to topInset + when (mode.a) {
-            is IslandAct.Music -> 168f
-            is IslandAct.Call -> if (mode.a.incoming || mode.a.hangup != null) 128f else 88f
-            is IslandAct.Message -> 92f
-            is IslandAct.Timer -> 96f
-            else -> 96f
+            // İçerik yüksekliği + üstte ve altta eşit 12 dp boşluk (ExpandedContent).
+            is IslandAct.Music -> 162f
+            is IslandAct.Call -> if (mode.a.incoming || mode.a.hangup != null) 134f else 72f
+            is IslandAct.Message -> if (s.notifText && mode.a.text.isNotBlank()) 84f else 70f
+            is IslandAct.Timer -> 74f
+            is IslandAct.Nav -> 90f
+            is IslandAct.Progress -> 80f
+            else -> 74f
         }
     }
     val bubble = second != null && mode is IslandMode.Compact && transient == null
@@ -483,7 +489,7 @@ private fun Waveform(color: Color, playing: Boolean, size: Dp) {
 private fun ExpandedContent(a: IslandAct, showText: Boolean) {
     val ctx = LocalContext.current
     val now = rememberSecondTick(a is IslandAct.Call || a is IslandAct.Timer)
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 14.dp), verticalArrangement = Arrangement.Center) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp, vertical = 12.dp), verticalArrangement = Arrangement.Center) {
         when (a) {
             is IslandAct.Music -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
