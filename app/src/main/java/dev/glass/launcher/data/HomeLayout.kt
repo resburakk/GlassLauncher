@@ -20,15 +20,42 @@ data class PageBreak(override val id: String) : HomeItem
  */
 data class GapItem(override val id: String) : HomeItem
 
+/** Ana ekran ızgarasının son bilinen boyutu (ekran çizilince güncellenir); yeni öğenin yerini bulmak için. */
+object HomeGrid {
+    @Volatile var columns = 4
+    @Volatile var rows = 6
+}
+
 /**
- * Yeni öğeyi son sayfadaki İLK boş hücreye koyar (serbest yerleşimdeki boşluk); boşluk yoksa listenin sonuna ekler
- * (son sayfada yer varsa oraya, yoksa kendiliğinden yeni sayfaya geçer). Önceden hep sona ekleniyordu: son sayfanın
- * son simgesi en alttaysa yukarıda boş yer olsa bile yeni uygulama yeni bir sayfa açıyordu.
+ * Yeni öğeyi ilk sayfadan başlayarak yer olan İLK sayfaya koyar: sayfadaki son simgeden sonraki boş hücreye
+ * (sayfa sonunun yerine ya da sondaki görünmez boşluğa). Hiçbir sayfada yer yoksa listenin sonuna ekler
+ * (gerekirse yeni sayfa açılır). Simgelerin arasında bilerek bırakılmış boşluklara dokunulmaz.
+ * Önceden yalnızca son sayfaya bakılıyordu: 1. sayfa bir sayfa sonuyla bitiyorsa yerde boşluk olsa bile yeni
+ * uygulama yeni bir sayfa açıyordu.
  */
 internal fun MutableList<HomeItem>.placeOnLastPage(item: HomeItem) {
-    val start = indexOfLast { it is PageBreak } + 1
-    val gap = (start until size).firstOrNull { this[it] is GapItem }
-    if (gap != null) this[gap] = item else add(item)
+    val c = HomeGrid.columns.coerceAtLeast(1); val r = HomeGrid.rows.coerceAtLeast(1)
+    val pl = runCatching { GridPacker.pack(this, c, r) }.getOrNull()
+    if (pl != null && pl.isNotEmpty()) {
+        val pages = pl.maxOf { it.page } + 1
+        for (p in 0 until pages) {
+            val onPage = pl.filter { it.page == p && !(it.item is PageBreak && it.spanX == 0) }
+            val lastReal = onPage.filter { it.item !is GapItem && it.item !is PageBreak }.maxOfOrNull { it.row * c + it.col } ?: -1
+            // 1) Son simgeden sonra kalan görünmez boşluk.
+            val gap = onPage.filter { it.item is GapItem && it.row * c + it.col > lastReal }.minByOrNull { it.row * c + it.col }
+            if (gap != null) {
+                val i = indexOfFirst { it.id == gap.item.id }
+                if (i >= 0) { this[i] = item; return }
+            }
+            // 2) Sayfa sonu boş bir hücrede duruyor: öğe onun önüne girer, o hücreye yerleşir.
+            val br = onPage.firstOrNull { it.item is PageBreak }
+            if (br != null) {
+                val i = indexOfFirst { it.id == br.item.id }
+                if (i >= 0) { add(i, item); return }
+            }
+        }
+    }
+    add(item)
 }
 
 internal fun List<HomeItem>.withPlaced(newItems: List<HomeItem>): List<HomeItem> =

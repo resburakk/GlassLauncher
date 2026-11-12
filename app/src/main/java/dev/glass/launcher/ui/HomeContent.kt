@@ -151,6 +151,7 @@ internal fun HomeContent(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val m = HomeMetrics.compute(maxWidth, maxHeight, statusTop, settings, navButtonsDp(), cutoutLeftDp(), cutoutRightDp())
         val firstTopPx = with(density) { m.firstTop.toPx() }
+        androidx.compose.runtime.SideEffect { dev.glass.launcher.data.HomeGrid.columns = m.columns; dev.glass.launcher.data.HomeGrid.rows = m.rows }
         val motion = LocalMotion.current
         val view = LocalView.current
         val items = layout.items

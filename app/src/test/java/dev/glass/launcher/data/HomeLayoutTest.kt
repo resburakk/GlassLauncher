@@ -182,4 +182,20 @@ class HomeLayoutTest {
         assertEquals(listOf("t2"), l.removeItem("t1").today.map { it.id })
         assertEquals(2, l.widgets.size)
     }
+
+    @Test fun newApp_goesToFirstPageWithRoom_notNewPage() {
+        HomeGrid.columns = 4; HomeGrid.rows = 6
+        val br = PageBreak("br")
+        val base = HomeLayout(items = apps("a", "b") + br + apps("c"), dock = emptyList())
+        val l = HomeLayout.reconcileKeys(base, listOf("a", "b", "c", "d"), emptyList())
+        assertEquals(apps("a", "b", "d") + br + apps("c"), l.items)
+    }
+
+    @Test fun newApp_keepsDeliberateGapsBetweenIcons() {
+        HomeGrid.columns = 4; HomeGrid.rows = 6
+        val g = GapItem("g")
+        val base = HomeLayout(items = apps("a") + g + apps("b"), dock = emptyList())
+        val l = HomeLayout.reconcileKeys(base, listOf("a", "b", "d"), emptyList())
+        assertEquals(apps("a") + g + apps("b", "d"), l.items)
+    }
 }
