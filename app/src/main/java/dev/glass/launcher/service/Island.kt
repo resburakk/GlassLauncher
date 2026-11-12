@@ -53,6 +53,8 @@ data class IslandSettings(
     val hideSystemPopup: Boolean = false,
     /** Bu uygulamaların sistem penceresi gizlenmez (paket adları). */
     val popupKeep: Set<String> = emptySet(),
+    /** Ada açıkken sistemin üstten açılan pencerelerini sistem ayarıyla tamamen kapat (WRITE_SECURE_SETTINGS gerekir). */
+    val systemOff: Boolean = false,
 ) {
     companion object {
         private const val P = "island"
@@ -86,6 +88,7 @@ data class IslandSettings(
                 progress = p.getBoolean("progress", d.progress),
                 hideSystemPopup = p.getBoolean("hideSystemPopup", d.hideSystemPopup),
                 popupKeep = p.getStringSet("popupKeep", d.popupKeep)?.toSet() ?: d.popupKeep,
+                systemOff = p.getBoolean("systemOff", d.systemOff),
             )
         }
 
@@ -101,6 +104,7 @@ data class IslandSettings(
                 .putBoolean("charging", s.charging).putBoolean("ringer", s.ringer).putBoolean("notifications", s.notifications)
                 .putBoolean("notifText", s.notifText).putBoolean("navigation", s.navigation).putBoolean("progress", s.progress)
                 .putBoolean("hideSystemPopup", s.hideSystemPopup).putStringSet("popupKeep", s.popupKeep)
+                .putBoolean("systemOff", s.systemOff)
                 .apply()
         }
     }
@@ -175,11 +179,13 @@ object Island {
         if (app != null) return
         app = ctx.applicationContext
         _settings.value = IslandSettings.load(ctx)
+        SystemHeadsUp.sync(app!!, _settings.value)
     }
 
     fun update(ctx: Context, s: IslandSettings) {
         IslandSettings.save(ctx, s)
         _settings.value = s
+        SystemHeadsUp.sync(ctx.applicationContext, s)
         IslandOverlay.sync(ctx.applicationContext)
     }
 

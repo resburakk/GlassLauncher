@@ -1626,6 +1626,7 @@ private fun IslandPage() {
     androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
         tick++
         dev.glass.launcher.service.IslandOverlay.sync(ctx)
+        dev.glass.launcher.service.SystemHeadsUp.sync(ctx.applicationContext, dev.glass.launcher.service.Island.settings.value)
     }
     val overlayOk = remember(tick) { dev.glass.launcher.service.IslandOverlay.canDraw(ctx) }
     val notifOk = remember(tick) { dev.glass.launcher.service.BadgeListener.isGranted(ctx) }
@@ -1741,6 +1742,33 @@ private fun IslandPage() {
     Footer(
         if (!a11yOk) "Erişilebilirlik hizmeti (\"Glass Launcher – Kilit ve Kontrol Merkezi\") açık olmalı. Açıkken: mesaj ya da arama geldiğinde Honor'un üstten açılan penceresi otomatik yukarı itilir, yalnızca ada genişler."
         else "Mesaj ya da arama geldiğinde Honor'un üstten açılan penceresi otomatik yukarı itilir, yalnızca ada genişler. Bildirim silinmez, bildirim panelinde kalır. Pencere bir an görünüp kaybolabilir. Kilit ekranında ve bildirim paneli açıkken dokunulmaz."
+    )
+    // Tamamen kapatma: Android'in kendi ayarı (heads_up_notifications_enabled = 0). Pencere hiç oluşmaz.
+    val shu = dev.glass.launcher.service.SystemHeadsUp
+    val secureOk = remember(tick) { shu.granted(ctx) }
+    val sysOn = remember(tick, st) { shu.systemEnabled(ctx) }
+    Group("Tamamen kapat (sistem ayarı)") {
+        if (secureOk) {
+            ToggleRow("Ada açıkken pencereleri tamamen kapat", st.systemOff) { v -> set(st.copy(systemOff = v)); tick++ }
+        } else {
+            InfoRow("İzin", "verilmedi")
+            RowDivider()
+            ActionRow("İzin komutunu kopyala") {
+                val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                cm?.setPrimaryClip(android.content.ClipData.newPlainText("komut", shu.GRANT_CMD))
+                android.widget.Toast.makeText(ctx, "Komut kopyalandı", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            RowDivider()
+            ActionRow("Geliştirici seçeneklerini aç") {
+                open(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS))
+            }
+        }
+        RowDivider()
+        InfoRow("Sistem pencereleri", when (sysOn) { true -> "açık"; false -> "kapalı"; null -> "?" })
+    }
+    Footer(
+        if (!secureOk) "Honor'un penceresini hiç oluşmadan kapatır (süre sıfır). Bunun için bir kez ADB izni gerekir:\n${shu.GRANT_CMD}\n\nGeliştirici seçenekleri > Kablosuz hata ayıklama açılıp bu komut LADB gibi bir uygulamadan ya da bilgisayardan çalıştırılır. İzin verildikten sonra bu sayfaya dönünce seçenek görünür."
+        else "Açıkken Honor'un üstten açılan bildirim pencereleri tamamen kapanır, bildirimler yalnızca adada ve bildirim panelinde görünür. \"Uygulamaları seç\" listesi bu modda çalışmaz (hepsi kapanır). Gelen arama sistem penceresi yerine tam ekran arama ekranıyla açılabilir. Ada ya da bu seçenek kapatılınca eski ayar geri gelir. Launcher'ı kaldırmadan önce bu seçeneği kapat."
     )
     if (st.hideSystemPopup && showApps) {
         val apps = remember {
