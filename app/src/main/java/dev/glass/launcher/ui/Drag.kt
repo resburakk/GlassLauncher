@@ -468,6 +468,7 @@ internal fun FolderIcon(
         anim.animateTo(target.toFloat(), androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 130f))
     }
     // Klasör rozeti: içindeki uygulamaların toplam bildirim sayısı (iOS gibi).
+    val honorFolder = LocalLauncherSettings.current.glassTone != "dark"
     val folderBadge = badgeCount(folder.keys.mapNotNull { byKey[it]?.takeIf { a -> !a.isShortcut }?.packageName })
     // Ana ekran klasörü dock ile aynı cam ortamında (ayar açıksa).
     DockGlass {
@@ -482,6 +483,8 @@ internal fun FolderIcon(
             edgeFraction = if (LocalLauncherSettings.current.let { it.clearSurface == "glass" && it.iconStyle == dev.glass.launcher.data.IconStyle.Clear }) 0.2f else null,
             // Ayarlar > Dock > "Klasörler ve Ara dock gibi": dock ile aynı kenar ışığı.
             brightRim = LocalLauncherSettings.current.glassLikeDock, iconRim = LocalLauncherSettings.current.glassLikeDock,
+            // Açık tonda Honor/MagicOS klasör camı (düz buzlu, renk korunarak aydınlık, üst/alt ince parlak çizgi).
+            honor = honorFolder,
         ),
         contentAlignment = Alignment.Center,
     ) {
@@ -515,7 +518,8 @@ internal fun FolderIcon(
                 if (kotlin.math.abs(pg - pos) >= 1f) continue // yalnızca görünen sayfalar çizilir
                 val shown = folder.keys.drop(pg * 9).take(9)
                 Column(
-                    Modifier.size(block).graphicsLayer { translationX = (pg - anim.value) * icon.toPx() },
+                    // Honor'da mini simgeler yarı saydam (≈%68): klasörün rengi beyaz yerlerinden geçer (ölçüldü).
+                    Modifier.size(block).graphicsLayer { translationX = (pg - anim.value) * icon.toPx(); if (honorFolder) alpha = 0.68f },
                     verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     shown.chunked(3).forEach { row ->

@@ -33,6 +33,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
@@ -176,6 +177,8 @@ class GlassHole(
     val plain: Boolean = false,
     val ios: Boolean = false,
     val lensRadius: Float = -1f,
+    /** Arka planın renk korunarak aydınlatılması (Honor klasör camı: ≈1,36). 1 = değişmez. */
+    val gain: Float = 1f,
 )
 
 /** Bir sayfanın cam arkalarını sayfa [dx] kadar kaymışken çizer. [rootOffset]: çizim alanının kökteki sol üst köşesi. */
@@ -192,7 +195,7 @@ fun DrawScope.drawPageGlassHoles(anchor: PageAnchor, dx: Float, rootOffset: Offs
                         area = Size(h.rect.width, h.rect.height))
                     else drawBackdrop(
                         h.bd, h.rootW, h.rootH, rootOffset + Offset(left, top), h.lens, h.refr, h.soft, h.clear || h.ios,
-                        area = Size(h.rect.width, h.rect.height), ios = h.ios, lensRadius = h.lensRadius,
+                        area = Size(h.rect.width, h.rect.height), ios = h.ios, lensRadius = h.lensRadius, gain = h.gain,
                     )
                 }
             }
@@ -321,6 +324,12 @@ fun Modifier.liquidGlass(
     forceClear: Boolean = false,
     /** Kenar kırılma bandının kısa kenara oranı (null: genel "kenar genişliği" ayarı). */
     edgeFraction: Float? = null,
+    /**
+     * Honor/MagicOS klasör camı (Honor ekranından piksel ölçümüyle): mercek yok, arkası güçlü bulanık ve DÜZ;
+     * beyaz sis yerine arka plan rengi korunarak ≈1,36 kat aydınlatılır; 1 dp ince kenar, parlak çizgi üstte ve
+     * altta (yanlar silik); gölge, koyu kenar ve parlama lekesi yok.
+     */
+    honor: Boolean = false,
 ): Modifier = composed {
     val look1 = LocalGlass.current.let { g -> if (forceClear && !g.reduced && g.sharp != null) g.copy(clear = true) else g }
     val ov = LocalOverlayBackdrop.current
@@ -329,7 +338,7 @@ fun Modifier.liquidGlass(
         look1.copy(clear = true, sharp = b, backdrop = b)
     } else look1
     // Düşük güçte her cam buzlu kabul edilir (arkası hazır bulanık kopya); şeffaf cam net kopya ister.
-    val look = if ((frosted && !overlay || look0.reduced) && look0.clear) look0.copy(clear = false) else look0
+    val look = if ((frosted && !overlay || look0.reduced || honor) && look0.clear) look0.copy(clear = false) else look0
     val st = LocalLauncherSettings.current
     // Açık ton (varsayılan): koyu temada bile cam karartmaz, Honor/MagicOS gibi hafif beyaz sis + ince parlak kenar.
     val lightTone = st.glassTone != "dark"
@@ -359,8 +368,9 @@ fun Modifier.liquidGlass(
     // Hafif yumuşatma yalnızca net kopyada; katman camlarının kopyası zaten bulanık (9 örneklik yumuşatma boşuna
     // ekran kartı yüküydü).
     val softPx = if (!overlay && clear && bd != null && bd === look.sharp && !look.sharpSoft) with(LocalDensity.current) { 2.5.dp.toPx() } else 0f
+    val gain = if (honor) 1.36f else 1f
     val refr = when {
-        look.noLens || look.reduced -> 0f
+        honor || look.noLens || look.reduced -> 0f
         clear -> (st.glassRefraction * 1.3f).coerceAtMost(1.2f)
         else -> st.glassRefraction
     }
@@ -370,7 +380,7 @@ fun Modifier.liquidGlass(
         Brush.verticalGradient(listOf(white(0.30f * s * fill * op), white(0.12f * s * fill * op)))
     }
     // iOS 26 kalın kenar merceği yalnızca kırılma açıkken (düşük güç / kırılma 0 ise kapalı).
-    val iosLens = ios && refr > 0.01f
+    val iosLens = ios && refr > 0.01f && !honor
     var origin by remember { mutableStateOf(Offset.Zero) }
     // Katman camı: hareket sırasında konum her karede izlenmez (her kartın her karede yeniden çizilmesine yol
     // açıyordu); hareket bitince son konum bir kez alınır.
@@ -409,11 +419,17 @@ fun Modifier.liquidGlass(
     } else {
         lightRim(0.80f * s * glow, 0.10f * s * glow, st.glassLightAngle, st.glassLightBack)
     }
+    val honorRim = if (honor) Brush.verticalGradient(
+        0f to white(0.55f * (glow / 0.4f).coerceIn(0f, 2f)),
+        0.2f to white(0.07f),
+        0.8f to white(0.07f),
+        1f to white(0.42f * (glow / 0.4f).coerceIn(0f, 2f)),
+    ) else null
     this
-        .then(if (look.reduced || brightRim) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
+        .then(if (look.reduced || brightRim || honor) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
         .then(
             when {
-                look.reduced || elevation == 0.dp || brightRim -> Modifier
+                look.reduced || elevation == 0.dp || brightRim || honor -> Modifier
                 // Sayfa içindeki cam (widget, klasör): sistem gölgesi saydam camın İÇİNDEN de görünür. Sayfa dururken
                 // cam arkasını kendisi çizdiği için örtülüyordu; kayarken arka planı alt katman çizdiğinden gölge
                 // camın içinde koyu bir kare olarak beliriyordu. Bunun yerine yalnızca camın DIŞINA düşen yumuşak gölge.
@@ -442,7 +458,7 @@ fun Modifier.liquidGlass(
                     val clipR = runCatching { pc.localBoundingBoxOf(c, clipBounds = true) }.getOrDefault(r)
                     val old = pageAnchor.holes[holeKey]
                     if (old == null || old.rect != r || old.clip != clipR || old.bd !== bd || old.refr != refr || old.clear != clear ||
-                        old.soft != softPx || old.rootW != look.rootW || old.rootH != look.rootH
+                        old.soft != softPx || old.gain != gain || old.rootW != look.rootW || old.rootH != look.rootH
                     ) {
                         // Arşiv / widget sayfası kayarken alan her karede değişir ama boyutu aynı kalır: şekil ve köşe
                         // yarıçapı yeniden hesaplanmaz (önceden şekil her karede her cam için baştan oluşturuluyordu).
@@ -454,7 +470,7 @@ fun Modifier.liquidGlass(
                             // Kayarken de tam cam (mercek + parlama): önceden sade çiziliyor, sayfa yerine oturunca
                             // mercek birden gelip kartlar aydınlanıyordu.
                             r, path, bd, lens, refr, softPx, clear, look.rootW, look.rootH, clipR, plain = false,
-                            ios = ios && refr > 0.01f, lensRadius = if (same) old!!.lensRadius else (shape as? SquircleShape)?.let { with(holeDensity) { it.radius.toPx() } } ?: outlineRadius(outline!!),
+                            ios = ios && refr > 0.01f && !honor, gain = gain, lensRadius = if (same) old!!.lensRadius else (shape as? SquircleShape)?.let { with(holeDensity) { it.radius.toPx() } } ?: outlineRadius(outline!!),
                         )
                     }
                 }
@@ -480,14 +496,14 @@ fun Modifier.liquidGlass(
                             // Kendisi kayan sayfa (widget sayfası): kopya her karede doğru yerden. Yumuşatma geçişte de açık:
                             // kapatılınca kayarken cam içi keskin görünüp bırakınca birden bulanıklaşıyordu.
                             drawBackdrop(bd, look.rootW, look.rootH, origin + sh, lens, refr, softPx, clear || iosLens,
-                                ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth, mask = mask, maskPaint = maskPaint)
+                                ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth, mask = mask, maskPaint = maskPaint, gain = gain)
                         } else if (inPage && GlassMotion.listScrolling) {
                             // Arşiv listesi kayıyor: kopya çizilmez (zemin zaten aynı bulanık duvar kâğıdı).
                         } else if (inPage || !(overlay && GlassMotion.moving)) {
                             // Sayfa içinde yalnızca alt katmanın da baktığı kaydırma bilgisi geçerli: bir kare geç güncellenen
                             // hareket işaretine bakınca kayma bitiminde kart bir kare boş kalıp göz kırpıyordu.
                             drawBackdrop(bd, look.rootW, look.rootH, origin, lens, refr, softPx, clear || iosLens,
-                                ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth, mask = mask, maskPaint = maskPaint)
+                                ios = iosLens, lensRadius = if (iosLens) shapeRadiusPx(shape, size, layoutDirection, this) else -1f, edgeFraction = edgeFraction ?: st.glassEdgeWidth, mask = mask, maskPaint = maskPaint, gain = gain)
                         }
                     }
                 }
@@ -499,11 +515,12 @@ fun Modifier.liquidGlass(
         // çizilmek zorunda (arkasındaki görüntü değişiyor) ama içerik değişmiyor. Ayrı katman olmayınca arkanın her
         // yeniden çiziminde widget'ın bütün içeriği de baştan çiziliyordu (widget sayfasında 120 Hz'i yetiştiremiyordu).
         .then(if (bd != null) Modifier.graphicsLayer().drawBehind { DrawCount.hit("Cam içeriği") } else Modifier)
-        .background(base)
+        // Honor camı: dolgu yok (aydınlatma arka planın kendisinde); arka plan kopyası yoksa düz hafif beyaz.
+        .background(if (honor) (if (bd == null && content == null) androidx.compose.ui.graphics.SolidColor(white(0.16f)) else androidx.compose.ui.graphics.SolidColor(Color.Transparent)) else base)
         .accentTint(st.glassAccent, fill)
         .glassBrightness(st.glassBrightness)
         .then(
-            if (look.reduced) Modifier
+            if (look.reduced || honor) Modifier
             // Parlama camın kendisine aittir: içeriğin (simgeler, yazılar) ALTINDA çizilir, yoksa simgeler soluk görünür.
             else Modifier.drawBehind {
                 // Speküler parlama (iOS 27: daha parlak).
@@ -524,9 +541,10 @@ fun Modifier.liquidGlass(
                 )
             }
         )
-        .then(if (look.reduced || brightRim || iconRim || lightTone) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
+        .then(if (look.reduced || brightRim || iconRim || lightTone || honor) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
         .then(
             when {
+                honorRim != null -> Modifier.border(1.dp, honorRim, shape)
                 iconRim -> Modifier.iosRim(shape, st.iconRimGlow, (1.2f * st.iconRimWidth).dp)
                 rimW > 0f -> Modifier.border(rimW.dp, rim, shape)
                 else -> Modifier
@@ -566,6 +584,8 @@ private fun DrawScope.drawBackdrop(
     /** Verilirse çizim bu şeklin içine, kenar yumuşatmalı yapılır (kırpma gerekmez). */
     mask: android.graphics.Path? = null,
     maskPaint: BackdropPaint? = null,
+    /** Renk korunarak aydınlatma çarpanı (yalnızca merceksiz yolda); 1 = değişmez. */
+    gain: Float = 1f,
 ) {
     if (rootW <= 0f || rootH <= 0f || bd.srcW <= 0 || bd.srcH <= 0) return
     val img = bd.image
@@ -613,8 +633,10 @@ private fun DrawScope.drawBackdrop(
         maskPaint.matrix.preTranslate(-il.toFloat(), -itop.toFloat())
         bs.setLocalMatrix(maskPaint.matrix)
         maskPaint.paint.shader = bs
+        maskPaint.paint.colorFilter = if (gain != 1f) gainFilter(gain).asAndroidColorFilter() else null
         drawIntoCanvas { it.nativeCanvas.drawPath(mask, maskPaint.paint) }
         maskPaint.paint.shader = null
+        maskPaint.paint.colorFilter = null
         return
     }
     drawImage(
@@ -624,6 +646,23 @@ private fun DrawScope.drawBackdrop(
         dstOffset = IntOffset.Zero,
         dstSize = IntSize(area.width.toInt(), area.height.toInt()),
         filterQuality = FilterQuality.Low,
+        colorFilter = if (gain != 1f) gainFilter(gain) else null,
+    )
+}
+
+private val gainFilters = HashMap<Float, androidx.compose.ui.graphics.ColorFilter>()
+
+/** RGB'yi aynı oranda çarpar (renk doygunluğu korunur, beyaz eklenmez) + çok küçük taban aydınlığı. */
+private fun gainFilter(g: Float): androidx.compose.ui.graphics.ColorFilter = gainFilters.getOrPut(g) {
+    androidx.compose.ui.graphics.ColorFilter.colorMatrix(
+        androidx.compose.ui.graphics.ColorMatrix(
+            floatArrayOf(
+                g, 0f, 0f, 0f, 2f,
+                0f, g, 0f, 0f, 2f,
+                0f, 0f, g, 0f, 2f,
+                0f, 0f, 0f, 1f, 0f,
+            )
+        )
     )
 }
 
