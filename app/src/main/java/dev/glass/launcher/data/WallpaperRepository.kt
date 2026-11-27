@@ -122,16 +122,43 @@ class WallpaperRepository(private val context: Context) {
         }
     }.getOrDefault(false)
 
+    /** Ekrandan alınması gereken canlı duvar kâğıdı (parmak izi); null = gerek yok. MainActivity izler. */
+    val liveCaptureNeeded = MutableStateFlow<String?>(null)
+
+    /**
+     * Launcher içeriği gizliyken alınan ekran görüntüsünü (yalnızca canlı duvar kâğıdı görünür) cam için kaydeder.
+     * Durum çubuğu ve gezinme çubuğu bölgeleri (saat, simgeler, ada) hemen altlarındaki/üstlerindeki satır uzatılarak
+     * örtülür.
+     */
+    suspend fun saveLiveCapture(shot: Bitmap, fp: String, topPx: Int, bottomPx: Int): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val b = shot.copy(Bitmap.Config.ARGB_8888, true)
+            val c = android.graphics.Canvas(b)
+            val w = b.width; val h = b.height
+            val t = topPx.coerceIn(0, h / 4); val bt = bottomPx.coerceIn(0, h / 4)
+            if (t > 0) c.drawBitmap(b, android.graphics.Rect(0, t + 2, w, t + 3), android.graphics.Rect(0, 0, w, t + 2), null)
+            if (bt > 0) c.drawBitmap(b, android.graphics.Rect(0, h - bt - 3, w, h - bt - 2), android.graphics.Rect(0, h - bt - 2, w, h), null)
+            val tmp = File(context.filesDir, "wallpaper.tmp")
+            tmp.outputStream().use { b.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            if (!tmp.renameTo(file)) return@runCatching false
+            prefs.edit().putInt("lastId", -1).putString("lastFp", fp).putBoolean("fromSync", true).apply()
+            liveCaptureNeeded.value = null
+            _version.value++
+            val ts = java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("tr")).format(java.util.Date())
+            status("Canlı duvar kâğıdı ana ekrandan alındı ($ts, ${w}x$h).")
+            problem(0)
+            true
+        }.getOrElse { status("Canlı duvar kâğıdı alınamadı: ${it.message}"); false }
+    }
+
     /**
      * Canlı duvar kâğıdının önizleme resmini cam için kopyalar. Yalnızca resim ekranla yaklaşık aynı orandaysa (±%15;
      * yoksa camdaki görüntü kayık dururdu) ve renkleri sistemin bildirdiği renklerle tutuyorsa kullanılır.
      */
-    private fun fromLiveThumbnail(wm: WallpaperManager, live: android.app.WallpaperInfo, name: String): Boolean = runCatching {
-        val sysColors = runCatching { wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
-        val fp = "live:" + live.component.flattenToShortString() + ":" +
-            (sysColors?.let { c -> listOfNotNull(c.primaryColor, c.secondaryColor, c.tertiaryColor).joinToString("/") { it.toArgb().toString() } } ?: "")
-        if (fp == prefs.getString("lastFp", "") && file.exists()) { problem(0); return@runCatching true }
-        val d = live.loadThumbnail(context.packageManager) ?: return@runCatching false
+    private fun fromLiveThumbnail(
+        wm: WallpaperManager, live: android.app.WallpaperInfo, name: String, fp: String, sysColors: android.app.WallpaperColors?,
+    ): Boolean = runCatching {
+        val d = live.loadThumbnail(context.packageManager) ?: run { android.util.Log.i("GlassDiag", "canlı önizleme yok"); return@runCatching false }
         val w = d.intrinsicWidth; val h = d.intrinsicHeight
         if (w <= 0 || h <= 0) return@runCatching false
         val dm = context.resources.displayMetrics
@@ -145,7 +172,7 @@ class WallpaperRepository(private val context: Context) {
         d.setBounds(0, 0, w, h); d.draw(android.graphics.Canvas(bmp))
         val tmp = File(context.filesDir, "wallpaper.tmp")
         tmp.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        if (sysColors != null && !colorsMatch(tmp, sysColors)) { tmp.delete(); return@runCatching false }
+        if (sysColors != null && !colorsMatch(tmp, sysColors)) { android.util.Log.i("GlassDiag", "canlı önizleme renkleri uymuyor"); tmp.delete(); return@runCatching false }
         if (!tmp.renameTo(file)) return@runCatching false
         prefs.edit().putInt("lastId", -1).putString("lastFp", fp).putBoolean("fromSync", true).apply()
         _version.value++
@@ -193,16 +220,29 @@ class WallpaperRepository(private val context: Context) {
             val live = wm.wallpaperInfo
             if (live != null) {
                 val name = runCatching { live.loadLabel(context.packageManager).toString() }.getOrDefault(live.packageName)
-                // Honor dinamik temaları canlı duvar kâğıdıdır: görüntüsü verilmez ama canlı duvar kâğıdının kendi
-                // önizleme resmi (thumbnail) okunabilir. Ekranla aynı oranda ve renkleri tutuyorsa cam onu kullanır.
-                if (fromLiveThumbnail(wm, live, name)) return@runCatching true
-                status("Canlı (hareketli) duvar kâğıdı: \"$name\". Android görüntüsünü vermediği ve önizlemesi uymadığı için kopyalanamaz.")
+                val lc = runCatching { wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+                val liveFp = "live:" + live.component.flattenToShortString() + ":" +
+                    (lc?.let { c -> listOfNotNull(c.primaryColor, c.secondaryColor, c.tertiaryColor).joinToString("/") { it.toArgb().toString() } } ?: "")
+                // Bu canlı duvar kâğıdı zaten alındıysa (önizlemeden ya da ekrandan) yeniden alınmaz.
+                if (!force && liveFp == prefs.getString("lastFp", "") && file.exists()) { liveCaptureNeeded.value = null; problem(0); return@runCatching true }
+                // Honor dinamik temaları canlı duvar kâğıdıdır: görüntüsü verilmez. 1) Önizleme resmi ekranla aynı
+                // oranda ve renkleri tutuyorsa o kullanılır. 2) Tutmuyorsa launcher içeriği bir anlık gizlenip
+                // erişilebilirlik hizmetiyle duvar kâğıdının kendisi ekrandan alınır (MainActivity).
+                if (fromLiveThumbnail(wm, live, name, liveFp, lc)) { liveCaptureNeeded.value = null; return@runCatching true }
                 // Eski kopya (sistemden alınmışsa) yanlış görüntü göstermesin; elle seçilen launcher duvar kâğıdına dokunma.
                 if (prefs.getBoolean("fromSync", false) && file.exists()) { file.delete(); _version.value++ }
                 prefs.edit().putInt("lastId", -1).putString("lastFp", "").apply()
+                if (dev.glass.launcher.service.LockService.canScreenshot()) {
+                    status("Canlı duvar kâğıdı: \"$name\". Ana ekrandan alınıyor (simgeler bir an gizlenir)…")
+                    liveCaptureNeeded.value = liveFp
+                } else {
+                    status("Canlı duvar kâğıdı: \"$name\". Görüntüsü alınamıyor. Ayarlar > Erişilebilirlik'te Glass Launcher hizmetini açarsan ana ekrandan alınır.")
+                    liveCaptureNeeded.value = null
+                }
                 problem(2)
                 return@runCatching false
             }
+            liveCaptureNeeded.value = null
             val id = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
             // Kimlik tek başına yetmiyor: MagicOS teması / dinamik tema duvar kâğıdını değiştirince kimlik aynı kalabiliyor
             // (cam eski duvar kâğıdını gösteriyordu). Sistemin bildirdiği renkler de parmak izi olarak karşılaştırılır.

@@ -61,6 +61,32 @@ class LockService : AccessibilityService() {
             }
         }
 
+        /** Ekran görüntüsü alınabilir mi (hizmet açık). */
+        fun canScreenshot(): Boolean = instance != null
+
+        /** Ekranın görüntüsü (yazılım bitmap'i); hizmet kapalıysa ya da sistem reddederse null. Saniyede en fazla bir kez. */
+        suspend fun screenshot(): android.graphics.Bitmap? {
+            val s = instance ?: return null
+            return kotlinx.coroutines.suspendCancellableCoroutine { c ->
+                runCatching {
+                    s.takeScreenshot(android.view.Display.DEFAULT_DISPLAY, s.mainExecutor, object : TakeScreenshotCallback {
+                        override fun onSuccess(r: ScreenshotResult) {
+                            val hb = r.hardwareBuffer
+                            val b = runCatching {
+                                android.graphics.Bitmap.wrapHardwareBuffer(hb, r.colorSpace)?.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+                            }.getOrNull()
+                            hb.close()
+                            if (c.isActive) c.resumeWith(Result.success(b))
+                        }
+                        override fun onFailure(errorCode: Int) {
+                            android.util.Log.w("GlassDiag", "ekran görüntüsü alınamadı: $errorCode")
+                            if (c.isActive) c.resumeWith(Result.success(null))
+                        }
+                    })
+                }.onFailure { if (c.isActive) c.resumeWith(Result.success(null)) }
+            }
+        }
+
         /** Kilitlediyse true; hizmet kapalıysa false. */
         fun lock(): Boolean = instance?.performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN) == true
 

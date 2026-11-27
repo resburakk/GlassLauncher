@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- canRetrieveWindowContent + canPerformGestures + flagRetrieveInteractiveWindows: yalnızca "Honor bildirim penceresini
-     gizle" açıkken, sistemin üstteki bildirim penceresini bulup yukarı kaydırmak için (bkz. HeadsUpHider). -->
+     gizle" açıkken, sistemin üstteki bildirim penceresini bulup yukarı kaydırmak için (bkz. HeadsUpHider).
+     canTakeScreenshot: canlı duvar kâğıdında (Honor dinamik tema) launcher içeriği bir anlık gizlenip yalnızca duvar
+     kâğıdının görüntüsü cam için alınır; görüntü telefonda kalır (bkz. WallpaperRepository.saveLiveCapture). -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/lock_service_description"
     android:accessibilityEventTypes="typeWindowStateChanged"
@@ -9,4 +11,5 @@
     android:notificationTimeout="1000"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
     android:isAccessibilityTool="false" />

@@ -3,6 +3,9 @@ package dev.glass.launcher
 import kotlinx.coroutines.launch
 
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.flow.collectLatest
 
 import android.app.Activity
 import android.app.WallpaperColors
@@ -47,6 +50,8 @@ class MainActivity : ComponentActivity(), WidgetRequester {
      * geçerken içerik solar; kart yalnızca duvar kâğıdı olarak kalır. Dönüşte iOS gibi büyüyerek gelir.
      */
     private var homeHidden by mutableStateOf(false)
+    /** Canlı duvar kâğıdı ekrandan alınırken launcher içeriği bir anlık tamamen gizlenir. */
+    private var capturingWallpaper by mutableStateOf(false)
 
     /** "Glass Ayarları" kısayoluyla açıldıysa ayarlar doğrudan gösterilir. */
     private var openSettingsRequest by mutableStateOf(0)
@@ -88,6 +93,29 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                 if (requestedOrientation != want) requestedOrientation = want
             }
         }
+        // Canlı duvar kâğıdı (Honor dinamik tema): görüntüsü verilmediği için ana ekran ön plandayken içerik bir anlık
+        // gizlenir ve erişilebilirlik hizmetiyle yalnızca duvar kâğıdının görüntüsü alınır (cam için; telefonda kalır).
+        lifecycleScope.launch {
+            repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) {
+                val repo = (application as LauncherApp).wallpaperRepository
+                repo.liveCaptureNeeded.collectLatest { fp ->
+                    if (fp == null) return@collectLatest
+                    // Kilit açılışı/duvar kâğıdı animasyonu otursun.
+                    kotlinx.coroutines.delay(1500)
+                    capturingWallpaper = true
+                    kotlinx.coroutines.delay(120) // gizli kare ekrana çıksın
+                    val shot = try { dev.glass.launcher.service.LockService.screenshot() } finally { capturingWallpaper = false }
+                    if (shot != null) {
+                        val ins = window.decorView.rootWindowInsets
+                        val top = ins?.getInsets(android.view.WindowInsets.Type.statusBars() or android.view.WindowInsets.Type.displayCutout())?.top ?: 0
+                        val bottom = ins?.getInsets(android.view.WindowInsets.Type.navigationBars())?.bottom ?: 0
+                        if (repo.saveLiveCapture(shot, fp, top, bottom)) vm.syncSystemWallpaper()
+                    } else {
+                        repo.liveCaptureNeeded.value = null
+                    }
+                }
+            }
+        }
         // iOS kilit açılışı: ekran kapanınca simgeler gizlenir, kilit açılınca yerine oturarak belirir.
         runCatching {
             registerReceiver(object : android.content.BroadcastReceiver() {
@@ -127,6 +155,9 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                     else androidx.compose.animation.core.spring(dampingRatio = 0.85f, stiffness = 380f),
                     label = "homeHide",
                 )
+                androidx.compose.foundation.layout.Box(
+                    androidx.compose.ui.Modifier.graphicsLayer { alpha = if (capturingWallpaper) 0f else 1f }
+                ) {
                 HomeScreen(
                     vm, isDefault,
                     onRequestDefault = ::requestHomeRole,
@@ -134,6 +165,7 @@ class MainActivity : ComponentActivity(), WidgetRequester {
                     addWidgetRequest = addWidgetRequest,
                     homeHide = { hide },
                 )
+                }
             }
         }
     }
