@@ -123,6 +123,39 @@ class WallpaperRepository(private val context: Context) {
     }.getOrDefault(false)
 
     /**
+     * Canlı duvar kâğıdının önizleme resmini cam için kopyalar. Yalnızca resim ekranla yaklaşık aynı orandaysa (±%15;
+     * yoksa camdaki görüntü kayık dururdu) ve renkleri sistemin bildirdiği renklerle tutuyorsa kullanılır.
+     */
+    private fun fromLiveThumbnail(wm: WallpaperManager, live: android.app.WallpaperInfo, name: String): Boolean = runCatching {
+        val sysColors = runCatching { wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+        val fp = "live:" + live.component.flattenToShortString() + ":" +
+            (sysColors?.let { c -> listOfNotNull(c.primaryColor, c.secondaryColor, c.tertiaryColor).joinToString("/") { it.toArgb().toString() } } ?: "")
+        if (fp == prefs.getString("lastFp", "") && file.exists()) { problem(0); return@runCatching true }
+        val d = live.loadThumbnail(context.packageManager) ?: return@runCatching false
+        val w = d.intrinsicWidth; val h = d.intrinsicHeight
+        if (w <= 0 || h <= 0) return@runCatching false
+        val dm = context.resources.displayMetrics
+        val screen = minOf(dm.widthPixels, dm.heightPixels).toFloat() / maxOf(dm.widthPixels, dm.heightPixels)
+        val ratio = minOf(w, h).toFloat() / maxOf(w, h)
+        if (h < w || kotlin.math.abs(ratio - screen) > screen * 0.15f) {
+            android.util.Log.i("GlassDiag", "canlı önizleme oranı uymuyor ${w}x$h")
+            return@runCatching false
+        }
+        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, w, h); d.draw(android.graphics.Canvas(bmp))
+        val tmp = File(context.filesDir, "wallpaper.tmp")
+        tmp.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        if (sysColors != null && !colorsMatch(tmp, sysColors)) { tmp.delete(); return@runCatching false }
+        if (!tmp.renameTo(file)) return@runCatching false
+        prefs.edit().putInt("lastId", -1).putString("lastFp", fp).putBoolean("fromSync", true).apply()
+        _version.value++
+        val t = java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("tr")).format(java.util.Date())
+        status("Canlı duvar kâğıdı \"$name\": önizleme resmi kullanılıyor ($t, ${w}x$h).")
+        problem(0)
+        true
+    }.getOrElse { android.util.Log.w("GlassDiag", "canlı önizleme: ${it.message}"); false }
+
+    /**
      * Kopyalanan görüntü, sistemin ekrandaki duvar kâğıdı için bildirdiği renklerle uyuşuyor mu. Sistemin baskın rengi,
      * görüntünün kendi baskın renklerinden birine yakın olmalı (gevşek eşik: yalnızca tamamen başka bir görüntüyü yakalar).
      */
@@ -160,10 +193,13 @@ class WallpaperRepository(private val context: Context) {
             val live = wm.wallpaperInfo
             if (live != null) {
                 val name = runCatching { live.loadLabel(context.packageManager).toString() }.getOrDefault(live.packageName)
-                status("Canlı (hareketli) duvar kâğıdı: \"$name\". Android görüntüsünü vermediği için kopyalanamaz.")
+                // Honor dinamik temaları canlı duvar kâğıdıdır: görüntüsü verilmez ama canlı duvar kâğıdının kendi
+                // önizleme resmi (thumbnail) okunabilir. Ekranla aynı oranda ve renkleri tutuyorsa cam onu kullanır.
+                if (fromLiveThumbnail(wm, live, name)) return@runCatching true
+                status("Canlı (hareketli) duvar kâğıdı: \"$name\". Android görüntüsünü vermediği ve önizlemesi uymadığı için kopyalanamaz.")
                 // Eski kopya (sistemden alınmışsa) yanlış görüntü göstermesin; elle seçilen launcher duvar kâğıdına dokunma.
                 if (prefs.getBoolean("fromSync", false) && file.exists()) { file.delete(); _version.value++ }
-                prefs.edit().putInt("lastId", -1).apply()
+                prefs.edit().putInt("lastId", -1).putString("lastFp", "").apply()
                 problem(2)
                 return@runCatching false
             }
