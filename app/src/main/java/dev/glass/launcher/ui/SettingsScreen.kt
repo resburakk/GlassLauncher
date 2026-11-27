@@ -919,10 +919,18 @@ private fun GlassPage(vm: LauncherViewModel, s: LauncherSettings, onChange: ((La
                 Chip(t, s.glassStyle == k, Modifier.weight(1f)) { onChange { it.copy(glassStyle = k) } }
             }
         }
+        RowDivider()
+        Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Ton", color = Fg, fontSize = 17.sp, modifier = Modifier.width(56.dp))
+            listOf("light" to "Açık", "dark" to "Koyu").forEach { (k, t) ->
+                Chip(t, s.glassTone == k, Modifier.weight(1f)) { onChange { it.copy(glassTone = k) } }
+            }
+        }
     }
     Footer(
         "Şeffaf: iOS 26'daki gibi camın arkası net görünür, kenarlarda mercek gibi bükülür (düzenleme düğmeleri gibi). " +
-            "Buzlu: arkası güçlü bulanık ve beyazımsı. Şeffafta yazılar okunur kalsın diye hafif yazı gölgesi kendiliğinden açılır."
+            "Buzlu: arkası güçlü bulanık ve beyazımsı. Şeffafta yazılar okunur kalsın diye hafif yazı gölgesi kendiliğinden açılır. " +
+            "Ton: Açık, Honor/MagicOS'taki gibi camı hafif aydınlatır ve kenarı ince parlak çizgiyle bitirir (koyu temada da). Koyu, camı dumanlı yapar."
     )
     Group("Arama ve Uygulama Arşivi camı") {
         Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

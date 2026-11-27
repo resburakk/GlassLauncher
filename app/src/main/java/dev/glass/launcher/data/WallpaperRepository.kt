@@ -122,6 +122,28 @@ class WallpaperRepository(private val context: Context) {
         }
     }.getOrDefault(false)
 
+    /**
+     * Kopyalanan görüntü, sistemin ekrandaki duvar kâğıdı için bildirdiği renklerle uyuşuyor mu. Sistemin baskın rengi,
+     * görüntünün kendi baskın renklerinden birine yakın olmalı (gevşek eşik: yalnızca tamamen başka bir görüntüyü yakalar).
+     */
+    private fun colorsMatch(f: File, sys: android.app.WallpaperColors): Boolean = runCatching {
+        val small = ImageDecoder.decodeBitmap(ImageDecoder.createSource(f)) { d, info, _ ->
+            val k = 96f / maxOf(info.size.width, info.size.height)
+            d.setTargetSize((info.size.width * k).toInt().coerceAtLeast(1), (info.size.height * k).toInt().coerceAtLeast(1))
+            d.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+        val mine = android.app.WallpaperColors.fromBitmap(small)
+        val a = listOfNotNull(sys.primaryColor, sys.secondaryColor, sys.tertiaryColor)
+        val b = listOfNotNull(mine.primaryColor, mine.secondaryColor, mine.tertiaryColor)
+        fun dist(x: android.graphics.Color, y: android.graphics.Color): Float {
+            val dr = (x.red() - y.red()) * 255; val dg = (x.green() - y.green()) * 255; val db = (x.blue() - y.blue()) * 255
+            return kotlin.math.sqrt(dr * dr + dg * dg + db * db)
+        }
+        // Sistemin baskın rengi görüntünün renklerinden birine VE görüntünün baskın rengi sistemin renklerinden birine yakın.
+        val p = a.first(); val q = b.first()
+        b.minOf { dist(p, it) } < 90f || a.minOf { dist(q, it) } < 90f
+    }.getOrDefault(true)
+
     suspend fun syncFromSystem(force: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         // Android sürümüne göre biri ya da ikisi gerekir; hiçbiri yoksa denemeye gerek yok.
         // Android 14+ (Samsung, Honor 400 ve diğerleri): sistem duvar kâğıdını okumak "Tüm dosyalara erişim" ister;
@@ -146,37 +168,59 @@ class WallpaperRepository(private val context: Context) {
                 return@runCatching false
             }
             val id = wm.getWallpaperId(WallpaperManager.FLAG_SYSTEM)
-            if (!force && id >= 0 && id == prefs.getInt("lastId", -1) && file.exists()) { problem(0); return@runCatching true }
+            // Kimlik tek başına yetmiyor: MagicOS teması / dinamik tema duvar kâğıdını değiştirince kimlik aynı kalabiliyor
+            // (cam eski duvar kâğıdını gösteriyordu). Sistemin bildirdiği renkler de parmak izi olarak karşılaştırılır.
+            val sysColors = runCatching { wm.getWallpaperColors(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+            val fp = sysColors?.let { c -> listOfNotNull(c.primaryColor, c.secondaryColor, c.tertiaryColor).joinToString("/") { it.toArgb().toString() } } ?: ""
+            if (!force && id >= 0 && id == prefs.getInt("lastId", -1) && fp == prefs.getString("lastFp", "") && file.exists()) { problem(0); return@runCatching true }
             val tmp = File(context.filesDir, "wallpaper.tmp")
-            // Önce orijinal dosya (tam çözünürlük); yoksa çizilebilir nesneden üret.
-            val pfd = runCatching { wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
-            if (pfd != null) {
-                pfd.use { p -> android.os.ParcelFileDescriptor.AutoCloseInputStream(p).use { input -> tmp.outputStream().use { input.copyTo(it) } } }
-            } else {
-                val d = wm.drawable ?: run {
-                    status("Duvar kâğıdı görüntüsü alınamadı.")
-                    problem(3)
-                    return@runCatching false
-                }
+            fun fromDrawable(): Boolean {
+                val d = runCatching { wm.drawable }.getOrNull() ?: return false
                 val bmp = (d as? android.graphics.drawable.BitmapDrawable)?.bitmap
                     ?: android.graphics.Bitmap.createBitmap(
                         d.intrinsicWidth.coerceAtLeast(1), d.intrinsicHeight.coerceAtLeast(1), android.graphics.Bitmap.Config.ARGB_8888,
                     ).also { b -> d.setBounds(0, 0, b.width, b.height); d.draw(android.graphics.Canvas(b)) }
                 tmp.outputStream().use { bmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+                return true
+            }
+            // Önce orijinal dosya (tam çözünürlük); yoksa çizilebilir nesneden üret.
+            val pfd = runCatching { wm.getWallpaperFile(WallpaperManager.FLAG_SYSTEM) }.getOrNull()
+            var source = "orijinal dosya"
+            if (pfd != null) {
+                pfd.use { p -> android.os.ParcelFileDescriptor.AutoCloseInputStream(p).use { input -> tmp.outputStream().use { input.copyTo(it) } } }
+                // Bazı temalarda (MagicOS) dosya eski duvar kâğıdında kalıyor, ekranda görünen başka: renkler tutmuyorsa
+                // ekranda çizilen görüntü (drawable) denenir.
+                if (sysColors != null && !colorsMatch(tmp, sysColors) && fromDrawable()) source = "ekrandaki görüntü"
+            } else {
+                if (!fromDrawable()) {
+                    status("Duvar kâğıdı görüntüsü alınamadı.")
+                    problem(3)
+                    return@runCatching false
+                }
+                source = "ekrandaki görüntü"
+            }
+            // Hâlâ ekrandaki duvar kâğıdıyla uyuşmuyorsa yanlış görüntü camda gösterilmez (eski kopya silinir).
+            if (sysColors != null && !colorsMatch(tmp, sysColors)) {
+                tmp.delete()
+                if (prefs.getBoolean("fromSync", false) && file.exists()) { file.delete(); _version.value++ }
+                prefs.edit().putInt("lastId", id).putString("lastFp", fp).apply()
+                status("Sistemin verdiği görüntü ekrandaki duvar kâğıdıyla uyuşmuyor (tema). Cam yalnızca saydam çizilir.")
+                problem(3)
+                return@runCatching false
             }
             // Aynı resim yeniden geldiyse (MagicOS kilit açılışında duvar kâğıdı kimliğini yenileyebiliyor) ana ekran
             // duvar kâğıdı baştan yüklenmez: yükleme her seferinde kısa bir yanıp sönmeye yol açıyordu.
             if (file.exists() && file.length() == tmp.length() && sameBytes(file, tmp)) {
                 tmp.delete()
-                prefs.edit().putInt("lastId", id).apply()
+                prefs.edit().putInt("lastId", id).putString("lastFp", fp).putBoolean("fromSync", true).apply()
                 problem(0)
                 return@runCatching true
             }
             if (!tmp.renameTo(file)) return@runCatching false
-            prefs.edit().putInt("lastId", id).putBoolean("fromSync", true).apply()
+            prefs.edit().putInt("lastId", id).putString("lastFp", fp).putBoolean("fromSync", true).apply()
             _version.value++
             val t = java.text.SimpleDateFormat("d MMM HH:mm", java.util.Locale("tr")).format(java.util.Date())
-            status("Kopyalandı ($t, ${file.length() / 1024} KB${if (pfd != null) ", orijinal dosya" else ""}).")
+            status("Kopyalandı ($t, ${file.length() / 1024} KB, $source).")
             problem(0)
             true
         }.onFailure {

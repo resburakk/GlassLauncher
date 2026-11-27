@@ -331,6 +331,9 @@ fun Modifier.liquidGlass(
     // Düşük güçte her cam buzlu kabul edilir (arkası hazır bulanık kopya); şeffaf cam net kopya ister.
     val look = if ((frosted && !overlay || look0.reduced) && look0.clear) look0.copy(clear = false) else look0
     val st = LocalLauncherSettings.current
+    // Açık ton (varsayılan): koyu temada bile cam karartmaz, Honor/MagicOS gibi hafif beyaz sis + ince parlak kenar.
+    val lightTone = st.glassTone != "dark"
+    val dk = look.dark && !lightTone
     val rimW = st.glassRimWidth
     val op = st.glassOpacity * glassTintFactor(st.glassTint)
     val glow = st.glassRimGlow
@@ -361,7 +364,7 @@ fun Modifier.liquidGlass(
         clear -> (st.glassRefraction * 1.3f).coerceAtMost(1.2f)
         else -> st.glassRefraction
     }
-    val base = if (look.dark) {
+    val base = if (dk) {
         Brush.verticalGradient(listOf(black((0.30f * s + 0.08f) * fill * op), black((0.42f * s + 0.08f) * fill * op)))
     } else {
         Brush.verticalGradient(listOf(white(0.30f * s * fill * op), white(0.12f * s * fill * op)))
@@ -399,9 +402,9 @@ fun Modifier.liquidGlass(
     }
     val rim = if (brightRim) {
         // Varsayılan kenar parlaklığına (0,4) göre ölçeklenir; ayarla birlikte artıp azalır.
-        val k = (glow / 0.4f).coerceIn(0f, 2.5f)
-        lightRim(0.70f * k, 0.30f * k, st.glassLightAngle, 0.65f)
-    } else if (look.dark) {
+        val k = (glow / 0.4f).coerceIn(0f, 2.5f) * (if (lightTone) 0.72f else 1f)
+        lightRim(0.70f * k, (if (lightTone) 0.18f else 0.30f) * k, st.glassLightAngle, 0.65f)
+    } else if (dk) {
         lightRim(0.45f * s * glow, 0.05f * s * glow, st.glassLightAngle, st.glassLightBack)
     } else {
         lightRim(0.80f * s * glow, 0.10f * s * glow, st.glassLightAngle, st.glassLightBack)
@@ -506,13 +509,13 @@ fun Modifier.liquidGlass(
                 // Speküler parlama (iOS 27: daha parlak).
                 drawRect(
                     Brush.radialGradient(
-                        listOf(white((if (look.dark) 0.18f else 0.32f) * s * glow), Color.Transparent),
+                        listOf(white((if (dk) 0.18f else 0.32f) * s * glow), Color.Transparent),
                         // Işık yönüne göre kenara yakın (varsayılan sol üst: eski konum).
                         center = lightSpot(size, st.glassLightAngle),
                         radius = size.width * 0.7f,
                     )
                 )
-                drawRect(
+                if (!lightTone) drawRect(
                     Brush.verticalGradient(
                         listOf(Color.Transparent, black(0.10f * s)),
                         startY = size.height * 0.55f,
@@ -521,7 +524,7 @@ fun Modifier.liquidGlass(
                 )
             }
         )
-        .then(if (look.reduced || brightRim || iconRim) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
+        .then(if (look.reduced || brightRim || iconRim || lightTone) Modifier else Modifier.darkEdge(shape, st.glassEdgeDark, (rimW + 1.6f).dp))
         .then(
             when {
                 iconRim -> Modifier.iosRim(shape, st.iconRimGlow, (1.2f * st.iconRimWidth).dp)
@@ -905,7 +908,7 @@ fun Modifier.lightGlass(shape: Shape, rimTop: Float, rimBottom: Float, fill: Flo
         .background(Brush.verticalGradient(listOf(white(0.24f * op), white(0.15f * op))))
         .accentTint(st.glassAccent)
         .glassBrightness(st.glassBrightness)
-        .darkEdge(shape, st.glassEdgeDark, (st.glassRimWidth + 1.6f).dp)
+        .darkEdge(shape, if (st.glassTone != "dark") 0f else st.glassEdgeDark, (st.glassRimWidth + 1.6f).dp)
         .then(
             if (st.glassRimWidth > 0f && glow > 0f) Modifier.border(
                 st.glassRimWidth.dp,

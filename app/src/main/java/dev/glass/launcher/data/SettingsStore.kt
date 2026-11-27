@@ -201,6 +201,8 @@ data class LauncherSettings(
     val syncSystemWallpaper: Boolean = true,
     /** Cam stili: "clear" (iOS 26 Şeffaf: arkası net, kenarda mercek) veya "frosted" (buzlu, bulanık). */
     val glassStyle: String = "clear",
+    /** Cam tonu: "light" = Honor/MagicOS gibi aydınlık (hafif beyaz sis, ince parlak kenar), "dark" = koyu dumanlı. */
+    val glassTone: String = "light",
     /** Arama paneli/çubuğu ve Uygulama Arşivi camı: "general" = yalnızca genel cam ayarları, "dock" = dock ile aynı yoğunluk. */
     val panelGlassSync: String = "dock",
     /** Arama önerileri 8 (iki sıra) mı açık, 4 (tek sıra) mı? Son durum hatırlanır. */
@@ -349,7 +351,7 @@ data class LauncherSettings(
         put("searchSuggestCorner", searchSuggestCorner.toDouble()); put("searchSuggestLabelSize", searchSuggestLabelSize.toDouble())
         put("searchSuggestLabelWeight", searchSuggestLabelWeight.toDouble())
         put("glassRefraction", glassRefraction.toDouble()); put("glassEdgeWidth", glassEdgeWidth.toDouble()); put("glassLightAngle", glassLightAngle.toDouble()); put("glassLightBack", glassLightBack.toDouble()); put("glassContactShadow", glassContactShadow.toDouble()); put("glassEdgeDark", glassEdgeDark.toDouble()); put("glassTint", glassTint.toDouble())
-        put("syncSystemWallpaper", syncSystemWallpaper); put("glassStyle", glassStyle); put("panelGlassSync", panelGlassSync)
+        put("syncSystemWallpaper", syncSystemWallpaper); put("glassStyle", glassStyle); put("glassTone", glassTone); put("panelGlassSync", panelGlassSync)
         put("searchSuggestExpanded", searchSuggestExpanded)
         put("searchShowLabels", searchShowLabels); put("searchNeutral2", searchNeutral)
         put("searchContacts", searchContacts); put("searchMessages", searchMessages); put("searchFiles", searchFiles)
@@ -484,6 +486,7 @@ data class LauncherSettings(
                 syncSystemWallpaper = o.optBoolean("syncSystemWallpaper", d.syncSystemWallpaper),
                 searchSuggestExpanded = o.optBoolean("searchSuggestExpanded", d.searchSuggestExpanded),
                 glassStyle = o.optString("glassStyle", d.glassStyle).takeIf { it == "clear" || it == "frosted" } ?: d.glassStyle,
+                glassTone = o.optString("glassTone", d.glassTone).takeIf { it == "light" || it == "dark" } ?: d.glassTone,
                 panelGlassSync = o.optString("panelGlassSync", d.panelGlassSync).takeIf { it == "general" || it == "dock" } ?: d.panelGlassSync,
                 searchSuggestLabelSize = o.optDouble("searchSuggestLabelSize", d.searchSuggestLabelSize.toDouble()).toFloat(),
                 searchSuggestLabelWeight = o.optDouble("searchSuggestLabelWeight", d.searchSuggestLabelWeight.toDouble()).toFloat(),

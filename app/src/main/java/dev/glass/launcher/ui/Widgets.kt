@@ -127,7 +127,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
         WidgetKind.GlassClock -> GlassClockWidget(w, width, height)
         // Fotoğraf seçilmemişken diğer widget'lar gibi Liquid Glass cam; fotoğraf seçilince fotoğrafın kendisi.
         WidgetKind.Photo -> Box(
-            if (w.data.isEmpty()) Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(if (HomeInk.light) Color(0x38FFFFFF) else Color(0x26000000))
+            if (w.data.isEmpty()) Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(widgetGlassVeil())
             else Modifier.size(width, height).clip(shape).background(Color(0x33000000))
         ) {
             PhotoWidget(w, vm, width, height)
@@ -138,7 +138,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
             // Google Play: her görünümde kendi oyun desenli zemini (yazılar beyaz).
             val play = w.kind == WidgetKind.PlayStore
             val frame = if (fill == 0 && !play) {
-                Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(if (HomeInk.light) Color(0x38FFFFFF) else Color(0x26000000))
+                Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true).background(widgetGlassVeil())
             } else {
                 // iOS 26 dolu widget: hava durumu gökyüzü renginde, diğerleri açık (beyaz) ya da koyu zemin.
                 val bg = when {
@@ -151,7 +151,7 @@ fun WidgetBody(w: WidgetItem, vm: LauncherViewModel, width: Dp, height: Dp, stre
                 // görünümde üstüne yarı saydam beyaz/koyu katman konuyordu; koyu duvar kâğıdında gri bir yama gibi duruyordu.
                 if (w.kind == WidgetKind.Suggestions)
                     Modifier.size(width, height).liquidGlass(shape, strength, 0.dp, iconRim = true)
-                        .background(if (HomeInk.light) Color(0x38FFFFFF) else Color(0x26000000))
+                        .background(widgetGlassVeil())
                 else if (play) Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).widgetRim(shape)
                 else Modifier.size(width, height).contactShadow(shape, LocalLauncherSettings.current.glassContactShadow).clip(shape).background(bg).widgetRim(shape)
             }
@@ -536,3 +536,10 @@ private fun CalendarNextLine(today: LocalDate, primary: Color, secondary: Color)
         }
     }
 }
+
+/** Cam widget'ın üst örtüsü: açık tonda (varsayılan) koyu duvar kâğıdında da hafif beyaz sis, koyu tonda eski karartma. */
+@Composable
+internal fun widgetGlassVeil(): Color =
+    if (HomeInk.light) Color(0x38FFFFFF)
+    else if (LocalLauncherSettings.current.glassTone != "dark") Color(0x1AFFFFFF)
+    else Color(0x26000000)
