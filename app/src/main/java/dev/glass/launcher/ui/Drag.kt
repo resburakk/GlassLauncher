@@ -518,8 +518,7 @@ internal fun FolderIcon(
                 if (kotlin.math.abs(pg - pos) >= 1f) continue // yalnızca görünen sayfalar çizilir
                 val shown = folder.keys.drop(pg * 9).take(9)
                 Column(
-                    // Honor'da mini simgeler yarı saydam (≈%68): klasörün rengi beyaz yerlerinden geçer (ölçüldü).
-                    Modifier.size(block).graphicsLayer { translationX = (pg - anim.value) * icon.toPx(); if (honorFolder) alpha = 0.68f },
+                    Modifier.size(block).graphicsLayer { translationX = (pg - anim.value) * icon.toPx() },
                     verticalArrangement = Arrangement.spacedBy(gap),
                 ) {
                     shown.chunked(3).forEach { row ->

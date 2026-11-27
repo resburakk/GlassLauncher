@@ -326,7 +326,8 @@ fun Modifier.liquidGlass(
     edgeFraction: Float? = null,
     /**
      * Honor/MagicOS klasör camı (Honor ekranından piksel ölçümüyle): mercek yok, arkası güçlü bulanık ve DÜZ;
-     * beyaz sis yerine arka plan rengi korunarak ≈1,36 kat aydınlatılır; 1 dp ince kenar, parlak çizgi üstte ve
+     * beyaz sis yerine doygunluk artırılıp parlaklık orta tona çekilir (koyu zeminde aydınlık, açık zeminde hafif koyu;
+     * bkz. gainFilter); 1 dp ince kenar, parlak çizgi üstte ve
      * altta (yanlar silik); gölge, koyu kenar ve parlama lekesi yok.
      */
     honor: Boolean = false,
@@ -420,10 +421,11 @@ fun Modifier.liquidGlass(
         lightRim(0.80f * s * glow, 0.10f * s * glow, st.glassLightAngle, st.glassLightBack)
     }
     val honorRim = if (honor) Brush.verticalGradient(
-        0f to white(0.55f * (glow / 0.4f).coerceIn(0f, 2f)),
-        0.2f to white(0.07f),
-        0.8f to white(0.07f),
-        1f to white(0.42f * (glow / 0.4f).coerceIn(0f, 2f)),
+        // Ölçüm: üst ve alt kenar ≈+40 parlak, yanlarda çizgi yok.
+        0f to white(0.42f * (glow / 0.4f).coerceIn(0f, 2f)),
+        0.16f to white(0.0f),
+        0.84f to white(0.0f),
+        1f to white(0.38f * (glow / 0.4f).coerceIn(0f, 2f)),
     ) else null
     this
         .then(if (look.reduced || brightRim || honor) Modifier else Modifier.contactShadow(shape, st.glassContactShadow))
@@ -650,20 +652,25 @@ private fun DrawScope.drawBackdrop(
     )
 }
 
-private val gainFilters = HashMap<Float, androidx.compose.ui.graphics.ColorFilter>()
+private var vibrancyCache: androidx.compose.ui.graphics.ColorFilter? = null
 
-/** RGB'yi aynı oranda çarpar (renk doygunluğu korunur, beyaz eklenmez) + çok küçük taban aydınlığı. */
-private fun gainFilter(g: Float): androidx.compose.ui.graphics.ColorFilter = gainFilters.getOrPut(g) {
-    androidx.compose.ui.graphics.ColorFilter.colorMatrix(
-        androidx.compose.ui.graphics.ColorMatrix(
-            floatArrayOf(
-                g, 0f, 0f, 0f, 2f,
-                0f, g, 0f, 0f, 2f,
-                0f, 0f, g, 0f, 2f,
-                0f, 0f, 0f, 1f, 0f,
-            )
-        )
-    )
+/**
+ * Honor/MagicOS klasör camının renk dönüşümü (iki farklı duvar kâğıdında piksel ölçümüyle bulundu):
+ * doygunluk ×1,55, ardından parlaklık orta tona sıkıştırılır: c' = 0,78·c + 30.
+ * Koyu zeminde camı aydınlatır (pembe-mor: 118,31,47 → 151,46,65; ölçülen 155,44,65), açık zeminde hafifçe
+ * koyulaştırıp doygunlaştırır (limon sarısı: 249,213,130 → 239,195,95; ölçülen 237,196,97). Önceki düz
+ * 1,36 kat aydınlatma açık zeminde rengi beyaza dayandırıp camı krem rengi çıkartmaya çeviriyordu.
+ * [g] yalnızca açık/kapalı anlamında (1 = dönüşüm yok).
+ */
+private fun gainFilter(@Suppress("UNUSED_PARAMETER") g: Float): androidx.compose.ui.graphics.ColorFilter = vibrancyCache ?: run {
+    val sat = 1.55f; val k = 0.78f; val off = 30f
+    val lr = 0.2126f; val lg = 0.7152f; val lb = 0.0722f
+    fun row(r: Float, g2: Float, b: Float) = floatArrayOf(k * r, k * g2, k * b, 0f, off)
+    val m = row((1 - sat) * lr + sat, (1 - sat) * lg, (1 - sat) * lb) +
+        row((1 - sat) * lr, (1 - sat) * lg + sat, (1 - sat) * lb) +
+        row((1 - sat) * lr, (1 - sat) * lg, (1 - sat) * lb + sat) +
+        floatArrayOf(0f, 0f, 0f, 1f, 0f)
+    androidx.compose.ui.graphics.ColorFilter.colorMatrix(androidx.compose.ui.graphics.ColorMatrix(m)).also { vibrancyCache = it }
 }
 
 /** Uygulama simgeleri için ince cam kenarı + üst parlama. */
